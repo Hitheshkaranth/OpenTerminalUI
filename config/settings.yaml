@@ -1,0 +1,18 @@
+app:
+  name: "OpenTerminalUI API"
+  environment: "local"
+  default_exchange_suffix: ".NS"
+
+data_sources:
+  market_data:
+    provider: "yfinance"
+    fallback_providers:
+      - "alpha_vantage"
+      - "polygon"
+  macro_data:
+    provider: "fred"
+
+storage:
+  raw_path: "data/raw"
+  processed_path: "data/processed"
+  cache_path: "data/cache"

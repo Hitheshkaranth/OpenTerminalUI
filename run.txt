@@ -1,0 +1,1 @@
+start "Trade_Screens Backend" cmd /k "cd /d C:\Users\hithe\Documents\SIDE_QUESTS\Trade_Screens && python -m uvicorn backend.main:app --host 127.0.0.1 --port 8010" && start "Trade_Screens Frontend" cmd /k "cd /d C:\Users\hithe\Documents\SIDE_QUESTS\Trade_Screens\frontend && set VITE_API_BASE_URL=http://127.0.0.1:8010/api && npm run dev -- --host 127.0.0.1 --port 5173"

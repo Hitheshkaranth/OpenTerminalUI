@@ -1,0 +1,17 @@
+default_alerts:
+  - name: "High Leverage"
+    field: "debt_to_market_cap"
+    op: ">="
+    threshold: 0.8
+    severity: "high"
+  - name: "Low Profitability"
+    field: "roe_pct"
+    op: "<="
+    threshold: 8.0
+    severity: "medium"
+  - name: "Rich Valuation"
+    field: "pe"
+    op: ">="
+    threshold: 35.0
+    severity: "medium"
+

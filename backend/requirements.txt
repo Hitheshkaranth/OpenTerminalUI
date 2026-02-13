@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+pandas
+numpy
+yfinance
+sqlalchemy
+pydantic
+PyYAML
+requests
+httpx
+h2
+redis
+apscheduler

@@ -1,0 +1,21 @@
+services:
+  openterminalui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: openterminalui:latest
+    container_name: openterminalui
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OPENTERMINALUI_PREFETCH_ENABLED: "${OPENTERMINALUI_PREFETCH_ENABLED:-${OPENSCREENS_PREFETCH_ENABLED:-0}}"
+      OPENTERMINALUI_SQLITE_URL: "${OPENTERMINALUI_SQLITE_URL:-${OPENSCREENS_SQLITE_URL:-sqlite:////data/openterminalui.db}}"
+    volumes:
+      - openterminalui_data:/data
+    restart: unless-stopped
+
+volumes:
+  openterminalui_data:

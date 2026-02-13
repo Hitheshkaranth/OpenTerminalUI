@@ -1,0 +1,39 @@
+value:
+  description: "Low valuation with baseline quality"
+  rules:
+    - field: pe
+      op: "<="
+      value: 25
+    - field: roe_pct
+      op: ">="
+      value: 12
+    - field: debt_to_market_cap
+      op: "<="
+      value: 0.8
+
+quality:
+  description: "High quality business profile"
+  rules:
+    - field: roe_pct
+      op: ">="
+      value: 15
+    - field: op_margin_pct
+      op: ">="
+      value: 12
+    - field: debt_to_market_cap
+      op: "<="
+      value: 0.5
+
+growth:
+  description: "Growth with positive profitability"
+  rules:
+    - field: rev_growth_pct
+      op: ">="
+      value: 10
+    - field: eps_growth_pct
+      op: ">="
+      value: 10
+    - field: net_margin_pct
+      op: ">="
+      value: 8
+
