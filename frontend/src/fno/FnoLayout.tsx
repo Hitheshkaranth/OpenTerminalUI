@@ -6,7 +6,6 @@ import { ErrorBoundary } from "../components/common/ErrorBoundary";
 import { StatusBar } from "../components/layout/StatusBar";
 import { TopBar } from "../components/layout/TopBar";
 import { useSettingsStore } from "../store/settingsStore";
-import { useStockStore } from "../store/stockStore";
 import { fetchExpiries } from "./api/fnoApi";
 import type { FnoContextValue } from "./types/fno";
 import { DEFAULT_FNO_SYMBOLS } from "./types/fno";
@@ -23,6 +22,8 @@ const LINKS = [
   { to: "/fno/expiry", label: "Expiry", key: "F8" },
   { to: "/fno/about", label: "About", key: "F9" },
 ] as const;
+const POPULAR_FNO_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"] as const;
+const FNO_SYMBOL_KEY = "fno:selectedSymbol";
 
 export function useFnoContext(): FnoContextValue {
   return useOutletContext<FnoContextValue>();
@@ -30,20 +31,30 @@ export function useFnoContext(): FnoContextValue {
 
 export function FnoLayout() {
   const [searchParams] = useSearchParams();
-  const [symbol, setSymbol] = useState<string>("NIFTY");
+  const [symbol, setSymbol] = useState<string>(() => {
+    try {
+      const raw = localStorage.getItem(FNO_SYMBOL_KEY);
+      const value = (raw || "NIFTY").trim().toUpperCase();
+      return value || "NIFTY";
+    } catch {
+      return "NIFTY";
+    }
+  });
   const [expiry, setExpiry] = useState<string>("");
   const symbolUniverse = useMemo(() => new Set((DEFAULT_FNO_SYMBOLS as readonly string[]).map((s) => s.toUpperCase())), []);
   const setSelectedCountry = useSettingsStore((s) => s.setSelectedCountry);
-  const setTicker = useStockStore((s) => s.setTicker);
 
   useEffect(() => {
     setSelectedCountry("IN");
   }, [setSelectedCountry]);
 
   useEffect(() => {
-    if (!symbol) return;
-    setTicker(symbol.toUpperCase());
-  }, [setTicker, symbol]);
+    try {
+      localStorage.setItem(FNO_SYMBOL_KEY, symbol.toUpperCase());
+    } catch {
+      // ignore local storage failures
+    }
+  }, [symbol]);
 
   useEffect(() => {
     const incoming = (searchParams.get("symbol") || searchParams.get("ticker") || "").trim().toUpperCase();
@@ -83,8 +94,8 @@ export function FnoLayout() {
   return (
     <div className="flex h-screen min-h-screen bg-terminal-bg text-terminal-text">
       <aside className="w-56 shrink-0 border-r border-terminal-border bg-terminal-panel p-0">
-        <div className="border-b border-terminal-border bg-terminal-accent px-3 py-2">
-          <img src={logo} alt="OpenTerminalUI" className="h-8 w-auto object-contain brightness-110" />
+        <div className="border-b border-terminal-border bg-terminal-panel px-3 py-2">
+          <img src={logo} alt="OpenTerminalUI" className="h-8 w-auto object-contain" />
         </div>
         <div className="border-b border-terminal-border px-3 py-2 text-[11px] text-terminal-muted">
           NSE F&O ANALYTICS
@@ -164,6 +175,18 @@ export function FnoLayout() {
               <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs">NSE F&O</div>
             </div>
           </div>
+          <div className="mt-2 flex flex-wrap items-center gap-1">
+            <span className="mr-1 text-[10px] uppercase tracking-wide text-terminal-muted">Popular Indices</span>
+            {POPULAR_FNO_INDICES.map((idx) => (
+              <button
+                key={idx}
+                className={`rounded border px-2 py-1 text-[11px] ${symbol === idx ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted hover:text-terminal-text"}`}
+                onClick={() => setSymbol(idx)}
+              >
+                {idx}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-3">
@@ -171,7 +194,7 @@ export function FnoLayout() {
             <Outlet context={ctx} />
           </ErrorBoundary>
         </div>
-        <StatusBar />
+        <StatusBar tickerOverride={symbol} />
       </div>
     </div>
   );

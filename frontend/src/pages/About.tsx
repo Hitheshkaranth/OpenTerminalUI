@@ -49,26 +49,42 @@ export function AboutPage() {
 
   return (
     <div className="space-y-3 p-3 font-mono">
-      <TerminalPanel title="Brand">
-        <div className="flex flex-col gap-2">
+      <TerminalPanel title="OpenTerminalUI">
+        <div className="flex items-center gap-3">
           <img src={logo} alt="OpenTerminalUI Logo" className="h-16 w-auto object-contain" />
-          <div className="text-xs text-terminal-muted">Analyze. Trade. Optimize.</div>
-        </div>
-      </TerminalPanel>
-      <TerminalPanel title="About OpenTerminalUI">
-        <div className="text-sm text-terminal-text">
-          OpenTerminalUI is an open-source NSE trading analytics workspace with two packs: Equity Analysis and Futures & Options.
+          <div className="text-xs text-terminal-muted">
+            Analyze. Trade. Optimize.
+            <div className="mt-1">Open-source NSE trading analytics workspace with Equity and F&O terminal packs.</div>
+          </div>
         </div>
       </TerminalPanel>
 
-      <TerminalPanel title="Project Packs">
-        <p className="mt-2 text-xs leading-relaxed text-terminal-text">
-          Equity pack covers stock search, charts, screener, fundamentals, DCF valuation, peers, portfolio/backtest, news and alerts. F&O pack covers option chain, Greeks, OI analysis, strategy builder, PCR, IV, heatmap and expiry dashboard.
-        </p>
-        <ul className="mt-2 space-y-1 text-xs text-terminal-muted">
-          <li>- FastAPI backend + React/TypeScript terminal UI.</li>
-          <li>- Realtime WebSocket streaming with REST fallback.</li>
-          <li>- Background services: instruments loader, news ingestor, PCR snapshots.</li>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <TerminalPanel title="Equity Pack">
+          <ul className="space-y-1 text-xs text-terminal-text">
+            <li>- Search, charting, screener and technical overlays.</li>
+            <li>- Fundamentals, DCF valuation and peer comparison.</li>
+            <li>- Portfolio/backtest workflows and alerts.</li>
+            <li>- News + sentiment linked to selected ticker.</li>
+          </ul>
+        </TerminalPanel>
+
+        <TerminalPanel title="F&O Pack">
+          <ul className="space-y-1 text-xs text-terminal-text">
+            <li>- Option chain, Greeks and OI analysis dashboards.</li>
+            <li>- Strategy builder with payoff views and presets.</li>
+            <li>- PCR, IV, heatmap and expiry workflows.</li>
+            <li>- Shared realtime chart engine + indicator framework.</li>
+          </ul>
+        </TerminalPanel>
+      </div>
+
+      <TerminalPanel title="Infrastructure">
+        <ul className="space-y-1 text-xs text-terminal-muted">
+          <li>- FastAPI backend + React/TypeScript terminal frontend.</li>
+          <li>- Realtime WebSocket quotes with REST fallback paths.</li>
+          <li>- Background services: instruments loader, news ingestion, snapshots.</li>
+          <li>- Caching layers and Docker-ready deployment model.</li>
         </ul>
       </TerminalPanel>
 
