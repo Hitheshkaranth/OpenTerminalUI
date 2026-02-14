@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import { searchSymbols } from "../../api/client";
 import { useMarketStatus } from "../../hooks/useStocks";
@@ -27,6 +27,7 @@ const COUNTRY_DEFAULT_MARKET: Record<CountryCode, MarketCode> = {
 };
 
 export function TopBar() {
+  const location = useLocation();
   const setTicker = useStockStore((s) => s.setTicker);
   const load = useStockStore((s) => s.load);
   const ticker = useStockStore((s) => s.ticker);
@@ -198,6 +199,7 @@ export function TopBar() {
     void handleLoad();
   }, [handleLoad, setTicker]);
   const safeTicker = (ticker || "NIFTY").toUpperCase();
+  const aboutPath = location.pathname.startsWith("/fno") ? "/fno/about" : "/equity/stocks/about";
 
   return (
     <div className="relative z-20 border-b border-terminal-border bg-terminal-panel">
@@ -237,7 +239,7 @@ export function TopBar() {
         <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/equity/screener">
           SCREENER
         </Link>
-        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/equity/stocks/about">
+        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={aboutPath}>
           ABOUT
         </Link>
         <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno?symbol=${encodeURIComponent(safeTicker)}`}>

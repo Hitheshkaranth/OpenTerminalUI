@@ -13,14 +13,15 @@ import { DEFAULT_FNO_SYMBOLS } from "./types/fno";
 import logo from "../assets/logo.png";
 
 const LINKS = [
-  { to: "/fno", label: "Option Chain" },
-  { to: "/fno/greeks", label: "Greeks" },
-  { to: "/fno/futures", label: "Futures" },
-  { to: "/fno/oi", label: "OI Analysis" },
-  { to: "/fno/strategy", label: "Strategy" },
-  { to: "/fno/pcr", label: "PCR" },
-  { to: "/fno/heatmap", label: "Heatmap" },
-  { to: "/fno/expiry", label: "Expiry" },
+  { to: "/fno", label: "Option Chain", key: "F1" },
+  { to: "/fno/greeks", label: "Greeks", key: "F2" },
+  { to: "/fno/futures", label: "Futures", key: "F3" },
+  { to: "/fno/oi", label: "OI Analysis", key: "F4" },
+  { to: "/fno/strategy", label: "Strategy", key: "F5" },
+  { to: "/fno/pcr", label: "PCR", key: "F6" },
+  { to: "/fno/heatmap", label: "Heatmap", key: "F7" },
+  { to: "/fno/expiry", label: "Expiry", key: "F8" },
+  { to: "/fno/about", label: "About", key: "F9" },
 ] as const;
 
 export function useFnoContext(): FnoContextValue {
@@ -81,18 +82,25 @@ export function FnoLayout() {
 
   return (
     <div className="flex h-screen min-h-screen bg-terminal-bg text-terminal-text">
-      <aside className="w-56 shrink-0 border-r border-terminal-border bg-terminal-panel">
-        <div className="border-b border-terminal-border px-3 py-3">
-          <img src={logo} alt="OpenTerminalUI" className="mb-2 h-10 w-auto object-contain" />
-          <NavLink to="/" className="text-xs text-terminal-accent hover:underline">
+      <aside className="w-56 shrink-0 border-r border-terminal-border bg-terminal-panel p-0">
+        <div className="border-b border-terminal-border bg-terminal-accent px-3 py-2">
+          <img src={logo} alt="OpenTerminalUI" className="h-8 w-auto object-contain brightness-110" />
+        </div>
+        <div className="border-b border-terminal-border px-3 py-2 text-[11px] text-terminal-muted">
+          NSE F&O ANALYTICS
+        </div>
+        <div className="space-y-1 border-b border-terminal-border px-2 py-2">
+          <NavLink to="/" className="block rounded px-2 py-1.5 text-xs text-terminal-accent hover:underline">
             Back to Home
           </NavLink>
-          <div className="mt-2">
-            <NavLink to={`/equity/stocks?ticker=${encodeURIComponent(symbol)}`} className="text-xs text-terminal-muted hover:text-terminal-text">
+          <div>
+            <NavLink
+              to={`/equity/stocks?ticker=${encodeURIComponent(symbol)}`}
+              className="block rounded px-2 py-1.5 text-xs text-terminal-muted hover:bg-terminal-bg hover:text-terminal-text"
+            >
               Switch to Equity {"->"}
             </NavLink>
           </div>
-          <div className="mt-2 text-[10px] uppercase tracking-wide text-terminal-muted">F&O Trading Desk</div>
         </div>
         <nav className="space-y-1 p-2 text-xs">
           {LINKS.map((link) => (
@@ -101,10 +109,13 @@ export function FnoLayout() {
               to={link.to}
               end={link.to === "/fno"}
               className={({ isActive }) =>
-                `block rounded px-2 py-2 ${isActive ? "bg-terminal-accent/20 text-terminal-accent" : "text-terminal-muted hover:bg-terminal-bg hover:text-terminal-text"}`
+                `flex items-center justify-between rounded px-2 py-2 ${
+                  isActive ? "bg-terminal-accent/20 text-terminal-accent" : "text-terminal-muted hover:bg-terminal-bg hover:text-terminal-text"
+                }`
               }
             >
-              {link.label}
+              <span>{link.label}</span>
+              <span className="text-[10px]">{link.key}</span>
             </NavLink>
           ))}
         </nav>

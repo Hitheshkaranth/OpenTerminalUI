@@ -19,6 +19,7 @@ import { StrategyPage } from "./fno/pages/StrategyPage";
 import { PCRPage } from "./fno/pages/PCRPage";
 import { HeatmapPage } from "./fno/pages/HeatmapPage";
 import { ExpiryPage } from "./fno/pages/ExpiryPage";
+import { FnoAboutPage } from "./fno/pages/AboutPage";
 
 function App() {
   return (
@@ -46,6 +47,7 @@ function App() {
         <Route path="pcr" element={<PCRPage />} />
         <Route path="heatmap" element={<HeatmapPage />} />
         <Route path="expiry" element={<ExpiryPage />} />
+        <Route path="about" element={<FnoAboutPage />} />
       </Route>
 
       <Route path="/stocks" element={<Navigate to="/equity/stocks" replace />} />
