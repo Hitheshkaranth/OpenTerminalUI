@@ -7,6 +7,7 @@ import { useSettingsStore } from "../../store/settingsStore";
 import { useStockStore } from "../../store/stockStore";
 import { COUNTRY_MARKETS } from "../../types";
 import type { CountryCode, MarketCode } from "../../types";
+import logo from "../../assets/logo.png";
 
 type DisplayCurrency = "INR" | "USD";
 
@@ -228,6 +229,7 @@ export function TopBar() {
         <div>CTRL+K COMMAND | / SEARCH</div>
       </div>
       <div className="relative flex items-center gap-2 px-3 py-1.5">
+        <img src={logo} alt="OpenTerminalUI" className="h-7 w-auto object-contain" />
         <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/">
           HOME
         </Link>
@@ -339,3 +341,4 @@ export function TopBar() {
     </div>
   );
 }
+

@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchExpiries } from "./api/fnoApi";
 import type { FnoContextValue } from "./types/fno";
 import { DEFAULT_FNO_SYMBOLS } from "./types/fno";
+import logo from "../assets/logo.png";
 
 const LINKS = [
   { to: "/fno", label: "Option Chain" },
@@ -56,12 +57,13 @@ export function FnoLayout() {
     <div className="flex h-full min-h-0">
       <aside className="w-56 shrink-0 border-r border-terminal-border bg-terminal-panel">
         <div className="border-b border-terminal-border px-3 py-3">
+          <img src={logo} alt="OpenTerminalUI" className="mb-2 h-10 w-auto object-contain" />
           <NavLink to="/" className="text-xs text-terminal-accent hover:underline">
             Back to Home
           </NavLink>
           <div className="mt-2">
             <NavLink to={`/equity/stocks?ticker=${encodeURIComponent(symbol)}`} className="text-xs text-terminal-muted hover:text-terminal-text">
-              Switch to Equity ?
+              Switch to Equity {"->"}
             </NavLink>
           </div>
           <div className="mt-2 text-[10px] uppercase tracking-wide text-terminal-muted">F&O Trading Desk</div>

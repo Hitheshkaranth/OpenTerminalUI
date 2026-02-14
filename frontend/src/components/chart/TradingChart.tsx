@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ColorType,
   PriceScaleMode,
+  CandlestickSeries,
+  LineSeries,
+  AreaSeries,
+  HistogramSeries,
   createChart,
   type IPriceLine,
   type IChartApi,
@@ -222,7 +226,7 @@ export function TradingChart({
         pinch: true,
       },
     });
-    const candles = chart.addCandlestickSeries({
+    const candles = chart.addSeries(CandlestickSeries, {
       upColor: "#26a69a",
       downColor: "#ef5350",
       borderVisible: false,
@@ -230,18 +234,18 @@ export function TradingChart({
       wickDownColor: "#ef5350",
       visible: mode === "candles",
     });
-    const line = chart.addLineSeries({
+    const line = chart.addSeries(LineSeries, {
       color: "#ff9f1a",
       lineWidth: 2,
       visible: mode === "line",
     });
-    const area = chart.addAreaSeries({
+    const area = chart.addSeries(AreaSeries, {
       lineColor: "#ff9f1a",
       topColor: "#ff9f1a55",
       bottomColor: "#ff9f1a12",
       visible: mode === "area",
     });
-    const volume = chart.addHistogramSeries({
+    const volume = chart.addSeries(HistogramSeries, {
       priceScaleId: "",
       color: "#ff9f1a",
       priceFormat: { type: "volume" },
@@ -428,7 +432,7 @@ export function TradingChart({
         }
       }
       for (const key of Array.from(keys)) {
-        const line = chart.addLineSeries({
+        const line = chart.addSeries(LineSeries, {
           color: palette[colorIdx % palette.length],
           lineWidth: key === "middle" ? 2 : 1,
         });
@@ -463,7 +467,7 @@ export function TradingChart({
         if (drawing.p1.time === drawing.p2.time) {
           continue;
         }
-        const line = chart.addLineSeries({
+        const line = chart.addSeries(LineSeries, {
           color: "#ffd166",
           lineWidth: 2,
           lastValueVisible: false,

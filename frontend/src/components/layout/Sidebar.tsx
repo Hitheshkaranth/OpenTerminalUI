@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useStockStore } from "../../store/stockStore";
+import logo from "../../assets/logo.png";
 
 export function Sidebar() {
   const ticker = useStockStore((s) => s.ticker);
@@ -15,8 +16,8 @@ export function Sidebar() {
 
   return (
     <aside className="relative z-30 w-48 shrink-0 border-r border-terminal-border bg-terminal-panel p-0">
-      <div className="border-b border-terminal-border bg-terminal-accent px-3 py-2 text-xs font-semibold uppercase tracking-wider text-black">
-        OpenTerminalUI
+      <div className="border-b border-terminal-border bg-terminal-panel px-3 py-2">
+        <img src={logo} alt="OpenTerminalUI" className="h-8 w-auto object-contain" />
       </div>
       <div className="border-b border-terminal-border px-3 py-2 text-[11px] text-terminal-muted">
         NSE EQUITY ANALYTICS
@@ -29,7 +30,7 @@ export function Sidebar() {
           to={`/fno?symbol=${encodeURIComponent((ticker || "NIFTY").toUpperCase())}`}
           className="block rounded px-2 py-2 text-terminal-muted hover:bg-terminal-bg hover:text-terminal-text"
         >
-          Switch To F&O →
+          Switch To F&O {"->"}
         </NavLink>
       </div>
       <nav className="space-y-1 p-2 text-xs">
@@ -53,3 +54,4 @@ export function Sidebar() {
     </aside>
   );
 }
+

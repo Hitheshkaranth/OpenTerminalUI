@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { TerminalBadge } from "../components/terminal/TerminalBadge";
 import { TerminalButton } from "../components/terminal/TerminalButton";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
+import logo from "../assets/logo.png";
 
 const REPO_URL = "https://github.com/Hitheshkaranth/OpenTerminalUI";
 
@@ -48,20 +49,26 @@ export function AboutPage() {
 
   return (
     <div className="space-y-3 p-3 font-mono">
+      <TerminalPanel title="Brand">
+        <div className="flex flex-col gap-2">
+          <img src={logo} alt="OpenTerminalUI Logo" className="h-16 w-auto object-contain" />
+          <div className="text-xs text-terminal-muted">Analyze. Trade. Optimize.</div>
+        </div>
+      </TerminalPanel>
       <TerminalPanel title="About OpenTerminalUI">
         <div className="text-sm text-terminal-text">
-          OpenTerminalUI is a terminal-first equities workspace for screening, charting, financial analysis, and monitoring market signals in one dense interface.
+          OpenTerminalUI is an open-source NSE trading analytics workspace with two packs: Equity Analysis and Futures & Options.
         </div>
       </TerminalPanel>
 
-      <TerminalPanel title="Why It Was Built">
+      <TerminalPanel title="Project Packs">
         <p className="mt-2 text-xs leading-relaxed text-terminal-text">
-          It was built to cut context switching between scattered finance tools and deliver a fast, keyboard-friendly command center for tracking symbols, reading fundamentals, and acting on data with minimal UI overhead.
+          Equity pack covers stock search, charts, screener, fundamentals, DCF valuation, peers, portfolio/backtest, news and alerts. F&O pack covers option chain, Greeks, OI analysis, strategy builder, PCR, IV, heatmap and expiry dashboard.
         </p>
         <ul className="mt-2 space-y-1 text-xs text-terminal-muted">
-          <li>- Terminal density with clear signal over decoration.</li>
-          <li>- Unified workflows across quote, chart, screener, portfolio, and news.</li>
-          <li>- Market-aware state, caching, and realtime/polling behavior designed for active sessions.</li>
+          <li>- FastAPI backend + React/TypeScript terminal UI.</li>
+          <li>- Realtime WebSocket streaming with REST fallback.</li>
+          <li>- Background services: instruments loader, news ingestor, PCR snapshots.</li>
         </ul>
       </TerminalPanel>
 

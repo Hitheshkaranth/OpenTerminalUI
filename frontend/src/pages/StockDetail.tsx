@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQueries } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
-import { fetchIndicator, fetchQuotesBatch } from "../api/client";
+import { fetchQuotesBatch } from "../api/client";
 import { OverviewPanel } from "../components/analysis/OverviewPanel";
 import { PeersComparison } from "../components/analysis/PeersComparison";
 import { FinancialsTable } from "../components/analysis/FinancialsTable";
@@ -13,36 +12,43 @@ import { QuarterlyReportsSection } from "../components/analysis/QuarterlyReports
 import { ScoreCard } from "../components/analysis/ScoreCard";
 import { ShareholdingChart } from "../components/analysis/ShareholdingChart";
 import { ValuationPanel } from "../components/analysis/ValuationPanel";
-import { ChartToolbar } from "../components/chart/ChartToolbar";
-import { DrawingTools, type DrawMode } from "../components/chart/DrawingTools";
-import { IndicatorPanel, type IndicatorId } from "../components/chart/IndicatorPanel";
-import { TimeframeSelector } from "../components/chart/TimeframeSelector";
-import { TradingChart } from "../components/chart/TradingChart";
 import { FuturesPanel } from "../components/market/FuturesPanel";
 import { TerminalBadge } from "../components/terminal/TerminalBadge";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { useFinancials, useStock, useStockHistory, useStockReturns } from "../hooks/useStocks";
 import { useDisplayCurrency } from "../hooks/useDisplayCurrency";
 import { useQuotesStore, useQuotesStream } from "../realtime/useQuotesStream";
+import { ChartEngine } from "../shared/chart/ChartEngine";
+import { SharedChartToolbar } from "../shared/chart/ChartToolbar";
+import { IndicatorPanel } from "../shared/chart/IndicatorPanel";
+import { chartPointsToBars } from "../shared/chart/chartUtils";
+import type { ChartKind, ChartTimeframe, IndicatorConfig } from "../shared/chart/types";
 import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
-import type { IndicatorResponse } from "../types";
 
-type ChartMode = "candles" | "line" | "area";
 type TabId = "overview" | "financials" | "analysis" | "peers" | "valuation";
 
-const INDICATOR_CONFIG: Record<IndicatorId, { apiType: string; params: Record<string, number> }> = {
-  sma20: { apiType: "sma", params: { period: 20 } },
-  sma50: { apiType: "sma", params: { period: 50 } },
-  sma200: { apiType: "sma", params: { period: 200 } },
-  ema20: { apiType: "ema", params: { period: 20 } },
-  ema50: { apiType: "ema", params: { period: 50 } },
-  bollinger_bands: { apiType: "bollinger_bands", params: { period: 20, std_dev: 2 } },
-  rsi: { apiType: "rsi", params: { period: 14 } },
-  macd: { apiType: "macd", params: { fast: 12, slow: 26, signal: 9 } },
-  volume: { apiType: "volume", params: {} },
-  atr: { apiType: "atr", params: { period: 14 } },
+const TIMEFRAME_TO_INTERVAL: Record<ChartTimeframe, { interval: string; range: string }> = {
+  "1m": { interval: "1m", range: "5d" },
+  "5m": { interval: "5m", range: "1mo" },
+  "15m": { interval: "15m", range: "1mo" },
+  "1h": { interval: "1h", range: "3mo" },
+  "4h": { interval: "1h", range: "6mo" },
+  "1D": { interval: "1d", range: "1y" },
+  "1W": { interval: "1wk", range: "5y" },
+  "1M": { interval: "1mo", range: "max" },
 };
+
+function intervalToTimeframe(interval: string): ChartTimeframe {
+  const value = interval.toLowerCase();
+  if (value === "1m") return "1m";
+  if (value === "5m") return "5m";
+  if (value === "15m") return "15m";
+  if (value === "1h") return "1h";
+  if (value === "1wk") return "1W";
+  if (value === "1mo") return "1M";
+  return "1D";
+}
 
 export function StockDetailPage() {
   const { ticker, interval, range, setInterval, setRange } = useStockStore();
@@ -51,16 +57,14 @@ export function StockDetailPage() {
   const { subscribe, unsubscribe, isConnected, connectionState } = useQuotesStream(selectedMarket);
   const ticksByToken = useQuotesStore((s) => s.ticksByToken);
 
-  const [mode, setMode] = useState<ChartMode>("candles");
-  const [selectedIndicators, setSelectedIndicators] = useState<IndicatorId[]>([]);
+  const [chartType, setChartType] = useState<ChartKind>("candle");
+  const [showIndicators, setShowIndicators] = useState(true);
+  const [selectedIndicators, setSelectedIndicators] = useState<IndicatorConfig[]>([]);
+  const [crosshair, setCrosshair] = useState<{ open: number; high: number; low: number; close: number; time: number } | null>(null);
+  const [realtimeTick, setRealtimeTick] = useState<{ ltp: number; change_pct: number } | null>(null);
   const [tab, setTab] = useState<TabId>("overview");
   const [financialPeriod, setFinancialPeriod] = useState<"annual" | "quarterly">("annual");
   const [showVolume, setShowVolume] = useState(true);
-  const [showHighLow, setShowHighLow] = useState(true);
-  const [logarithmic, setLogarithmic] = useState(false);
-  const [drawMode, setDrawMode] = useState<DrawMode>("none");
-  const [clearDrawingsSignal, setClearDrawingsSignal] = useState(0);
-  const [pendingTrendPoint, setPendingTrendPoint] = useState(false);
   const [snapshotTick, setSnapshotTick] = useState<{ ltp: number; change: number; change_pct: number } | null>(null);
 
   const { data: stock } = useStock(ticker);
@@ -100,25 +104,26 @@ export function StockDetailPage() {
     };
   }, [selectedMarket, ticker]);
 
-  const indicatorQueries = useQueries({
-    queries: selectedIndicators.map((id) => ({
-      queryKey: ["indicator", ticker, id, interval, range, INDICATOR_CONFIG[id]],
-      queryFn: () => fetchIndicator(ticker, INDICATOR_CONFIG[id].apiType, interval, range, INDICATOR_CONFIG[id].params),
-      enabled: Boolean(ticker),
-      staleTime: 60 * 1000,
-    })),
-  });
+  useEffect(() => {
+    const storageKey = `chart:indicators:${ticker.toUpperCase()}`;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as IndicatorConfig[];
+      if (Array.isArray(parsed)) setSelectedIndicators(parsed);
+    } catch {
+      // ignore bad local storage payloads
+    }
+  }, [ticker]);
 
-  const overlays = useMemo(() => {
-    const map: Record<string, IndicatorResponse | undefined> = {};
-    selectedIndicators.forEach((id, index) => {
-      const payload = indicatorQueries[index]?.data;
-      if (payload?.data?.length) {
-        map[id] = payload;
-      }
-    });
-    return map;
-  }, [indicatorQueries, selectedIndicators]);
+  useEffect(() => {
+    const storageKey = `chart:indicators:${ticker.toUpperCase()}`;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(selectedIndicators));
+    } catch {
+      // ignore storage write failure
+    }
+  }, [selectedIndicators, ticker]);
 
   const stockForOverview = useMemo(
     () => ({
@@ -142,9 +147,9 @@ export function StockDetailPage() {
   const derivedChangeFromSnapshot =
     latestPrice !== null && changePct !== null && changePct > -100 ? latestPrice - latestPrice / (1 + changePct / 100) : null;
   const liveTick = ticker ? ticksByToken[`${selectedMarket}:${ticker.toUpperCase()}`] : undefined;
-  const displayedLatestPrice = liveTick?.ltp ?? snapshotTick?.ltp ?? latestPrice;
+  const displayedLatestPrice = realtimeTick?.ltp ?? liveTick?.ltp ?? snapshotTick?.ltp ?? latestPrice;
   const displayedChange = liveTick?.change ?? snapshotTick?.change ?? derivedChangeFromSnapshot;
-  const displayedChangePct = liveTick?.change_pct ?? snapshotTick?.change_pct ?? changePct;
+  const displayedChangePct = realtimeTick?.change_pct ?? liveTick?.change_pct ?? snapshotTick?.change_pct ?? changePct;
   const moveClass =
     displayedChangePct === null
       ? "text-terminal-muted"
@@ -157,6 +162,15 @@ export function StockDetailPage() {
       : `${displayedChange >= 0 ? "+" : ""}${displayedChange.toFixed(2)}`;
   const changePctText =
     displayedChangePct === null ? "-" : `${displayedChangePct >= 0 ? "+" : ""}${displayedChangePct.toFixed(2)}%`;
+  const timeframe = intervalToTimeframe(interval);
+  const ohlcForToolbar =
+    crosshair ??
+    (chart?.data?.length
+      ? (() => {
+          const last = chart.data[chart.data.length - 1];
+          return { open: last.o, high: last.h, low: last.l, close: last.c, time: last.t };
+        })()
+      : null);
 
   if (!ticker) return <div className="p-8 text-center text-terminal-muted">Select a stock to view details.</div>;
 
@@ -164,36 +178,37 @@ export function StockDetailPage() {
     <div className="relative h-full space-y-3 overflow-y-auto px-3 py-2">
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_220px]">
         <div className="space-y-3">
-          <TerminalPanel className="rounded-sm" bodyClassName="px-2 py-1.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-            <TimeframeSelector interval={interval} onChange={(i, r) => { setInterval(i); setRange(r); }} />
-            <ChartToolbar
-              mode={mode}
-              onModeChange={setMode}
-              showVolume={showVolume}
-              onToggleVolume={() => setShowVolume((v) => !v)}
-              showHighLow={showHighLow}
-              onToggleHighLow={() => setShowHighLow((v) => !v)}
-              logarithmic={logarithmic}
-              onToggleLogarithmic={() => setLogarithmic((v) => !v)}
-            />
-            </div>
-          </TerminalPanel>
+          <SharedChartToolbar
+            symbol={ticker}
+            ltp={displayedLatestPrice}
+            changePct={displayedChangePct}
+            ohlc={ohlcForToolbar}
+            timeframe={timeframe}
+            onTimeframeChange={(tf) => {
+              const next = TIMEFRAME_TO_INTERVAL[tf];
+              setInterval(next.interval);
+              setRange(next.range);
+            }}
+            chartType={chartType}
+            onChartTypeChange={setChartType}
+            showIndicators={showIndicators}
+            onToggleIndicators={() => setShowIndicators((v) => !v)}
+          />
           <div className="h-[calc(100vh-280px)] min-h-[350px] rounded border border-terminal-border bg-terminal-panel p-1">
             {isChartLoading ? (
               <div className="flex h-full items-center justify-center text-terminal-muted">Loading chart...</div>
             ) : chart?.data?.length ? (
-              <TradingChart
-                ticker={ticker}
-                data={chart.data}
-                mode={mode}
-                overlays={overlays}
+              <ChartEngine
+                symbol={ticker}
+                timeframe={timeframe}
+                historicalData={chartPointsToBars(chart.data)}
+                market={selectedMarket}
+                activeIndicators={selectedIndicators}
+                chartType={chartType}
                 showVolume={showVolume}
-                showHighLow={showHighLow}
-                logarithmic={logarithmic}
-                drawMode={drawMode}
-                clearDrawingsSignal={clearDrawingsSignal}
-                onPendingTrendPointChange={setPendingTrendPoint}
+                enableRealtime={true}
+                onCrosshairOHLC={setCrosshair}
+                onTick={setRealtimeTick}
               />
             ) : (
               <div className="flex h-full items-center justify-center text-terminal-muted">
@@ -215,21 +230,15 @@ export function StockDetailPage() {
                 LIVE
               </span>
               <TerminalBadge variant={isConnected ? "live" : "mock"}>{connectionState.toUpperCase()}</TerminalBadge>
+              <button
+                className={`rounded border px-2 py-0.5 text-[11px] ${showVolume ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted"}`}
+                onClick={() => setShowVolume((v) => !v)}
+              >
+                VOLUME
+              </button>
             </div>
           </TerminalPanel>
-          <IndicatorPanel
-            selected={selectedIndicators}
-            onToggle={(id) => setSelectedIndicators((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
-          />
-          <DrawingTools
-            mode={drawMode}
-            onModeChange={setDrawMode}
-            pendingTrendPoint={pendingTrendPoint}
-            onClear={() => {
-              setPendingTrendPoint(false);
-              setClearDrawingsSignal((v) => v + 1);
-            }}
-          />
+          {showIndicators && <IndicatorPanel symbol={ticker} activeIndicators={selectedIndicators} onChange={setSelectedIndicators} />}
           <FuturesPanel />
         </div>
       </div>
