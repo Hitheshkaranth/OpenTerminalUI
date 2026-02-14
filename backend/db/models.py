@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Float, Integer, String, UniqueConstraint
+from sqlalchemy import Float, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.database import Base
@@ -83,3 +83,17 @@ class NewsArticle(Base):
     sentiment_label: Mapped[str | None] = mapped_column(String(16), nullable=True)
     sentiment_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())
+
+
+class BacktestRun(Base):
+    __tablename__ = "backtest_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    run_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
+    request_json: Mapped[str] = mapped_column(Text)
+    result_json: Mapped[str] = mapped_column(Text, default="")
+    logs: Mapped[str] = mapped_column(Text, default="")
+    error: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())
+    updated_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())

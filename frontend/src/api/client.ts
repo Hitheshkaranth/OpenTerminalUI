@@ -349,3 +349,60 @@ export async function runBacktest(payload: BacktestPayload): Promise<BacktestRes
   const { data } = await api.post<BacktestResponse>("/backtest/run", payload, { timeout: 120000 });
   return data;
 }
+
+export type BacktestJobSubmitPayload = {
+  symbol: string;
+  market: string;
+  start?: string;
+  end?: string;
+  limit?: number;
+  strategy: string;
+  context?: Record<string, unknown>;
+  config?: Record<string, unknown>;
+};
+
+export type BacktestJobStatus = {
+  run_id: string;
+  status: "queued" | "running" | "done" | "failed" | "not_found";
+};
+
+export type BacktestJobResult = {
+  run_id: string;
+  status: "queued" | "running" | "done" | "failed";
+  result?: {
+    symbol: string;
+    bars: number;
+    total_return: number;
+    max_drawdown: number;
+    sharpe: number;
+    trades: Array<{ date: string; action: string; quantity: number; price: number }>;
+    equity_curve: Array<{
+      date: string;
+      open: number;
+      high: number;
+      low: number;
+      close: number;
+      equity: number;
+      signal: number;
+      cash: number;
+      position: number;
+    }>;
+  } | null;
+  logs?: string;
+  error?: string;
+};
+
+export async function submitBacktestJob(payload: BacktestJobSubmitPayload): Promise<BacktestJobStatus> {
+  const { data } = await api.post<BacktestJobStatus>("/backtests", payload);
+  return data;
+}
+
+export async function fetchBacktestJobStatus(runId: string): Promise<BacktestJobStatus> {
+  const { data } = await api.get<BacktestJobStatus>(`/backtests/${encodeURIComponent(runId)}/status`);
+  return data;
+}
+
+export async function fetchBacktestJobResult(runId: string): Promise<BacktestJobResult> {
+  const { data } = await api.get<BacktestJobResult>(`/backtests/${encodeURIComponent(runId)}/result`);
+  return data;
+}

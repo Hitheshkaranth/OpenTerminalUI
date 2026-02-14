@@ -163,6 +163,31 @@ npm run dev -- --host 127.0.0.1 --port 5173
 - API docs: `http://127.0.0.1:8010/docs`
 - Health: `http://127.0.0.1:8010/health`
 
+## Developer verify gates
+
+Use the standard local gate before handing off changes:
+
+```bash
+make gate
+```
+
+Makefile targets:
+
+- `make test-backend` -> `cd backend && source .venv/bin/activate && python -m compileall . && pytest -q`
+- `make build-frontend` -> `cd frontend && npm run build`
+- `make gate` -> runs backend checks and frontend production build
+
+PowerShell equivalent commands:
+
+```powershell
+if (Test-Path backend\.venv\Scripts\Activate.ps1) { . backend\.venv\Scripts\Activate.ps1 }
+Set-Location backend
+python -m compileall .
+pytest -q
+Set-Location ..\frontend
+npm.cmd run build
+```
+
 ## Manual Docker run (alternative to compose)
 
 ```bash

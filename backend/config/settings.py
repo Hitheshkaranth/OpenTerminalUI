@@ -20,7 +20,7 @@ class AppSettings(BaseModel):
             "http://127.0.0.1:5174",
         ]
     )
-    sqlite_url: str = "sqlite:///./backend/openterminalui.db"
+    sqlite_url: str = "sqlite:///backend/openterminalui.db"
     price_cache_ttl_seconds: int = 60
     fundamentals_cache_ttl_seconds: int = 1800
 
@@ -54,6 +54,7 @@ def _env(name: str, legacy_name: str | None = None) -> str | None:
 @lru_cache(maxsize=1)
 def get_settings() -> AppSettings:
     base = Path(__file__).resolve().parents[2]
+    default_sqlite = f"sqlite:///{(base / 'backend' / 'openterminalui.db').resolve().as_posix()}"
     settings_path = base / "config" / "settings.yaml"
     legacy_path = base.parent / "config" / "settings.yaml"
     payload: dict[str, Any] = {}
@@ -81,7 +82,7 @@ def get_settings() -> AppSettings:
         sqlite_url=(
             _env("OPENTERMINALUI_SQLITE_URL")
             or _env("OPENSCREENS_SQLITE_URL", "TRADE_SCREENS_SQLITE_URL")
-            or payload.get("sqlite_url", "sqlite:///./backend/openterminalui.db")
+            or payload.get("sqlite_url", default_sqlite)
         ),
         price_cache_ttl_seconds=int(
             _env("OPENTERMINALUI_PRICE_CACHE_TTL_SECONDS")

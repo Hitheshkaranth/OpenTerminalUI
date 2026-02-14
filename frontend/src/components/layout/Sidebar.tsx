@@ -12,6 +12,7 @@ export function Sidebar() {
     { label: "News", path: "/equity/news", key: "F5" },
     { label: "Settings", path: "/equity/settings", key: "F6" },
     { label: "About", path: "/equity/stocks/about", key: "F7" },
+    { label: "Backtesting", path: "/backtesting", key: "F8" },
   ];
 
   return (

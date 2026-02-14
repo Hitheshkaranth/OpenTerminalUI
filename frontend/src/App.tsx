@@ -8,6 +8,8 @@ import { SettingsPage } from "./pages/Settings";
 import { StockDetailPage } from "./pages/StockDetail";
 import { WatchlistPage } from "./pages/Watchlist";
 import { NewsPage } from "./pages/News";
+import { BacktestingPage } from "./pages/Backtesting";
+import { BacktestingLayout } from "./pages/BacktestingLayout";
 import { EquityLayout } from "./equity/EquityLayout";
 import { HomePage } from "./home/HomePage";
 import { FnoLayout } from "./fno/FnoLayout";
@@ -48,6 +50,10 @@ function App() {
         <Route path="heatmap" element={<HeatmapPage />} />
         <Route path="expiry" element={<ExpiryPage />} />
         <Route path="about" element={<FnoAboutPage />} />
+      </Route>
+
+      <Route path="/backtesting" element={<BacktestingLayout />}>
+        <Route index element={<BacktestingPage />} />
       </Route>
 
       <Route path="/stocks" element={<Navigate to="/equity/stocks" replace />} />
