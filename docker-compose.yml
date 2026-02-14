@@ -1,5 +1,5 @@
 services:
-  openterminalui:
+  backend:
     build:
       context: .
       dockerfile: Dockerfile
@@ -7,14 +7,38 @@ services:
     container_name: openterminalui
     ports:
       - "8000:8000"
-    env_file:
-      - path: .env
-        required: false
     environment:
+      FMP_API_KEY: "${FMP_API_KEY:-}"
+      FINNHUB_API_KEY: "${FINNHUB_API_KEY:-}"
+      KITE_API_KEY: "${KITE_API_KEY:-}"
+      KITE_API_SECRET: "${KITE_API_SECRET:-}"
+      KITE_ACCESS_TOKEN: "${KITE_ACCESS_TOKEN:-}"
+      REDIS_URL: "${REDIS_URL:-}"
       OPENTERMINALUI_PREFETCH_ENABLED: "${OPENTERMINALUI_PREFETCH_ENABLED:-${OPENSCREENS_PREFETCH_ENABLED:-0}}"
       OPENTERMINALUI_SQLITE_URL: "${OPENTERMINALUI_SQLITE_URL:-${OPENSCREENS_SQLITE_URL:-sqlite:////data/openterminalui.db}}"
+      OPENTERMINALUI_CORS_ORIGINS: "${OPENTERMINALUI_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}"
     volumes:
       - openterminalui_data:/data
+    develop:
+      watch:
+        - action: rebuild
+          path: ./Dockerfile
+        - action: rebuild
+          path: ./backend
+        - action: rebuild
+          path: ./frontend
+        - action: rebuild
+          path: ./config
+        - action: rebuild
+          path: ./data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: openterminalui-redis
+    profiles: ["redis"]
+    ports:
+      - "6379:6379"
     restart: unless-stopped
 
 volumes:

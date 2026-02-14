@@ -18,8 +18,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from backend.api.routes import admin, alerts, backtest, chart, fundamentals, health, kite, news, peers, portfolio, quotes, reports, screener, search, stocks, valuation
+from backend.api.routes import admin, alerts, backtest, chart, fundamentals, futures, health, kite, news, peers, portfolio, quotes, reports, screener, search, stocks, stream, valuation
 from backend.api.deps import shutdown_unified_fetcher
+from backend.services.cache import cache as cache_instance
+from backend.services.instruments_loader import get_instruments_loader
+from backend.services.marketdata_hub import get_marketdata_hub
+from backend.services.news_ingestor import get_news_ingestor
 from backend.services.prefetch_worker import get_prefetch_worker
 from backend.config.settings import get_settings
 from backend.db.database import init_db
@@ -31,6 +35,8 @@ settings = get_settings()
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
 _prefetch_worker = None
+_instruments_loader = None
+_news_ingestor = None
 _prefetch_enabled = (
     os.getenv("OPENTERMINALUI_PREFETCH_ENABLED")
     or os.getenv("OPENSCREENS_PREFETCH_ENABLED")
@@ -80,6 +86,8 @@ app.include_router(news.router, prefix="/api", tags=["news"])
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(kite.router, prefix="/api", tags=["kite"])
 app.include_router(admin.router, prefix="/api", tags=["admin"])
+app.include_router(stream.router, prefix="/api", tags=["stream"])
+app.include_router(futures.router, prefix="/api", tags=["futures"])
 
 
 @app.on_event("startup")
@@ -87,31 +95,92 @@ async def on_startup() -> None:
     _install_windows_loop_exception_filter()
     init_db()
     
-    global _prefetch_worker
+    global _prefetch_worker, _instruments_loader, _news_ingestor
     from backend.api.deps import get_unified_fetcher
     fetcher = await get_unified_fetcher()
     _prefetch_worker = get_prefetch_worker(fetcher)
+    _instruments_loader = get_instruments_loader()
+    _news_ingestor = get_news_ingestor()
     
     if _prefetch_enabled:
         await _prefetch_worker.start()
+    if _instruments_loader:
+        await _instruments_loader.start()
+    if _news_ingestor:
+        await _news_ingestor.start()
+
+    await get_marketdata_hub().start()
 
 
 @app.on_event("shutdown")
 async def on_shutdown() -> None:
+    await get_marketdata_hub().shutdown()
+    if _news_ingestor:
+        await _news_ingestor.stop()
+    if _instruments_loader:
+        await _instruments_loader.stop()
     if _prefetch_enabled and _prefetch_worker:
         await _prefetch_worker.stop()
     await shutdown_unified_fetcher()
 
 
-@app.get("/health")
+@app.get("/health", tags=["health"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/healthz", tags=["health"])
+async def healthz() -> dict[str, object]:
+    redis_status = "disabled"
+    if cache_instance.redis_url:
+        redis_status = "disabled"
+        if cache_instance._redis is not None:
+            try:
+                await cache_instance._redis.ping()
+                redis_status = "ok"
+            except Exception:
+                redis_status = "disabled"
+
+    sqlite_status = "ok"
+    try:
+        if cache_instance._db_conn is None:
+            sqlite_status = "disabled"
+        else:
+            cache_instance._db_conn.execute("SELECT 1")
+    except Exception:
+        sqlite_status = "disabled"
+
+    return {
+        "status": "ok",
+        "cache": {
+            "mem": "ok",
+            "redis": redis_status,
+            "sqlite": sqlite_status,
+        },
+    }
+
+
+@app.get("/metrics-lite", tags=["health"])
+async def metrics_lite() -> dict[str, object]:
+    hub = get_marketdata_hub()
+    ws_metrics = await hub.metrics_snapshot()
+    news_status = _news_ingestor.status_snapshot() if _news_ingestor else {
+        "last_news_ingest_at": None,
+        "last_news_ingest_status": "not_initialized",
+    }
+    return {
+        "ws_connected_clients": ws_metrics.get("ws_connected_clients", 0),
+        "ws_subscriptions": ws_metrics.get("ws_subscriptions", 0),
+        "last_news_ingest_at": news_status.get("last_news_ingest_at"),
+        "last_news_ingest_status": news_status.get("last_news_ingest_status"),
+        "last_kite_stream_status": hub.kite_stream_status(),
+    }
 
 
 _frontend_dist = Path(__file__).resolve().parents[1] / "frontend" / "dist"
 
 
-@app.get("/{full_path:path}")
+@app.get("/{full_path:path}", include_in_schema=False)
 def spa_entry(full_path: str) -> FileResponse:
     if not _frontend_dist.exists():
         raise HTTPException(status_code=404, detail="Frontend bundle not found")

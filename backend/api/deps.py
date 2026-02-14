@@ -4,6 +4,7 @@ import asyncio
 import logging
 from typing import Any, Generator
 
+from backend.core.ttl_policy import market_open_now, ttl_seconds
 from backend.core.unified_fetcher import UnifiedFetcher
 from backend.db.database import SessionLocal
 from backend.services.cache import cache as cache_instance
@@ -69,12 +70,11 @@ async def fetch_stock_snapshot_coalesced(ticker: str) -> dict[str, Any]:
     try:
         data = await fetcher.fetch_stock_snapshot(symbol)
         if data:
-            # Cache it
-            # User requirement: "Smart TTL based on market hours" - handled in cache.ttl_for?
-            # cache.py didn't implement ttl_for explicitly in my overwrite, I must add it or use hardcoded.
-            # I can rely on a default or add logic here.
-            # Let's use 60s for snapshot as safe default, or better 15 mins if market closed.
-            await cache_instance.set(cache_key, data, ttl=60)
+            await cache_instance.set(
+                cache_key,
+                data,
+                ttl=ttl_seconds("snapshot", market_open_now()),
+            )
         return data
     except Exception as e:
         logger.error(f"Snapshot fetch failed for {symbol}: {e}")

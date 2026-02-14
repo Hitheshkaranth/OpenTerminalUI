@@ -11,6 +11,7 @@ import {
   fetchPeers,
   fetchRelativeValuation,
   fetchShareholding,
+  fetchStockReturns,
   getFinancials,
   getHistory,
   getQuote,
@@ -27,6 +28,17 @@ import type {
   StockSnapshot,
 } from "../types";
 
+function hasUsableSnapshot(data: StockSnapshot | undefined): boolean {
+  if (!data) return false;
+  const currentPrice =
+    typeof data.current_price === "number"
+      ? data.current_price
+      : Number.isFinite(Number(data.current_price))
+      ? Number(data.current_price)
+      : null;
+  return Boolean(data.company_name || data.sector || (currentPrice !== null && currentPrice > 0));
+}
+
 export function useStock(ticker: string) {
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
   return useQuery<StockSnapshot>({
@@ -34,6 +46,7 @@ export function useStock(ticker: string) {
     queryFn: () => getQuote(ticker, selectedMarket),
     enabled: Boolean(ticker),
     staleTime: 60 * 1000,
+    refetchInterval: (query) => (hasUsableSnapshot(query.state.data as StockSnapshot | undefined) ? false : 5000),
   });
 }
 
@@ -143,5 +156,15 @@ export function useSearch(query: string) {
     queryFn: () => searchSymbols(query, selectedMarket),
     enabled: query.length > 1,
     staleTime: 60 * 60 * 1000,
+  });
+}
+
+export function useStockReturns(ticker: string) {
+  return useQuery<{ "1m"?: number | null; "3m"?: number | null; "1y"?: number | null }>({
+    queryKey: ["returns", ticker],
+    queryFn: () => fetchStockReturns(ticker),
+    enabled: Boolean(ticker),
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }

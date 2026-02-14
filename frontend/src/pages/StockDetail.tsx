@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
-import { fetchIndicator } from "../api/client";
+import { fetchIndicator, fetchQuotesBatch } from "../api/client";
 import { OverviewPanel } from "../components/analysis/OverviewPanel";
 import { PeersComparison } from "../components/analysis/PeersComparison";
 import { FinancialsTable } from "../components/analysis/FinancialsTable";
@@ -18,12 +18,12 @@ import { DrawingTools, type DrawMode } from "../components/chart/DrawingTools";
 import { IndicatorPanel, type IndicatorId } from "../components/chart/IndicatorPanel";
 import { TimeframeSelector } from "../components/chart/TimeframeSelector";
 import { TradingChart } from "../components/chart/TradingChart";
-import { NewsPanel } from "../components/market/NewsPanel";
+import { FuturesPanel } from "../components/market/FuturesPanel";
 import { TerminalBadge } from "../components/terminal/TerminalBadge";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
-import { useFinancials, useStock, useStockHistory } from "../hooks/useStocks";
-import { formatMoney } from "../lib/format";
-import { subscribe, type ConnectionState } from "../realtime/priceStream";
+import { useFinancials, useStock, useStockHistory, useStockReturns } from "../hooks/useStocks";
+import { useDisplayCurrency } from "../hooks/useDisplayCurrency";
+import { useQuotesStore, useQuotesStream } from "../realtime/useQuotesStream";
 import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
 import type { IndicatorResponse } from "../types";
@@ -46,8 +46,10 @@ const INDICATOR_CONFIG: Record<IndicatorId, { apiType: string; params: Record<st
 
 export function StockDetailPage() {
   const { ticker, interval, range, setInterval, setRange } = useStockStore();
-  const displayCurrency = useSettingsStore((s) => s.displayCurrency);
+  const { formatDisplayMoney } = useDisplayCurrency();
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
+  const { subscribe, unsubscribe, isConnected, connectionState } = useQuotesStream(selectedMarket);
+  const ticksByToken = useQuotesStore((s) => s.ticksByToken);
 
   const [mode, setMode] = useState<ChartMode>("candles");
   const [selectedIndicators, setSelectedIndicators] = useState<IndicatorId[]>([]);
@@ -59,29 +61,43 @@ export function StockDetailPage() {
   const [drawMode, setDrawMode] = useState<DrawMode>("none");
   const [clearDrawingsSignal, setClearDrawingsSignal] = useState(0);
   const [pendingTrendPoint, setPendingTrendPoint] = useState(false);
-  const [liveLast, setLiveLast] = useState<number | null>(null);
-  const [liveChangePct, setLiveChangePct] = useState<number | null>(null);
-  const [streamState, setStreamState] = useState<ConnectionState>("DISCONNECTED");
+  const [snapshotTick, setSnapshotTick] = useState<{ ltp: number; change: number; change_pct: number } | null>(null);
 
   const { data: stock } = useStock(ticker);
+  const { data: returnsData } = useStockReturns(ticker);
   const { data: chart, isLoading: isChartLoading, error: chartError } = useStockHistory(ticker, range, interval);
   const { data: financials, isLoading: isFinancialsLoading } = useFinancials(ticker, financialPeriod);
 
   useEffect(() => {
-    setLiveLast(null);
-    setLiveChangePct(null);
+    setSnapshotTick(null);
     if (!ticker) return;
-    return subscribe({
-      market: selectedMarket,
-      symbols: [ticker],
-      onUpdate: (updates) => {
-        const next = updates[0];
-        if (!next) return;
-        setLiveLast(next.last);
-        setLiveChangePct(next.changePct);
-      },
-      onStateChange: setStreamState,
-    });
+    subscribe([ticker]);
+    return () => unsubscribe([ticker]);
+  }, [selectedMarket, subscribe, ticker, unsubscribe]);
+
+  useEffect(() => {
+    let active = true;
+    if (!ticker) return;
+    void (async () => {
+      try {
+        const payload = await fetchQuotesBatch([ticker], selectedMarket);
+        if (!active) return;
+        const row = payload.quotes?.[0];
+        if (!row) return;
+        const ltp = Number(row.last);
+        if (!Number.isFinite(ltp)) return;
+        setSnapshotTick({
+          ltp,
+          change: Number.isFinite(Number(row.change)) ? Number(row.change) : 0,
+          change_pct: Number.isFinite(Number(row.changePct)) ? Number(row.changePct) : 0,
+        });
+      } catch {
+        // Snapshot fallback can fail; UI still has /stocks snapshot and live ticks.
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, [selectedMarket, ticker]);
 
   const indicatorQueries = useQueries({
@@ -104,10 +120,13 @@ export function StockDetailPage() {
     return map;
   }, [indicatorQueries, selectedIndicators]);
 
-  const stockForOverview = useMemo(() => {
-    if (!stock) return null;
-    return stock;
-  }, [stock]);
+  const stockForOverview = useMemo(
+    () => ({
+      ticker: ticker.toUpperCase(),
+      ...(stock ?? {}),
+    }),
+    [stock, ticker],
+  );
   const latestPrice =
     typeof stockForOverview?.current_price === "number"
       ? stockForOverview.current_price
@@ -120,18 +139,24 @@ export function StockDetailPage() {
       : Number.isFinite(Number(stockForOverview?.change_pct))
       ? Number(stockForOverview?.change_pct)
       : null;
-  const displayedLatestPrice = liveLast ?? latestPrice;
-  const displayedChangePct = liveChangePct ?? changePct;
+  const derivedChangeFromSnapshot =
+    latestPrice !== null && changePct !== null && changePct > -100 ? latestPrice - latestPrice / (1 + changePct / 100) : null;
+  const liveTick = ticker ? ticksByToken[`${selectedMarket}:${ticker.toUpperCase()}`] : undefined;
+  const displayedLatestPrice = liveTick?.ltp ?? snapshotTick?.ltp ?? latestPrice;
+  const displayedChange = liveTick?.change ?? snapshotTick?.change ?? derivedChangeFromSnapshot;
+  const displayedChangePct = liveTick?.change_pct ?? snapshotTick?.change_pct ?? changePct;
   const moveClass =
     displayedChangePct === null
       ? "text-terminal-muted"
       : displayedChangePct >= 0
       ? "text-terminal-pos"
       : "text-terminal-neg";
-  const moveText =
-    displayedChangePct === null
+  const changeText =
+    displayedChange === null
       ? "-"
-      : `${displayedChangePct >= 0 ? "+" : ""}${displayedChangePct.toFixed(2)}%`;
+      : `${displayedChange >= 0 ? "+" : ""}${displayedChange.toFixed(2)}`;
+  const changePctText =
+    displayedChangePct === null ? "-" : `${displayedChangePct >= 0 ? "+" : ""}${displayedChangePct.toFixed(2)}%`;
 
   if (!ticker) return <div className="p-8 text-center text-terminal-muted">Select a stock to view details.</div>;
 
@@ -181,11 +206,15 @@ export function StockDetailPage() {
         <div className="space-y-4">
           <TerminalPanel title="Latest Price" className="rounded-sm">
             <div className="mt-1 text-xl font-bold text-terminal-accent tabular-nums">
-              {displayedLatestPrice !== null ? formatMoney(displayedLatestPrice, displayCurrency) : "-"}
+              {displayedLatestPrice !== null ? formatDisplayMoney(displayedLatestPrice) : "-"}
             </div>
-            <div className={`mt-1 text-sm font-semibold ${moveClass}`}>{moveText}</div>
-            <div className="mt-1">
-              <TerminalBadge variant={streamState.includes("LIVE") ? "live" : "mock"}>{streamState}</TerminalBadge>
+            <div className={`mt-1 text-sm font-semibold tabular-nums ${moveClass}`}>{changeText}</div>
+            <div className={`mt-1 text-sm font-semibold tabular-nums ${moveClass}`}>{changePctText}</div>
+            <div className="mt-2 flex items-center gap-2">
+              <span className={`rounded border px-2 py-0.5 text-[11px] ${isConnected ? "border-terminal-pos text-terminal-pos" : "border-terminal-border text-terminal-muted"}`}>
+                LIVE
+              </span>
+              <TerminalBadge variant={isConnected ? "live" : "mock"}>{connectionState.toUpperCase()}</TerminalBadge>
             </div>
           </TerminalPanel>
           <IndicatorPanel
@@ -201,7 +230,7 @@ export function StockDetailPage() {
               setClearDrawingsSignal((v) => v + 1);
             }}
           />
-          <NewsPanel symbol={ticker} market={selectedMarket} />
+          <FuturesPanel />
         </div>
       </div>
 
@@ -226,12 +255,17 @@ export function StockDetailPage() {
       </div>
 
       <div className="min-h-[300px] pb-4">
-        {tab === "overview" && stockForOverview && (
+        {tab === "overview" && (
           <div className="space-y-6">
-            <OverviewPanel stock={stockForOverview} />
+            <OverviewPanel
+              stock={stockForOverview}
+              momPct={returnsData?.["1m"] ?? null}
+              qoqPct={returnsData?.["3m"] ?? null}
+              yoyPct={returnsData?.["1y"] ?? null}
+            />
             <ScoreCard ticker={ticker} />
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <ShareholdingChart ticker={ticker} />
+              <ShareholdingChart ticker={ticker} market={selectedMarket} />
               <FinancialTrend ticker={ticker} />
             </div>
           </div>
@@ -253,9 +287,9 @@ export function StockDetailPage() {
                   {financialPeriod === "quarterly" && <QuarterlyResults ticker={ticker} />}
                 </div>
                 <div className="mt-6 space-y-6">
-                  <FinancialsTable title="Income Statement" rows={financials.income_statement} />
-                  <FinancialsTable title="Balance Sheet" rows={financials.balance_sheet} />
-                  <FinancialsTable title="Cash Flow" rows={financials.cashflow} />
+                  <FinancialsTable title="Income Statement" rows={financials.income_statement} period={financialPeriod} />
+                  <FinancialsTable title="Balance Sheet" rows={financials.balance_sheet} period={financialPeriod} />
+                  <FinancialsTable title="Cash Flow" rows={financials.cashflow} period={financialPeriod} />
                 </div>
               </>
             ) : (
@@ -269,7 +303,7 @@ export function StockDetailPage() {
             <ScoreCard ticker={ticker} />
             <div className="grid grid-cols-1 gap-6">
               <QuarterlyResults ticker={ticker} />
-              <ShareholdingChart ticker={ticker} />
+              <ShareholdingChart ticker={ticker} market={selectedMarket} />
             </div>
             <FundamentalMetricsPanel ticker={ticker} />
           </div>

@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
+from sqlalchemy import desc, or_
+from sqlalchemy.exc import OperationalError
 
-from backend.api.deps import get_unified_fetcher
+from backend.api.deps import cache_instance, get_unified_fetcher
+from backend.core.ttl_policy import market_open_now, ttl_seconds
+from backend.db.database import SessionLocal
+from backend.db.models import NewsArticle
 
 router = APIRouter()
 
@@ -61,6 +67,26 @@ def _normalize_items(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
     return sorted(dedup.values(), key=_sort_key, reverse=True)
 
 
+def _row_to_item(row: NewsArticle) -> dict[str, Any]:
+    tickers: list[str] = []
+    try:
+        parsed = json.loads(row.tickers or "[]")
+        if isinstance(parsed, list):
+            tickers = [str(v).upper() for v in parsed if str(v).strip()]
+    except Exception:
+        tickers = []
+    return {
+        "id": row.id,
+        "source": row.source,
+        "title": row.title,
+        "url": row.url,
+        "summary": row.summary,
+        "image_url": row.image_url,
+        "published_at": row.published_at,
+        "tickers": tickers,
+    }
+
+
 def _validate_market(market: str) -> str:
     market_code = market.strip().upper()
     if market_code not in SUPPORTED_MARKETS:
@@ -106,3 +132,100 @@ async def get_market_news(
     rows = await fetcher.finnhub.get_market_news(category="general", limit=limit)
     items = _normalize_items(rows if isinstance(rows, list) else [])
     return {"items": items[:limit]}
+
+
+@router.get("/news/latest")
+async def get_latest_news(limit: int = Query(default=50, ge=1, le=200)) -> dict[str, Any]:
+    cache_key = cache_instance.build_key("news_latest", "all", {"limit": limit})
+    cached = await cache_instance.get(cache_key)
+    if cached:
+        return cached
+
+    db = SessionLocal()
+    try:
+        rows = db.query(NewsArticle).order_by(desc(NewsArticle.published_at)).limit(limit).all()
+        payload = {"items": [_row_to_item(row) for row in rows]}
+    except OperationalError:
+        payload = {"items": []}
+    finally:
+        db.close()
+
+    await cache_instance.set(
+        cache_key,
+        payload,
+        ttl=ttl_seconds("news_latest", market_open_now()),
+    )
+    return payload
+
+
+@router.get("/news/search")
+async def search_news(
+    q: str = Query(..., min_length=1, max_length=100),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> dict[str, Any]:
+    term = q.strip()
+    cache_key = cache_instance.build_key("news_latest", "search", {"q": term.lower(), "limit": limit})
+    cached = await cache_instance.get(cache_key)
+    if cached:
+        return cached
+
+    db = SessionLocal()
+    try:
+        like = f"%{term}%"
+        rows = (
+            db.query(NewsArticle)
+            .filter(
+                or_(
+                    NewsArticle.title.ilike(like),
+                    NewsArticle.summary.ilike(like),
+                    NewsArticle.source.ilike(like),
+                )
+            )
+            .order_by(desc(NewsArticle.published_at))
+            .limit(limit)
+            .all()
+        )
+        payload = {"items": [_row_to_item(row) for row in rows]}
+    except OperationalError:
+        payload = {"items": []}
+    finally:
+        db.close()
+
+    await cache_instance.set(
+        cache_key,
+        payload,
+        ttl=ttl_seconds("news_latest", market_open_now()),
+    )
+    return payload
+
+
+@router.get("/news/by-ticker/{ticker}")
+async def get_news_by_ticker(ticker: str, limit: int = Query(default=50, ge=1, le=200)) -> dict[str, Any]:
+    symbol = ticker.strip().upper()
+    cache_key = cache_instance.build_key("news_latest", f"ticker:{symbol}", {"limit": limit})
+    cached = await cache_instance.get(cache_key)
+    if cached:
+        return cached
+
+    db = SessionLocal()
+    try:
+        like = f'%"{symbol}"%'
+        rows = (
+            db.query(NewsArticle)
+            .filter(NewsArticle.tickers.like(like))
+            .order_by(desc(NewsArticle.published_at))
+            .limit(limit)
+            .all()
+        )
+        payload = {"items": [_row_to_item(row) for row in rows]}
+    except OperationalError:
+        payload = {"items": []}
+    finally:
+        db.close()
+
+    await cache_instance.set(
+        cache_key,
+        payload,
+        ttl=ttl_seconds("news_latest", market_open_now()),
+    )
+    return payload

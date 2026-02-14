@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { useDisplayCurrency } from "../../hooks/useDisplayCurrency";
 import { useFinancials } from "../../hooks/useStocks";
 
 interface FinancialTrendProps {
@@ -20,8 +21,8 @@ interface FinancialTrendProps {
 
 export const FinancialTrend: React.FC<FinancialTrendProps> = ({ ticker }) => {
   const { data, isLoading, error } = useFinancials(ticker, "annual");
+  const { financialUnit, scaleFinancialAmount } = useDisplayCurrency();
   const [metricType, setMetricType] = useState<"revenue_profit" | "margins">("revenue_profit");
-  const CRORE = 1e7;
 
   const chartData = useMemo(() => {
     if (!data?.income_statement?.length) return [];
@@ -37,12 +38,12 @@ export const FinancialTrend: React.FC<FinancialTrendProps> = ({ ticker }) => {
       const netIncome = getVal("Net Income");
       return {
         year,
-        revenueCr: revenue / CRORE,
-        netIncomeCr: netIncome / CRORE,
+        revenueScaled: scaleFinancialAmount(revenue),
+        netIncomeScaled: scaleFinancialAmount(netIncome),
         margin: revenue ? (netIncome / revenue) * 100 : 0,
       };
     });
-  }, [data]);
+  }, [data, scaleFinancialAmount]);
 
   if (isLoading) return <div className="h-64 animate-pulse rounded border border-terminal-border bg-terminal-panel"></div>;
   if (error) return <div className="text-terminal-neg">Failed to load financials</div>;
@@ -78,15 +79,15 @@ export const FinancialTrend: React.FC<FinancialTrendProps> = ({ ticker }) => {
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: "#8e98a8", fontSize: 11 }}
-                tickFormatter={(v) => `INR ${Number(v).toFixed(0)} Cr`}
+                tickFormatter={(v) => `${Number(v).toFixed(0)} ${financialUnit}`}
               />
               <Tooltip
-                formatter={(value: number | string | undefined) => `INR ${Number(value ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })} Cr`}
+                formatter={(value: number | string | undefined) => `${Number(value ?? 0).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${financialUnit}`}
                 contentStyle={{ borderRadius: "4px", border: "1px solid #2a2f3a", background: "#0c0f14", color: "#d8dde7" }}
               />
               <Legend wrapperStyle={{ color: "#d8dde7" }} />
-              <Bar dataKey="revenueCr" name="Revenue (Cr)" fill="#ff9f1a" radius={[4, 4, 0, 0]} maxBarSize={50} />
-              <Bar dataKey="netIncomeCr" name="Net Profit (Cr)" fill="#00c176" radius={[4, 4, 0, 0]} maxBarSize={50} />
+              <Bar dataKey="revenueScaled" name={`Revenue (${financialUnit})`} fill="#ff9f1a" radius={[4, 4, 0, 0]} maxBarSize={50} />
+              <Bar dataKey="netIncomeScaled" name={`Net Profit (${financialUnit})`} fill="#00c176" radius={[4, 4, 0, 0]} maxBarSize={50} />
             </BarChart>
           ) : (
             <LineChart data={chartData}>

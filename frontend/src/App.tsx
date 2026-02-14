@@ -11,6 +11,7 @@ import { ScreenerPage } from "./pages/Screener";
 import { SettingsPage } from "./pages/Settings";
 import { StockDetailPage } from "./pages/StockDetail";
 import { WatchlistPage } from "./pages/Watchlist";
+import { NewsPage } from "./pages/News";
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
               <Route path="/screener" element={<ScreenerPage />} />
               <Route path="/portfolio" element={<PortfolioPage />} />
               <Route path="/watchlist" element={<WatchlistPage />} />
+              <Route path="/news" element={<NewsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </div>

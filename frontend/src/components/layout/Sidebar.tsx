@@ -6,8 +6,9 @@ export function Sidebar() {
     { label: "Screener", path: "/screener", key: "F2" },
     { label: "Portfolio", path: "/portfolio", key: "F3" },
     { label: "Watchlist", path: "/watchlist", key: "F4" },
-    { label: "Settings", path: "/settings", key: "F5" },
-    { label: "About", path: "/stocks/about", key: "F6" },
+    { label: "News", path: "/news", key: "F5" },
+    { label: "Settings", path: "/settings", key: "F6" },
+    { label: "About", path: "/stocks/about", key: "F7" },
   ];
 
   return (

@@ -1,19 +1,23 @@
 import { useEffect, useState } from "react";
 
-import { addWatchlistItem, deleteWatchlistItem, fetchWatchlist } from "../api/client";
-import { formatMoney } from "../lib/format";
-import { subscribe } from "../realtime/priceStream";
+import { addWatchlistItem, deleteWatchlistItem, fetchQuotesBatch, fetchWatchlist } from "../api/client";
+import { useDisplayCurrency } from "../hooks/useDisplayCurrency";
+import { useQuotesStore, useQuotesStream } from "../realtime/useQuotesStream";
 import { useSettingsStore } from "../store/settingsStore";
 import type { WatchlistItem } from "../types";
 
+type SnapshotQuote = { ltp: number; change: number; change_pct: number };
+
 export function WatchlistPage() {
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
-  const displayCurrency = useSettingsStore((s) => s.displayCurrency);
+  const { formatDisplayMoney } = useDisplayCurrency();
+  const { subscribe, unsubscribe, isConnected } = useQuotesStream(selectedMarket);
+  const ticksByToken = useQuotesStore((s) => s.ticksByToken);
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [watchlistName, setWatchlistName] = useState("Core Picks");
   const [ticker, setTicker] = useState("INFY");
   const [error, setError] = useState<string | null>(null);
-  const [lastPriceByTicker, setLastPriceByTicker] = useState<Record<string, number>>({});
+  const [snapshotByTicker, setSnapshotByTicker] = useState<Record<string, SnapshotQuote>>({});
 
   const load = async () => {
     try {
@@ -31,24 +35,39 @@ export function WatchlistPage() {
   useEffect(() => {
     const symbols = items.map((item) => item.ticker);
     if (!symbols.length) {
-      setLastPriceByTicker({});
+      setSnapshotByTicker({});
       return;
     }
-    return subscribe({
-      market: selectedMarket,
-      symbols,
-      onUpdate: (updates) => {
-        if (!updates.length) return;
-        setLastPriceByTicker((prev) => {
-          const next = { ...prev };
-          for (const update of updates) {
-            next[update.symbol] = update.last;
-          }
-          return next;
-        });
-      },
-    });
-  }, [items, selectedMarket]);
+
+    let active = true;
+    subscribe(symbols);
+
+    void (async () => {
+      try {
+        const payload = await fetchQuotesBatch(symbols, selectedMarket);
+        if (!active) return;
+        const next: Record<string, SnapshotQuote> = {};
+        for (const row of payload.quotes || []) {
+          const key = String(row.symbol || "").toUpperCase();
+          const ltp = Number(row.last);
+          if (!Number.isFinite(ltp) || !key) continue;
+          next[key] = {
+            ltp,
+            change: Number.isFinite(Number(row.change)) ? Number(row.change) : 0,
+            change_pct: Number.isFinite(Number(row.changePct)) ? Number(row.changePct) : 0,
+          };
+        }
+        setSnapshotByTicker(next);
+      } catch {
+        // Snapshot fallback can fail; live ticks may still be available.
+      }
+    })();
+
+    return () => {
+      active = false;
+      unsubscribe(symbols);
+    };
+  }, [items, selectedMarket, subscribe, unsubscribe]);
 
   return (
     <div className="space-y-3 p-4">
@@ -75,26 +94,47 @@ export function WatchlistPage() {
       {error && <div className="rounded border border-terminal-neg bg-terminal-neg/10 p-2 text-xs text-terminal-neg">{error}</div>}
 
       <div className="rounded border border-terminal-border bg-terminal-panel p-3">
-        <div className="mb-2 text-sm font-semibold">Watchlist Items ({items.length})</div>
+        <div className="mb-2 flex items-center justify-between text-sm font-semibold">
+          <span>Watchlist Items ({items.length})</span>
+          <span className={`rounded border px-2 py-0.5 text-[11px] ${isConnected ? "border-terminal-pos text-terminal-pos" : "border-terminal-border text-terminal-muted"}`}>
+            LIVE
+          </span>
+        </div>
         <div className="overflow-auto">
           <table className="min-w-full text-xs">
             <thead>
               <tr className="border-b border-terminal-border text-terminal-muted">
                 <th className="px-2 py-1 text-left">Watchlist</th>
                 <th className="px-2 py-1 text-left">Ticker</th>
-                <th className="px-2 py-1 text-right">Last Price</th>
+                <th className="px-2 py-1 text-right">LTP</th>
+                <th className="px-2 py-1 text-right">Change</th>
+                <th className="px-2 py-1 text-right">Change %</th>
                 <th className="px-2 py-1 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
               {items.map((item) => {
-                const lastPrice = lastPriceByTicker[item.ticker];
+                const symbol = item.ticker.toUpperCase();
+                const token = `${selectedMarket}:${symbol}`;
+                const live = ticksByToken[token];
+                const snapshot = snapshotByTicker[symbol];
+                const ltp = live?.ltp ?? snapshot?.ltp ?? null;
+                const change = live?.change ?? snapshot?.change ?? null;
+                const changePct = live?.change_pct ?? snapshot?.change_pct ?? null;
+                const moveClass =
+                  changePct === null ? "text-terminal-muted" : changePct >= 0 ? "text-terminal-pos" : "text-terminal-neg";
                 return (
                   <tr key={item.id} className="border-b border-terminal-border/50">
                     <td className="px-2 py-1">{item.watchlist_name}</td>
                     <td className="px-2 py-1">{item.ticker}</td>
                     <td className="px-2 py-1 text-right tabular-nums">
-                      {Number.isFinite(lastPrice) ? formatMoney(lastPrice, displayCurrency) : "-"}
+                      {ltp !== null ? formatDisplayMoney(ltp) : "-"}
+                    </td>
+                    <td className={`px-2 py-1 text-right tabular-nums ${moveClass}`}>
+                      {change !== null ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}` : "-"}
+                    </td>
+                    <td className={`px-2 py-1 text-right tabular-nums ${moveClass}`}>
+                      {changePct !== null ? `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%` : "-"}
                     </td>
                     <td className="px-2 py-1 text-right">
                       <button

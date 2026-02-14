@@ -158,6 +158,6 @@ class MultiTierCache:
         s = symbol.strip().upper()
         p_str = json.dumps(params or {}, sort_keys=True)
         h = hashlib.md5(p_str.encode()).hexdigest()
-        return f"trade_screens:{data_type}:{s}:{h}"
+        return f"openterminalui:{data_type}:{s}:{h}"
 
 cache = MultiTierCache()

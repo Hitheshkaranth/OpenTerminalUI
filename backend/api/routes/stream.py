@@ -1,0 +1,65 @@
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
+from backend.services.marketdata_hub import get_marketdata_hub
+
+router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _symbols_from_payload(payload: dict[str, Any]) -> list[str]:
+    symbols = payload.get("symbols")
+    if not isinstance(symbols, list):
+        return []
+    out: list[str] = []
+    for item in symbols:
+        if isinstance(item, str):
+            out.append(item.strip().upper())
+    return out
+
+
+@router.websocket("/ws/quotes")
+async def ws_quotes(websocket: WebSocket) -> None:
+    hub = get_marketdata_hub()
+    await websocket.accept()
+    await hub.register(websocket)
+
+    try:
+        while True:
+            payload = await websocket.receive_json()
+            if not isinstance(payload, dict):
+                await websocket.send_json({"type": "error", "message": "Invalid message payload"})
+                continue
+
+            op = str(payload.get("op") or "").strip().lower()
+            if op == "ping":
+                await websocket.send_json({"type": "pong"})
+                continue
+
+            if op == "subscribe":
+                symbols = _symbols_from_payload(payload)
+                accepted = await hub.subscribe(websocket, symbols)
+                if not accepted:
+                    await websocket.send_json({"type": "error", "message": "No valid symbols to subscribe"})
+                continue
+
+            if op == "unsubscribe":
+                symbols = _symbols_from_payload(payload)
+                await hub.unsubscribe(websocket, symbols)
+                continue
+
+            await websocket.send_json({"type": "error", "message": f"Unsupported op: {op or 'unknown'}"})
+    except WebSocketDisconnect:
+        logger.debug("WS quotes client disconnected")
+    except Exception as exc:
+        logger.exception("WS quotes error: %s", exc)
+        try:
+            await websocket.send_json({"type": "error", "message": "Internal server error"})
+        except Exception:
+            pass
+    finally:
+        await hub.unregister(websocket)

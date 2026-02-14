@@ -61,7 +61,7 @@ export function SettingsPage() {
               </option>
             ))}
           </TerminalInput>
-          <TerminalInput as="select" value={displayCurrency} onChange={(e) => setDisplayCurrency(e.target.value as "INR" | "USD")} title="Display currency (format only)">
+          <TerminalInput as="select" value={displayCurrency} onChange={(e) => setDisplayCurrency(e.target.value as "INR" | "USD")} title="Display currency">
             <option value="INR">INR</option>
             <option value="USD">USD</option>
           </TerminalInput>

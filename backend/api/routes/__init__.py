@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from backend.api.routes import alerts, backtest, chart, kite, news, peers, portfolio, quotes, reports, screener, search, stocks, valuation
+from backend.api.routes import alerts, backtest, chart, futures, kite, news, peers, portfolio, quotes, reports, screener, search, stocks, stream, valuation
 
 __all__ = [
     "stocks",
@@ -15,5 +15,7 @@ __all__ = [
     "search",
     "news",
     "quotes",
+    "futures",
+    "stream",
     "kite",
 ]

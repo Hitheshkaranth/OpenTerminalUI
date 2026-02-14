@@ -38,7 +38,10 @@ export function TopBar() {
   const { data: marketStatus } = useMarketStatus();
   const [query, setQuery] = useState(ticker);
   const [results, setResults] = useState<Array<{ ticker: string; name: string }>>([]);
+  const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const searchRequestRef = useRef(0);
+  const suppressSuggestionsRef = useRef(false);
   const marketsForCountry = COUNTRY_MARKETS[selectedCountry];
   const statusPayload = (marketStatus as {
     error?: string;
@@ -122,6 +125,7 @@ export function TopBar() {
       if (event.key === "Escape") {
         if (results.length > 0) {
           setResults([]);
+          setIsSuggestionsOpen(false);
           return;
         }
         if (editing && tag === "input") {
@@ -141,26 +145,57 @@ export function TopBar() {
   }, [marketsForCountry, selectedCountry, selectedMarket, setSelectedMarket]);
 
   const doSearch = useCallback(async (q: string) => {
-    if (q.length < 2) {
+    if (suppressSuggestionsRef.current) {
       setResults([]);
+      setIsSuggestionsOpen(false);
       return;
     }
+    if (q.length < 2) {
+      setResults([]);
+      setIsSuggestionsOpen(false);
+      return;
+    }
+    const requestId = ++searchRequestRef.current;
     try {
       const res = await searchSymbols(q, selectedMarket);
+      if (requestId !== searchRequestRef.current || suppressSuggestionsRef.current) {
+        return;
+      }
       setResults(res);
+      setIsSuggestionsOpen(res.length > 0);
     } catch {
-      setResults([]);
+      if (requestId === searchRequestRef.current) {
+        setResults([]);
+        setIsSuggestionsOpen(false);
+      }
     }
   }, [selectedMarket]);
 
   const handleLoad = useCallback(async () => {
+    setResults([]);
+    setIsSuggestionsOpen(false);
     try {
       await load();
     } catch {
       // Stock store handles errors internally
     }
-    setResults([]);
   }, [load]);
+
+  const selectTicker = useCallback((value: string) => {
+    const symbol = value.trim().toUpperCase();
+    if (!symbol) return;
+    suppressSuggestionsRef.current = true;
+    searchRequestRef.current += 1;
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    setResults([]);
+    setIsSuggestionsOpen(false);
+    setQuery(symbol);
+    setTicker(symbol);
+    void handleLoad();
+  }, [handleLoad, setTicker]);
 
   return (
     <div className="relative z-20 border-b border-terminal-border bg-terminal-panel">
@@ -209,24 +244,36 @@ export function TopBar() {
           value={query}
           onChange={(e) => {
             const next = e.target.value.toUpperCase();
+            suppressSuggestionsRef.current = false;
             setQuery(next);
+            setIsSuggestionsOpen(next.length >= 2);
             if (debounceRef.current) clearTimeout(debounceRef.current);
             debounceRef.current = setTimeout(() => {
               void doSearch(next);
             }, 300);
           }}
+          onFocus={() => {
+            if (results.length > 0 && query.length >= 2) {
+              setIsSuggestionsOpen(true);
+            }
+          }}
+          onBlur={() => {
+            setTimeout(() => setIsSuggestionsOpen(false), 120);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
-              setTicker(query);
-              void handleLoad();
+              selectTicker(query);
+            }
+            if (e.key === "Escape") {
+              setResults([]);
+              setIsSuggestionsOpen(false);
             }
           }}
         />
         <button
           className="rounded bg-terminal-accent px-2 py-1 text-xs font-medium text-black"
           onClick={() => {
-            setTicker(query);
-            void handleLoad();
+            selectTicker(query);
           }}
         >
           Load
@@ -253,15 +300,15 @@ export function TopBar() {
           </select>
         </div>
         <div className="flex items-center gap-1 border-l border-terminal-border pl-2">
-          <span className="text-[11px] leading-none" title="Display currency (format only)">
+          <span className="text-[11px] leading-none" title="Display currency">
             {CURRENCY_FLAGS[displayCurrency]}
           </span>
           <select
             className="w-[72px] rounded border border-terminal-border bg-terminal-bg px-1 py-1 text-[11px] uppercase text-terminal-text outline-none"
             value={displayCurrency}
             onChange={(e) => setDisplayCurrency(e.target.value as DisplayCurrency)}
-            title="Display currency (format only)"
-            aria-label="Display currency (format only)"
+            title="Display currency"
+            aria-label="Display currency"
           >
             <option value="INR">INR</option>
             <option value="USD">USD</option>
@@ -270,16 +317,14 @@ export function TopBar() {
         <div className="border-l border-terminal-border pl-2 text-[11px] uppercase tracking-wide text-terminal-muted">
           {selectedCountry} • {selectedMarket} • {displayCurrency}
         </div>
-        {results.length > 0 && (
+        {isSuggestionsOpen && results.length > 0 && (
           <div className="absolute left-3 right-3 top-10 z-10 max-h-72 overflow-auto rounded border border-terminal-border bg-terminal-panel">
             {results.map((item) => (
               <button
                 key={item.ticker}
                 className="block w-full border-b border-terminal-border px-3 py-2 text-left text-sm hover:bg-terminal-bg"
                 onClick={() => {
-                  setQuery(item.ticker);
-                  setTicker(item.ticker);
-                  void handleLoad();
+                  selectTicker(item.ticker);
                 }}
               >
                 {item.ticker} - {item.name}

@@ -64,22 +64,22 @@ class PrefetchWorker:
             return
         self._stop_event.clear()
         self._task = asyncio.create_task(self._loop())
-        logger.info("Prefetch worker started")
+        logger.info("event=prefetch_worker_started interval_seconds=%s", self.interval)
 
     async def stop(self):
         if self._task:
             self._stop_event.set()
             await self._task
             self._task = None
-            logger.info("Prefetch worker stopped")
+            logger.info("event=prefetch_worker_stopped")
 
     async def _loop(self):
         while not self._stop_event.is_set():
             if is_market_hours():
-                logger.info("Market is open. Starting prefetch cycle...")
+                logger.info("event=prefetch_cycle_start market_open=true")
                 await self._prefetch()
             else:
-                logger.debug("Market closed. Sleeping...")
+                logger.debug("event=prefetch_cycle_skip market_open=false")
             
             # Wait for interval or stop
             try:
@@ -93,7 +93,7 @@ class PrefetchWorker:
         targets.update(get_db_tickers())
         ticker_list = list(targets)
         
-        logger.info(f"Prefetching {len(ticker_list)} symbols")
+        logger.info("event=prefetch_symbols count=%s", len(ticker_list))
         
         # 2. Fetch/Cache in batches
         sem = asyncio.Semaphore(10) # Concurrency limit
@@ -121,7 +121,7 @@ class PrefetchWorker:
                     logger.error(f"Prefetch failed for {ticker}: {e}")
 
         await asyncio.gather(*(work(t) for t in ticker_list))
-        logger.info("Prefetch cycle complete")
+        logger.info("event=prefetch_cycle_complete symbols=%s", len(ticker_list))
 
 _worker_instance = None
 

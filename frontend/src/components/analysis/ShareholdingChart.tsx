@@ -10,12 +10,14 @@ import {
     ResponsiveContainer
 } from "recharts";
 import { useShareholding } from "../../hooks/useStocks";
+import { NewsPanel } from "../market/NewsPanel";
 
 interface ShareholdingChartProps {
     ticker: string;
+    market: string;
 }
 
-export const ShareholdingChart: React.FC<ShareholdingChartProps> = ({ ticker }) => {
+export const ShareholdingChart: React.FC<ShareholdingChartProps> = ({ ticker, market }) => {
     const { data, isLoading, error } = useShareholding(ticker);
 
     const chartData = useMemo(() => {
@@ -30,8 +32,7 @@ export const ShareholdingChart: React.FC<ShareholdingChartProps> = ({ ticker }) 
     }, [data]);
 
     if (isLoading) return <div className="h-64 animate-pulse rounded border border-terminal-border bg-terminal-panel"></div>;
-    if (error) return <div className="text-terminal-neg">Failed to load shareholding pattern</div>;
-    if (!chartData.length) return <div className="text-terminal-muted">No shareholding data available</div>;
+    if (error || !chartData.length) return <NewsPanel symbol={ticker} market={market} limit={12} />;
 
     return (
         <div className="rounded border border-terminal-border bg-terminal-panel p-4">

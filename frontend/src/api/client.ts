@@ -181,6 +181,11 @@ export async function fetchMarketStatus(): Promise<Record<string, unknown>> {
   return data;
 }
 
+export async function fetchStockReturns(ticker: string): Promise<{ "1m"?: number | null; "3m"?: number | null; "1y"?: number | null }> {
+  const { data } = await api.get<{ "1m"?: number | null; "3m"?: number | null; "1y"?: number | null }>(`/stocks/${ticker}/returns`);
+  return data ?? {};
+}
+
 export type NewsApiItem = {
   id: string;
   title: string;
@@ -190,6 +195,16 @@ export type NewsApiItem = {
   summary?: string;
 };
 
+export type NewsLatestApiItem = {
+  id: string | number;
+  title: string;
+  source: string;
+  url: string;
+  summary?: string;
+  image_url?: string;
+  published_at?: string;
+};
+
 export async function fetchSymbolNews(market: string, symbol: string, limit = 30): Promise<NewsApiItem[]> {
   const { data } = await api.get<{ items: NewsApiItem[] }>("/news/symbol", { params: { market, symbol, limit } });
   return Array.isArray(data?.items) ? data.items : [];
@@ -197,6 +212,23 @@ export async function fetchSymbolNews(market: string, symbol: string, limit = 30
 
 export async function fetchMarketNews(market: string, limit = 30): Promise<NewsApiItem[]> {
   const { data } = await api.get<{ items: NewsApiItem[] }>("/news/market", { params: { market, limit } });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchLatestNews(limit = 100): Promise<NewsLatestApiItem[]> {
+  const { data } = await api.get<{ items: NewsLatestApiItem[] }>("/news/latest", { params: { limit } });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function searchLatestNews(q: string, limit = 100): Promise<NewsLatestApiItem[]> {
+  const { data } = await api.get<{ items: NewsLatestApiItem[] }>("/news/search", { params: { q, limit } });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchNewsByTicker(ticker: string, limit = 100): Promise<NewsLatestApiItem[]> {
+  const symbol = ticker.trim().toUpperCase();
+  if (!symbol) return [];
+  const { data } = await api.get<{ items: NewsLatestApiItem[] }>(`/news/by-ticker/${encodeURIComponent(symbol)}`, { params: { limit } });
   return Array.isArray(data?.items) ? data.items : [];
 }
 
@@ -229,6 +261,43 @@ export async function fetchQuotesBatch(
   const { data } = await api.get<{ market: string; status?: string; quotes: Array<{ symbol: string; last: number; change: number; changePct: number; ts: string }> }>("/quotes", {
     params: { symbols: tickers, market },
   });
+  return data;
+}
+
+export type FuturesChainContract = {
+  expiry_date: string;
+  tradingsymbol: string;
+  exchange: string;
+  ws_symbol: string;
+  instrument_token: number;
+  lot_size: number;
+  tick_size: number;
+  ltp?: number | null;
+  change?: number | null;
+  change_pct?: number | null;
+  oi?: number | null;
+  volume?: number | null;
+};
+
+export async function fetchFuturesUnderlyings(q: string, limit = 25): Promise<string[]> {
+  const { data } = await api.get<{ count: number; items: string[] }>("/futures/underlyings", { params: { q, limit } });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchFuturesChain(underlying: string): Promise<{
+  underlying: string;
+  count: number;
+  ws_symbols: string[];
+  token_to_ws_symbol: Record<string, string>;
+  contracts: FuturesChainContract[];
+}> {
+  const { data } = await api.get<{
+    underlying: string;
+    count: number;
+    ws_symbols: string[];
+    token_to_ws_symbol: Record<string, string>;
+    contracts: FuturesChainContract[];
+  }>(`/futures/chain/${encodeURIComponent(underlying)}`);
   return data;
 }
 

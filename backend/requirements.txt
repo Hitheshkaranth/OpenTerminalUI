@@ -11,3 +11,4 @@ httpx
 h2
 redis
 apscheduler
+kiteconnect

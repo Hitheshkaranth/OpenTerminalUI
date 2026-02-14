@@ -1,5 +1,4 @@
-import { formatMoney } from "../../lib/format";
-import { useSettingsStore } from "../../store/settingsStore";
+import { useDisplayCurrency } from "../../hooks/useDisplayCurrency";
 import { formatPct } from "../../utils/formatters";
 
 type Props = {
@@ -25,10 +24,13 @@ type Props = {
     div_yield_pct?: number;
     beta?: number;
   };
+  momPct?: number | null;
+  qoqPct?: number | null;
+  yoyPct?: number | null;
 };
 
-const METRICS: Array<[string, keyof Props["stock"], "inr" | "pct" | "raw"]> = [
-  ["Market Cap", "market_cap", "inr"],
+const METRICS: Array<[string, keyof Props["stock"], "money" | "compact" | "pct" | "raw"]> = [
+  ["Market Cap", "market_cap", "compact"],
   ["P/E (TTM)", "pe", "raw"],
   ["P/E (Fwd)", "forward_pe_calc", "raw"],
   ["P/B", "pb_calc", "raw"],
@@ -53,10 +55,21 @@ function toNum(value: unknown): number | undefined {
   return undefined;
 }
 
-export function OverviewPanel({ stock }: Props) {
-  const displayCurrency = useSettingsStore((s) => s.displayCurrency);
+function moveLabel(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "-";
+  const direction = value >= 0 ? "Increase" : "Decrease";
+  return `${direction} ${value >= 0 ? "+" : ""}${formatPct(value)}`;
+}
+
+function moveClass(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "text-terminal-muted";
+  return value >= 0 ? "text-terminal-pos" : "text-terminal-neg";
+}
+
+export function OverviewPanel({ stock, momPct, qoqPct, yoyPct }: Props) {
+  const { formatDisplayMoney, formatFinancialCompact } = useDisplayCurrency();
   const changePct = toNum(stock.change_pct);
-  const moveClass =
+  const priceMoveClass =
     changePct === undefined
       ? "text-terminal-muted"
       : changePct >= 0
@@ -78,18 +91,36 @@ export function OverviewPanel({ stock }: Props) {
         </div>
         <div className="mt-3 flex items-end gap-3">
           <div className="text-2xl font-bold tabular-nums">
-            {currentPrice !== undefined ? formatMoney(currentPrice, displayCurrency) : "-"}
+            {currentPrice !== undefined ? formatDisplayMoney(currentPrice) : "-"}
           </div>
-          <div className={`text-sm font-semibold ${moveClass}`}>{moveText}</div>
+          <div className={`text-sm font-semibold ${priceMoveClass}`}>{moveText}</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="rounded border border-terminal-border bg-terminal-panel p-3">
+          <div className="text-xs text-terminal-muted">MoM Price Move</div>
+          <div className={`mt-1 text-sm font-semibold ${moveClass(momPct)}`}>{moveLabel(momPct)}</div>
+        </div>
+        <div className="rounded border border-terminal-border bg-terminal-panel p-3">
+          <div className="text-xs text-terminal-muted">QoQ Price Move</div>
+          <div className={`mt-1 text-sm font-semibold ${moveClass(qoqPct)}`}>{moveLabel(qoqPct)}</div>
+        </div>
+        <div className="rounded border border-terminal-border bg-terminal-panel p-3">
+          <div className="text-xs text-terminal-muted">YoY Price Move</div>
+          <div className={`mt-1 text-sm font-semibold ${moveClass(yoyPct)}`}>{moveLabel(yoyPct)}</div>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {METRICS.map(([label, key, mode]) => {
           const val = toNum(stock[key]);
           const rendered =
-            mode === "inr"
+            mode === "compact"
               ? val !== undefined
-                ? formatMoney(val, displayCurrency)
+                ? formatFinancialCompact(val)
+                : "-"
+              : mode === "money"
+              ? val !== undefined
+                ? formatDisplayMoney(val)
                 : "-"
               : mode === "pct"
               ? formatPct(val)
@@ -97,7 +128,7 @@ export function OverviewPanel({ stock }: Props) {
           return (
             <div key={label} className="rounded border border-terminal-border bg-terminal-panel p-3">
               <div className="text-xs text-terminal-muted">{label}</div>
-              <div className={`mt-1 text-sm font-semibold ${mode === "inr" ? "tabular-nums" : ""}`}>{rendered}</div>
+              <div className={`mt-1 text-sm font-semibold ${mode === "money" || mode === "compact" ? "tabular-nums" : ""}`}>{rendered}</div>
             </div>
           );
         })}
