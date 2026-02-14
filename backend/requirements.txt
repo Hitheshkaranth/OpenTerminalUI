@@ -12,3 +12,6 @@ h2
 redis
 apscheduler
 kiteconnect
+nsepython>=2.97
+nsetools>=1.0.10
+mibian>=0.1.3
