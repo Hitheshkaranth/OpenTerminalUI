@@ -230,6 +230,14 @@ class UnifiedFetcher:
         company_name = _get_val(nq, "info", "companyName") or \
                        fq.get("name") or \
                        fp.get("name")
+        exchange = _get_val(nq, "info", "exchange") or _get_val(nq, "metadata", "exchange") or "NSE"
+        country_code = "IN"
+        indices: list[str] = []
+        idx_meta = _get_val(nq, "metadata", "index")
+        if isinstance(idx_meta, str) and idx_meta.strip():
+            indices = [idx_meta.strip()]
+        elif isinstance(idx_meta, list):
+            indices = [str(x).strip() for x in idx_meta if str(x).strip()]
 
         forward_pe = _yraw(ks, "forwardPE") or _yraw(sd, "forwardPE")
         pb = _yraw(ks, "priceToBook") or _yraw(sd, "priceToBook")
@@ -269,6 +277,9 @@ class UnifiedFetcher:
             "beta": beta,
             "sector": ap.get("sector") or fp.get("finnhubIndustry"),
             "industry": ap.get("industry") or fp.get("finnhubIndustry") or ap.get("sector"),
+            "country_code": country_code,
+            "exchange": str(exchange),
+            "indices": indices,
             "details": {
                 "nse": bool(nq),
                 "yahoo": bool(ys),

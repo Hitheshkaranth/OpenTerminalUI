@@ -12,6 +12,7 @@ router = APIRouter()
 
 class BacktestSubmitPayload(BaseModel):
     symbol: str = Field(min_length=1)
+    asset: str | None = None
     market: str = "NSE"
     start: str | None = None
     end: str | None = None
@@ -27,6 +28,7 @@ async def submit_backtest(payload: BacktestSubmitPayload) -> dict[str, str]:
     run_id = await service.submit(
         BacktestJobRequest(
             symbol=payload.symbol,
+            asset=payload.asset,
             market=payload.market,
             start=payload.start,
             end=payload.end,

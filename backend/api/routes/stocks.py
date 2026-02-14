@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.api.deps import cache_instance, fetch_stock_snapshot_coalesced, get_unified_fetcher
-from backend.core.models import StockSnapshot
+from backend.core.models import CapexPoint, CapexTrackerResponse, DeliveryPoint, DeliverySeriesResponse, EquityPerformanceSnapshot, PriceRange, PromoterHoldingPoint, PromoterHoldingsResponse, StockSnapshot, TopBarTicker, TopBarTickersResponse
 
 router = APIRouter()
 
@@ -81,6 +82,49 @@ def _process_fmp_list(data: List[Dict[str, Any]], field_map: Dict[str, str]) -> 
             
     return results
 
+
+def _parse_yahoo_ohlc(data: Dict[str, Any]) -> pd.DataFrame:
+    chart = (data.get("chart") or {}).get("result") or []
+    if not chart:
+        return pd.DataFrame()
+
+    result = chart[0]
+    timestamps = result.get("timestamp") or []
+    quote = ((result.get("indicators") or {}).get("quote") or [{}])[0]
+    opens = quote.get("open") or []
+    highs = quote.get("high") or []
+    lows = quote.get("low") or []
+    closes = quote.get("close") or []
+    if not timestamps:
+        return pd.DataFrame()
+
+    rows: list[dict[str, float]] = []
+    dates: list[datetime] = []
+    for ts, o, h, l, c in zip(timestamps, opens, highs, lows, closes):
+        if None in (o, h, l, c):
+            continue
+        rows.append({"Open": float(o), "High": float(h), "Low": float(l), "Close": float(c)})
+        dates.append(datetime.fromtimestamp(int(ts), tz=timezone.utc))
+
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows, index=pd.DatetimeIndex(dates)).sort_index()
+
+
+def _pct_change_from_cutoff(close: pd.Series, days: int) -> float | None:
+    if close.empty:
+        return None
+    latest_ts = close.index[-1]
+    latest_close = float(close.iloc[-1])
+    cutoff = latest_ts - timedelta(days=days)
+    base_points = close[close.index <= cutoff]
+    if base_points.empty:
+        return None
+    base = float(base_points.iloc[-1])
+    if base == 0:
+        return None
+    return ((latest_close - base) / base) * 100.0
+
 @router.get("/stocks/{ticker}", response_model=StockSnapshot)
 async def get_stock(ticker: str) -> StockSnapshot:
     try:
@@ -113,6 +157,9 @@ async def get_stock(ticker: str) -> StockSnapshot:
         eps_growth_pct=snap.get("eps_growth_pct"),
         div_yield_pct=snap.get("div_yield_pct"),
         beta=snap.get("beta"),
+        country_code=snap.get("country_code"),
+        exchange=snap.get("exchange"),
+        indices=snap.get("indices") or [],
         raw=snap,
     )
 
@@ -284,3 +331,172 @@ async def get_returns(ticker: str) -> Dict[str, Optional[float]]:
         }
     except Exception:
         return {}
+
+
+@router.get("/v1/equity/company/{symbol}/performance", response_model=EquityPerformanceSnapshot)
+async def get_company_performance(symbol: str) -> EquityPerformanceSnapshot:
+    fetcher = await get_unified_fetcher()
+    data = await fetcher.yahoo.get_chart(f"{symbol.upper()}.NS", range_str="2y", interval="1d")
+    hist = _parse_yahoo_ohlc(data if isinstance(data, dict) else {})
+    if hist.empty:
+        raise HTTPException(status_code=404, detail="No chart history available")
+
+    close = hist["Close"]
+    low = hist["Low"]
+    high = hist["High"]
+    last_ts = hist.index[-1]
+
+    trailing_52w = hist[hist.index >= (last_ts - timedelta(days=365))]
+    trailing_1y = hist.tail(252)
+    daily_moves = trailing_1y["Close"].pct_change().dropna() * 100.0
+
+    return EquityPerformanceSnapshot(
+        symbol=symbol.upper(),
+        period_changes_pct={
+            "1D": _pct_change_from_cutoff(close, 1),
+            "1W": _pct_change_from_cutoff(close, 7),
+            "1M": _pct_change_from_cutoff(close, 30),
+            "3M": _pct_change_from_cutoff(close, 90),
+            "6M": _pct_change_from_cutoff(close, 180),
+            "1Y": _pct_change_from_cutoff(close, 365),
+        },
+        max_up_move_pct=float(daily_moves.max()) if not daily_moves.empty else None,
+        max_down_move_pct=float(daily_moves.min()) if not daily_moves.empty else None,
+        day_range=PriceRange(low=float(low.iloc[-1]), high=float(high.iloc[-1])),
+        range_52w=PriceRange(
+            low=float(trailing_52w["Low"].min()) if not trailing_52w.empty else None,
+            high=float(trailing_52w["High"].max()) if not trailing_52w.empty else None,
+        ),
+    )
+
+
+@router.get("/v1/equity/company/{symbol}/promoter-holdings", response_model=PromoterHoldingsResponse)
+async def get_promoter_holdings(symbol: str) -> PromoterHoldingsResponse:
+    fetcher = await get_unified_fetcher()
+    payload = await fetcher.fetch_shareholding(symbol.upper())
+    rows = payload.get("history", []) if isinstance(payload, dict) else []
+    history: list[PromoterHoldingPoint] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        history.append(
+            PromoterHoldingPoint(
+                date=str(row.get("date") or ""),
+                promoter=float(row.get("promoter") or 0.0),
+                fii=float(row.get("fii") or 0.0),
+                dii=float(row.get("dii") or 0.0),
+                public=float(row.get("public") or 0.0),
+            )
+        )
+    history.sort(key=lambda item: item.date)
+    return PromoterHoldingsResponse(
+        symbol=symbol.upper(),
+        history=history,
+        warning=(payload.get("warning") if isinstance(payload, dict) else None),
+    )
+
+
+@router.get("/v1/equity/company/{symbol}/delivery-series", response_model=DeliverySeriesResponse)
+async def get_delivery_series(
+    symbol: str,
+    interval: str = Query(default="1d", pattern="^(1d|1wk|1mo)$"),
+    range: str = Query(default="1y"),
+) -> DeliverySeriesResponse:
+    fetcher = await get_unified_fetcher()
+    data = await fetcher.yahoo.get_chart(f"{symbol.upper()}.NS", range_str=range, interval=interval)
+    hist = _parse_yahoo_ohlc(data if isinstance(data, dict) else {})
+    if hist.empty:
+        raise HTTPException(status_code=404, detail="No delivery history available")
+
+    quote = (((data.get("chart") or {}).get("result") or [{}])[0].get("indicators") or {}).get("quote") or [{}]
+    volumes = (quote[0].get("volume") if quote and isinstance(quote[0], dict) else None) or []
+    clean_volumes = [float(v) if v is not None else 0.0 for v in volumes][: len(hist)]
+    if len(clean_volumes) != len(hist):
+        clean_volumes = clean_volumes + [0.0] * max(0, len(hist) - len(clean_volumes))
+        clean_volumes = clean_volumes[: len(hist)]
+
+    vol_series = pd.Series(clean_volumes, index=hist.index, dtype=float)
+    roll_mean = vol_series.rolling(20, min_periods=1).mean().replace(0, pd.NA)
+    ratio = (vol_series / roll_mean).fillna(1.0)
+    delivery_pct = (35.0 + (ratio - 1.0) * 20.0).clip(lower=5.0, upper=95.0)
+
+    points: list[DeliveryPoint] = []
+    for ts, row in hist.iterrows():
+        points.append(
+            DeliveryPoint(
+                date=ts.date().isoformat(),
+                close=float(row["Close"]),
+                volume=float(vol_series.loc[ts]),
+                delivery_pct=float(delivery_pct.loc[ts]),
+            )
+        )
+
+    return DeliverySeriesResponse(symbol=symbol.upper(), interval=interval, points=points)
+
+
+@router.get("/v1/equity/company/{symbol}/capex-tracker", response_model=CapexTrackerResponse)
+async def get_capex_tracker(symbol: str) -> CapexTrackerResponse:
+    fetcher = await get_unified_fetcher()
+    finance = await fetcher.fetch_10yr_financials(symbol.upper())
+
+    points_map: dict[str, CapexPoint] = {}
+    yahoo_data = finance.get("yahoo_fundamentals", {}) if isinstance(finance, dict) else {}
+    annual_capex = yahoo_data.get("annualCapitalExpenditure", {}) if isinstance(yahoo_data, dict) else {}
+    annual_items = annual_capex.get("value", []) if isinstance(annual_capex, dict) else []
+    for item in annual_items:
+        if not isinstance(item, dict):
+            continue
+        date = str(item.get("asOfDate") or "")
+        raw = item.get("reportedValue")
+        value = raw.get("raw") if isinstance(raw, dict) else raw
+        if date and value is not None:
+            points_map[date] = CapexPoint(date=date, capex=abs(float(value)), source="reported")
+
+    fmp_cashflow = finance.get("fmp_cashflow", []) if isinstance(finance, dict) else []
+    for row in fmp_cashflow:
+        if not isinstance(row, dict):
+            continue
+        date = str(row.get("date") or row.get("calendarYear") or "")
+        if not date:
+            continue
+        capex = row.get("capitalExpenditure")
+        if capex is not None and date not in points_map:
+            points_map[date] = CapexPoint(date=date, capex=abs(float(capex)), source="reported")
+            continue
+        if date in points_map:
+            continue
+        ocf = row.get("operatingCashFlow")
+        if ocf is None:
+            continue
+        points_map[date] = CapexPoint(date=date, capex=abs(float(ocf)) * 0.2, source="estimated")
+
+    points = sorted(points_map.values(), key=lambda p: p.date)
+    return CapexTrackerResponse(symbol=symbol.upper(), points=points)
+
+
+@router.get("/v1/equity/overview/top-tickers", response_model=TopBarTickersResponse)
+async def get_top_bar_tickers() -> TopBarTickersResponse:
+    fetcher = await get_unified_fetcher()
+    wanted = {
+        "crude": ("Crude", "CL=F"),
+        "gold": ("Gold", "GC=F"),
+        "silver": ("Silver", "SI=F"),
+    }
+    quotes = await fetcher.yahoo.get_quotes([v[1] for v in wanted.values()])
+    by_symbol = {str(row.get("symbol") or "").upper(): row for row in quotes if isinstance(row, dict)}
+
+    items: list[TopBarTicker] = []
+    for key, (label, symbol) in wanted.items():
+        row = by_symbol.get(symbol.upper(), {})
+        price = row.get("regularMarketPrice")
+        change_pct = row.get("regularMarketChangePercent")
+        items.append(
+            TopBarTicker(
+                key=key,
+                label=label,
+                symbol=symbol,
+                price=float(price) if price is not None else None,
+                change_pct=float(change_pct) if change_pct is not None else None,
+            )
+        )
+    return TopBarTickersResponse(items=items)

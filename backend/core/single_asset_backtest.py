@@ -24,18 +24,18 @@ class Broker:
     def _cost_multiplier(self) -> float:
         return 1.0 + ((self.fee_bps + self.slippage_bps) / 10000.0)
 
-    def execute(self, portfolio: Portfolio, target_position: int, close_price: float) -> tuple[float, str] | None:
-        current = 0 if portfolio.position == 0 else (1 if portfolio.position > 0 else -1)
+    def execute(self, portfolio: Portfolio, target_position: float, close_price: float) -> tuple[float, str] | None:
+        current = portfolio.position
         if current == target_position:
             return None
-        qty_delta = float(target_position - current)
+        qty_delta = target_position - current
         trade_notional = qty_delta * close_price
         cost = abs(trade_notional) * (self._cost_multiplier() - 1.0)
         portfolio.cash -= trade_notional
         portfolio.cash -= cost
-        portfolio.position = float(target_position)
+        portfolio.position = target_position
         action = "BUY" if qty_delta > 0 else "SELL"
-        return qty_delta, action
+        return float(qty_delta), action
 
 
 class BacktestEngine:
@@ -43,7 +43,7 @@ class BacktestEngine:
         self.config = config or BacktestConfig()
         self.broker = Broker(fee_bps=self.config.fee_bps, slippage_bps=self.config.slippage_bps)
 
-    def run(self, symbol: str, frame: pd.DataFrame, signals: pd.Series) -> BacktestResult:
+    def run(self, symbol: str, frame: pd.DataFrame, signals: pd.Series, asset: str | None = None) -> BacktestResult:
         if frame.empty:
             raise ValueError("No OHLCV data provided")
         required = {"date", "close"}
@@ -66,7 +66,16 @@ class BacktestEngine:
             if not self.config.allow_short and target < 0:
                 target = 0
             close_price = float(row["close"])
-            trade = self.broker.execute(portfolio, target, close_price)
+            if target == 0:
+                target_position = 0.0
+            elif self.config.position_fraction is not None:
+                equity_now = max(portfolio.equity(close_price), 0.0)
+                target_notional = equity_now * float(self.config.position_fraction)
+                units = int(target_notional // close_price) if close_price > 0 else 0
+                target_position = float(units * (1 if target > 0 else -1))
+            else:
+                target_position = float(target) * float(self.config.position_size)
+            trade = self.broker.execute(portfolio, target_position, close_price)
             if trade is not None:
                 qty_delta, action = trade
                 trades.append(
@@ -95,6 +104,8 @@ class BacktestEngine:
 
         equity_series = pd.Series([point.equity for point in equity_curve], dtype=float)
         returns = equity_series.pct_change().dropna()
+        final_equity = float(equity_series.iloc[-1]) if not equity_series.empty else float(self.config.initial_cash)
+        pnl_amount = final_equity - float(self.config.initial_cash)
         total_return = (equity_series.iloc[-1] / self.config.initial_cash) - 1.0 if not equity_series.empty else 0.0
         drawdown = (equity_series / equity_series.cummax()) - 1.0 if not equity_series.empty else pd.Series(dtype=float)
         max_drawdown = float(drawdown.min()) if not drawdown.empty else 0.0
@@ -103,7 +114,12 @@ class BacktestEngine:
 
         return BacktestResult(
             symbol=symbol,
+            asset=(asset or symbol),
             bars=len(equity_curve),
+            initial_cash=float(self.config.initial_cash),
+            final_equity=final_equity,
+            pnl_amount=pnl_amount,
+            ending_cash=float(portfolio.cash),
             total_return=float(total_return),
             max_drawdown=max_drawdown,
             sharpe=sharpe,

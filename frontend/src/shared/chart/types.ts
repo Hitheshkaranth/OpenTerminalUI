@@ -26,6 +26,10 @@ export type ChartEngineProps = {
   symbolIsFnO?: boolean;
   onCrosshairOHLC?: (payload: { open: number; high: number; low: number; close: number; time: number } | null) => void;
   onTick?: (payload: { ltp: number; change_pct: number } | null) => void;
+  canRequestBackfill?: boolean;
+  onRequestBackfill?: (oldestTime: number) => Promise<void> | void;
+  showDeliveryOverlay?: boolean;
+  deliverySeries?: Array<{ time: number; value: number }>;
 };
 
 export type IndicatorRegistryView = {

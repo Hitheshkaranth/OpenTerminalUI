@@ -1,29 +1,30 @@
 import { ColorType, type DeepPartial, type ChartOptions } from "lightweight-charts";
+import { terminalColors } from "../../theme/terminal";
 
 export const terminalChartTheme: DeepPartial<ChartOptions> = {
   layout: {
-    background: { type: ColorType.Solid, color: "#0c0f14" },
-    textColor: "#d8dde7",
+    background: { type: ColorType.Solid, color: terminalColors.panel },
+    textColor: terminalColors.text,
     fontFamily: "Consolas, IBM Plex Mono, Lucida Console, monospace",
     panes: {
       enableResize: true,
-      separatorColor: "#2a2f3a",
-      separatorHoverColor: "#f57c20",
+      separatorColor: terminalColors.border,
+      separatorHoverColor: terminalColors.accentAlt,
     },
   },
   grid: {
-    vertLines: { color: "#2a2f3a" },
-    horzLines: { color: "#2a2f3a" },
+    vertLines: { color: terminalColors.border },
+    horzLines: { color: terminalColors.border },
   },
   crosshair: {
-    vertLine: { color: "#8e98a8" },
-    horzLine: { color: "#8e98a8" },
+    vertLine: { color: terminalColors.muted },
+    horzLine: { color: terminalColors.muted },
   },
   rightPriceScale: {
-    borderColor: "#2a2f3a",
+    borderColor: terminalColors.border,
   },
   timeScale: {
-    borderColor: "#2a2f3a",
+    borderColor: terminalColors.border,
     timeVisible: true,
     secondsVisible: false,
   },

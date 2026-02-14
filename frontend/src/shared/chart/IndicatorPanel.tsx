@@ -8,15 +8,19 @@ type Props = {
   symbol: string;
   activeIndicators: IndicatorConfig[];
   onChange: (next: IndicatorConfig[]) => void;
+  templateScope?: "equity" | "fno";
 };
 
 const MAX_ACTIVE = 8;
 
-export function IndicatorPanel({ symbol, activeIndicators, onChange }: Props) {
+export function IndicatorPanel({ symbol, activeIndicators, onChange, templateScope = "equity" }: Props) {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [templateName, setTemplateName] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState("");
   const all = useMemo(() => listIndicators(), []);
+  const templateStorageKey = `chart:indicator-templates:${templateScope}`;
 
   const grouped = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -31,6 +35,15 @@ export function IndicatorPanel({ symbol, activeIndicators, onChange }: Props) {
 
   const activeSet = useMemo(() => new Set(activeIndicators.map((a) => a.id)), [activeIndicators]);
   const editingConfig = useMemo(() => activeIndicators.find((x) => x.id === editingId) || null, [activeIndicators, editingId]);
+  const templates = useMemo(() => {
+    try {
+      const raw = localStorage.getItem(templateStorageKey);
+      const data = raw ? JSON.parse(raw) : {};
+      return typeof data === "object" && data ? (data as Record<string, IndicatorConfig[]>) : {};
+    } catch {
+      return {};
+    }
+  }, [activeIndicators, templateStorageKey]);
 
   const toggle = (id: string) => {
     if (activeSet.has(id)) {
@@ -47,6 +60,19 @@ export function IndicatorPanel({ symbol, activeIndicators, onChange }: Props) {
         visible: true,
       },
     ]);
+  };
+  const saveTemplate = () => {
+    const name = templateName.trim();
+    if (!name || !activeIndicators.length) return;
+    const next = { ...templates, [name]: activeIndicators };
+    localStorage.setItem(templateStorageKey, JSON.stringify(next));
+    setTemplateName("");
+    setSelectedTemplate(name);
+  };
+  const loadTemplate = () => {
+    const rows = templates[selectedTemplate];
+    if (!rows?.length) return;
+    onChange(rows);
   };
 
   return (
@@ -70,7 +96,7 @@ export function IndicatorPanel({ symbol, activeIndicators, onChange }: Props) {
                 className="mb-1 w-full text-left text-[11px] uppercase tracking-wide text-terminal-muted"
                 onClick={() => setExpanded((prev) => ({ ...prev, [category]: !isOpen }))}
               >
-                {isOpen ? "▼" : "▶"} {category}
+                {isOpen ? "v" : ">"} {category}
               </button>
               {isOpen && (
                 <div className="space-y-1">
@@ -88,22 +114,18 @@ export function IndicatorPanel({ symbol, activeIndicators, onChange }: Props) {
                           onClick={() => toggle(item.id)}
                           title={item.id}
                         >
-                          {active ? "☑" : "☐"} {item.name}
+                          {active ? "[x]" : "[ ]"} {item.name}
                         </button>
                         {active && (
                           <>
                             <button
                               className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted"
                               onClick={() => setEditingId(item.id)}
-                            >
-                              ⚙
-                            </button>
+                            >cfg</button>
                             <button
                               className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted"
                               onClick={() => onChange(activeIndicators.filter((x) => x.id !== item.id))}
-                            >
-                              ✕
-                            </button>
+                            >del</button>
                           </>
                         )}
                         {active && current?.params && (
@@ -119,6 +141,37 @@ export function IndicatorPanel({ symbol, activeIndicators, onChange }: Props) {
             </div>
           );
         })}
+      </div>
+      <div className="mt-2 space-y-2 rounded border border-terminal-border p-2">
+        <div className="text-[11px] uppercase tracking-wide text-terminal-muted">Templates</div>
+        <div className="flex items-center gap-1">
+          <input
+            value={templateName}
+            onChange={(e) => setTemplateName(e.target.value)}
+            placeholder="Template name"
+            className="min-w-0 flex-1 rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs text-terminal-text outline-none focus:border-terminal-accent"
+          />
+          <button className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-accent" onClick={saveTemplate}>
+            Save
+          </button>
+        </div>
+        <div className="flex items-center gap-1">
+          <select
+            className="min-w-0 flex-1 rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs text-terminal-text outline-none"
+            value={selectedTemplate}
+            onChange={(e) => setSelectedTemplate(e.target.value)}
+          >
+            <option value="">Select template</option>
+            {Object.keys(templates).map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <button className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-accent" onClick={loadTemplate}>
+            Load
+          </button>
+        </div>
       </div>
       <div className="mt-2 flex items-center justify-between">
         <div className="text-[11px] text-terminal-muted">{symbol.toUpperCase()}</div>
@@ -139,3 +192,4 @@ export function IndicatorPanel({ symbol, activeIndicators, onChange }: Props) {
     </div>
   );
 }
+

@@ -4,6 +4,7 @@ import type { Bar } from "oakscriptjs";
 
 import { computeIndicator } from "./IndicatorManager";
 import type { IndicatorConfig } from "./types";
+import { terminalColors } from "../../theme/terminal";
 
 type SeriesMap = Record<string, Record<string, ISeriesApi<"Line", Time>>>;
 type CacheMeta = Record<string, { length: number; lastTime: number | null }>;
@@ -61,43 +62,72 @@ export function useIndicators(chart: IChartApi | null, bars: Bar[], configs: Ind
       const overlay = Boolean(result.metadata?.overlay);
       const plots = result.plots ?? {};
       const key = cfg.id;
-      const prevMeta = cacheRef.current[key] ?? { length: 0, lastTime: null };
-      const nowLast = bars.length ? Number(bars[bars.length - 1].time) : null;
-      const canIncremental = prevMeta.length === bars.length && prevMeta.lastTime === nowLast;
-
       if (!seriesMapRef.current[key]) {
         seriesMapRef.current[key] = {};
+      }
+      const existingPlotIds = new Set(Object.keys(seriesMapRef.current[key]));
+      const incomingPlotIds = new Set(Object.keys(plots));
+
+      for (const stalePlotId of existingPlotIds) {
+        if (incomingPlotIds.has(stalePlotId)) continue;
+        try {
+          chart.removeSeries(seriesMapRef.current[key][stalePlotId]);
+        } catch {
+          // ignore remove failures from stale refs
+        }
+        delete seriesMapRef.current[key][stalePlotId];
       }
 
       for (const [plotId, rawPoints] of Object.entries(plots)) {
         const points = toPlotData(rawPoints as Array<{ time: unknown; value: unknown }>);
         if (!points.length) continue;
+        points.sort((a, b) => Number(a.time) - Number(b.time));
         let series = seriesMapRef.current[key][plotId];
         if (!series) {
-          series = chart.addSeries(
-            LineSeries,
-            {
-              color: cfg.color || (overlay ? "#2962FF" : "#7E57C2"),
-              lineWidth: ((cfg.lineWidth ?? 2) as 1 | 2 | 3 | 4),
-              lastValueVisible: true,
-            },
-            overlay ? 0 : paneIndex,
-          );
+          try {
+            series = chart.addSeries(
+              LineSeries,
+              {
+                color: cfg.color || (overlay ? terminalColors.indicatorOverlay : terminalColors.indicatorPane),
+                lineWidth: ((cfg.lineWidth ?? 2) as 1 | 2 | 3 | 4),
+                lastValueVisible: true,
+              },
+              overlay ? 0 : paneIndex,
+            );
+          } catch {
+            continue;
+          }
           seriesMapRef.current[key][plotId] = series;
-          series.setData(points);
+          try {
+            series.setData(points);
+          } catch {
+            try {
+              chart.removeSeries(series);
+            } catch {
+              // ignore stale refs
+            }
+            delete seriesMapRef.current[key][plotId];
+            continue;
+          }
           if (!overlay) {
             chart.panes()[paneIndex]?.setStretchFactor(300);
           }
           continue;
         }
-        if (canIncremental) {
-          const last = points[points.length - 1];
-          series.update(last);
-        } else {
+        try {
           series.setData(points);
+        } catch {
+          try {
+            chart.removeSeries(series);
+          } catch {
+            // ignore stale refs
+          }
+          delete seriesMapRef.current[key][plotId];
+          continue;
         }
       }
       if (!overlay) paneIndex += 1;
+      const nowLast = bars.length ? Number(bars[bars.length - 1].time) : null;
       cacheRef.current[key] = { length: bars.length, lastTime: nowLast };
     }
 

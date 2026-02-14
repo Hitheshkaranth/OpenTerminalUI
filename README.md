@@ -20,51 +20,45 @@
 
 ## Project overview
 
-OpenTerminalUI is organized into two analysis packs accessible from a unified home screen:
+OpenTerminalUI is a terminal-style market analysis workspace organized around three connected operating areas:
 
 ### Equity & Fundamental Analysis Pack
-- **Stock Search & Charts** — interactive price charts with technical indicators
-- **Screener** — filter NSE stocks by financial and technical criteria
-- **Fundamentals** — income statement, balance sheet, cash flow, ratios
-- **DCF Valuation** — discounted cash flow model with scenario analysis
-- **Peer Comparison** — compare companies within sectors
-- **Portfolio & Backtest** — build and backtest portfolios with historical data
-- **News & Sentiment** — real-time news feed with financial sentiment scoring
-- **Alerts** — price and event alerts
+- **Chart Workstation** - multi-timeframe charts, indicator overlays, delivery overlay, and history backfill
+- **Company Analytics** - fundamentals, scorecards, trends, reports, valuation, peer comparison
+- **Advanced Research Widgets** - promoter holdings, capex tracker, and in-app Python execution
+- **Operations Screens** - screener, portfolio, watchlist, settings, and news/sentiment flows
 
 ### Futures & Options (F&O) Analysis Pack
-- **Option Chain** — interactive NSE-style option chain with OI, IV, Greeks
-- **Greeks Dashboard** — Delta, Gamma, Theta, Vega heatmaps + GEX chart
-- **OI Analysis** — open interest buildup classification, max pain, support/resistance
-- **Strategy Builder** — multi-leg payoff diagrams with 8+ preset strategies
-- **PCR Tracker** — put-call ratio with historical trend and signal
-- **IV Surface** — implied volatility skew and 3D surface visualization
-- **F&O Heatmap** — market-wide OI/IV/volume treemap across F&O stocks
-- **Expiry Dashboard** — NIFTY/BANKNIFTY key levels summary for expiry day
+- **Option Chain + Greeks + OI** - strike-level structure, Greeks, and open-interest context
+- **Strategy Builder** - multi-leg payoff analysis with preset templates
+- **PCR + Heatmap + Expiry Dashboards** - breadth, participation, and expiry-focused signals
+- **Futures Terminal** - shared chart/indicator stack with Equity for consistent workflow
 
-### Infrastructure
-- **Real-time Streaming** — WebSocket quotes via Kite Connect with REST fallback
-- **News Ingestion** — automated 3-minute cycle (Finnhub + FMP providers)
-- **Background Services** — instruments loader, PCR snapshots, news ingestor
-- **Caching** — in-memory L1 + optional Redis L2
-- **Docker** — single-command deployment with compose + watch mode
+### Backtesting Control Deck
+- **Asset + Capital Inputs** - user-defined asset and trade capital at run start
+- **Model Presets + Custom Script** - built-in strategies or custom Python `generate_signals(df, context)`
+- **Capital-aware Execution** - model allocation determines share quantity against available capital
+- **Result Accounting** - initial capital, final equity, net P/L, and ending cash shown in performance block
+- **Trade Audit** - buy/sell markers, execution logs, and full trade blotter by asset
+
+### Platform & APIs
+- **Realtime Streaming** - WebSocket quotes with REST/snapshot fallback
+- **V1 Endpoints** - equity performance, promoter holdings, delivery series, capex tracker, indicators, crypto, scripting
+- **UI Reliability** - hardened chart/indicator pipelines for first-load and timeframe-switch stability
+- **Background Services** - instruments loader and scheduled news ingestion
+- **Deployment** - Docker compose workflow with optional Redis cache profile
 
 ## Roadmap
 
-- [x] Stock search, charts, screener, fundamentals
-- [x] DCF valuation, peer comparison, backtest
-- [x] Real-time WebSocket streaming (Kite Connect)
-- [x] News ingestion (Finnhub + FMP)
-- [x] Futures chain endpoints
-- [x] Docker + CI/CD pipeline
-- [ ] Financial sentiment scoring engine
-- [ ] News & sentiment frontend enhancement
-- [ ] Backend architecture separation (Equity / F&O packs)
-- [ ] F&O option chain + Greeks + OI analysis backend
-- [ ] Strategy builder + PCR tracker + IV surface backend
-- [ ] F&O frontend (option chain, Greeks, OI pages)
-- [ ] Home screen with pack navigation
-- [ ] F&O heatmap + expiry dashboard
+- [x] Equity terminal with charting, research panels, and operational workflows
+- [x] F&O terminal with option chain, Greeks, OI, strategy, PCR, heatmap, and expiry views
+- [x] Capital-aware backtesting control deck with model-based execution sizing
+- [x] Realtime quote stream with fallback and stable market tape rendering
+- [x] API v1 surface for analytics, indicators, crypto, and scripting
+- [x] Dockerized deployment and CI-compatible verify flow
+- [ ] Portfolio-level backtesting and strategy comparison views
+- [ ] Expanded model/template library and parameter presets
+- [ ] Additional performance optimization for large watchlists and long chart sessions
 
 ## Repository structure
 
@@ -318,3 +312,4 @@ git diff --cached
 ```
 
 5. If any key was ever exposed, rotate it before release.
+

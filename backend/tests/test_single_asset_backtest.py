@@ -29,10 +29,25 @@ def test_single_asset_backtest_engine_runs_and_returns_metrics() -> None:
         signals=signals,
     )
     assert result.symbol == "TEST"
+    assert result.asset == "TEST"
     assert result.bars == len(frame)
     assert isinstance(result.total_return, float)
     assert len(result.equity_curve) == len(frame)
     assert len(result.trades) > 0
+
+
+def test_single_asset_backtest_uses_model_position_size() -> None:
+    frame = _synthetic_ohlcv()
+    signals = pd.Series([0, 1, 1, 0, -1, -1, 0], dtype=int)
+    result = BacktestEngine(BacktestConfig(initial_cash=10000, position_size=25)).run(
+        symbol="TEST",
+        asset="RELIANCE",
+        frame=frame.iloc[: len(signals)],
+        signals=signals,
+    )
+    assert result.asset == "RELIANCE"
+    assert len(result.trades) > 0
+    assert all(abs(t.quantity) % 25 == 0 for t in result.trades)
 
 
 def test_builtin_sma_strategy_produces_ternary_signals() -> None:
@@ -40,3 +55,15 @@ def test_builtin_sma_strategy_produces_ternary_signals() -> None:
     signals = generate_sma_crossover_signals(frame, short_window=2, long_window=4)
     assert len(signals) == len(frame)
     assert set(int(v) for v in signals.tolist()).issubset({-1, 0, 1})
+
+
+def test_single_asset_backtest_uses_capital_fraction_sizing() -> None:
+    frame = _synthetic_ohlcv().iloc[:3].copy()
+    signals = pd.Series([0, 1, 1], dtype=int)
+    result = BacktestEngine(
+        BacktestConfig(initial_cash=1000, position_fraction=0.5, fee_bps=0, slippage_bps=0)
+    ).run(symbol="TEST", frame=frame, signals=signals)
+    assert len(result.trades) == 1
+    first_trade = result.trades[0]
+    assert first_trade.action == "BUY"
+    assert first_trade.quantity == 4.0

@@ -5,6 +5,7 @@ import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "rec
 import { fetchLatestNews, fetchNewsByTicker, fetchNewsSentiment, searchLatestNews, type NewsLatestApiItem } from "../api/client";
 import { useStock } from "../hooks/useStocks";
 import { useStockStore } from "../store/stockStore";
+import { terminalColors } from "../theme/terminal";
 
 type SentimentLabel = "Bullish" | "Bearish" | "Neutral";
 type PeriodOption = 1 | 3 | 7 | 14 | 30;
@@ -85,9 +86,9 @@ function relativeTime(iso: string, nowMs: number): string {
 }
 
 function sentimentColor(label: SentimentLabel): string {
-  if (label === "Bullish") return "#10b981";
-  if (label === "Bearish") return "#ef4444";
-  return "#6b7280";
+  if (label === "Bullish") return terminalColors.positive;
+  if (label === "Bearish") return terminalColors.negative;
+  return terminalColors.muted;
 }
 
 function sentimentDot(label: SentimentLabel): string {
@@ -378,10 +379,10 @@ export function NewsPage() {
         </div>
 
         <div className="mt-2 h-2 w-full overflow-hidden rounded bg-terminal-bg">
-          <div className="flex h-full w-full">
-            <div style={{ width: `${summary.bullish_pct}%`, background: "#10b981" }} />
-            <div style={{ width: `${summary.neutral_pct}%`, background: "#6b7280" }} />
-            <div style={{ width: `${summary.bearish_pct}%`, background: "#ef4444" }} />
+            <div className="flex h-full w-full">
+            <div style={{ width: `${summary.bullish_pct}%`, background: terminalColors.positive }} />
+            <div style={{ width: `${summary.neutral_pct}%`, background: terminalColors.muted }} />
+            <div style={{ width: `${summary.bearish_pct}%`, background: terminalColors.negative }} />
           </div>
         </div>
         <div className="mt-1 flex items-center justify-between text-[11px] text-terminal-muted">
@@ -395,8 +396,8 @@ export function NewsPage() {
             <LineChart data={summary.daily_sentiment}>
               <XAxis dataKey="date" hide />
               <YAxis domain={[-1, 1]} hide />
-              <Tooltip contentStyle={{ borderRadius: "4px", border: "1px solid #2a2f3a", background: "#0c0f14", color: "#d8dde7" }} labelStyle={{ color: "#8e98a8" }} />
-              <Line type="monotone" dataKey="avg_score" stroke="#f59e0b" strokeWidth={2} dot={false} />
+              <Tooltip contentStyle={{ borderRadius: "4px", border: `1px solid ${terminalColors.border}`, background: terminalColors.panel, color: terminalColors.text }} labelStyle={{ color: terminalColors.muted }} />
+              <Line type="monotone" dataKey="avg_score" stroke={terminalColors.accent} strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>

@@ -14,6 +14,14 @@ export type ChartResponse = {
   data: ChartPoint[];
   meta?: {
     warnings?: Array<{ code: string; message: string }>;
+    pagination?: {
+      cursor?: number | null;
+      has_more?: boolean;
+      limit?: number | null;
+      requested_cursor?: number | null;
+      returned?: number;
+      total?: number;
+    };
   };
 };
 
@@ -54,6 +62,9 @@ export type StockSnapshot = {
   eps_growth_pct?: number;
   div_yield_pct?: number;
   beta?: number;
+  country_code?: string;
+  exchange?: string;
+  indices?: string[];
   fifty_two_week_low?: number;
   fifty_two_week_high?: number;
   raw?: any;
@@ -181,6 +192,84 @@ export type AlertRule = {
   threshold: number;
   note: string;
   created_at: string;
+};
+
+export type PriceRange = {
+  low?: number | null;
+  high?: number | null;
+};
+
+export type EquityPerformanceSnapshot = {
+  symbol: string;
+  period_changes_pct: {
+    "1D"?: number | null;
+    "1W"?: number | null;
+    "1M"?: number | null;
+    "3M"?: number | null;
+    "6M"?: number | null;
+    "1Y"?: number | null;
+  };
+  max_up_move_pct?: number | null;
+  max_down_move_pct?: number | null;
+  day_range: PriceRange;
+  range_52w: PriceRange;
+};
+
+export type PromoterHoldingPoint = {
+  date: string;
+  promoter: number;
+  fii: number;
+  dii: number;
+  public: number;
+};
+
+export type PromoterHoldingsResponse = {
+  symbol: string;
+  history: PromoterHoldingPoint[];
+  warning?: string | null;
+};
+
+export type DeliverySeriesPoint = {
+  date: string;
+  close: number;
+  volume: number;
+  delivery_pct: number;
+};
+
+export type DeliverySeriesResponse = {
+  symbol: string;
+  interval: string;
+  points: DeliverySeriesPoint[];
+};
+
+export type CapexPoint = {
+  date: string;
+  capex: number;
+  source: "reported" | "estimated" | string;
+};
+
+export type CapexTrackerResponse = {
+  symbol: string;
+  points: CapexPoint[];
+};
+
+export type TopBarTicker = {
+  key: string;
+  label: string;
+  symbol: string;
+  price?: number | null;
+  change_pct?: number | null;
+};
+
+export type TopBarTickersResponse = {
+  items: TopBarTicker[];
+};
+
+export type PythonExecuteResponse = {
+  stdout: string;
+  stderr: string;
+  result: unknown;
+  timed_out: boolean;
 };
 
 export type BulkDeal = {

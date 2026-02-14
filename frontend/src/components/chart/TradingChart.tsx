@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ColorType,
   PriceScaleMode,
   CandlestickSeries,
   LineSeries,
@@ -17,6 +16,8 @@ import {
 
 import type { ChartPoint, IndicatorResponse } from "../../types";
 import type { DrawMode } from "./DrawingTools";
+import { terminalChartTheme } from "../../shared/chart/chartTheme";
+import { terminalColors, terminalOverlayPalette } from "../../theme/terminal";
 
 type ChartMode = "candles" | "line" | "area";
 type TrendPoint = { time: number; price: number };
@@ -121,7 +122,16 @@ export function TradingChart({
         low: d.l,
         close: d.c,
         volume: d.v,
-      })),
+      }))
+      .filter(
+        (d) =>
+          Number.isFinite(Number(d.time)) &&
+          Number.isFinite(Number(d.open)) &&
+          Number.isFinite(Number(d.high)) &&
+          Number.isFinite(Number(d.low)) &&
+          Number.isFinite(Number(d.close)),
+      )
+      .sort((a, b) => Number(a.time) - Number(b.time)),
     [data]
   );
   const parsedByTime = useMemo(() => {
@@ -192,62 +202,32 @@ export function TradingChart({
       return;
     }
     const chart = createChart(chartRef.current, {
+      ...terminalChartTheme,
       width: chartRef.current.clientWidth,
       height: chartRef.current.clientHeight || 520,
-      layout: {
-        background: { type: ColorType.Solid, color: "#0c0f14" },
-        textColor: "#d8dde7",
-      },
-      grid: {
-        vertLines: { color: "#2a2f3a" },
-        horzLines: { color: "#2a2f3a" },
-      },
-      crosshair: {
-        vertLine: { color: "#8e98a8" },
-        horzLine: { color: "#8e98a8" },
-      },
-      rightPriceScale: {
-        borderColor: "#2a2f3a",
-      },
-      timeScale: {
-        borderColor: "#2a2f3a",
-        timeVisible: true,
-        secondsVisible: false,
-      },
-      handleScroll: {
-        mouseWheel: true,
-        pressedMouseMove: true,
-        horzTouchDrag: true,
-        vertTouchDrag: true,
-      },
-      handleScale: {
-        axisPressedMouseMove: true,
-        mouseWheel: true,
-        pinch: true,
-      },
     });
     const candles = chart.addSeries(CandlestickSeries, {
-      upColor: "#26a69a",
-      downColor: "#ef5350",
+      upColor: terminalColors.candleUp,
+      downColor: terminalColors.candleDown,
       borderVisible: false,
-      wickUpColor: "#26a69a",
-      wickDownColor: "#ef5350",
+      wickUpColor: terminalColors.candleUp,
+      wickDownColor: terminalColors.candleDown,
       visible: mode === "candles",
     });
     const line = chart.addSeries(LineSeries, {
-      color: "#ff9f1a",
+      color: terminalColors.accent,
       lineWidth: 2,
       visible: mode === "line",
     });
     const area = chart.addSeries(AreaSeries, {
-      lineColor: "#ff9f1a",
-      topColor: "#ff9f1a55",
-      bottomColor: "#ff9f1a12",
+      lineColor: terminalColors.accent,
+      topColor: terminalColors.accentAreaTop,
+      bottomColor: terminalColors.accentAreaBottom,
       visible: mode === "area",
     });
     const volume = chart.addSeries(HistogramSeries, {
       priceScaleId: "",
-      color: "#ff9f1a",
+      color: terminalColors.accent,
       priceFormat: { type: "volume" },
       visible: showVolume,
     });
@@ -388,8 +368,8 @@ export function TradingChart({
     volumeRef.current.setData(
       parsed.map((d) => ({
         time: d.time,
-        value: d.volume,
-        color: d.close >= d.open ? "#26a69a88" : "#ef535088",
+        value: Number.isFinite(Number(d.volume)) ? Number(d.volume) : 0,
+        color: d.close >= d.open ? terminalColors.candleUpAlpha88 : terminalColors.candleDownAlpha88,
       }))
     );
     volumeRef.current.applyOptions({ visible: showVolume });
@@ -402,7 +382,7 @@ export function TradingChart({
     }
     apiRef.current.applyOptions({
       rightPriceScale: {
-        borderColor: "#2a2f3a",
+        borderColor: terminalColors.border,
         mode: logarithmic ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
       },
     });
@@ -418,7 +398,7 @@ export function TradingChart({
     }
     overlaySeriesRef.current = [];
 
-    const palette = ["#ff9800", "#00bcd4", "#ab47bc", "#f06292", "#66bb6a", "#ffa726"];
+    const palette = terminalOverlayPalette;
     let colorIdx = 0;
 
     for (const payload of Object.values(overlays)) {
@@ -468,7 +448,7 @@ export function TradingChart({
           continue;
         }
         const line = chart.addSeries(LineSeries, {
-          color: "#ffd166",
+          color: terminalColors.drawingTrend,
           lineWidth: 2,
           lastValueVisible: false,
           priceLineVisible: false,
@@ -481,7 +461,7 @@ export function TradingChart({
       } else if (drawing.type === "hline") {
         const pl = candles.createPriceLine({
           price: drawing.price,
-          color: "#4dd0e1",
+          color: terminalColors.drawingHLine,
           lineWidth: 1,
           lineStyle: 2,
           axisLabelVisible: true,
@@ -519,7 +499,7 @@ export function TradingChart({
     }
     highLineRef.current = series.createPriceLine({
       price: selectedCandle.high,
-      color: "#66bb6a",
+      color: terminalColors.positive,
       lineWidth: 1,
       lineStyle: 2,
       axisLabelVisible: true,
@@ -527,7 +507,7 @@ export function TradingChart({
     });
     lowLineRef.current = series.createPriceLine({
       price: selectedCandle.low,
-      color: "#ef5350",
+      color: terminalColors.candleDown,
       lineWidth: 1,
       lineStyle: 2,
       axisLabelVisible: true,

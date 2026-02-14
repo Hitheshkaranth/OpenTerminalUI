@@ -3,9 +3,15 @@ import axios from "axios";
 import type {
   ChartResponse,
   DcfResponse,
+  DeliverySeriesResponse,
+  CapexTrackerResponse,
+  TopBarTickersResponse,
+  PythonExecuteResponse,
+  PromoterHoldingsResponse,
   FinancialsResponse,
   FundamentalScoresResponse,
   IndicatorResponse,
+  EquityPerformanceSnapshot,
   PortfolioResponse,
   PeerResponse,
   RelativeValuationResponse,
@@ -21,8 +27,15 @@ const api = axios.create({
   timeout: 30000,
 });
 
-export async function getHistory(symbol: string, market: string, interval = "1d", range = "1y"): Promise<ChartResponse> {
-  const { data } = await api.get<ChartResponse>(`/chart/${symbol}`, { params: { market, interval, range } });
+export async function getHistory(
+  symbol: string,
+  market: string,
+  interval = "1d",
+  range = "1y",
+  limit?: number,
+  cursor?: number,
+): Promise<ChartResponse> {
+  const { data } = await api.get<ChartResponse>(`/chart/${symbol}`, { params: { market, interval, range, limit, cursor } });
   return data;
 }
 
@@ -184,6 +197,48 @@ export async function fetchMarketStatus(): Promise<Record<string, unknown>> {
 export async function fetchStockReturns(ticker: string): Promise<{ "1m"?: number | null; "3m"?: number | null; "1y"?: number | null }> {
   const { data } = await api.get<{ "1m"?: number | null; "3m"?: number | null; "1y"?: number | null }>(`/stocks/${ticker}/returns`);
   return data ?? {};
+}
+
+export async function fetchEquityPerformance(symbol: string): Promise<EquityPerformanceSnapshot> {
+  const { data } = await api.get<EquityPerformanceSnapshot>(`/v1/equity/company/${encodeURIComponent(symbol)}/performance`);
+  return data;
+}
+
+export async function fetchPromoterHoldings(symbol: string): Promise<PromoterHoldingsResponse> {
+  const { data } = await api.get<PromoterHoldingsResponse>(`/v1/equity/company/${encodeURIComponent(symbol)}/promoter-holdings`);
+  return data;
+}
+
+export async function fetchDeliverySeries(symbol: string, interval = "1d", range = "1y"): Promise<DeliverySeriesResponse> {
+  const { data } = await api.get<DeliverySeriesResponse>(`/v1/equity/company/${encodeURIComponent(symbol)}/delivery-series`, {
+    params: { interval, range },
+  });
+  return data;
+}
+
+export async function fetchCapexTracker(symbol: string): Promise<CapexTrackerResponse> {
+  const { data } = await api.get<CapexTrackerResponse>(`/v1/equity/company/${encodeURIComponent(symbol)}/capex-tracker`);
+  return data;
+}
+
+export async function fetchTopBarTickers(): Promise<TopBarTickersResponse> {
+  const { data } = await api.get<TopBarTickersResponse>("/v1/equity/overview/top-tickers");
+  return data;
+}
+
+export async function fetchCryptoSearch(q: string): Promise<Array<{ ticker: string; name: string }>> {
+  const { data } = await api.get<{ items: Array<{ symbol: string; name: string }> }>("/v1/crypto/search", { params: { q } });
+  return (data.items || []).map((row) => ({ ticker: row.symbol, name: row.name }));
+}
+
+export async function fetchCryptoCandles(symbol: string, interval = "1d", range = "1y"): Promise<ChartResponse> {
+  const { data } = await api.get<ChartResponse>("/v1/crypto/candles", { params: { symbol, interval, range } });
+  return data;
+}
+
+export async function executePython(payload: { code: string; timeout_seconds?: number }): Promise<PythonExecuteResponse> {
+  const { data } = await api.post<PythonExecuteResponse>("/v1/scripting/python/execute", payload);
+  return data;
 }
 
 export type NewsApiItem = {
@@ -352,6 +407,7 @@ export async function runBacktest(payload: BacktestPayload): Promise<BacktestRes
 
 export type BacktestJobSubmitPayload = {
   symbol: string;
+  asset?: string;
   market: string;
   start?: string;
   end?: string;
@@ -371,7 +427,12 @@ export type BacktestJobResult = {
   status: "queued" | "running" | "done" | "failed";
   result?: {
     symbol: string;
+    asset: string;
     bars: number;
+    initial_cash: number;
+    final_equity: number;
+    pnl_amount: number;
+    ending_cash: number;
     total_return: number;
     max_drawdown: number;
     sharpe: number;

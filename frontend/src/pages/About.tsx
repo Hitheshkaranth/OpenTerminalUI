@@ -54,7 +54,7 @@ export function AboutPage() {
           <img src={logo} alt="OpenTerminalUI Logo" className="h-16 w-auto object-contain" />
           <div className="text-xs text-terminal-muted">
             Analyze. Trade. Optimize.
-            <div className="mt-1">Open-source NSE trading analytics workspace with Equity and F&O terminal packs.</div>
+            <div className="mt-1">Open-source trading analytics workspace with integrated Equity, F&O, and Backtesting flows.</div>
           </div>
         </div>
       </TerminalPanel>
@@ -62,29 +62,39 @@ export function AboutPage() {
       <div className="grid gap-3 lg:grid-cols-2">
         <TerminalPanel title="Equity Pack">
           <ul className="space-y-1 text-xs text-terminal-text">
-            <li>- Search, charting, screener and technical overlays.</li>
-            <li>- Fundamentals, DCF valuation and peer comparison.</li>
-            <li>- Portfolio/backtest workflows and alerts.</li>
-            <li>- News + sentiment linked to selected ticker.</li>
+            <li>- Multi-timeframe chart workstation with indicators, delivery overlay, and automatic backfill.</li>
+            <li>- Company intelligence stack: overview, scorecard, fundamentals, valuation, peers, reports.</li>
+            <li>- Advanced panels: promoter holdings, capex tracker, and Python execution lab.</li>
+            <li>- Operational screens: screener, portfolio, watchlist, and news/sentiment monitor.</li>
           </ul>
         </TerminalPanel>
 
         <TerminalPanel title="F&O Pack">
           <ul className="space-y-1 text-xs text-terminal-text">
-            <li>- Option chain, Greeks and OI analysis dashboards.</li>
-            <li>- Strategy builder with payoff views and presets.</li>
-            <li>- PCR, IV, heatmap and expiry workflows.</li>
-            <li>- Shared realtime chart engine + indicator framework.</li>
+            <li>- Option chain with Greeks + OI context for strike-level decision support.</li>
+            <li>- Futures terminal with shared chart/indicator engine and live quote sync.</li>
+            <li>- Strategy builder, PCR analytics, heatmap, and expiry dashboards.</li>
+            <li>- Unified navigation and ticker context across Equity and F&O packs.</li>
           </ul>
         </TerminalPanel>
       </div>
 
+      <TerminalPanel title="Backtesting Control Deck">
+        <ul className="space-y-1 text-xs text-terminal-text">
+          <li>- Asset input + trade capital input with model presets or custom Python signals.</li>
+          <li>- Capital-aware execution sizing: share quantity derives from capital and model allocation.</li>
+          <li>- Performance block tracks initial capital, final equity, net P/L, and ending cash.</li>
+          <li>- Chart-first review with buy/sell markers, indicator overlays, and trade blotter.</li>
+        </ul>
+      </TerminalPanel>
+
       <TerminalPanel title="Infrastructure">
         <ul className="space-y-1 text-xs text-terminal-muted">
           <li>- FastAPI backend + React/TypeScript terminal frontend.</li>
-          <li>- Realtime WebSocket quotes with REST fallback paths.</li>
-          <li>- Background services: instruments loader, news ingestion, snapshots.</li>
-          <li>- Caching layers and Docker-ready deployment model.</li>
+          <li>- Realtime quote stream with resilient snapshot fallback and scrolling market tape.</li>
+          <li>- API v1 coverage: equity analytics, indicators, crypto candles/search, and scripting.</li>
+          <li>- Background services: instruments loader, scheduled news ingestion, cache-aware fetchers.</li>
+          <li>- Docker-first deployment with optional Redis profile for L2 caching.</li>
         </ul>
       </TerminalPanel>
 

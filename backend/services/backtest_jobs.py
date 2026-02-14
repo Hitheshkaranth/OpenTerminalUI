@@ -19,6 +19,7 @@ from backend.db.models import BacktestRun
 @dataclass(frozen=True)
 class BacktestJobRequest:
     symbol: str
+    asset: str | None = None
     market: str = "NSE"
     start: str | None = None
     end: str | None = None
@@ -77,7 +78,7 @@ class BacktestJobService:
             req = BacktestJobRequest(**json.loads(row.request_json))
             service = get_historical_data_service()
             symbol, bars = service.fetch_daily_ohlcv(
-                raw_symbol=req.symbol,
+                raw_symbol=(req.asset or req.symbol),
                 market=req.market,
                 start=req.start,
                 end=req.end,
@@ -100,7 +101,13 @@ class BacktestJobService:
                 raise ValueError("No OHLCV bars available for request")
             strategy_out = self._runner.run(req.strategy, frame, context=req.context or {})
             cfg = BacktestConfig(**(req.config or {}))
-            result = BacktestEngine(cfg).run(symbol=symbol.canonical, frame=frame, signals=strategy_out.signals)
+            traded_asset = (req.asset or req.symbol or symbol.canonical).strip().upper()
+            result = BacktestEngine(cfg).run(
+                symbol=symbol.canonical,
+                asset=traded_asset,
+                frame=frame,
+                signals=strategy_out.signals,
+            )
             row.result_json = result.model_dump_json()
             row.logs = strategy_out.stdout + (f"\nSTDERR:\n{strategy_out.stderr}" if strategy_out.stderr else "")
             row.status = "done"

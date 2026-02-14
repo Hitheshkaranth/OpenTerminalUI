@@ -102,7 +102,7 @@ export function FuturesPage() {
               </button>
             </div>
           </div>
-          {showIndicators && <IndicatorPanel symbol={symbol} activeIndicators={activeIndicators} onChange={setActiveIndicators} />}
+          {showIndicators && <IndicatorPanel symbol={symbol} activeIndicators={activeIndicators} onChange={setActiveIndicators} templateScope="fno" />}
           <FuturesPanel />
         </div>
       </div>

@@ -112,59 +112,95 @@ def _parse_yahoo_chart(data: Dict[str, Any]) -> pd.DataFrame:
 
 
 @router.get("/chart/{ticker}", response_model=ChartResponse)
-async def get_chart(ticker: str, interval: str = Query(default="1d"), range: str = Query(default="1y")) -> ChartResponse:
+async def get_chart(
+    ticker: str,
+    interval: str = Query(default="1d"),
+    range: str = Query(default="1y"),
+    limit: int | None = Query(default=None, ge=1, le=5000),
+    cursor: int | None = Query(default=None),
+) -> ChartResponse:
     key = cache_instance.build_key("chart", ticker.upper(), {"i": interval, "r": range})
     cached = await cache_instance.get(key)
     if cached:
-        return ChartResponse(**cached)
-
-    fetcher = await get_unified_fetcher()
-    # UnifiedFetcher.fetch_history prioritizes NSE > Yahoo > FMP
-    # But currently returns raw dict. We need to parse it.
-    # If it's Yahoo-like data:
-    raw_data = await fetcher.fetch_history(ticker, range_str=range, interval=interval)
-    
-    hist = pd.DataFrame()
-    if raw_data and "chart" in raw_data:
-        hist = _parse_yahoo_chart(raw_data)
-    elif raw_data and "historical" in raw_data: # FMP style
-        # TODO: Parse FMP if needed, but Yahoo is primary
-        pass
+        payload = cached
+    else:
+        fetcher = await get_unified_fetcher()
+        # UnifiedFetcher.fetch_history prioritizes NSE > Yahoo > FMP
+        # But currently returns raw dict. We need to parse it.
+        # If it's Yahoo-like data:
+        raw_data = await fetcher.fetch_history(ticker, range_str=range, interval=interval)
         
-    warnings: list[Dict[str, str]] = []
-    if hist.empty:
-        hist = _synthetic_history(ticker=ticker, interval=interval, range_val=range)
-        warnings.append(
-            {
-                "code": "chart_data_fallback",
-                "message": "Live data unavailable; displaying synthetic fallback series.",
-            }
-        )
-    if hist.empty:
-        raise HTTPException(status_code=404, detail="No chart data available")
+        hist = pd.DataFrame()
+        if raw_data and "chart" in raw_data:
+            hist = _parse_yahoo_chart(raw_data)
+        elif raw_data and "historical" in raw_data: # FMP style
+            # TODO: Parse FMP if needed, but Yahoo is primary
+            pass
+            
+        warnings: list[Dict[str, str]] = []
+        if hist.empty:
+            hist = _synthetic_history(ticker=ticker, interval=interval, range_val=range)
+            warnings.append(
+                {
+                    "code": "chart_data_fallback",
+                    "message": "Live data unavailable; displaying synthetic fallback series.",
+                }
+            )
+        if hist.empty:
+            raise HTTPException(status_code=404, detail="No chart data available")
 
-    data: list[OhlcvPoint] = []
-    for idx, row in hist.iterrows():
-        # idx is Timestamp
-        ts_int = int(idx.timestamp())
-        data.append(OhlcvPoint(
-            t=ts_int, 
-            o=float(row["Open"]), 
-            h=float(row["High"]), 
-            l=float(row["Low"]), 
-            c=float(row["Close"]), 
-            v=float(row.get("Volume", 0) or 0)
-        ))
+        data: list[OhlcvPoint] = []
+        for idx, row in hist.iterrows():
+            # idx is Timestamp
+            ts_int = int(idx.timestamp())
+            data.append(OhlcvPoint(
+                t=ts_int, 
+                o=float(row["Open"]), 
+                h=float(row["High"]), 
+                l=float(row["Low"]), 
+                c=float(row["Close"]), 
+                v=float(row.get("Volume", 0) or 0)
+            ))
 
-    payload = {
-        "ticker": ticker.upper(),
-        "interval": interval,
-        "currency": "INR",
-        "data": [d.model_dump() for d in data],
-        "meta": {"warnings": warnings},
-    }
-    await cache_instance.set(key, payload, ttl=300)
-    return ChartResponse(**payload)
+        payload = {
+            "ticker": ticker.upper(),
+            "interval": interval,
+            "currency": "INR",
+            "data": [d.model_dump() for d in data],
+            "meta": {"warnings": warnings},
+        }
+        await cache_instance.set(key, payload, ttl=300)
+
+    all_points = [OhlcvPoint(**point) if not isinstance(point, OhlcvPoint) else point for point in payload.get("data", [])]
+    # Keep deterministic oldest->newest ordering before slicing.
+    all_points.sort(key=lambda p: p.t)
+
+    filtered_points = [p for p in all_points if cursor is None or p.t < cursor]
+    has_more = False
+    next_cursor: int | None = None
+    if limit is not None and len(filtered_points) > limit:
+        has_more = True
+        filtered_points = filtered_points[-limit:]
+        if filtered_points:
+            next_cursor = filtered_points[0].t
+
+    return ChartResponse(
+        ticker=str(payload.get("ticker") or ticker.upper()),
+        interval=str(payload.get("interval") or interval),
+        currency=str(payload.get("currency") or "INR"),
+        data=filtered_points,
+        meta={
+            "warnings": (payload.get("meta") or {}).get("warnings", []),
+            "pagination": {
+                "cursor": next_cursor,
+                "has_more": has_more,
+                "limit": limit,
+                "requested_cursor": cursor,
+                "returned": len(filtered_points),
+                "total": len(all_points),
+            },
+        },
+    )
 
 
 @router.get("/chart/{ticker}/indicators", response_model=IndicatorResponse)

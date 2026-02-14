@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { fetchQuotesBatch } from "../api/client";
+import { fetchQuotesBatch, getHistory } from "../api/client";
 import { OverviewPanel } from "../components/analysis/OverviewPanel";
 import { PeersComparison } from "../components/analysis/PeersComparison";
+import { PromoterHoldingsCard } from "../components/analysis/PromoterHoldingsCard";
+import { CapexTrackerCard } from "../components/analysis/CapexTrackerCard";
+import { PythonLabWidget } from "../components/analysis/PythonLabWidget";
 import { FinancialsTable } from "../components/analysis/FinancialsTable";
 import { FinancialTrend } from "../components/analysis/FinancialTrend";
 import { FundamentalMetricsPanel } from "../components/analysis/FundamentalMetricsPanel";
@@ -15,7 +18,7 @@ import { ValuationPanel } from "../components/analysis/ValuationPanel";
 import { FuturesPanel } from "../components/market/FuturesPanel";
 import { TerminalBadge } from "../components/terminal/TerminalBadge";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
-import { useFinancials, useStock, useStockHistory, useStockReturns } from "../hooks/useStocks";
+import { useDeliverySeries, useEquityPerformance, useFinancials, useStock, useStockHistory, useStockReturns } from "../hooks/useStocks";
 import { useDisplayCurrency } from "../hooks/useDisplayCurrency";
 import { useQuotesStore, useQuotesStream } from "../realtime/useQuotesStream";
 import { ChartEngine } from "../shared/chart/ChartEngine";
@@ -65,11 +68,19 @@ export function StockDetailPage() {
   const [tab, setTab] = useState<TabId>("overview");
   const [financialPeriod, setFinancialPeriod] = useState<"annual" | "quarterly">("annual");
   const [showVolume, setShowVolume] = useState(true);
+  const [showDeliveryOverlay, setShowDeliveryOverlay] = useState(false);
   const [snapshotTick, setSnapshotTick] = useState<{ ltp: number; change: number; change_pct: number } | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [chartPoints, setChartPoints] = useState<Array<{ t: number; o: number; h: number; l: number; c: number; v: number }>>([]);
+  const [isBackfilling, setIsBackfilling] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const chartFullscreenRef = useRef<HTMLDivElement | null>(null);
 
   const { data: stock } = useStock(ticker);
   const { data: returnsData } = useStockReturns(ticker);
+  const { data: performanceData } = useEquityPerformance(ticker);
   const { data: chart, isLoading: isChartLoading, error: chartError } = useStockHistory(ticker, range, interval);
+  const { data: deliverySeriesData } = useDeliverySeries(ticker, interval, range);
   const { data: financials, isLoading: isFinancialsLoading } = useFinancials(ticker, financialPeriod);
 
   useEffect(() => {
@@ -125,6 +136,20 @@ export function StockDetailPage() {
     }
   }, [selectedIndicators, ticker]);
 
+  useEffect(() => {
+    setChartPoints(chart?.data ?? []);
+    setHasMoreHistory(true);
+  }, [chart?.data, ticker, interval, range]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      const node = chartFullscreenRef.current;
+      setIsFullscreen(Boolean(node && document.fullscreenElement === node));
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
   const stockForOverview = useMemo(
     () => ({
       ticker: ticker.toUpperCase(),
@@ -165,14 +190,76 @@ export function StockDetailPage() {
   const timeframe = intervalToTimeframe(interval);
   const ohlcForToolbar =
     crosshair ??
-    (chart?.data?.length
+    (chartPoints.length
       ? (() => {
-          const last = chart.data[chart.data.length - 1];
+          const last = chartPoints[chartPoints.length - 1];
           return { open: last.o, high: last.h, low: last.l, close: last.c, time: last.t };
         })()
       : null);
+  const deliveryOverlaySeries = useMemo(
+    () =>
+      (deliverySeriesData?.points ?? [])
+        .map((row) => ({
+          time: Math.floor(new Date(`${row.date}T00:00:00Z`).getTime() / 1000),
+          value: Number(row.delivery_pct),
+        }))
+        .filter((row) => Number.isFinite(row.time) && Number.isFinite(row.value)),
+    [deliverySeriesData?.points],
+  );
 
   if (!ticker) return <div className="p-8 text-center text-terminal-muted">Select a stock to view details.</div>;
+
+  const formatPct = (value: number | null | undefined) => {
+    if (value == null || Number.isNaN(value)) return "-";
+    const sign = value > 0 ? "+" : "";
+    return `${sign}${value.toFixed(2)}%`;
+  };
+  const pctColor = (value: number | null | undefined) => {
+    if (value == null || Number.isNaN(value)) return "text-terminal-muted";
+    return value >= 0 ? "text-terminal-pos" : "text-terminal-neg";
+  };
+  const formatPrice = (value: number | null | undefined) => {
+    if (value == null || Number.isNaN(value)) return "-";
+    return formatDisplayMoney(value);
+  };
+  const mergePrependDedupe = (
+    existing: Array<{ t: number; o: number; h: number; l: number; c: number; v: number }>,
+    older: Array<{ t: number; o: number; h: number; l: number; c: number; v: number }>,
+  ) => {
+    const byTime = new Map<number, { t: number; o: number; h: number; l: number; c: number; v: number }>();
+    for (const row of existing) byTime.set(Number(row.t), row);
+    for (const row of older) {
+      const ts = Number(row.t);
+      if (!byTime.has(ts)) byTime.set(ts, row);
+    }
+    return Array.from(byTime.values()).sort((a, b) => a.t - b.t);
+  };
+  const backfillHistory = async (oldestTime: number) => {
+    if (!ticker || isBackfilling || !hasMoreHistory) return;
+    setIsBackfilling(true);
+    try {
+      const response = await getHistory(ticker, selectedMarket, interval, range, 300, oldestTime);
+      const older = response.data ?? [];
+      setChartPoints((prev) => mergePrependDedupe(prev, older));
+      if (!older.length || response.meta?.pagination?.has_more === false) {
+        setHasMoreHistory(false);
+      }
+    } catch {
+      setHasMoreHistory(false);
+    } finally {
+      setIsBackfilling(false);
+    }
+  };
+  const fullscreenSupported = typeof document !== "undefined" && Boolean(document.fullscreenEnabled);
+  const toggleFullscreen = async () => {
+    const node = chartFullscreenRef.current;
+    if (!node || !fullscreenSupported) return;
+    if (document.fullscreenElement === node) {
+      await document.exitFullscreen();
+      return;
+    }
+    await node.requestFullscreen();
+  };
 
   return (
     <div className="relative h-full space-y-3 overflow-y-auto px-3 py-2">
@@ -194,14 +281,17 @@ export function StockDetailPage() {
             showIndicators={showIndicators}
             onToggleIndicators={() => setShowIndicators((v) => !v)}
           />
-          <div className="h-[calc(100vh-280px)] min-h-[350px] rounded border border-terminal-border bg-terminal-panel p-1">
+          <div
+            ref={chartFullscreenRef}
+            className={`${isFullscreen ? "h-screen w-screen bg-terminal-bg p-2" : "h-[calc(100vh-280px)] min-h-[350px] rounded border border-terminal-border bg-terminal-panel p-1"}`}
+          >
             {isChartLoading ? (
               <div className="flex h-full items-center justify-center text-terminal-muted">Loading chart...</div>
-            ) : chart?.data?.length ? (
+            ) : chartPoints.length ? (
               <ChartEngine
                 symbol={ticker}
                 timeframe={timeframe}
-                historicalData={chartPointsToBars(chart.data)}
+                historicalData={chartPointsToBars(chartPoints)}
                 market={selectedMarket}
                 activeIndicators={selectedIndicators}
                 chartType={chartType}
@@ -209,6 +299,10 @@ export function StockDetailPage() {
                 enableRealtime={true}
                 onCrosshairOHLC={setCrosshair}
                 onTick={setRealtimeTick}
+                canRequestBackfill={hasMoreHistory && !isBackfilling}
+                onRequestBackfill={(oldest) => backfillHistory(oldest)}
+                showDeliveryOverlay={showDeliveryOverlay}
+                deliverySeries={deliveryOverlaySeries}
               />
             ) : (
               <div className="flex h-full items-center justify-center text-terminal-muted">
@@ -216,6 +310,37 @@ export function StockDetailPage() {
               </div>
             )}
           </div>
+          <TerminalPanel title="Performance Strip" className="rounded-sm">
+            <div className="grid grid-cols-3 gap-2 text-xs md:grid-cols-6">
+              {(["1D", "1W", "1M", "3M", "6M", "1Y"] as const).map((key) => {
+                const value = performanceData?.period_changes_pct?.[key];
+                return (
+                  <div key={key} className="rounded border border-terminal-border bg-terminal-bg px-2 py-1">
+                    <div className="text-[10px] uppercase tracking-wide text-terminal-muted">{key}</div>
+                    <div className={`mt-1 font-semibold tabular-nums ${pctColor(value)}`}>{formatPct(value)}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-2 text-xs md:grid-cols-2">
+              <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-terminal-muted">Day Range</div>
+                <div className="mt-1 flex items-center justify-between tabular-nums">
+                  <span>{formatPrice(performanceData?.day_range?.low)}</span>
+                  <span className="text-terminal-muted">to</span>
+                  <span>{formatPrice(performanceData?.day_range?.high)}</span>
+                </div>
+              </div>
+              <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-terminal-muted">52W Range</div>
+                <div className="mt-1 flex items-center justify-between tabular-nums">
+                  <span>{formatPrice(performanceData?.range_52w?.low)}</span>
+                  <span className="text-terminal-muted">to</span>
+                  <span>{formatPrice(performanceData?.range_52w?.high)}</span>
+                </div>
+              </div>
+            </div>
+          </TerminalPanel>
         </div>
 
         <div className="space-y-4">
@@ -236,9 +361,24 @@ export function StockDetailPage() {
               >
                 VOLUME
               </button>
+              <button
+                className={`rounded border px-2 py-0.5 text-[11px] ${showDeliveryOverlay ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted"}`}
+                onClick={() => setShowDeliveryOverlay((v) => !v)}
+              >
+                DELIVERY %
+              </button>
+              <button
+                className={`rounded border px-2 py-0.5 text-[11px] ${isFullscreen ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted"} ${fullscreenSupported ? "" : "cursor-not-allowed opacity-60"}`}
+                onClick={() => {
+                  void toggleFullscreen();
+                }}
+                disabled={!fullscreenSupported}
+              >
+                {isFullscreen ? "EXIT FS" : "FULLSCREEN"}
+              </button>
             </div>
           </TerminalPanel>
-          {showIndicators && <IndicatorPanel symbol={ticker} activeIndicators={selectedIndicators} onChange={setSelectedIndicators} />}
+          {showIndicators && <IndicatorPanel symbol={ticker} activeIndicators={selectedIndicators} onChange={setSelectedIndicators} templateScope="equity" />}
           <FuturesPanel />
         </div>
       </div>
@@ -272,6 +412,10 @@ export function StockDetailPage() {
               qoqPct={returnsData?.["3m"] ?? null}
               yoyPct={returnsData?.["1y"] ?? null}
             />
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+              <PromoterHoldingsCard ticker={ticker} />
+              <CapexTrackerCard ticker={ticker} />
+            </div>
             <ScoreCard ticker={ticker} />
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <ShareholdingChart ticker={ticker} market={selectedMarket} />
@@ -315,6 +459,7 @@ export function StockDetailPage() {
               <ShareholdingChart ticker={ticker} market={selectedMarket} />
             </div>
             <FundamentalMetricsPanel ticker={ticker} />
+            <PythonLabWidget />
           </div>
         )}
 

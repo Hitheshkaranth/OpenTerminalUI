@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
-import { searchSymbols } from "../../api/client";
-import { useMarketStatus } from "../../hooks/useStocks";
+import { fetchCryptoSearch, searchSymbols } from "../../api/client";
+import { useMarketStatus, useTopBarTickers } from "../../hooks/useStocks";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useStockStore } from "../../store/stockStore";
 import { COUNTRY_MARKETS } from "../../types";
@@ -11,13 +11,13 @@ import type { CountryCode, MarketCode } from "../../types";
 type DisplayCurrency = "INR" | "USD";
 
 const COUNTRY_FLAGS: Record<CountryCode, string> = {
-  IN: "🇮🇳",
-  US: "🇺🇸",
+  IN: "IN",
+  US: "US",
 };
 
 const CURRENCY_FLAGS: Record<DisplayCurrency, string> = {
-  INR: "🇮🇳",
-  USD: "🇺🇸",
+  INR: "INR",
+  USD: "USD",
 };
 
 const COUNTRY_DEFAULT_MARKET: Record<CountryCode, MarketCode> = {
@@ -27,6 +27,7 @@ const COUNTRY_DEFAULT_MARKET: Record<CountryCode, MarketCode> = {
 
 export function TopBar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const setTicker = useStockStore((s) => s.setTicker);
   const load = useStockStore((s) => s.load);
   const ticker = useStockStore((s) => s.ticker);
@@ -37,6 +38,7 @@ export function TopBar() {
   const setSelectedMarket = useSettingsStore((s) => s.setSelectedMarket);
   const setDisplayCurrency = useSettingsStore((s) => s.setDisplayCurrency);
   const { data: marketStatus } = useMarketStatus();
+  const { data: topBarTickers } = useTopBarTickers();
   const [query, setQuery] = useState(ticker);
   const [results, setResults] = useState<Array<{ ticker: string; name: string }>>([]);
   const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
@@ -158,7 +160,8 @@ export function TopBar() {
     }
     const requestId = ++searchRequestRef.current;
     try {
-      const res = await searchSymbols(q, selectedMarket);
+      const [equityRes, cryptoRes] = await Promise.all([searchSymbols(q, selectedMarket), fetchCryptoSearch(q)]);
+      const res = [...equityRes, ...cryptoRes];
       if (requestId !== searchRequestRef.current || suppressSuggestionsRef.current) {
         return;
       }
@@ -199,37 +202,92 @@ export function TopBar() {
   }, [handleLoad, setTicker]);
   const safeTicker = (ticker || "NIFTY").toUpperCase();
   const aboutPath = location.pathname.startsWith("/fno") ? "/fno/about" : "/equity/stocks/about";
+  const topIndicators = topBarTickers?.items ?? [];
+  const chartProxyTickerByKey: Record<string, string> = {
+    crude: "ONGC",
+    gold: "GOLDBEES",
+    silver: "SILVERBEES",
+  };
+  const marketTickerItems = (
+    <>
+      <span className="text-terminal-accent">NIFTY 50</span>
+      <span>{formatIndex(nifty50)}</span>
+      <span className={pctClass(nifty50Pct)}>{formatPct(nifty50Pct)}</span>
+      <span className={hasIndexData ? "text-terminal-pos" : "text-terminal-neg"}>
+        {feedStateLabel}
+      </span>
+      <span className="text-terminal-accent">SENSEX</span>
+      <span>{formatIndex(sensex)}</span>
+      <span className={pctClass(sensexPct)}>{formatPct(sensexPct)}</span>
+      <span className="text-terminal-accent">USD/INR</span>
+      <span>{formatFx(usdInr ?? (inrUsd ? 1 / inrUsd : null))}</span>
+      <span className={pctClass(usdInrPct)}>{formatPct(usdInrPct)}</span>
+      <span className="text-terminal-accent">S&P500</span>
+      <span>{formatGlobalIndex(sp500)}</span>
+      <span className={pctClass(sp500Pct)}>{formatPct(sp500Pct)}</span>
+      <span className="text-terminal-accent">NIKKEI225</span>
+      <span>{formatGlobalIndex(nikkei225)}</span>
+      <span className={pctClass(nikkei225Pct)}>{formatPct(nikkei225Pct)}</span>
+      <span className="text-terminal-accent">HANGSENG</span>
+      <span>{formatGlobalIndex(hangseng)}</span>
+      <span className={pctClass(hangsengPct)}>{formatPct(hangsengPct)}</span>
+      {topIndicators.map((item) => (
+        <button
+          key={item.key}
+          className="inline-flex items-center gap-1 rounded border border-terminal-border px-1.5 py-0.5 text-[10px] uppercase hover:border-terminal-accent hover:text-terminal-accent"
+          onClick={() => {
+            const proxy = chartProxyTickerByKey[item.key] || safeTicker;
+            setTicker(proxy);
+            void load();
+            navigate("/equity/stocks");
+          }}
+          title={`Open chart pane (${(chartProxyTickerByKey[item.key] || safeTicker).toUpperCase()})`}
+        >
+          <span className="text-terminal-accent">{item.label}</span>
+          <span>{item.price == null ? "NA" : Number(item.price).toFixed(2)}</span>
+          <span className={pctClass(item.change_pct ?? null)}>{formatPct(item.change_pct ?? null)}</span>
+        </button>
+      ))}
+      <span className="text-terminal-muted">{isFallback ? "fallback enabled" : backendHealthLabel}</span>
+      {marketError && !hasIndexData && <span className="text-terminal-neg">feed error</span>}
+    </>
+  );
 
   return (
     <div className="relative z-20 border-b border-terminal-border bg-terminal-panel">
       <div className="flex items-center justify-between border-b border-terminal-border px-3 py-1 text-[11px] uppercase text-terminal-muted">
-        <div className="flex items-center gap-3">
-          <span className="text-terminal-accent">NIFTY 50</span>
-          <span>{formatIndex(nifty50)}</span>
-          <span className={pctClass(nifty50Pct)}>{formatPct(nifty50Pct)}</span>
-          <span className={hasIndexData ? "text-terminal-pos" : "text-terminal-neg"}>
-            {feedStateLabel}
-          </span>
-          <span className="text-terminal-accent">SENSEX</span>
-          <span>{formatIndex(sensex)}</span>
-          <span className={pctClass(sensexPct)}>{formatPct(sensexPct)}</span>
-          <span className="text-terminal-accent">USD/INR</span>
-          <span>{formatFx(usdInr ?? (inrUsd ? 1 / inrUsd : null))}</span>
-          <span className={pctClass(usdInrPct)}>{formatPct(usdInrPct)}</span>
-          <span className="text-terminal-accent">S&P500</span>
-          <span>{formatGlobalIndex(sp500)}</span>
-          <span className={pctClass(sp500Pct)}>{formatPct(sp500Pct)}</span>
-          <span className="text-terminal-accent">NIKKEI225</span>
-          <span>{formatGlobalIndex(nikkei225)}</span>
-          <span className={pctClass(nikkei225Pct)}>{formatPct(nikkei225Pct)}</span>
-          <span className="text-terminal-accent">HANGSENG</span>
-          <span>{formatGlobalIndex(hangseng)}</span>
-          <span className={pctClass(hangsengPct)}>{formatPct(hangsengPct)}</span>
-          <span className="text-terminal-muted">{isFallback ? "fallback enabled" : backendHealthLabel}</span>
-          {marketError && !hasIndexData && <span className="text-terminal-neg">feed error</span>}
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <div className="topbar-marquee-track">
+            <div className="topbar-marquee-segment">{marketTickerItems}</div>
+            <div className="topbar-marquee-segment" aria-hidden="true">{marketTickerItems}</div>
+          </div>
         </div>
-        <div>CTRL+K COMMAND | / SEARCH</div>
+        <div className="ml-3 shrink-0">CTRL+K COMMAND | / SEARCH</div>
       </div>
+      <style>{`
+        .topbar-marquee-track {
+          display: flex;
+          width: max-content;
+          animation: topbar-marquee 70s linear infinite;
+          will-change: transform;
+        }
+        .topbar-marquee-segment {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          white-space: nowrap;
+          padding-right: 0.75rem;
+        }
+        @keyframes topbar-marquee {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .topbar-marquee-track {
+            animation: none;
+          }
+        }
+      `}</style>
       <div className="relative flex items-center gap-2 px-3 py-1.5">
         <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/">
           HOME
@@ -237,11 +295,14 @@ export function TopBar() {
         <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/equity/screener">
           SCREENER
         </Link>
+        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno/heatmap?symbol=${encodeURIComponent(safeTicker)}`}>
+          HEATMAP
+        </Link>
         <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={aboutPath}>
           ABOUT
         </Link>
         <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno?symbol=${encodeURIComponent(safeTicker)}`}>
-          F&O →
+          F&O -&gt;
         </Link>
         <input
           ref={searchInputRef}
@@ -290,8 +351,8 @@ export function TopBar() {
             value={selectedCountry}
             onChange={(e) => setSelectedCountry(e.target.value as CountryCode)}
           >
-            <option value="IN">{COUNTRY_FLAGS.IN} IN</option>
-            <option value="US">{COUNTRY_FLAGS.US} US</option>
+            <option value="IN">{COUNTRY_FLAGS.IN}</option>
+            <option value="US">{COUNTRY_FLAGS.US}</option>
           </select>
           <select
             className="w-[86px] rounded border border-terminal-border bg-terminal-bg px-1 py-1 text-[11px] uppercase text-terminal-text outline-none"
@@ -321,7 +382,7 @@ export function TopBar() {
           </select>
         </div>
         <div className="border-l border-terminal-border pl-2 text-[11px] uppercase tracking-wide text-terminal-muted">
-          {selectedCountry} • {selectedMarket} • {displayCurrency}
+          {selectedCountry} | {selectedMarket} | {displayCurrency}
         </div>
         {isSuggestionsOpen && results.length > 0 && (
           <div className="absolute left-3 right-3 top-10 z-10 max-h-72 overflow-auto rounded border border-terminal-border bg-terminal-panel">
@@ -342,4 +403,5 @@ export function TopBar() {
     </div>
   );
 }
+
 

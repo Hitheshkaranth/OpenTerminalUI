@@ -26,7 +26,7 @@ export function FnoAboutPage() {
         <div className="flex items-center gap-3">
           <img src={logo} alt="OpenTerminalUI" className="h-14 w-auto object-contain" />
           <div className="text-xs text-terminal-muted">
-            Bloomberg-style dense terminal view focused on futures/options analytics while staying aligned with the Equity workspace conventions.
+            Dense F&O terminal focused on derivatives workflows with unified behavior across the Equity and Backtesting experiences.
           </div>
         </div>
       </TerminalPanel>
@@ -34,19 +34,19 @@ export function FnoAboutPage() {
       <div className="grid gap-3 md:grid-cols-2">
         <TerminalPanel title="F&O Pack Modules">
           <ul className="space-y-1 text-xs text-terminal-text">
-            <li>- Option Chain, Greeks, OI analysis and Futures chart.</li>
-            <li>- Strategy builder, PCR, heatmap and expiry dashboards.</li>
-            <li>- Shared chart engine with realtime stream + indicators.</li>
-            <li>- ATM/PCR/Max Pain marker overlays and key levels.</li>
+            <li>- Option chain with Greeks and OI context for directional and volatility setups.</li>
+            <li>- Strategy builder with presets and payoff visualization for multi-leg structures.</li>
+            <li>- PCR dashboard, market heatmap, and expiry dashboard for breadth and timing.</li>
+            <li>- Futures page with chart + indicators using the shared chart engine.</li>
           </ul>
         </TerminalPanel>
 
         <TerminalPanel title="Cross-Pack Consistency">
           <ul className="space-y-1 text-xs text-terminal-muted">
-            <li>- Same top market header and bottom data status strip as Equity.</li>
-            <li>- Same terminal navigation density and function-key mapping.</li>
-            <li>- Shared ticker context for quick pack switching.</li>
-            <li>- Matching about/navigation patterns across both packs.</li>
+            <li>- Shared top market strip with live index and commodity movement.</li>
+            <li>- Unified route model and quick links (including direct Heatmap access).</li>
+            <li>- Common ticker context to switch Equity/F&O without re-entry.</li>
+            <li>- Matching visual language, control density, and panel behavior.</li>
           </ul>
         </TerminalPanel>
       </div>
@@ -79,8 +79,9 @@ export function FnoAboutPage() {
         <ul className="space-y-1 text-xs text-terminal-muted">
           <li>- FastAPI + React/TypeScript terminal architecture.</li>
           <li>- WebSocket quote stream with fallback polling path.</li>
-          <li>- Background services for news, instruments and snapshots.</li>
-          <li>- Docker and CI-enabled build/test workflow.</li>
+          <li>- Shared API v1 capabilities: indicators, scripting, crypto and equity analytics endpoints.</li>
+          <li>- Background services for instruments, news, and snapshot continuity.</li>
+          <li>- Docker and CI-ready build/verify workflow.</li>
         </ul>
       </TerminalPanel>
     </div>

@@ -10,6 +10,30 @@ type RealtimeResult = {
   liveTick: { ltp: number; change_pct: number } | null;
 };
 
+function normalizeBars(input: Bar[]): Bar[] {
+  const byTime = new Map<number, Bar>();
+  for (const row of input) {
+    const time = Number(row.time);
+    const open = Number(row.open);
+    const high = Number(row.high);
+    const low = Number(row.low);
+    const close = Number(row.close);
+    const volume = Number(row.volume ?? 0);
+    if (!Number.isFinite(time) || !Number.isFinite(open) || !Number.isFinite(high) || !Number.isFinite(low) || !Number.isFinite(close)) {
+      continue;
+    }
+    byTime.set(time, {
+      time,
+      open,
+      high: Math.max(open, high, low, close),
+      low: Math.min(open, high, low, close),
+      close,
+      volume: Number.isFinite(volume) ? volume : 0,
+    });
+  }
+  return Array.from(byTime.values()).sort((a, b) => Number(a.time) - Number(b.time));
+}
+
 export function useRealtimeChart(
   market: string,
   symbol: string,
@@ -20,10 +44,10 @@ export function useRealtimeChart(
   const token = `${market.toUpperCase()}:${symbol.toUpperCase()}`;
   const { subscribe, unsubscribe } = useQuotesStream(market);
   const tick = useQuotesStore((s) => s.ticksByToken[token]);
-  const [bars, setBars] = useState<Bar[]>(seedBars);
+  const [bars, setBars] = useState<Bar[]>(normalizeBars(seedBars));
 
   useEffect(() => {
-    setBars(seedBars);
+    setBars(normalizeBars(seedBars));
   }, [seedBars, symbol, timeframe]);
 
   useEffect(() => {

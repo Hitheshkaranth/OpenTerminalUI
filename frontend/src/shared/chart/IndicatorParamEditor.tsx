@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 import { listIndicators } from "./IndicatorManager";
 import type { IndicatorConfig } from "./types";
+import { terminalColors } from "../../theme/terminal";
 
 type Props = {
   config: IndicatorConfig;
@@ -46,7 +47,7 @@ export function IndicatorParamEditor({ config, onClose, onSave }: Props) {
           <input
             type="color"
             className="h-8 w-full rounded border border-terminal-border bg-terminal-bg"
-            value={draft.color || "#2962ff"}
+            value={draft.color || terminalColors.accent}
             onChange={(e) => setDraft((prev) => ({ ...prev, color: e.target.value }))}
           />
         </label>

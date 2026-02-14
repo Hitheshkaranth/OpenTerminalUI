@@ -17,6 +17,7 @@ import { terminalChartTheme } from "./chartTheme";
 import { useIndicators } from "./useIndicators";
 import { useRealtimeChart } from "./useRealtimeChart";
 import type { ChartEngineProps } from "./types";
+import { terminalColors } from "../../theme/terminal";
 
 type SeriesRef = {
   candles: ISeriesApi<"Candlestick", Time> | null;
@@ -25,6 +26,7 @@ type SeriesRef = {
   baseline: ISeriesApi<"Baseline", Time> | null;
   volume: ISeriesApi<"Histogram", Time> | null;
   oi: ISeriesApi<"Area", Time> | null;
+  delivery: ISeriesApi<"Line", Time> | null;
 };
 
 export function ChartEngine({
@@ -40,20 +42,41 @@ export function ChartEngine({
   symbolIsFnO = false,
   onCrosshairOHLC,
   onTick,
+  canRequestBackfill = false,
+  onRequestBackfill,
+  showDeliveryOverlay = false,
+  deliverySeries = [],
 }: ChartEngineProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<SeriesRef>({ candles: null, line: null, area: null, baseline: null, volume: null, oi: null });
+  const seriesRef = useRef<SeriesRef>({ candles: null, line: null, area: null, baseline: null, volume: null, oi: null, delivery: null });
   const byTimeRef = useRef<Map<number, Bar>>(new Map());
   const crosshairCbRef = useRef<ChartEngineProps["onCrosshairOHLC"]>(onCrosshairOHLC);
+  const backfillCbRef = useRef<ChartEngineProps["onRequestBackfill"]>(onRequestBackfill);
+  const canBackfillRef = useRef<boolean>(canRequestBackfill);
+  const barsRef = useRef<Bar[]>(historicalData);
+  const backfillInFlightRef = useRef(false);
+  const lastBackfillOldestRef = useRef<number | null>(null);
   const [chartApi, setChartApi] = useState<IChartApi | null>(null);
   const { bars, liveTick } = useRealtimeChart(market, symbol, timeframe, historicalData, enableRealtime);
+  const safeBars = useMemo(
+    () =>
+      bars.filter(
+        (b) =>
+          Number.isFinite(Number(b.time)) &&
+          Number.isFinite(Number(b.open)) &&
+          Number.isFinite(Number(b.high)) &&
+          Number.isFinite(Number(b.low)) &&
+          Number.isFinite(Number(b.close)),
+      ),
+    [bars],
+  );
 
   const byTime = useMemo(() => {
     const map = new Map<number, Bar>();
-    for (const b of bars) map.set(Number(b.time), b);
+    for (const b of safeBars) map.set(Number(b.time), b);
     return map;
-  }, [bars]);
+  }, [safeBars]);
 
   useEffect(() => {
     byTimeRef.current = byTime;
@@ -62,6 +85,15 @@ export function ChartEngine({
   useEffect(() => {
     crosshairCbRef.current = onCrosshairOHLC;
   }, [onCrosshairOHLC]);
+  useEffect(() => {
+    backfillCbRef.current = onRequestBackfill;
+  }, [onRequestBackfill]);
+  useEffect(() => {
+    canBackfillRef.current = canRequestBackfill;
+  }, [canRequestBackfill]);
+  useEffect(() => {
+    barsRef.current = safeBars;
+  }, [safeBars]);
 
   useEffect(() => {
     onTick?.(liveTick);
@@ -78,31 +110,31 @@ export function ChartEngine({
     const candles = chart.addSeries(
       CandlestickSeries,
       {
-        upColor: "#26a69a",
-        downColor: "#ef5350",
+        upColor: terminalColors.candleUp,
+        downColor: terminalColors.candleDown,
         borderVisible: false,
-        wickUpColor: "#26a69a",
-        wickDownColor: "#ef5350",
+        wickUpColor: terminalColors.candleUp,
+        wickDownColor: terminalColors.candleDown,
         visible: chartType === "candle",
       },
       0,
     );
-    const line = chart.addSeries(LineSeries, { color: "#ff9f1a", lineWidth: 2, visible: chartType === "line" }, 0);
+    const line = chart.addSeries(LineSeries, { color: terminalColors.accent, lineWidth: 2, visible: chartType === "line" }, 0);
     const area = chart.addSeries(
       AreaSeries,
-      { lineColor: "#ff9f1a", topColor: "#ff9f1a55", bottomColor: "#ff9f1a12", visible: chartType === "area" },
+      { lineColor: terminalColors.accent, topColor: terminalColors.accentAreaTop, bottomColor: terminalColors.accentAreaBottom, visible: chartType === "area" },
       0,
     );
     const baseline = chart.addSeries(
       BaselineSeries,
       {
         visible: chartType === "baseline",
-        topLineColor: "#26a69a",
-        bottomLineColor: "#ef5350",
-        topFillColor1: "#26a69a44",
-        topFillColor2: "#26a69a11",
-        bottomFillColor1: "#ef535044",
-        bottomFillColor2: "#ef535011",
+        topLineColor: terminalColors.candleUp,
+        bottomLineColor: terminalColors.candleDown,
+        topFillColor1: terminalColors.candleUpFillStrong,
+        topFillColor2: terminalColors.candleUpFillSoft,
+        bottomFillColor1: terminalColors.candleDownFillStrong,
+        bottomFillColor2: terminalColors.candleDownFillSoft,
       },
       0,
     );
@@ -110,11 +142,25 @@ export function ChartEngine({
       HistogramSeries,
       {
         priceFormat: { type: "volume" },
-        color: "#26a69a80",
+        color: terminalColors.candleUpAlpha80,
         visible: showVolume,
       },
       1,
     );
+    const delivery = chart.addSeries(
+      LineSeries,
+      {
+        color: terminalColors.info,
+        lineWidth: 2,
+        visible: showDeliveryOverlay,
+        priceScaleId: "delivery-scale",
+      },
+      0,
+    );
+    chart.priceScale("delivery-scale").applyOptions({
+      borderVisible: false,
+      scaleMargins: { top: 0.7, bottom: 0.12 },
+    });
 
     // Keep price action dominant and volume compact.
     chart.panes()[0]?.setStretchFactor(950);
@@ -127,7 +173,7 @@ export function ChartEngine({
         {
           topColor: "rgba(245,124,32,0.2)",
           bottomColor: "rgba(245,124,32,0.01)",
-          lineColor: "#f57c20",
+          lineColor: terminalColors.accentAlt,
           lineWidth: 1,
           priceScaleId: "oi-scale",
         },
@@ -139,7 +185,7 @@ export function ChartEngine({
       });
     }
 
-    seriesRef.current = { candles, line, area, baseline, volume, oi };
+    seriesRef.current = { candles, line, area, baseline, volume, oi, delivery };
     chartRef.current = chart;
     setChartApi(chart);
 
@@ -159,6 +205,25 @@ export function ChartEngine({
 
     chart.subscribeCrosshairMove(onCrosshairMove as never);
 
+    const onVisibleLogicalRangeChange = (logicalRange: { from: number; to: number } | null) => {
+      if (!logicalRange || !canBackfillRef.current || backfillInFlightRef.current) return;
+      if (logicalRange.from > 20) return;
+      const localBars = barsRef.current;
+      if (!localBars.length) return;
+      const oldest = Number(localBars[0].time);
+      if (!Number.isFinite(oldest) || oldest <= 0) return;
+      if (lastBackfillOldestRef.current === oldest) return;
+      const cb = backfillCbRef.current;
+      if (!cb) return;
+
+      backfillInFlightRef.current = true;
+      lastBackfillOldestRef.current = oldest;
+      Promise.resolve(cb(oldest)).finally(() => {
+        backfillInFlightRef.current = false;
+      });
+    };
+    chart.timeScale().subscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChange as never);
+
     const observer = new ResizeObserver(() => {
       if (!hostRef.current) return;
       chart.applyOptions({ width: hostRef.current.clientWidth, height: hostRef.current.clientHeight || height });
@@ -168,6 +233,7 @@ export function ChartEngine({
     return () => {
       observer.disconnect();
       chart.unsubscribeCrosshairMove(onCrosshairMove as never);
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChange as never);
       chart.remove();
       chartRef.current = null;
       setChartApi(null);
@@ -185,19 +251,19 @@ export function ChartEngine({
 
   useEffect(() => {
     const s = seriesRef.current;
-    if (!s.candles || !s.line || !s.area || !s.baseline || !s.volume) return;
-    const candles = bars.map((b) => ({
+    if (!s.candles || !s.line || !s.area || !s.baseline || !s.volume || !s.delivery) return;
+    const candles = safeBars.map((b) => ({
       time: Number(b.time) as UTCTimestamp,
       open: Number(b.open),
       high: Number(b.high),
       low: Number(b.low),
       close: Number(b.close),
     }));
-    const closeLine = bars.map((b) => ({ time: Number(b.time) as UTCTimestamp, value: Number(b.close) }));
-    const vol = bars.map((b) => ({
+    const closeLine = safeBars.map((b) => ({ time: Number(b.time) as UTCTimestamp, value: Number(b.close) }));
+    const vol = safeBars.map((b) => ({
       time: Number(b.time) as UTCTimestamp,
       value: Number(b.volume ?? 0),
-      color: Number(b.close) >= Number(b.open) ? "#26a69a80" : "#ef535080",
+      color: Number(b.close) >= Number(b.open) ? terminalColors.candleUpAlpha80 : terminalColors.candleDownAlpha80,
     }));
     s.candles.setData(candles);
     s.line.setData(closeLine);
@@ -205,15 +271,22 @@ export function ChartEngine({
     s.baseline.setData(closeLine);
     s.volume.setData(vol);
     s.volume.applyOptions({ visible: showVolume });
+    s.delivery.setData(
+      deliverySeries.map((row) => ({
+        time: Number(row.time) as UTCTimestamp,
+        value: Number(row.value),
+      })),
+    );
+    s.delivery.applyOptions({ visible: showDeliveryOverlay });
     s.oi?.setData(
-      bars.map((b) => ({
+      safeBars.map((b) => ({
         time: Number(b.time) as UTCTimestamp,
         value: Number(b.volume ?? 0),
       })),
     );
-  }, [bars, showVolume]);
+  }, [safeBars, showVolume, deliverySeries, showDeliveryOverlay]);
 
-  useIndicators(chartApi, bars, activeIndicators);
+  useIndicators(chartApi, safeBars, activeIndicators);
 
   return (
     <div className="relative z-0 h-full w-full rounded border border-terminal-border">

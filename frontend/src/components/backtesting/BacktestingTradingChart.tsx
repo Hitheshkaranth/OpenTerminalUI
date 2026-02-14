@@ -17,6 +17,7 @@ import type { Bar } from "oakscriptjs";
 import { terminalChartTheme } from "../../shared/chart/chartTheme";
 import { useIndicators } from "../../shared/chart/useIndicators";
 import type { ChartKind, IndicatorConfig } from "../../shared/chart/types";
+import { terminalColors } from "../../theme/terminal";
 
 type TradeMarker = {
   date: string;
@@ -60,12 +61,13 @@ export function BacktestingTradingChart({
           return {
             time: ts,
             position: t.action === "BUY" ? "belowBar" : "aboveBar",
-            color: t.action === "BUY" ? "#00c176" : "#ff4d4f",
+            color: t.action === "BUY" ? terminalColors.positive : terminalColors.negative,
             shape: t.action === "BUY" ? "arrowUp" : "arrowDown",
             text: t.action === "BUY" ? "BUY" : "SELL",
           } as const;
         })
-        .filter((m): m is NonNullable<typeof m> => Boolean(m)),
+        .filter((m): m is NonNullable<typeof m> => Boolean(m))
+        .sort((a, b) => Number(a.time) - Number(b.time)),
     [trades],
   );
   const byTimeRef = useRef<Map<number, Bar>>(new Map());
@@ -90,29 +92,29 @@ export function BacktestingTradingChart({
       height,
     });
     const candles = chart.addSeries(CandlestickSeries, {
-      upColor: "#26a69a",
-      downColor: "#ef5350",
+      upColor: terminalColors.candleUp,
+      downColor: terminalColors.candleDown,
       borderVisible: false,
-      wickUpColor: "#26a69a",
-      wickDownColor: "#ef5350",
+      wickUpColor: terminalColors.candleUp,
+      wickDownColor: terminalColors.candleDown,
       visible: chartType === "candle",
     });
     const line = chart.addSeries(LineSeries, {
-      color: "#5aa9ff",
+      color: terminalColors.info,
       lineWidth: 2,
       visible: chartType === "line",
     });
     const area = chart.addSeries(AreaSeries, {
-      lineColor: "#5aa9ff",
-      topColor: "#5aa9ff55",
-      bottomColor: "#5aa9ff12",
+      lineColor: terminalColors.info,
+      topColor: terminalColors.infoAreaTop,
+      bottomColor: terminalColors.infoAreaBottom,
       visible: chartType === "area",
     });
     const volume = chart.addSeries(
       HistogramSeries,
       {
         priceFormat: { type: "volume" },
-        color: "#26a69a80",
+        color: terminalColors.candleUpAlpha80,
         visible: showVolume,
       },
       1,
@@ -177,22 +179,30 @@ export function BacktestingTradingChart({
     const area = areaRef.current;
     const volume = volumeRef.current;
     if (!candles || !line || !area || !volume) return;
-    const candleData = bars.map((b) => ({
+    const safeBars = bars.filter(
+      (b) =>
+        Number.isFinite(Number(b.time)) &&
+        Number.isFinite(Number(b.open)) &&
+        Number.isFinite(Number(b.high)) &&
+        Number.isFinite(Number(b.low)) &&
+        Number.isFinite(Number(b.close)),
+    );
+    const candleData = safeBars.map((b) => ({
       time: Number(b.time) as UTCTimestamp,
       open: Number(b.open),
       high: Number(b.high),
       low: Number(b.low),
       close: Number(b.close),
     }));
-    const closeData = bars.map((b) => ({ time: Number(b.time) as UTCTimestamp, value: Number(b.close) }));
+    const closeData = safeBars.map((b) => ({ time: Number(b.time) as UTCTimestamp, value: Number(b.close) }));
     candles.setData(candleData);
     line.setData(closeData);
     area.setData(closeData);
     volume.setData(
-      bars.map((b) => ({
+      safeBars.map((b) => ({
         time: Number(b.time) as UTCTimestamp,
         value: Number(b.volume ?? 0),
-        color: Number(b.close) >= Number(b.open) ? "#26a69a80" : "#ef535080",
+        color: Number(b.close) >= Number(b.open) ? terminalColors.candleUpAlpha80 : terminalColors.candleDownAlpha80,
       })),
     );
     volume.applyOptions({ visible: showVolume });
