@@ -313,7 +313,7 @@ export function StockDetailPage() {
         {tab === "valuation" && <ValuationPanel ticker={ticker} />}
       </div>
       <Link
-        to="/stocks/about"
+        to="/equity/stocks/about"
         className="fixed bottom-12 left-2 z-20 rounded-sm border border-terminal-border bg-terminal-panel px-2 py-1 text-[11px] uppercase tracking-wide text-terminal-muted hover:text-terminal-accent md:left-52"
       >
         About

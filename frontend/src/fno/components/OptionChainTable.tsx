@@ -22,6 +22,18 @@ export function OptionChainTable({ rows, atmStrike }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("strike");
   const [asc, setAsc] = useState(true);
   const [selectedLeg, setSelectedLeg] = useState<{ side: "CE" | "PE"; strike: number; ltp: number } | null>(null);
+  const persistLeg = (leg: { side: "CE" | "PE"; strike: number; ltp: number }) => {
+    try {
+      const key = "fno_strategy_pending_legs";
+      const raw = localStorage.getItem(key);
+      const current = raw ? (JSON.parse(raw) as Array<{ side: "CE" | "PE"; strike: number; ltp: number }>) : [];
+      current.push(leg);
+      localStorage.setItem(key, JSON.stringify(current));
+      window.dispatchEvent(new Event("fno:add-leg"));
+    } catch {
+      // ignore local storage failure
+    }
+  };
 
   const sorted = useMemo(() => {
     const out = [...rows];
@@ -104,6 +116,12 @@ export function OptionChainTable({ rows, atmStrike }: Props) {
       {selectedLeg && (
         <div className="border-t border-terminal-border bg-terminal-bg px-3 py-2 text-xs">
           Add to Strategy: <span className="text-terminal-accent">{selectedLeg.side} {selectedLeg.strike}</span> @ {selectedLeg.ltp.toFixed(2)}
+          <button
+            className="ml-3 rounded border border-terminal-accent px-2 py-0.5 text-[11px] text-terminal-accent"
+            onClick={() => persistLeg(selectedLeg)}
+          >
+            Add
+          </button>
           <button className="ml-3 rounded border border-terminal-border px-2 py-0.5 text-[11px]" onClick={() => setSelectedLeg(null)}>Close</button>
         </div>
       )}

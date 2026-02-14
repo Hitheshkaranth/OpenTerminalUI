@@ -87,6 +87,76 @@ export type FnoContextValue = {
   expiries: string[];
 };
 
+export type StrategyLeg = {
+  type: "CE" | "PE";
+  strike: number;
+  action: "buy" | "sell";
+  premium: number;
+  lots: number;
+  lot_size: number;
+  expiry: string;
+};
+
+export type StrategyPayoffPoint = { spot: number; pnl: number };
+
+export type StrategyPayoffResponse = {
+  legs: StrategyLeg[];
+  payoff_at_expiry: StrategyPayoffPoint[];
+  max_profit: number | "unlimited";
+  max_loss: number | "unlimited";
+  breakeven_points: number[];
+  risk_reward_ratio: number;
+  net_premium: number;
+  total_margin_approx: number;
+  strategy_name: string;
+};
+
+export type PCRCurrentResponse = {
+  symbol: string;
+  expiry_date: string;
+  timestamp: string;
+  pcr_oi: number;
+  pcr_vol: number;
+  pcr_oi_change: number;
+  signal: string;
+  total_ce_oi: number;
+  total_pe_oi: number;
+};
+
+export type PCRHistoryPoint = {
+  date: string;
+  pcr_oi: number;
+  pcr_vol: number;
+  signal: string;
+};
+
+export type PCRByStrikePoint = {
+  strike: number;
+  ce_oi: number;
+  pe_oi: number;
+  pcr_oi: number;
+  ce_vol: number;
+  pe_vol: number;
+  pcr_vol: number;
+};
+
+export type IvSkewResponse = {
+  symbol: string;
+  expiry: string;
+  spot: number;
+  atm_iv: number;
+  iv_skew: Array<{ strike: number; ce_iv: number; pe_iv: number; moneyness: number }>;
+  iv_percentile: number;
+  iv_rank: number;
+};
+
+export type IvSurfaceResponse = {
+  symbol: string;
+  expiries: string[];
+  strikes: number[];
+  surface: number[][];
+};
+
 export const DEFAULT_FNO_SYMBOLS = [
   "NIFTY",
   "BANKNIFTY",

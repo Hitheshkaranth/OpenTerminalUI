@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet, useOutletContext } from "react-router-dom";
+import { NavLink, Outlet, useOutletContext, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { fetchExpiries } from "./api/fnoApi";
@@ -22,8 +22,14 @@ export function useFnoContext(): FnoContextValue {
 }
 
 export function FnoLayout() {
+  const [searchParams] = useSearchParams();
   const [symbol, setSymbol] = useState<string>("NIFTY");
   const [expiry, setExpiry] = useState<string>("");
+
+  useEffect(() => {
+    const incoming = (searchParams.get("symbol") || searchParams.get("ticker") || "").trim().toUpperCase();
+    if (incoming) setSymbol(incoming);
+  }, [searchParams]);
 
   const expiryQuery = useQuery({
     queryKey: ["fno-expiries", symbol],
@@ -50,9 +56,14 @@ export function FnoLayout() {
     <div className="flex h-full min-h-0">
       <aside className="w-56 shrink-0 border-r border-terminal-border bg-terminal-panel">
         <div className="border-b border-terminal-border px-3 py-3">
-          <NavLink to="/stocks" className="text-xs text-terminal-accent hover:underline">
-            ? Back to Home
+          <NavLink to="/" className="text-xs text-terminal-accent hover:underline">
+            Back to Home
           </NavLink>
+          <div className="mt-2">
+            <NavLink to={`/equity/stocks?ticker=${encodeURIComponent(symbol)}`} className="text-xs text-terminal-muted hover:text-terminal-text">
+              Switch to Equity ?
+            </NavLink>
+          </div>
           <div className="mt-2 text-[10px] uppercase tracking-wide text-terminal-muted">F&O Trading Desk</div>
         </div>
         <nav className="space-y-1 p-2 text-xs">
@@ -81,7 +92,7 @@ export function FnoLayout() {
                 value={symbol}
                 onChange={(e) => setSymbol(e.target.value.toUpperCase())}
               >
-                {DEFAULT_FNO_SYMBOLS.map((item) => (
+                {[...new Set([...(DEFAULT_FNO_SYMBOLS as readonly string[]), symbol])].map((item) => (
                   <option key={item} value={item}>{item}</option>
                 ))}
               </select>

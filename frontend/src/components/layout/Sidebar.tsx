@@ -1,15 +1,16 @@
 import { NavLink } from "react-router-dom";
+import { useStockStore } from "../../store/stockStore";
 
 export function Sidebar() {
+  const ticker = useStockStore((s) => s.ticker);
   const nav = [
-    { label: "Market", path: "/stocks", key: "F1" },
-    { label: "Screener", path: "/screener", key: "F2" },
-    { label: "Portfolio", path: "/portfolio", key: "F3" },
-    { label: "Watchlist", path: "/watchlist", key: "F4" },
-    { label: "News", path: "/news", key: "F5" },
-    { label: "F&O", path: "/fno", key: "F6" },
-    { label: "Settings", path: "/settings", key: "F7" },
-    { label: "About", path: "/stocks/about", key: "F8" },
+    { label: "Market", path: "/equity/stocks", key: "F1" },
+    { label: "Screener", path: "/equity/screener", key: "F2" },
+    { label: "Portfolio", path: "/equity/portfolio", key: "F3" },
+    { label: "Watchlist", path: "/equity/watchlist", key: "F4" },
+    { label: "News", path: "/equity/news", key: "F5" },
+    { label: "Settings", path: "/equity/settings", key: "F6" },
+    { label: "About", path: "/equity/stocks/about", key: "F7" },
   ];
 
   return (
@@ -19,6 +20,17 @@ export function Sidebar() {
       </div>
       <div className="border-b border-terminal-border px-3 py-2 text-[11px] text-terminal-muted">
         NSE EQUITY ANALYTICS
+      </div>
+      <div className="space-y-1 border-b border-terminal-border p-2 text-xs">
+        <NavLink to="/" className="block rounded px-2 py-2 text-terminal-muted hover:bg-terminal-bg hover:text-terminal-text">
+          Home
+        </NavLink>
+        <NavLink
+          to={`/fno?symbol=${encodeURIComponent((ticker || "NIFTY").toUpperCase())}`}
+          className="block rounded px-2 py-2 text-terminal-muted hover:bg-terminal-bg hover:text-terminal-text"
+        >
+          Switch To F&O →
+        </NavLink>
       </div>
       <nav className="space-y-1 p-2 text-xs">
         {nav.map((item) => (

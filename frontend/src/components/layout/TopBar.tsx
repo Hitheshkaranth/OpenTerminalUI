@@ -228,14 +228,17 @@ export function TopBar() {
         <div>CTRL+K COMMAND | / SEARCH</div>
       </div>
       <div className="relative flex items-center gap-2 px-3 py-1.5">
-        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/stocks">
+        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/">
           HOME
         </Link>
-        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/screener">
+        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/equity/screener">
           SCREENER
         </Link>
-        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/stocks/about">
+        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/equity/stocks/about">
           ABOUT
+        </Link>
+        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno?symbol=${encodeURIComponent(ticker.toUpperCase())}`}>
+          F&O →
         </Link>
         <input
           ref={searchInputRef}
