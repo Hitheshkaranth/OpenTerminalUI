@@ -27,7 +27,14 @@ jobs:
         run: python -m compileall backend
 
       - name: Run pytest
-        run: pytest backend/tests -q
+        run: PYTHONPATH=. pytest backend/tests -q --junitxml=pytest-report.xml
+
+      - name: Upload pytest report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report
+          path: pytest-report.xml
 
       - name: Setup Node
         uses: actions/setup-node@v4
