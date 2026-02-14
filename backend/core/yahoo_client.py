@@ -133,7 +133,6 @@ class YahooClient:
         Get real-time quotes for multiple symbols (automatically batched).
         """
         await self._ensure_client()
-        await self._ensure_crumb()
 
         # Deduplicate
         symbols = list(set(symbols))
@@ -145,12 +144,13 @@ class YahooClient:
             batch = symbols[i : i + chunk_size]
             try:
                 params: Dict[str, str] = {"symbols": ",".join(batch)}
-                if self._crumb:
-                    params["crumb"] = self._crumb
-                response = await self.client.get(
-                    "https://query1.finance.yahoo.com/v7/finance/quote",
-                    params=params,
-                )
+                response = await self.client.get("https://query1.finance.yahoo.com/v7/finance/quote", params=params)
+                if response.status_code == 401:
+                    self._crumb = None
+                    await self._ensure_crumb()
+                    if self._crumb:
+                        params["crumb"] = self._crumb
+                        response = await self.client.get("https://query1.finance.yahoo.com/v7/finance/quote", params=params)
                 response.raise_for_status()
                 data = response.json()
                 quotes = (data.get("quoteResponse") or {}).get("result") or []
@@ -164,17 +164,23 @@ class YahooClient:
     async def get_quote_summary(self, symbol: str, modules: Optional[List[str]] = None) -> Dict[str, Any]:
         """Get comprehensive data from Yahoo quoteSummary v10 API."""
         await self._ensure_client()
-        await self._ensure_crumb()
         if modules is None:
             modules = ["financialData", "summaryDetail", "defaultKeyStatistics", "assetProfile"]
         try:
             params: Dict[str, str] = {"modules": ",".join(modules)}
-            if self._crumb:
-                params["crumb"] = self._crumb
             response = await self.client.get(
                 f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{symbol}",
                 params=params,
             )
+            if response.status_code == 401:
+                self._crumb = None
+                await self._ensure_crumb()
+                if self._crumb:
+                    params["crumb"] = self._crumb
+                    response = await self.client.get(
+                        f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{symbol}",
+                        params=params,
+                    )
             response.raise_for_status()
             data = response.json()
             results = (data.get("quoteSummary") or {}).get("result") or [{}]
@@ -272,4 +278,3 @@ class YahooClient:
         """Get asset profile (sector, industry, description)."""
         summary = await self.get_quote_summary(symbol, ["assetProfile"])
         return summary.get("assetProfile", {})
-

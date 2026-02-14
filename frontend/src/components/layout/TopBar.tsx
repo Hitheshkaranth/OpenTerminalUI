@@ -1,19 +1,48 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { searchStocks } from "../../api/client";
+import { searchSymbols } from "../../api/client";
 import { useMarketStatus } from "../../hooks/useStocks";
+import { useSettingsStore } from "../../store/settingsStore";
 import { useStockStore } from "../../store/stockStore";
+import { COUNTRY_MARKETS } from "../../types";
+import type { CountryCode, MarketCode } from "../../types";
+
+type DisplayCurrency = "INR" | "USD";
+
+const COUNTRY_FLAGS: Record<CountryCode, string> = {
+  IN: "🇮🇳",
+  US: "🇺🇸",
+};
+
+const CURRENCY_FLAGS: Record<DisplayCurrency, string> = {
+  INR: "🇮🇳",
+  USD: "🇺🇸",
+};
+
+const COUNTRY_DEFAULT_MARKET: Record<CountryCode, MarketCode> = {
+  IN: "NSE",
+  US: "NASDAQ",
+};
 
 export function TopBar() {
   const setTicker = useStockStore((s) => s.setTicker);
   const load = useStockStore((s) => s.load);
   const ticker = useStockStore((s) => s.ticker);
+  const selectedCountry = useSettingsStore((s) => s.selectedCountry);
+  const selectedMarket = useSettingsStore((s) => s.selectedMarket);
+  const displayCurrency = useSettingsStore((s) => s.displayCurrency);
+  const setSelectedCountry = useSettingsStore((s) => s.setSelectedCountry);
+  const setSelectedMarket = useSettingsStore((s) => s.setSelectedMarket);
+  const setDisplayCurrency = useSettingsStore((s) => s.setDisplayCurrency);
   const { data: marketStatus } = useMarketStatus();
   const [query, setQuery] = useState(ticker);
   const [results, setResults] = useState<Array<{ ticker: string; name: string }>>([]);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const marketsForCountry = COUNTRY_MARKETS[selectedCountry];
   const statusPayload = (marketStatus as {
     error?: string;
+    marketState?: Array<{ marketStatus?: string; tradeDate?: string }>;
     nifty50?: number | null;
     sensex?: number | null;
     inrUsd?: number | null;
@@ -45,7 +74,18 @@ export function TopBar() {
   const nikkei225Pct = typeof statusPayload?.nikkei225Pct === "number" ? statusPayload.nikkei225Pct : null;
   const hangsengPct = typeof statusPayload?.hangsengPct === "number" ? statusPayload.hangsengPct : null;
   const hasIndexData = nifty50 !== null || sensex !== null;
+  const hasGlobalData = sp500 !== null || nikkei225 !== null || hangseng !== null;
+  const hasFxData = usdInr !== null || inrUsd !== null;
   const isFallback = Boolean(statusPayload?.fallbackEnabled) || !statusPayload?.source?.nseIndices;
+  const marketStateLabel = String(statusPayload?.marketState?.[0]?.marketStatus || "").toUpperCase();
+  const feedStateLabel = !hasIndexData
+    ? "OFFLINE"
+    : marketStateLabel === "CLOSE"
+    ? "CLOSED"
+    : isFallback
+    ? "FALLBACK"
+    : "LIVE";
+  const backendHealthLabel = hasGlobalData && hasFxData ? "stream ok" : "partial feed";
 
   const formatIndex = (value: number | null) =>
     value === null ? "NA" : value.toLocaleString("en-IN", { maximumFractionDigits: 2 });
@@ -66,18 +106,52 @@ export function TopBar() {
     setQuery(ticker);
   }, [ticker]);
 
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      const editing =
+        tag === "input" || tag === "textarea" || tag === "select" || Boolean(target?.isContentEditable);
+
+      if (event.key === "/" && !editing) {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+      if (event.key === "Escape") {
+        if (results.length > 0) {
+          setResults([]);
+          return;
+        }
+        if (editing && tag === "input") {
+          const inputEl = target as HTMLInputElement;
+          inputEl.blur();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [results.length]);
+
+  useEffect(() => {
+    if (!marketsForCountry.includes(selectedMarket)) {
+      setSelectedMarket(COUNTRY_DEFAULT_MARKET[selectedCountry]);
+    }
+  }, [marketsForCountry, selectedCountry, selectedMarket, setSelectedMarket]);
+
   const doSearch = useCallback(async (q: string) => {
     if (q.length < 2) {
       setResults([]);
       return;
     }
     try {
-      const res = await searchStocks(q);
+      const res = await searchSymbols(q, selectedMarket);
       setResults(res);
     } catch {
       setResults([]);
     }
-  }, []);
+  }, [selectedMarket]);
 
   const handleLoad = useCallback(async () => {
     try {
@@ -96,7 +170,7 @@ export function TopBar() {
           <span>{formatIndex(nifty50)}</span>
           <span className={pctClass(nifty50Pct)}>{formatPct(nifty50Pct)}</span>
           <span className={hasIndexData ? "text-terminal-pos" : "text-terminal-neg"}>
-            {hasIndexData ? (isFallback ? "FALLBACK" : "CONNECTED") : "OFFLINE"}
+            {feedStateLabel}
           </span>
           <span className="text-terminal-accent">SENSEX</span>
           <span>{formatIndex(sensex)}</span>
@@ -113,21 +187,25 @@ export function TopBar() {
           <span className="text-terminal-accent">HANGSENG</span>
           <span>{formatGlobalIndex(hangseng)}</span>
           <span className={pctClass(hangsengPct)}>{formatPct(hangsengPct)}</span>
-          <span className="text-terminal-muted">{isFallback ? "fallback enabled" : "stream ok"}</span>
+          <span className="text-terminal-muted">{isFallback ? "fallback enabled" : backendHealthLabel}</span>
           {marketError && !hasIndexData && <span className="text-terminal-neg">feed error</span>}
         </div>
         <div>CTRL+K COMMAND | / SEARCH</div>
       </div>
-      <div className="relative flex items-center gap-3 px-3 py-2">
-        <Link className="rounded border border-terminal-border px-2 py-2 text-xs text-terminal-muted hover:text-terminal-text" to="/stocks">
+      <div className="relative flex items-center gap-2 px-3 py-1.5">
+        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/stocks">
           HOME
         </Link>
-        <Link className="rounded border border-terminal-border px-2 py-2 text-xs text-terminal-muted hover:text-terminal-text" to="/screener">
+        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/screener">
           SCREENER
         </Link>
+        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/stocks/about">
+          ABOUT
+        </Link>
         <input
-          className="w-full rounded border border-terminal-border bg-terminal-bg px-3 py-2 text-sm outline-none focus:border-terminal-accent"
-          placeholder="Search NSE symbol ( / )"
+          ref={searchInputRef}
+          className="min-w-0 flex-1 rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs outline-none focus:border-terminal-accent"
+          placeholder={`Search ${selectedMarket} symbol ( / )`}
           value={query}
           onChange={(e) => {
             const next = e.target.value.toUpperCase();
@@ -145,7 +223,7 @@ export function TopBar() {
           }}
         />
         <button
-          className="rounded bg-terminal-accent px-3 py-2 text-sm font-medium text-black"
+          className="rounded bg-terminal-accent px-2 py-1 text-xs font-medium text-black"
           onClick={() => {
             setTicker(query);
             void handleLoad();
@@ -153,8 +231,47 @@ export function TopBar() {
         >
           Load
         </button>
+        <div className="flex items-center gap-1 border-l border-terminal-border pl-2">
+          <select
+            className="w-[88px] rounded border border-terminal-border bg-terminal-bg px-1 py-1 text-[11px] uppercase text-terminal-text outline-none"
+            value={selectedCountry}
+            onChange={(e) => setSelectedCountry(e.target.value as CountryCode)}
+          >
+            <option value="IN">{COUNTRY_FLAGS.IN} IN</option>
+            <option value="US">{COUNTRY_FLAGS.US} US</option>
+          </select>
+          <select
+            className="w-[86px] rounded border border-terminal-border bg-terminal-bg px-1 py-1 text-[11px] uppercase text-terminal-text outline-none"
+            value={selectedMarket}
+            onChange={(e) => setSelectedMarket(e.target.value as MarketCode)}
+          >
+            {marketsForCountry.map((market) => (
+              <option key={market} value={market}>
+                {market}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-1 border-l border-terminal-border pl-2">
+          <span className="text-[11px] leading-none" title="Display currency (format only)">
+            {CURRENCY_FLAGS[displayCurrency]}
+          </span>
+          <select
+            className="w-[72px] rounded border border-terminal-border bg-terminal-bg px-1 py-1 text-[11px] uppercase text-terminal-text outline-none"
+            value={displayCurrency}
+            onChange={(e) => setDisplayCurrency(e.target.value as DisplayCurrency)}
+            title="Display currency (format only)"
+            aria-label="Display currency (format only)"
+          >
+            <option value="INR">INR</option>
+            <option value="USD">USD</option>
+          </select>
+        </div>
+        <div className="border-l border-terminal-border pl-2 text-[11px] uppercase tracking-wide text-terminal-muted">
+          {selectedCountry} • {selectedMarket} • {displayCurrency}
+        </div>
         {results.length > 0 && (
-          <div className="absolute left-3 right-3 top-12 z-10 max-h-72 overflow-auto rounded border border-terminal-border bg-terminal-panel">
+          <div className="absolute left-3 right-3 top-10 z-10 max-h-72 overflow-auto rounded border border-terminal-border bg-terminal-panel">
             {results.map((item) => (
               <button
                 key={item.ticker}

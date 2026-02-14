@@ -1,4 +1,6 @@
-import { formatInr, formatPct } from "../../utils/formatters";
+import { formatMoney } from "../../lib/format";
+import { useSettingsStore } from "../../store/settingsStore";
+import { formatPct } from "../../utils/formatters";
 
 type Props = {
   stock: {
@@ -52,6 +54,7 @@ function toNum(value: unknown): number | undefined {
 }
 
 export function OverviewPanel({ stock }: Props) {
+  const displayCurrency = useSettingsStore((s) => s.displayCurrency);
   const changePct = toNum(stock.change_pct);
   const moveClass =
     changePct === undefined
@@ -74,18 +77,27 @@ export function OverviewPanel({ stock }: Props) {
           {stock.sector || "-"} | {stock.industry || "-"}
         </div>
         <div className="mt-3 flex items-end gap-3">
-          <div className="text-2xl font-bold">{formatInr(currentPrice)}</div>
+          <div className="text-2xl font-bold tabular-nums">
+            {currentPrice !== undefined ? formatMoney(currentPrice, displayCurrency) : "-"}
+          </div>
           <div className={`text-sm font-semibold ${moveClass}`}>{moveText}</div>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {METRICS.map(([label, key, mode]) => {
           const val = toNum(stock[key]);
-          const rendered = mode === "inr" ? formatInr(val) : mode === "pct" ? formatPct(val) : val?.toFixed(2) ?? "-";
+          const rendered =
+            mode === "inr"
+              ? val !== undefined
+                ? formatMoney(val, displayCurrency)
+                : "-"
+              : mode === "pct"
+              ? formatPct(val)
+              : val?.toFixed(2) ?? "-";
           return (
             <div key={label} className="rounded border border-terminal-border bg-terminal-panel p-3">
               <div className="text-xs text-terminal-muted">{label}</div>
-              <div className="mt-1 text-sm font-semibold">{rendered}</div>
+              <div className={`mt-1 text-sm font-semibold ${mode === "inr" ? "tabular-nums" : ""}`}>{rendered}</div>
             </div>
           );
         })}

@@ -21,8 +21,8 @@ const api = axios.create({
   timeout: 30000,
 });
 
-export async function fetchChart(ticker: string, interval = "1d", range = "1y"): Promise<ChartResponse> {
-  const { data } = await api.get<ChartResponse>(`/chart/${ticker}`, { params: { interval, range } });
+export async function getHistory(symbol: string, market: string, interval = "1d", range = "1y"): Promise<ChartResponse> {
+  const { data } = await api.get<ChartResponse>(`/chart/${symbol}`, { params: { market, interval, range } });
   return data;
 }
 
@@ -39,13 +39,13 @@ export async function fetchIndicator(
   return data;
 }
 
-export async function fetchStock(ticker: string): Promise<StockSnapshot> {
-  const { data } = await api.get<StockSnapshot>(`/stocks/${ticker}`);
+export async function getQuote(symbol: string, market: string): Promise<StockSnapshot> {
+  const { data } = await api.get<StockSnapshot>(`/stocks/${symbol}`, { params: { market } });
   return data;
 }
 
-export async function fetchFinancials(ticker: string, period: "annual" | "quarterly"): Promise<FinancialsResponse> {
-  const { data } = await api.get<FinancialsResponse>(`/stocks/${ticker}/financials`, { params: { period } });
+export async function getFinancials(symbol: string, market: string, period: "annual" | "quarterly"): Promise<FinancialsResponse> {
+  const { data } = await api.get<FinancialsResponse>(`/stocks/${symbol}/financials`, { params: { market, period } });
   return data;
 }
 
@@ -80,9 +80,25 @@ export async function runScreener(rules: ScreenerRule[], limit = 50): Promise<Sc
   return data;
 }
 
-export async function searchStocks(q: string): Promise<Array<{ ticker: string; name: string }>> {
-  const { data } = await api.get<{ results: Array<{ ticker: string; name: string }> }>("/search", { params: { q } });
+export async function searchSymbols(q: string, market: string): Promise<Array<{ ticker: string; name: string }>> {
+  const { data } = await api.get<{ results: Array<{ ticker: string; name: string }> }>("/search", { params: { q, market } });
   return data.results;
+}
+
+export async function fetchChart(ticker: string, interval = "1d", range = "1y", market = "NSE"): Promise<ChartResponse> {
+  return getHistory(ticker, market, interval, range);
+}
+
+export async function fetchStock(ticker: string, market = "NSE"): Promise<StockSnapshot> {
+  return getQuote(ticker, market);
+}
+
+export async function fetchFinancials(ticker: string, period: "annual" | "quarterly", market = "NSE"): Promise<FinancialsResponse> {
+  return getFinancials(ticker, market, period);
+}
+
+export async function searchStocks(q: string, market = "NSE"): Promise<Array<{ ticker: string; name: string }>> {
+  return searchSymbols(q, market);
 }
 
 export async function fetchPortfolio(): Promise<PortfolioResponse> {
@@ -162,6 +178,57 @@ export async function fetchEvents(): Promise<Array<{ date: string; ticker: strin
 
 export async function fetchMarketStatus(): Promise<Record<string, unknown>> {
   const { data } = await api.get<Record<string, unknown>>("/reports/market-status");
+  return data;
+}
+
+export type NewsApiItem = {
+  id: string;
+  title: string;
+  source: string;
+  publishedAt: string;
+  url: string;
+  summary?: string;
+};
+
+export async function fetchSymbolNews(market: string, symbol: string, limit = 30): Promise<NewsApiItem[]> {
+  const { data } = await api.get<{ items: NewsApiItem[] }>("/news/symbol", { params: { market, symbol, limit } });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchMarketNews(market: string, limit = 30): Promise<NewsApiItem[]> {
+  const { data } = await api.get<{ items: NewsApiItem[] }>("/news/market", { params: { market, limit } });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export type QuarterlyReportApiItem = {
+  id: string;
+  symbol: string;
+  market: string;
+  periodEndDate: string;
+  publishedAt: string;
+  reportType: string;
+  title: string;
+  links: Array<{ label: string; url: string }>;
+  source: string;
+};
+
+export async function fetchQuarterlyReports(market: string, symbol: string, limit = 8): Promise<QuarterlyReportApiItem[]> {
+  const { data } = await api.get<{ items: QuarterlyReportApiItem[] }>("/reports/quarterly", {
+    params: { market, symbol, limit },
+  });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchQuotesBatch(
+  symbols: string[],
+  market: string,
+): Promise<{ market: string; status?: string; quotes: Array<{ symbol: string; last: number; change: number; changePct: number; ts: string }> }> {
+  if (!symbols.length) return { market, quotes: [] };
+  const tickers = symbols.map((s) => s.trim().toUpperCase()).filter(Boolean).join(",");
+  if (!tickers) return { market, quotes: [] };
+  const { data } = await api.get<{ market: string; status?: string; quotes: Array<{ symbol: string; last: number; change: number; changePct: number; ts: string }> }>("/quotes", {
+    params: { symbols: tickers, market },
+  });
   return data;
 }
 

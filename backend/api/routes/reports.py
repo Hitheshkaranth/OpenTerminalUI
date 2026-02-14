@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+from datetime import date, datetime, timezone
 from typing import Any, List, Dict
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Query
 
 from backend.api.deps import get_unified_fetcher
 
 router = APIRouter()
+US_MARKETS = {"NASDAQ", "NYSE"}
+IN_MARKETS = {"NSE", "BSE"}
+SUPPORTED_MARKETS = US_MARKETS | IN_MARKETS
 
 
 def _to_float(value: Any) -> float | None:
@@ -62,6 +67,41 @@ def _extract_index_metrics(payload: Dict[str, Any], accepted_names: set[str]) ->
         if value_out is not None or pct_out is not None:
             return value_out, pct_out
     return None, None
+
+
+def _quarter_end(year: int, quarter: int) -> date:
+    if quarter == 1:
+        return date(year, 3, 31)
+    if quarter == 2:
+        return date(year, 6, 30)
+    if quarter == 3:
+        return date(year, 9, 30)
+    return date(year, 12, 31)
+
+
+def _last_quarter_ends(limit: int) -> list[date]:
+    today = date.today()
+    quarter = ((today.month - 1) // 3) + 1
+    year = today.year
+    out: list[date] = []
+    while len(out) < limit:
+        q_end = _quarter_end(year, quarter)
+        if q_end <= today:
+            out.append(q_end)
+        quarter -= 1
+        if quarter == 0:
+            quarter = 4
+            year -= 1
+    return out
+
+
+def _iso_day(day: date) -> str:
+    return datetime(day.year, day.month, day.day, tzinfo=timezone.utc).isoformat()
+
+
+def _stable_id(market: str, symbol: str, period_end: str, report_type: str) -> str:
+    raw = f"{market}|{symbol}|{period_end}|{report_type}".encode("utf-8")
+    return hashlib.sha1(raw).hexdigest()[:16]
 
 @router.get("/reports/bulk-deals")
 async def bulk_deals() -> Dict[str, Any]:
@@ -216,3 +256,50 @@ async def events() -> List[Dict[str, Any]]:
         {"date": "2024-10-18", "ticker": "TCS", "event": "Dividend Ex-Date"},
         {"date": "2024-10-20", "ticker": "HDFCBANK", "event": "Q2 Earnings"},
     ]
+
+
+@router.get("/reports/quarterly")
+async def quarterly_reports(
+    market: str = Query(..., description="NSE|BSE|NASDAQ|NYSE"),
+    symbol: str = Query(..., min_length=1, max_length=24),
+    limit: int = Query(default=8, ge=1, le=50),
+) -> Dict[str, Any]:
+    market_code = market.strip().upper()
+    ticker = symbol.strip().upper()
+    if market_code not in SUPPORTED_MARKETS:
+        raise HTTPException(status_code=400, detail=f"Unsupported market: {market_code}")
+
+    # India contract stability path: no provider linked yet.
+    if market_code in IN_MARKETS:
+        return {"items": []}
+
+    # US stub with SEC links. TODO: replace with direct SEC filings API ingestion.
+    quarter_ends = _last_quarter_ends(limit)
+    items: list[dict[str, Any]] = []
+    for period in quarter_ends:
+        report_type = "10-K" if period.month == 12 else "10-Q"
+        published = period.replace(day=min(period.day, 28))
+        published_day = published if report_type == "10-Q" else date(period.year + 1, 2, 28)
+        period_iso = _iso_day(period)
+        published_iso = _iso_day(published_day)
+        sec_query = f"{ticker} {report_type}"
+        sec_search_url = f"https://www.sec.gov/edgar/search/#/q={sec_query.replace(' ', '%20')}"
+        items.append(
+            {
+                "id": _stable_id(market_code, ticker, period_iso, report_type),
+                "symbol": ticker,
+                "market": market_code,
+                "periodEndDate": period_iso,
+                "publishedAt": published_iso,
+                "reportType": report_type,
+                "title": f"{ticker} {report_type} filing",
+                "links": [
+                    {"label": "PDF", "url": sec_search_url},
+                    {"label": "SOURCE", "url": sec_search_url},
+                ],
+                "source": "SEC",
+            }
+        )
+
+    items.sort(key=lambda item: item["publishedAt"], reverse=True)
+    return {"items": items[:limit]}

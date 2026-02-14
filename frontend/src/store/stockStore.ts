@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { fetchChart, fetchStock } from "../api/client";
+import { useSettingsStore } from "./settingsStore";
 import type { ChartResponse, StockSnapshot } from "../types";
 
 type StockState = {
@@ -30,9 +31,13 @@ export const useStockStore = create<StockState>((set, get) => ({
   setRange: (range) => set({ range }),
   load: async () => {
     const { ticker, interval, range } = get();
+    const market = useSettingsStore.getState().selectedMarket;
     set({ loading: true, error: null });
     try {
-      const [stockResult, chartResult] = await Promise.allSettled([fetchStock(ticker), fetchChart(ticker, interval, range)]);
+      const [stockResult, chartResult] = await Promise.allSettled([
+        fetchStock(ticker, market),
+        fetchChart(ticker, interval, range, market),
+      ]);
       const nextStock = stockResult.status === "fulfilled" ? stockResult.value : get().stock;
       const nextChart = chartResult.status === "fulfilled" ? chartResult.value : get().chart;
       const errors: string[] = [];

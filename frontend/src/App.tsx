@@ -5,6 +5,7 @@ import { StatusBar } from "./components/layout/StatusBar";
 import { TopBar } from "./components/layout/TopBar";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { DashboardPage } from "./pages/Dashboard";
+import { AboutPage } from "./pages/About";
 import { PortfolioPage } from "./pages/Portfolio";
 import { ScreenerPage } from "./pages/Screener";
 import { SettingsPage } from "./pages/Settings";
@@ -22,6 +23,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Navigate to="/stocks" replace />} />
               <Route path="/stocks" element={<StockDetailPage />} />
+              <Route path="/stocks/about" element={<AboutPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/screener" element={<ScreenerPage />} />
               <Route path="/portfolio" element={<PortfolioPage />} />

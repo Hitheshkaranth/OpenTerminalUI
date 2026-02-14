@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 
 import { fetchIndicator } from "../api/client";
 import { OverviewPanel } from "../components/analysis/OverviewPanel";
@@ -8,6 +9,7 @@ import { FinancialsTable } from "../components/analysis/FinancialsTable";
 import { FinancialTrend } from "../components/analysis/FinancialTrend";
 import { FundamentalMetricsPanel } from "../components/analysis/FundamentalMetricsPanel";
 import { QuarterlyResults } from "../components/analysis/QuarterlyResults";
+import { QuarterlyReportsSection } from "../components/analysis/QuarterlyReportsSection";
 import { ScoreCard } from "../components/analysis/ScoreCard";
 import { ShareholdingChart } from "../components/analysis/ShareholdingChart";
 import { ValuationPanel } from "../components/analysis/ValuationPanel";
@@ -16,7 +18,13 @@ import { DrawingTools, type DrawMode } from "../components/chart/DrawingTools";
 import { IndicatorPanel, type IndicatorId } from "../components/chart/IndicatorPanel";
 import { TimeframeSelector } from "../components/chart/TimeframeSelector";
 import { TradingChart } from "../components/chart/TradingChart";
+import { NewsPanel } from "../components/market/NewsPanel";
+import { TerminalBadge } from "../components/terminal/TerminalBadge";
+import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { useFinancials, useStock, useStockHistory } from "../hooks/useStocks";
+import { formatMoney } from "../lib/format";
+import { subscribe, type ConnectionState } from "../realtime/priceStream";
+import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
 import type { IndicatorResponse } from "../types";
 
@@ -38,6 +46,8 @@ const INDICATOR_CONFIG: Record<IndicatorId, { apiType: string; params: Record<st
 
 export function StockDetailPage() {
   const { ticker, interval, range, setInterval, setRange } = useStockStore();
+  const displayCurrency = useSettingsStore((s) => s.displayCurrency);
+  const selectedMarket = useSettingsStore((s) => s.selectedMarket);
 
   const [mode, setMode] = useState<ChartMode>("candles");
   const [selectedIndicators, setSelectedIndicators] = useState<IndicatorId[]>([]);
@@ -49,10 +59,30 @@ export function StockDetailPage() {
   const [drawMode, setDrawMode] = useState<DrawMode>("none");
   const [clearDrawingsSignal, setClearDrawingsSignal] = useState(0);
   const [pendingTrendPoint, setPendingTrendPoint] = useState(false);
+  const [liveLast, setLiveLast] = useState<number | null>(null);
+  const [liveChangePct, setLiveChangePct] = useState<number | null>(null);
+  const [streamState, setStreamState] = useState<ConnectionState>("DISCONNECTED");
 
   const { data: stock } = useStock(ticker);
   const { data: chart, isLoading: isChartLoading, error: chartError } = useStockHistory(ticker, range, interval);
   const { data: financials, isLoading: isFinancialsLoading } = useFinancials(ticker, financialPeriod);
+
+  useEffect(() => {
+    setLiveLast(null);
+    setLiveChangePct(null);
+    if (!ticker) return;
+    return subscribe({
+      market: selectedMarket,
+      symbols: [ticker],
+      onUpdate: (updates) => {
+        const next = updates[0];
+        if (!next) return;
+        setLiveLast(next.last);
+        setLiveChangePct(next.changePct);
+      },
+      onStateChange: setStreamState,
+    });
+  }, [selectedMarket, ticker]);
 
   const indicatorQueries = useQueries({
     queries: selectedIndicators.map((id) => ({
@@ -90,24 +120,27 @@ export function StockDetailPage() {
       : Number.isFinite(Number(stockForOverview?.change_pct))
       ? Number(stockForOverview?.change_pct)
       : null;
+  const displayedLatestPrice = liveLast ?? latestPrice;
+  const displayedChangePct = liveChangePct ?? changePct;
   const moveClass =
-    changePct === null
+    displayedChangePct === null
       ? "text-terminal-muted"
-      : changePct >= 0
+      : displayedChangePct >= 0
       ? "text-terminal-pos"
       : "text-terminal-neg";
   const moveText =
-    changePct === null
+    displayedChangePct === null
       ? "-"
-      : `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%`;
+      : `${displayedChangePct >= 0 ? "+" : ""}${displayedChangePct.toFixed(2)}%`;
 
   if (!ticker) return <div className="p-8 text-center text-terminal-muted">Select a stock to view details.</div>;
 
   return (
-    <div className="h-full space-y-3 overflow-y-auto px-3 py-2">
+    <div className="relative h-full space-y-3 overflow-y-auto px-3 py-2">
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_220px]">
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-terminal-border bg-terminal-panel px-2 py-1.5">
+          <TerminalPanel className="rounded-sm" bodyClassName="px-2 py-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
             <TimeframeSelector interval={interval} onChange={(i, r) => { setInterval(i); setRange(r); }} />
             <ChartToolbar
               mode={mode}
@@ -119,7 +152,8 @@ export function StockDetailPage() {
               logarithmic={logarithmic}
               onToggleLogarithmic={() => setLogarithmic((v) => !v)}
             />
-          </div>
+            </div>
+          </TerminalPanel>
           <div className="h-[calc(100vh-280px)] min-h-[350px] rounded border border-terminal-border bg-terminal-panel p-1">
             {isChartLoading ? (
               <div className="flex h-full items-center justify-center text-terminal-muted">Loading chart...</div>
@@ -145,11 +179,15 @@ export function StockDetailPage() {
         </div>
 
         <div className="space-y-4">
-          <div className="rounded border border-terminal-border bg-terminal-panel p-3">
-            <div className="text-xs font-semibold uppercase text-terminal-muted">Latest Price</div>
-            <div className="mt-1 text-xl font-bold text-terminal-accent">{"\u20B9"}{latestPrice !== null ? latestPrice.toFixed(2) : "-"}</div>
+          <TerminalPanel title="Latest Price" className="rounded-sm">
+            <div className="mt-1 text-xl font-bold text-terminal-accent tabular-nums">
+              {displayedLatestPrice !== null ? formatMoney(displayedLatestPrice, displayCurrency) : "-"}
+            </div>
             <div className={`mt-1 text-sm font-semibold ${moveClass}`}>{moveText}</div>
-          </div>
+            <div className="mt-1">
+              <TerminalBadge variant={streamState.includes("LIVE") ? "live" : "mock"}>{streamState}</TerminalBadge>
+            </div>
+          </TerminalPanel>
           <IndicatorPanel
             selected={selectedIndicators}
             onToggle={(id) => setSelectedIndicators((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
@@ -163,6 +201,7 @@ export function StockDetailPage() {
               setClearDrawingsSignal((v) => v + 1);
             }}
           />
+          <NewsPanel symbol={ticker} market={selectedMarket} />
         </div>
       </div>
 
@@ -204,6 +243,7 @@ export function StockDetailPage() {
               <button onClick={() => setFinancialPeriod("annual")} className={`rounded border px-3 py-1 text-sm ${financialPeriod === "annual" ? "border-terminal-accent bg-terminal-accent/20 text-terminal-accent" : "border-terminal-border text-terminal-muted"}`}>Annual</button>
               <button onClick={() => setFinancialPeriod("quarterly")} className={`rounded border px-3 py-1 text-sm ${financialPeriod === "quarterly" ? "border-terminal-accent bg-terminal-accent/20 text-terminal-accent" : "border-terminal-border text-terminal-muted"}`}>Quarterly</button>
             </div>
+            <QuarterlyReportsSection symbol={ticker} market={selectedMarket} limit={8} />
             {isFinancialsLoading ? (
               <div className="py-10 text-center text-terminal-muted">Loading financials...</div>
             ) : financials ? (
@@ -238,6 +278,12 @@ export function StockDetailPage() {
         {tab === "peers" && <PeersComparison ticker={ticker} />}
         {tab === "valuation" && <ValuationPanel ticker={ticker} />}
       </div>
+      <Link
+        to="/stocks/about"
+        className="fixed bottom-12 left-2 z-20 rounded-sm border border-terminal-border bg-terminal-panel px-2 py-1 text-[11px] uppercase tracking-wide text-terminal-muted hover:text-terminal-accent md:left-52"
+      >
+        About
+      </Link>
     </div>
   );
 }

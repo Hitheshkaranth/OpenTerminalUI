@@ -1,8 +1,26 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { execSync } from "node:child_process";
+
+function resolveGitCommit(): string {
+  try {
+    return execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+  } catch {
+    return "unknown";
+  }
+}
+
+const buildDate = new Date().toISOString();
+const gitCommit = resolveGitCommit();
+const appVersion = process.env.npm_package_version ?? "0.0.0";
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    __BUILD_DATE__: JSON.stringify(buildDate),
+    __GIT_COMMIT__: JSON.stringify(gitCommit),
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   server: {
     host: "0.0.0.0",
     port: 5173,

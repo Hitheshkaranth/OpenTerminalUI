@@ -7,6 +7,7 @@ export function Sidebar() {
     { label: "Portfolio", path: "/portfolio", key: "F3" },
     { label: "Watchlist", path: "/watchlist", key: "F4" },
     { label: "Settings", path: "/settings", key: "F5" },
+    { label: "About", path: "/stocks/about", key: "F6" },
   ];
 
   return (

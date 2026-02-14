@@ -18,7 +18,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from backend.api.routes import admin, alerts, backtest, chart, fundamentals, health, kite, peers, portfolio, reports, screener, search, stocks, valuation
+from backend.api.routes import admin, alerts, backtest, chart, fundamentals, health, kite, news, peers, portfolio, quotes, reports, screener, search, stocks, valuation
 from backend.api.deps import shutdown_unified_fetcher
 from backend.services.prefetch_worker import get_prefetch_worker
 from backend.config.settings import get_settings
@@ -71,10 +71,12 @@ app.include_router(valuation.router, prefix="/api", tags=["valuation"])
 app.include_router(fundamentals.router, prefix="/api", tags=["fundamentals"])
 app.include_router(peers.router, prefix="/api", tags=["peers"])
 app.include_router(search.router, prefix="/api", tags=["search"])
+app.include_router(quotes.router, prefix="/api", tags=["quotes"])
 app.include_router(portfolio.router, prefix="/api", tags=["portfolio"])
 app.include_router(backtest.router, prefix="/api", tags=["backtest"])
 app.include_router(alerts.router, prefix="/api", tags=["alerts"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
+app.include_router(news.router, prefix="/api", tags=["news"])
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(kite.router, prefix="/api", tags=["kite"])
 app.include_router(admin.router, prefix="/api", tags=["admin"])

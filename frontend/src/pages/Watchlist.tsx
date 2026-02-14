@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
 
 import { addWatchlistItem, deleteWatchlistItem, fetchWatchlist } from "../api/client";
+import { formatMoney } from "../lib/format";
+import { subscribe } from "../realtime/priceStream";
+import { useSettingsStore } from "../store/settingsStore";
 import type { WatchlistItem } from "../types";
 
 export function WatchlistPage() {
+  const selectedMarket = useSettingsStore((s) => s.selectedMarket);
+  const displayCurrency = useSettingsStore((s) => s.displayCurrency);
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [watchlistName, setWatchlistName] = useState("Core Picks");
   const [ticker, setTicker] = useState("INFY");
   const [error, setError] = useState<string | null>(null);
+  const [lastPriceByTicker, setLastPriceByTicker] = useState<Record<string, number>>({});
 
   const load = async () => {
     try {
@@ -21,6 +27,28 @@ export function WatchlistPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    const symbols = items.map((item) => item.ticker);
+    if (!symbols.length) {
+      setLastPriceByTicker({});
+      return;
+    }
+    return subscribe({
+      market: selectedMarket,
+      symbols,
+      onUpdate: (updates) => {
+        if (!updates.length) return;
+        setLastPriceByTicker((prev) => {
+          const next = { ...prev };
+          for (const update of updates) {
+            next[update.symbol] = update.last;
+          }
+          return next;
+        });
+      },
+    });
+  }, [items, selectedMarket]);
 
   return (
     <div className="space-y-3 p-4">
@@ -54,31 +82,38 @@ export function WatchlistPage() {
               <tr className="border-b border-terminal-border text-terminal-muted">
                 <th className="px-2 py-1 text-left">Watchlist</th>
                 <th className="px-2 py-1 text-left">Ticker</th>
+                <th className="px-2 py-1 text-right">Last Price</th>
                 <th className="px-2 py-1 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
-                <tr key={item.id} className="border-b border-terminal-border/50">
-                  <td className="px-2 py-1">{item.watchlist_name}</td>
-                  <td className="px-2 py-1">{item.ticker}</td>
-                  <td className="px-2 py-1 text-right">
-                    <button
-                      className="rounded border border-terminal-border px-2 py-1"
-                      onClick={async () => {
-                        try {
-                          await deleteWatchlistItem(item.id);
-                          await load();
-                        } catch (e) {
-                          setError(e instanceof Error ? e.message : "Failed to delete watchlist item");
-                        }
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {items.map((item) => {
+                const lastPrice = lastPriceByTicker[item.ticker];
+                return (
+                  <tr key={item.id} className="border-b border-terminal-border/50">
+                    <td className="px-2 py-1">{item.watchlist_name}</td>
+                    <td className="px-2 py-1">{item.ticker}</td>
+                    <td className="px-2 py-1 text-right tabular-nums">
+                      {Number.isFinite(lastPrice) ? formatMoney(lastPrice, displayCurrency) : "-"}
+                    </td>
+                    <td className="px-2 py-1 text-right">
+                      <button
+                        className="rounded border border-terminal-border px-2 py-1"
+                        onClick={async () => {
+                          try {
+                            await deleteWatchlistItem(item.id);
+                            await load();
+                          } catch (e) {
+                            setError(e instanceof Error ? e.message : "Failed to delete watchlist item");
+                          }
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

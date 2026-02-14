@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -82,3 +83,28 @@ class FinnhubClient:
 
     async def get_insider_transactions(self, symbol: str, limit: int = 10) -> Dict[str, Any]:
         return await self._get("/stock/insider-transactions", {"symbol": self._symbol(symbol), "limit": limit})
+
+    async def get_quote(self, symbol: str) -> Dict[str, Any]:
+        return await self._get("/quote", {"symbol": symbol.strip().upper()})
+
+    async def get_company_news(self, symbol: str, limit: int = 30) -> List[Dict[str, Any]]:
+        today = date.today()
+        frm = (today - timedelta(days=14)).isoformat()
+        to = today.isoformat()
+        data = await self._get(
+            "/company-news",
+            {
+                "symbol": symbol.strip().upper(),
+                "from": frm,
+                "to": to,
+            },
+        )
+        if not isinstance(data, list):
+            return []
+        return data[:limit]
+
+    async def get_market_news(self, category: str = "general", limit: int = 30) -> List[Dict[str, Any]]:
+        data = await self._get("/news", {"category": category})
+        if not isinstance(data, list):
+            return []
+        return data[:limit]
