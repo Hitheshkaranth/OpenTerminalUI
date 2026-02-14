@@ -12,6 +12,15 @@ import { SettingsPage } from "./pages/Settings";
 import { StockDetailPage } from "./pages/StockDetail";
 import { WatchlistPage } from "./pages/Watchlist";
 import { NewsPage } from "./pages/News";
+import { FnoLayout } from "./fno/FnoLayout";
+import { OptionChainPage } from "./fno/pages/OptionChainPage";
+import { GreeksPage } from "./fno/pages/GreeksPage";
+import { FuturesPage } from "./fno/pages/FuturesPage";
+import { OIAnalysisPage } from "./fno/pages/OIAnalysisPage";
+import { StrategyPage } from "./fno/pages/StrategyPage";
+import { PCRPage } from "./fno/pages/PCRPage";
+import { HeatmapPage } from "./fno/pages/HeatmapPage";
+import { ExpiryPage } from "./fno/pages/ExpiryPage";
 
 function App() {
   return (
@@ -30,6 +39,16 @@ function App() {
               <Route path="/portfolio" element={<PortfolioPage />} />
               <Route path="/watchlist" element={<WatchlistPage />} />
               <Route path="/news" element={<NewsPage />} />
+              <Route path="/fno" element={<FnoLayout />}>
+                <Route index element={<OptionChainPage />} />
+                <Route path="greeks" element={<GreeksPage />} />
+                <Route path="futures" element={<FuturesPage />} />
+                <Route path="oi" element={<OIAnalysisPage />} />
+                <Route path="strategy" element={<StrategyPage />} />
+                <Route path="pcr" element={<PCRPage />} />
+                <Route path="heatmap" element={<HeatmapPage />} />
+                <Route path="expiry" element={<ExpiryPage />} />
+              </Route>
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </div>
