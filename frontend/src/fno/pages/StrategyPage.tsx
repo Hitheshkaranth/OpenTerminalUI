@@ -5,12 +5,13 @@ import { Area, AreaChart, CartesianGrid, Line, ReferenceLine, ResponsiveContaine
 import { fetchOptionChain, fetchStrategyPayoff, fetchStrategyPresets, fetchStrategyFromPreset } from "../api/fnoApi";
 import { useFnoContext } from "../FnoLayout";
 import type { StrategyLeg } from "../types/fno";
-import { formatCurrencyINR } from "../types/fno";
+import { useDisplayCurrency } from "../../hooks/useDisplayCurrency";
 
 const STORAGE_KEY = "fno_strategy_pending_legs";
 
 export function StrategyPage() {
   const { symbol, expiry } = useFnoContext();
+  const { formatDisplayMoney } = useDisplayCurrency();
   const [legs, setLegs] = useState<StrategyLeg[]>([]);
   const [selectedPreset, setSelectedPreset] = useState<string>("bull_call_spread");
 
@@ -165,9 +166,9 @@ export function StrategyPage() {
 
           <div className="rounded border border-terminal-border bg-terminal-panel p-3 text-xs">
             <div>Name: <span className="text-terminal-accent">{payoffQuery.data?.strategy_name || "Custom"}</span></div>
-            <div>Net Premium: {formatCurrencyINR(Number(payoffQuery.data?.net_premium || 0))}</div>
-            <div>Max Profit: {String(payoffQuery.data?.max_profit ?? "-")}</div>
-            <div>Max Loss: {String(payoffQuery.data?.max_loss ?? "-")}</div>
+            <div>Net Premium: {formatDisplayMoney(Number(payoffQuery.data?.net_premium || 0))}</div>
+            <div>Max Profit: {typeof payoffQuery.data?.max_profit === "number" ? formatDisplayMoney(payoffQuery.data.max_profit) : String(payoffQuery.data?.max_profit ?? "-")}</div>
+            <div>Max Loss: {typeof payoffQuery.data?.max_loss === "number" ? formatDisplayMoney(payoffQuery.data.max_loss) : String(payoffQuery.data?.max_loss ?? "-")}</div>
             <div>Risk/Reward: {Number(payoffQuery.data?.risk_reward_ratio || 0).toFixed(2)}</div>
             <div>Breakeven: {(payoffQuery.data?.breakeven_points || []).join(", ") || "-"}</div>
           </div>

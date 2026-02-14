@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { FuturesPanel } from "../../components/market/FuturesPanel";
 import { useStockHistory } from "../../hooks/useStocks";
+import { useDisplayCurrency } from "../../hooks/useDisplayCurrency";
 import { ChartEngine } from "../../shared/chart/ChartEngine";
 import { SharedChartToolbar } from "../../shared/chart/ChartToolbar";
 import { IndicatorPanel } from "../../shared/chart/IndicatorPanel";
@@ -26,6 +27,7 @@ const TF_TO_INTERVAL_RANGE: Record<ChartTimeframe, { interval: string; range: st
 
 export function FuturesPage() {
   const { symbol, expiry } = useFnoContext();
+  const { formatDisplayMoney } = useDisplayCurrency();
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
   const [timeframe, setTimeframe] = useState<ChartTimeframe>("1D");
   const [chartType, setChartType] = useState<ChartKind>("candle");
@@ -36,6 +38,7 @@ export function FuturesPage() {
   const [tick, setTick] = useState<{ ltp: number; change_pct: number } | null>(null);
   const tfConfig = TF_TO_INTERVAL_RANGE[timeframe];
   const { data: chart, isLoading } = useStockHistory(symbol, tfConfig.range, tfConfig.interval);
+  const chartBars = chart?.data?.length ? chartPointsToBars(chart.data) : [];
   const summaryQuery = useQuery({
     queryKey: ["fno-summary-futures", symbol, expiry],
     queryFn: () => fetchChainSummary(symbol, expiry || undefined),
@@ -61,11 +64,13 @@ export function FuturesPage() {
         <div className="h-[460px] rounded border border-terminal-border bg-terminal-panel p-1">
           {isLoading || !chart?.data?.length ? (
             <div className="flex h-full items-center justify-center text-xs text-terminal-muted">Loading futures chart...</div>
+          ) : chartBars.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-xs text-terminal-neg">No valid chart bars for {symbol}</div>
           ) : (
             <ChartEngine
               symbol={symbol}
               timeframe={timeframe}
-              historicalData={chartPointsToBars(chart.data)}
+              historicalData={chartBars}
               chartType={chartType}
               showVolume={showVolume}
               enableRealtime={true}
@@ -82,7 +87,7 @@ export function FuturesPage() {
           <div className="rounded border border-terminal-border bg-terminal-panel p-3 text-xs">
             <div className="text-[10px] uppercase tracking-wide text-terminal-muted">Latest</div>
             <div className="mt-1 text-lg font-semibold text-terminal-accent">
-              {tick?.ltp?.toLocaleString("en-IN", { maximumFractionDigits: 2 }) ?? "-"}
+              {typeof tick?.ltp === "number" ? formatDisplayMoney(tick.ltp) : "-"}
             </div>
             <div className={tick && tick.change_pct >= 0 ? "text-terminal-pos" : "text-terminal-neg"}>
               {tick ? `${tick.change_pct >= 0 ? "+" : ""}${tick.change_pct.toFixed(2)}%` : "-"}
@@ -107,7 +112,7 @@ export function FuturesPage() {
         <div className="grid grid-cols-1 gap-2 text-xs md:grid-cols-5">
           <div>
             <div className="text-[10px] uppercase text-terminal-muted">ATM</div>
-            <div>{summaryQuery.data?.atm_strike ?? "-"}</div>
+            <div>{typeof summaryQuery.data?.atm_strike === "number" ? formatDisplayMoney(summaryQuery.data.atm_strike) : "-"}</div>
           </div>
           <div>
             <div className="text-[10px] uppercase text-terminal-muted">PCR</div>
@@ -115,15 +120,19 @@ export function FuturesPage() {
           </div>
           <div>
             <div className="text-[10px] uppercase text-terminal-muted">Max Pain</div>
-            <div>{summaryQuery.data?.max_pain ?? "-"}</div>
+            <div>{typeof summaryQuery.data?.max_pain === "number" ? formatDisplayMoney(summaryQuery.data.max_pain) : "-"}</div>
           </div>
           <div>
             <div className="text-[10px] uppercase text-terminal-muted">Support</div>
-            <div>{summaryQuery.data?.support_resistance?.support?.slice(0, 2).join(", ") || "-"}</div>
+            <div>
+              {summaryQuery.data?.support_resistance?.support?.slice(0, 2).map((v) => formatDisplayMoney(v)).join(", ") || "-"}
+            </div>
           </div>
           <div>
             <div className="text-[10px] uppercase text-terminal-muted">Resistance</div>
-            <div>{summaryQuery.data?.support_resistance?.resistance?.slice(0, 2).join(", ") || "-"}</div>
+            <div>
+              {summaryQuery.data?.support_resistance?.resistance?.slice(0, 2).map((v) => formatDisplayMoney(v)).join(", ") || "-"}
+            </div>
           </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import type { ChartKind, ChartTimeframe } from "./types";
+import { useDisplayCurrency } from "../../hooks/useDisplayCurrency";
 
 const TIMEFRAMES: Array<{ label: string; value: ChartTimeframe }> = [
   { label: "1m", value: "1m" },
@@ -36,13 +37,14 @@ export function SharedChartToolbar({
   showIndicators,
   onToggleIndicators,
 }: Props) {
+  const { formatDisplayMoney } = useDisplayCurrency();
   const pctClass = changePct === null ? "text-terminal-muted" : changePct >= 0 ? "text-terminal-pos" : "text-terminal-neg";
 
   return (
     <div className="rounded border border-terminal-border bg-terminal-panel px-3 py-2 text-xs">
       <div className="flex flex-wrap items-center gap-3">
         <div className="font-semibold uppercase text-terminal-accent">{symbol}</div>
-        <div className="tabular-nums text-terminal-text">{ltp === null ? "-" : ltp.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</div>
+        <div className="tabular-nums text-terminal-text">{ltp === null ? "-" : formatDisplayMoney(ltp)}</div>
         <div className={`tabular-nums ${pctClass}`}>
           {changePct === null ? "-" : `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%`}
         </div>

@@ -55,6 +55,22 @@ export function useRealtimeChart(
         };
         return next;
       }
+      if (Number(last.time) > t) {
+        const idx = next.findIndex((b) => Number(b.time) === t);
+        if (idx >= 0) {
+          const row = next[idx];
+          next[idx] = {
+            ...row,
+            high: Math.max(Number(row.high), ltp),
+            low: Math.min(Number(row.low), ltp),
+            close: ltp,
+            volume: Number.isFinite(Number(tick.volume)) ? Number(tick.volume) : row.volume,
+          };
+          return next;
+        }
+        // Ignore stale/out-of-order ticks that don't map to an existing candle.
+        return next;
+      }
       return [
         ...next,
         {

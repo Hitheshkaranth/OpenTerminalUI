@@ -9,10 +9,14 @@ function nowLabel(now: Date): string {
   return now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-export function StatusBar() {
+type Props = {
+  tickerOverride?: string | null;
+};
+
+export function StatusBar({ tickerOverride }: Props) {
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
   const displayCurrency = useSettingsStore((s) => s.displayCurrency);
-  const ticker = useStockStore((s) => s.ticker);
+  const tickerFromStore = useStockStore((s) => s.ticker);
   const stockLoading = useStockStore((s) => s.loading);
   const stockError = useStockStore((s) => s.error);
   const {
@@ -48,6 +52,7 @@ export function StatusBar() {
     }
     return { label: "DISCONNECTED", variant: "neutral" as const };
   }, [marketError, marketFetching, marketLoading, marketStatus, stockError, stockLoading]);
+  const ticker = (tickerOverride || tickerFromStore || "").toUpperCase();
 
   return (
     <div className="border-t border-terminal-border bg-terminal-panel px-3 py-1 text-[11px] uppercase tracking-wide text-terminal-muted">

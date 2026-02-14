@@ -8,6 +8,7 @@ import { useStockStore } from "../store/stockStore";
 
 type SentimentLabel = "Bullish" | "Bearish" | "Neutral";
 type PeriodOption = 1 | 3 | 7 | 14 | 30;
+type SourceMode = "by_ticker" | "search" | "latest" | "failed";
 
 type UiNewsItem = {
   id: string;
@@ -21,6 +22,13 @@ type UiNewsItem = {
     label: SentimentLabel;
     confidence: number;
   };
+};
+
+type NewsQueryResult = {
+  items: NewsLatestApiItem[];
+  sourceMode: SourceMode;
+  searchTerm?: string;
+  errors: string[];
 };
 
 const PERIOD_OPTIONS: PeriodOption[] = [1, 3, 7, 14, 30];
@@ -83,9 +91,85 @@ function sentimentColor(label: SentimentLabel): string {
 }
 
 function sentimentDot(label: SentimentLabel): string {
-  if (label === "Bullish") return "🟢";
-  if (label === "Bearish") return "🔴";
-  return "⚪";
+  if (label === "Bullish") return "GREEN";
+  if (label === "Bearish") return "RED";
+  return "NEUTRAL";
+}
+
+function toUpperWords(value: string): string[] {
+  return value
+    .toUpperCase()
+    .replace(/[^A-Z0-9\s]/g, " ")
+    .split(/\s+/)
+    .map((w) => w.trim())
+    .filter((w) => w.length >= 3);
+}
+
+function relevanceScore(item: UiNewsItem, ticker: string, aliases: string[]): number {
+  const text = `${item.title} ${item.summary}`.toUpperCase();
+  const tickerToken = ticker.toUpperCase();
+  let score = 0;
+  if (tickerToken && new RegExp(`\\b${tickerToken}\\b`).test(text)) score += 6;
+  for (const alias of aliases) {
+    if (alias && new RegExp(`\\b${alias}\\b`).test(text)) score += 3;
+  }
+  return score;
+}
+
+function relevanceReason(item: UiNewsItem, ticker: string, aliases: string[]): string {
+  const text = `${item.title} ${item.summary}`.toUpperCase();
+  const tickerToken = ticker.toUpperCase();
+  if (tickerToken && new RegExp(`\\b${tickerToken}\\b`).test(text)) return "Ticker match";
+  for (const alias of aliases) {
+    if (alias && new RegExp(`\\b${alias}\\b`).test(text)) return "Company match";
+  }
+  return "Market fallback";
+}
+
+async function loadTickerContextNews(ticker: string, companyName: string, limit = 200): Promise<NewsQueryResult> {
+  const symbol = ticker.trim().toUpperCase();
+  const errors: string[] = [];
+  if (!symbol) {
+    try {
+      const latest = await fetchLatestNews(limit);
+      return { items: latest, sourceMode: "latest", errors };
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : "latest failed");
+      return { items: [], sourceMode: "failed", errors };
+    }
+  }
+
+  try {
+    const byTicker = await fetchNewsByTicker(symbol, limit);
+    if (Array.isArray(byTicker) && byTicker.length > 0) {
+      return { items: byTicker, sourceMode: "by_ticker", errors };
+    }
+  } catch (e) {
+    errors.push(`by_ticker: ${e instanceof Error ? e.message : "failed"}`);
+  }
+
+  const searchTerms = Array.from(
+    new Set([companyName, `${symbol} stock`, symbol].map((v) => v.trim()).filter((v) => v.length >= 2)),
+  );
+
+  for (const term of searchTerms) {
+    try {
+      const searched = await searchLatestNews(term, limit);
+      if (Array.isArray(searched) && searched.length > 0) {
+        return { items: searched, sourceMode: "search", searchTerm: term, errors };
+      }
+    } catch (e) {
+      errors.push(`search(${term}): ${e instanceof Error ? e.message : "failed"}`);
+    }
+  }
+
+  try {
+    const latest = await fetchLatestNews(limit);
+    return { items: latest, sourceMode: "latest", errors };
+  } catch (e) {
+    errors.push(`latest: ${e instanceof Error ? e.message : "failed"}`);
+    return { items: [], sourceMode: "failed", errors };
+  }
 }
 
 export function NewsPage() {
@@ -97,6 +181,11 @@ export function NewsPage() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [nowMs, setNowMs] = useState(Date.now());
   const [isTickerMode, setIsTickerMode] = useState(true);
+  const [lastRefreshMs, setLastRefreshMs] = useState<number>(Date.now());
+  const relevanceAliases = useMemo(
+    () => Array.from(new Set(toUpperWords(String(selectedStock?.company_name || "")).slice(0, 6))),
+    [selectedStock?.company_name],
+  );
 
   const tickerDisplay = (selectedStock?.company_name || currentTicker || "").trim();
 
@@ -116,16 +205,26 @@ export function NewsPage() {
     setDebouncedSearch("");
   }, [currentTicker, isTickerMode]);
 
-  const newsQuery = useQuery({
-    queryKey: ["news-page", currentTicker, debouncedSearch, isTickerMode],
-    queryFn: () => {
-      if (isTickerMode && currentTicker) return fetchNewsByTicker(currentTicker, 200);
-      return debouncedSearch ? searchLatestNews(debouncedSearch, 200) : fetchLatestNews(200);
+  const newsQuery = useQuery<NewsQueryResult>({
+    queryKey: ["news-page", currentTicker, selectedStock?.company_name || "", debouncedSearch, isTickerMode],
+    queryFn: async () => {
+      if (isTickerMode) {
+        return loadTickerContextNews(currentTicker, String(selectedStock?.company_name || ""), 200);
+      }
+      const items = debouncedSearch ? await searchLatestNews(debouncedSearch, 200) : await fetchLatestNews(200);
+      return { items, sourceMode: debouncedSearch ? "search" : "latest", searchTerm: debouncedSearch || undefined, errors: [] };
     },
+    retry: 2,
     staleTime: 60_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
   });
+
+  useEffect(() => {
+    if (newsQuery.dataUpdatedAt > 0) {
+      setLastRefreshMs(newsQuery.dataUpdatedAt);
+    }
+  }, [newsQuery.dataUpdatedAt]);
 
   const sentimentQuery = useQuery({
     queryKey: ["news-sentiment", currentTicker, periodDays],
@@ -136,10 +235,20 @@ export function NewsPage() {
     refetchOnWindowFocus: true,
   });
 
-  const normalizedItems = useMemo(
-    () => (newsQuery.data ?? []).map(normalizeNewsItem).filter((v): v is UiNewsItem => Boolean(v)),
-    [newsQuery.data],
-  );
+  const normalizedItems = useMemo(() => {
+    const raw = newsQuery.data?.items ?? [];
+    const mapped = raw.map(normalizeNewsItem).filter((v): v is UiNewsItem => Boolean(v));
+    if (!isTickerMode) return mapped;
+
+    const ticker = currentTicker.trim().toUpperCase();
+    const aliases = relevanceAliases;
+    const scored = mapped.map((item) => ({ item, score: relevanceScore(item, ticker, aliases) }));
+    const relevant = scored.filter((x) => x.score >= 3).map((x) => x.item);
+
+    if (relevant.length > 0) return relevant;
+    if (newsQuery.data?.sourceMode === "by_ticker") return mapped;
+    return mapped.slice(0, 40);
+  }, [currentTicker, isTickerMode, newsQuery.data?.items, newsQuery.data?.sourceMode, relevanceAliases]);
 
   const cutoffMs = nowMs - periodDays * 24 * 60 * 60 * 1000;
   const periodItems = useMemo(
@@ -153,7 +262,7 @@ export function NewsPage() {
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [debouncedSearch, periodDays, periodItems.length]);
+  }, [debouncedSearch, periodDays, periodItems.length, currentTicker, isTickerMode]);
 
   const fallbackSummary = useMemo(() => {
     const total = periodItems.length;
@@ -199,11 +308,13 @@ export function NewsPage() {
     };
   }, [periodItems]);
 
-  const summary = isTickerMode && sentimentQuery.data ? sentimentQuery.data : {
-    ticker: currentTicker,
-    period_days: periodDays,
-    ...fallbackSummary,
-  };
+  const summary = isTickerMode && sentimentQuery.data
+    ? sentimentQuery.data
+    : {
+        ticker: currentTicker,
+        period_days: periodDays,
+        ...fallbackSummary,
+      };
 
   const visibleItems = periodItems.slice(0, visibleCount);
 
@@ -215,6 +326,9 @@ export function NewsPage() {
             <div className="text-sm font-semibold">News & Sentiment</div>
             <div className="text-[11px] text-terminal-muted">
               {isTickerMode ? `Ticker context: ${tickerDisplay || currentTicker}` : "Global/search context"}
+            </div>
+            <div className="text-[10px] text-terminal-muted">
+              Source: {newsQuery.data?.sourceMode || "-"} {newsQuery.data?.searchTerm ? `(${newsQuery.data.searchTerm})` : ""} | Refreshed: {new Date(lastRefreshMs).toLocaleTimeString()}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -229,10 +343,7 @@ export function NewsPage() {
                 </option>
               ))}
             </select>
-            <button
-              className="rounded border border-terminal-border px-2 py-1 text-xs"
-              onClick={() => setIsTickerMode(true)}
-            >
+            <button className="rounded border border-terminal-border px-2 py-1 text-xs" onClick={() => setIsTickerMode(true)}>
               Use ticker
             </button>
           </div>
@@ -253,10 +364,7 @@ export function NewsPage() {
       <section className="rounded border border-terminal-border bg-terminal-panel p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span
-              className="rounded px-2 py-0.5 text-[11px] font-semibold text-black"
-              style={{ backgroundColor: sentimentColor(summary.overall_label as SentimentLabel) }}
-            >
+            <span className="rounded px-2 py-0.5 text-[11px] font-semibold text-black" style={{ backgroundColor: sentimentColor(summary.overall_label as SentimentLabel) }}>
               {summary.overall_label}
             </span>
             <span className="text-sm font-semibold">
@@ -287,25 +395,27 @@ export function NewsPage() {
             <LineChart data={summary.daily_sentiment}>
               <XAxis dataKey="date" hide />
               <YAxis domain={[-1, 1]} hide />
-              <Tooltip
-                contentStyle={{ borderRadius: "4px", border: "1px solid #2a2f3a", background: "#0c0f14", color: "#d8dde7" }}
-                labelStyle={{ color: "#8e98a8" }}
-              />
+              <Tooltip contentStyle={{ borderRadius: "4px", border: "1px solid #2a2f3a", background: "#0c0f14", color: "#d8dde7" }} labelStyle={{ color: "#8e98a8" }} />
               <Line type="monotone" dataKey="avg_score" stroke="#f59e0b" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </section>
 
-      {(newsQuery.isLoading || sentimentQuery.isLoading) && (
+      {(newsQuery.isLoading || (isTickerMode && sentimentQuery.isLoading)) && (
         <div className="space-y-2">
           {Array.from({ length: 3 }).map((_, idx) => (
             <div key={idx} className="h-20 animate-pulse rounded border border-terminal-border bg-terminal-panel" />
           ))}
         </div>
       )}
-      {(newsQuery.isError || sentimentQuery.isError) && (
-        <div className="rounded border border-terminal-neg bg-terminal-neg/10 p-2 text-xs text-terminal-neg">Failed to load news sentiment</div>
+      {newsQuery.isError && (
+        <div className="rounded border border-terminal-neg bg-terminal-neg/10 p-2 text-xs text-terminal-neg">Failed to load latest news feed</div>
+      )}
+      {isTickerMode && sentimentQuery.isError && (
+        <div className="rounded border border-terminal-warn bg-terminal-warn/10 p-2 text-xs text-terminal-warn">
+          Sentiment service unavailable. Showing headline feed with fallback sentiment summary.
+        </div>
       )}
 
       <div className="space-y-2">
@@ -316,7 +426,14 @@ export function NewsPage() {
                 {sentimentDot(item.sentiment.label)} {item.sentiment.score >= 0 ? "+" : ""}
                 {item.sentiment.score.toFixed(2)}
               </div>
-              <div className="text-[11px] text-terminal-muted">{relativeTime(item.publishedAt, nowMs)}</div>
+              <div className="flex items-center gap-2">
+                {isTickerMode && (
+                  <span className="rounded border border-terminal-border px-1.5 py-0.5 text-[10px] text-terminal-muted">
+                    {relevanceReason(item, currentTicker, relevanceAliases)}
+                  </span>
+                )}
+                <div className="text-[11px] text-terminal-muted">{relativeTime(item.publishedAt, nowMs)}</div>
+              </div>
             </div>
             <a href={item.url} target="_blank" rel="noopener noreferrer" className="mt-1 block text-sm font-semibold text-terminal-accent hover:underline">
               {item.title}
@@ -329,7 +446,7 @@ export function NewsPage() {
         ))}
         {!newsQuery.isLoading && visibleItems.length === 0 && (
           <div className="rounded border border-terminal-border bg-terminal-panel p-3 text-xs text-terminal-muted">
-            {isTickerMode ? `No news found for ${currentTicker}` : "No news found for this search"}
+            {isTickerMode ? `No relevant latest news found for ${currentTicker}.` : "No news found for this search"}
           </div>
         )}
       </div>

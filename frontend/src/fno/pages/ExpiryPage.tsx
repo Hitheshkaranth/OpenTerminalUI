@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { fetchExpiryDashboard } from "../api/fnoApi";
+import { useDisplayCurrency } from "../../hooks/useDisplayCurrency";
 
 export function ExpiryPage() {
+  const { formatDisplayMoney } = useDisplayCurrency();
   const query = useQuery({
     queryKey: ["fno-expiry-dashboard"],
     queryFn: fetchExpiryDashboard,
@@ -23,9 +25,9 @@ export function ExpiryPage() {
             <div>Spot/Expiry: {row.expiry_date} ({row.days_to_expiry}d)</div>
             <div>ATM IV: {Number(row.atm_iv || 0).toFixed(2)}%</div>
             <div>PCR: {Number(row.pcr?.pcr_oi || 0).toFixed(2)} ({row.pcr?.signal || "Neutral"})</div>
-            <div>Max Pain: {row.max_pain}</div>
-            <div>Support: {(row.support_resistance?.support ?? []).join(", ") || "-"}</div>
-            <div>Resistance: {(row.support_resistance?.resistance ?? []).join(", ") || "-"}</div>
+            <div>Max Pain: {typeof row.max_pain === "number" ? formatDisplayMoney(row.max_pain) : "-"}</div>
+            <div>Support: {(row.support_resistance?.support ?? []).map((v) => formatDisplayMoney(v)).join(", ") || "-"}</div>
+            <div>Resistance: {(row.support_resistance?.resistance ?? []).map((v) => formatDisplayMoney(v)).join(", ") || "-"}</div>
           </div>
         ))}
       </div>
@@ -52,9 +54,9 @@ export function ExpiryPage() {
                   <td className="px-2 py-1">{row.expiry_date}</td>
                   <td className="px-2 py-1 text-right">{Number(row.atm_iv || 0).toFixed(2)}%</td>
                   <td className="px-2 py-1 text-right">{Number(row.pcr?.pcr_oi || 0).toFixed(2)}</td>
-                  <td className="px-2 py-1 text-right">{row.max_pain}</td>
-                  <td className="px-2 py-1">{(row.support_resistance?.support ?? []).join(", ")}</td>
-                  <td className="px-2 py-1">{(row.support_resistance?.resistance ?? []).join(", ")}</td>
+                  <td className="px-2 py-1 text-right">{typeof row.max_pain === "number" ? formatDisplayMoney(row.max_pain) : "-"}</td>
+                  <td className="px-2 py-1">{(row.support_resistance?.support ?? []).map((v) => formatDisplayMoney(v)).join(", ")}</td>
+                  <td className="px-2 py-1">{(row.support_resistance?.resistance ?? []).map((v) => formatDisplayMoney(v)).join(", ")}</td>
                 </tr>
               ))}
               {!rest.length && (
