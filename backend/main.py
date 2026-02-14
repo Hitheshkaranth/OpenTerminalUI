@@ -21,6 +21,7 @@ from fastapi.responses import FileResponse
 from backend.api.deps import shutdown_unified_fetcher
 from backend.bg_services.instruments_loader import get_instruments_loader
 from backend.bg_services.news_ingestor import get_news_ingestor
+from backend.bg_services.pcr_snapshot import get_pcr_snapshot_service
 from backend.equity.routes import equity_router
 from backend.fno.routes import fno_router
 from backend.services.prefetch_worker import get_prefetch_worker
@@ -38,6 +39,7 @@ app = FastAPI(title=settings.app_name, version=settings.app_version)
 _prefetch_worker = None
 _instruments_loader = None
 _news_ingestor = None
+_pcr_snapshot_service = None
 _prefetch_enabled = (
     os.getenv("OPENTERMINALUI_PREFETCH_ENABLED")
     or os.getenv("OPENSCREENS_PREFETCH_ENABLED")
@@ -80,12 +82,13 @@ async def on_startup() -> None:
     _install_windows_loop_exception_filter()
     init_db()
     
-    global _prefetch_worker, _instruments_loader, _news_ingestor
+    global _prefetch_worker, _instruments_loader, _news_ingestor, _pcr_snapshot_service
     from backend.api.deps import get_unified_fetcher
     fetcher = await get_unified_fetcher()
     _prefetch_worker = get_prefetch_worker(fetcher)
     _instruments_loader = get_instruments_loader()
     _news_ingestor = get_news_ingestor()
+    _pcr_snapshot_service = get_pcr_snapshot_service()
     
     if _prefetch_enabled:
         await _prefetch_worker.start()
@@ -93,6 +96,8 @@ async def on_startup() -> None:
         await _instruments_loader.start()
     if _news_ingestor:
         await _news_ingestor.start()
+    if _pcr_snapshot_service:
+        await _pcr_snapshot_service.start()
 
     await get_marketdata_hub().start()
 
@@ -100,6 +105,8 @@ async def on_startup() -> None:
 @app.on_event("shutdown")
 async def on_shutdown() -> None:
     await get_marketdata_hub().shutdown()
+    if _pcr_snapshot_service:
+        await _pcr_snapshot_service.stop()
     if _news_ingestor:
         await _news_ingestor.stop()
     if _instruments_loader:
@@ -153,11 +160,17 @@ async def metrics_lite() -> dict[str, object]:
         "last_news_ingest_at": None,
         "last_news_ingest_status": "not_initialized",
     }
+    pcr_status = _pcr_snapshot_service.status_snapshot() if _pcr_snapshot_service else {
+        "last_pcr_snapshot_date": None,
+        "last_pcr_snapshot_status": "not_initialized",
+    }
     return {
         "ws_connected_clients": ws_metrics.get("ws_connected_clients", 0),
         "ws_subscriptions": ws_metrics.get("ws_subscriptions", 0),
         "last_news_ingest_at": news_status.get("last_news_ingest_at"),
         "last_news_ingest_status": news_status.get("last_news_ingest_status"),
+        "last_pcr_snapshot_date": pcr_status.get("last_pcr_snapshot_date"),
+        "last_pcr_snapshot_status": pcr_status.get("last_pcr_snapshot_status"),
         "last_kite_stream_status": hub.kite_stream_status(),
     }
 
