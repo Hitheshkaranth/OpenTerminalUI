@@ -10,6 +10,7 @@ from typing import Any
 from backend.api.deps import get_unified_fetcher
 from backend.db.database import SessionLocal
 from backend.db.models import Holding, NewsArticle, WatchlistItem
+from nlp.sentiment import score_financial_sentiment
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,9 @@ class NormalizedNews:
     image_url: str
     published_at: str
     tickers: list[str]
+    sentiment_score: float = 0.0
+    sentiment_label: str = "Neutral"
+    sentiment_confidence: float = 0.0
 
 
 def normalize_news_record(row: dict[str, Any], provider: str) -> NormalizedNews | None:
@@ -76,7 +80,7 @@ def normalize_news_record(row: dict[str, Any], provider: str) -> NormalizedNews 
         title = str(row.get("headline") or row.get("title") or "").strip()
         if not url or not title:
             return None
-        return NormalizedNews(
+        payload = NormalizedNews(
             source=str(row.get("source") or "Finnhub").strip() or "Finnhub",
             title=title,
             url=url,
@@ -85,13 +89,15 @@ def normalize_news_record(row: dict[str, Any], provider: str) -> NormalizedNews 
             published_at=_to_iso(row.get("datetime")),
             tickers=_normalize_tickers(row.get("related")),
         )
+        _attach_sentiment(payload)
+        return payload
 
     if provider_key == "fmp":
         url = str(row.get("url") or row.get("link") or "").strip()
         title = str(row.get("title") or row.get("headline") or "").strip()
         if not url or not title:
             return None
-        return NormalizedNews(
+        payload = NormalizedNews(
             source=str(row.get("site") or row.get("source") or "FMP").strip() or "FMP",
             title=title,
             url=url,
@@ -100,7 +106,17 @@ def normalize_news_record(row: dict[str, Any], provider: str) -> NormalizedNews 
             published_at=_to_iso(row.get("publishedDate") or row.get("publishedAt")),
             tickers=_normalize_tickers(row.get("symbol") or row.get("ticker")),
         )
+        _attach_sentiment(payload)
+        return payload
     return None
+
+
+def _attach_sentiment(item: NormalizedNews) -> None:
+    text = f"{item.title}. {item.summary}".strip()
+    sentiment = score_financial_sentiment(text)
+    item.sentiment_score = float(sentiment.get("score", 0.0))
+    item.sentiment_label = str(sentiment.get("label", "Neutral"))
+    item.sentiment_confidence = float(sentiment.get("confidence", 0.0))
 
 
 class NewsIngestor:
@@ -240,6 +256,9 @@ class NewsIngestor:
                         image_url=item.image_url[:2048],
                         published_at=item.published_at,
                         tickers=json.dumps(item.tickers),
+                        sentiment_score=item.sentiment_score,
+                        sentiment_label=item.sentiment_label[:16],
+                        sentiment_confidence=item.sentiment_confidence,
                         created_at=now_iso,
                     )
                 )

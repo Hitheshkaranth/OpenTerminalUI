@@ -203,6 +203,23 @@ export type NewsLatestApiItem = {
   summary?: string;
   image_url?: string;
   published_at?: string;
+  sentiment?: {
+    score: number;
+    label: "Bullish" | "Bearish" | "Neutral" | string;
+    confidence: number;
+  };
+};
+
+export type NewsSentimentSummary = {
+  ticker: string;
+  period_days: number;
+  total_articles: number;
+  average_score: number;
+  bullish_pct: number;
+  bearish_pct: number;
+  neutral_pct: number;
+  overall_label: "Bullish" | "Bearish" | "Neutral" | string;
+  daily_sentiment: Array<{ date: string; avg_score: number; count: number }>;
 };
 
 export async function fetchSymbolNews(market: string, symbol: string, limit = 30): Promise<NewsApiItem[]> {
@@ -230,6 +247,12 @@ export async function fetchNewsByTicker(ticker: string, limit = 100): Promise<Ne
   if (!symbol) return [];
   const { data } = await api.get<{ items: NewsLatestApiItem[] }>(`/news/by-ticker/${encodeURIComponent(symbol)}`, { params: { limit } });
   return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchNewsSentiment(ticker: string, days = 7): Promise<NewsSentimentSummary> {
+  const symbol = ticker.trim().toUpperCase();
+  const { data } = await api.get<NewsSentimentSummary>(`/news/sentiment/${encodeURIComponent(symbol)}`, { params: { days } });
+  return data;
 }
 
 export type QuarterlyReportApiItem = {

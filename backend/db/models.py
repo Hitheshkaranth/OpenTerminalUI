@@ -79,4 +79,7 @@ class NewsArticle(Base):
     image_url: Mapped[str] = mapped_column(String(2048), default="")
     published_at: Mapped[str] = mapped_column(String(40), index=True)
     tickers: Mapped[str] = mapped_column(String(2048), default="[]")
+    sentiment_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sentiment_label: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    sentiment_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())

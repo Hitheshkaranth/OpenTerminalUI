@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -13,6 +14,7 @@ from backend.api.deps import cache_instance, get_unified_fetcher
 from backend.core.ttl_policy import market_open_now, ttl_seconds
 from backend.db.database import SessionLocal
 from backend.db.models import NewsArticle
+from nlp.sentiment import score_financial_sentiment
 
 router = APIRouter()
 
@@ -75,6 +77,7 @@ def _row_to_item(row: NewsArticle) -> dict[str, Any]:
             tickers = [str(v).upper() for v in parsed if str(v).strip()]
     except Exception:
         tickers = []
+    sentiment = _row_sentiment(row)
     return {
         "id": row.id,
         "source": row.source,
@@ -84,7 +87,37 @@ def _row_to_item(row: NewsArticle) -> dict[str, Any]:
         "image_url": row.image_url,
         "published_at": row.published_at,
         "tickers": tickers,
+        "sentiment": sentiment,
     }
+
+
+def _compose_news_text(title: str, summary: str) -> str:
+    return f"{title or ''}. {summary or ''}".strip()
+
+
+def _row_sentiment(row: NewsArticle) -> dict[str, Any]:
+    if row.sentiment_label and row.sentiment_score is not None and row.sentiment_confidence is not None:
+        return {
+            "score": float(row.sentiment_score),
+            "label": str(row.sentiment_label),
+            "confidence": float(row.sentiment_confidence),
+        }
+    return score_financial_sentiment(_compose_news_text(row.title, row.summary))
+
+
+def _label_from_score(score: float) -> str:
+    if score > 0.1:
+        return "Bullish"
+    if score < -0.1:
+        return "Bearish"
+    return "Neutral"
+
+
+def _to_day(value: str) -> str | None:
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).date().isoformat()
+    except Exception:
+        return None
 
 
 def _validate_market(market: str) -> str:
@@ -223,6 +256,86 @@ async def get_news_by_ticker(ticker: str, limit: int = Query(default=50, ge=1, l
     finally:
         db.close()
 
+    await cache_instance.set(
+        cache_key,
+        payload,
+        ttl=ttl_seconds("news_latest", market_open_now()),
+    )
+    return payload
+
+
+@router.get("/news/sentiment/{ticker}")
+async def get_news_sentiment(
+    ticker: str,
+    days: int = Query(default=7, ge=1, le=30),
+) -> dict[str, Any]:
+    symbol = ticker.strip().upper()
+    cache_key = cache_instance.build_key("news_latest", f"sentiment:{symbol}", {"days": days})
+    cached = await cache_instance.get(cache_key)
+    if cached:
+        return cached
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff_iso = cutoff.isoformat()
+
+    db = SessionLocal()
+    try:
+        like = f'%"{symbol}"%'
+        rows = (
+            db.query(NewsArticle)
+            .filter(NewsArticle.tickers.like(like), NewsArticle.published_at >= cutoff_iso)
+            .order_by(desc(NewsArticle.published_at))
+            .all()
+        )
+    except OperationalError:
+        rows = []
+    finally:
+        db.close()
+
+    total = len(rows)
+    bullish = 0
+    bearish = 0
+    neutral = 0
+    sum_score = 0.0
+    day_buckets: dict[str, list[float]] = defaultdict(list)
+
+    for row in rows:
+        sentiment = _row_sentiment(row)
+        score = float(sentiment.get("score", 0.0))
+        label = str(sentiment.get("label") or _label_from_score(score))
+        if label == "Bullish":
+            bullish += 1
+        elif label == "Bearish":
+            bearish += 1
+        else:
+            neutral += 1
+        sum_score += score
+
+        day = _to_day(row.published_at)
+        if day:
+            day_buckets[day].append(score)
+
+    avg_score = (sum_score / total) if total else 0.0
+    daily_sentiment = [
+        {
+            "date": d,
+            "avg_score": round(sum(vals) / len(vals), 4),
+            "count": len(vals),
+        }
+        for d, vals in sorted(day_buckets.items())
+    ]
+
+    payload = {
+        "ticker": symbol,
+        "period_days": days,
+        "total_articles": total,
+        "average_score": round(avg_score, 4),
+        "bullish_pct": round((bullish * 100.0 / total), 1) if total else 0.0,
+        "bearish_pct": round((bearish * 100.0 / total), 1) if total else 0.0,
+        "neutral_pct": round((neutral * 100.0 / total), 1) if total else 0.0,
+        "overall_label": _label_from_score(avg_score),
+        "daily_sentiment": daily_sentiment,
+    }
     await cache_instance.set(
         cache_key,
         payload,
