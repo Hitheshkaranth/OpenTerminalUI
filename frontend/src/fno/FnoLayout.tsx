@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useOutletContext, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
+import { ErrorBoundary } from "../components/common/ErrorBoundary";
 import { fetchExpiries } from "./api/fnoApi";
 import type { FnoContextValue } from "./types/fno";
 import { DEFAULT_FNO_SYMBOLS } from "./types/fno";
@@ -26,11 +27,21 @@ export function FnoLayout() {
   const [searchParams] = useSearchParams();
   const [symbol, setSymbol] = useState<string>("NIFTY");
   const [expiry, setExpiry] = useState<string>("");
+  const symbolUniverse = useMemo(() => new Set((DEFAULT_FNO_SYMBOLS as readonly string[]).map((s) => s.toUpperCase())), []);
 
   useEffect(() => {
     const incoming = (searchParams.get("symbol") || searchParams.get("ticker") || "").trim().toUpperCase();
-    if (incoming) setSymbol(incoming);
-  }, [searchParams]);
+    if (!incoming) return;
+    if (symbolUniverse.has(incoming)) {
+      setSymbol(incoming);
+      return;
+    }
+    if (/^[A-Z0-9_-]{2,20}$/.test(incoming)) {
+      setSymbol(incoming);
+      return;
+    }
+    setSymbol("NIFTY");
+  }, [searchParams, symbolUniverse]);
 
   const expiryQuery = useQuery({
     queryKey: ["fno-expiries", symbol],
@@ -54,7 +65,7 @@ export function FnoLayout() {
   const ctx: FnoContextValue = { symbol, setSymbol, expiry, setExpiry, expiries };
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-screen min-h-screen bg-terminal-bg text-terminal-text">
       <aside className="w-56 shrink-0 border-r border-terminal-border bg-terminal-panel">
         <div className="border-b border-terminal-border px-3 py-3">
           <img src={logo} alt="OpenTerminalUI" className="mb-2 h-10 w-auto object-contain" />
@@ -129,7 +140,9 @@ export function FnoLayout() {
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-3">
-          <Outlet context={ctx} />
+          <ErrorBoundary>
+            <Outlet context={ctx} />
+          </ErrorBoundary>
         </div>
       </div>
     </div>

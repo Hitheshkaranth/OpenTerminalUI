@@ -197,6 +197,7 @@ export function TopBar() {
     setTicker(symbol);
     void handleLoad();
   }, [handleLoad, setTicker]);
+  const safeTicker = (ticker || "NIFTY").toUpperCase();
 
   return (
     <div className="relative z-20 border-b border-terminal-border bg-terminal-panel">
@@ -239,7 +240,7 @@ export function TopBar() {
         <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/equity/stocks/about">
           ABOUT
         </Link>
-        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno?symbol=${encodeURIComponent(ticker.toUpperCase())}`}>
+        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno?symbol=${encodeURIComponent(safeTicker)}`}>
           F&O →
         </Link>
         <input
