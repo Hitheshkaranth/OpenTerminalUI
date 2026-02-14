@@ -3,6 +3,10 @@ import { NavLink, Outlet, useOutletContext, useSearchParams } from "react-router
 import { useQuery } from "@tanstack/react-query";
 
 import { ErrorBoundary } from "../components/common/ErrorBoundary";
+import { StatusBar } from "../components/layout/StatusBar";
+import { TopBar } from "../components/layout/TopBar";
+import { useSettingsStore } from "../store/settingsStore";
+import { useStockStore } from "../store/stockStore";
 import { fetchExpiries } from "./api/fnoApi";
 import type { FnoContextValue } from "./types/fno";
 import { DEFAULT_FNO_SYMBOLS } from "./types/fno";
@@ -28,6 +32,17 @@ export function FnoLayout() {
   const [symbol, setSymbol] = useState<string>("NIFTY");
   const [expiry, setExpiry] = useState<string>("");
   const symbolUniverse = useMemo(() => new Set((DEFAULT_FNO_SYMBOLS as readonly string[]).map((s) => s.toUpperCase())), []);
+  const setSelectedCountry = useSettingsStore((s) => s.setSelectedCountry);
+  const setTicker = useStockStore((s) => s.setTicker);
+
+  useEffect(() => {
+    setSelectedCountry("IN");
+  }, [setSelectedCountry]);
+
+  useEffect(() => {
+    if (!symbol) return;
+    setTicker(symbol.toUpperCase());
+  }, [setTicker, symbol]);
 
   useEffect(() => {
     const incoming = (searchParams.get("symbol") || searchParams.get("ticker") || "").trim().toUpperCase();
@@ -96,6 +111,7 @@ export function FnoLayout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar />
         <div className="sticky top-0 z-20 border-b border-terminal-border bg-terminal-panel px-3 py-2">
           <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
             <label className="text-[11px]">
@@ -144,6 +160,7 @@ export function FnoLayout() {
             <Outlet context={ctx} />
           </ErrorBoundary>
         </div>
+        <StatusBar />
       </div>
     </div>
   );
