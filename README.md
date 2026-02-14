@@ -1,14 +1,70 @@
-# OpenTerminalUI
+<p align="center">
+  <img src="assets/logo.png" alt="OpenTerminal Logo" width="600" />
+</p>
 
-OpenTerminalUI is a trading analytics workspace focused on NSE equities.  
-It combines a FastAPI backend and a React terminal-style frontend to help you analyze stocks, screen opportunities, compare peers, and review valuation/fundamental data in one place.
+<p align="center">
+  <strong>Analyze. Trade. Optimize.</strong><br>
+  Open-source NSE trading analytics workspace
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/TypeScript-5.x-blue?logo=typescript&logoColor=white" />
+  <img src="https://img.shields.io/badge/FastAPI-0.100+-green?logo=fastapi&logoColor=white" />
+  <img src="https://img.shields.io/badge/React-18+-61DAFB?logo=react&logoColor=black" />
+  <img src="https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white" />
+  <img src="https://img.shields.io/badge/License-MIT-yellow" />
+</p>
+
+---
 
 ## Project overview
 
-- Stock search and chart data endpoints
-- Screener, valuation, peers, and fundamentals APIs
-- Portfolio/backtest and alert-oriented endpoints
-- Web UI optimized for fast keyboard-and-panel workflows
+OpenTerminalUI is organized into two analysis packs accessible from a unified home screen:
+
+### Equity & Fundamental Analysis Pack
+- **Stock Search & Charts** — interactive price charts with technical indicators
+- **Screener** — filter NSE stocks by financial and technical criteria
+- **Fundamentals** — income statement, balance sheet, cash flow, ratios
+- **DCF Valuation** — discounted cash flow model with scenario analysis
+- **Peer Comparison** — compare companies within sectors
+- **Portfolio & Backtest** — build and backtest portfolios with historical data
+- **News & Sentiment** — real-time news feed with financial sentiment scoring
+- **Alerts** — price and event alerts
+
+### Futures & Options (F&O) Analysis Pack
+- **Option Chain** — interactive NSE-style option chain with OI, IV, Greeks
+- **Greeks Dashboard** — Delta, Gamma, Theta, Vega heatmaps + GEX chart
+- **OI Analysis** — open interest buildup classification, max pain, support/resistance
+- **Strategy Builder** — multi-leg payoff diagrams with 8+ preset strategies
+- **PCR Tracker** — put-call ratio with historical trend and signal
+- **IV Surface** — implied volatility skew and 3D surface visualization
+- **F&O Heatmap** — market-wide OI/IV/volume treemap across F&O stocks
+- **Expiry Dashboard** — NIFTY/BANKNIFTY key levels summary for expiry day
+
+### Infrastructure
+- **Real-time Streaming** — WebSocket quotes via Kite Connect with REST fallback
+- **News Ingestion** — automated 3-minute cycle (Finnhub + FMP providers)
+- **Background Services** — instruments loader, PCR snapshots, news ingestor
+- **Caching** — in-memory L1 + optional Redis L2
+- **Docker** — single-command deployment with compose + watch mode
+
+## Roadmap
+
+- [x] Stock search, charts, screener, fundamentals
+- [x] DCF valuation, peer comparison, backtest
+- [x] Real-time WebSocket streaming (Kite Connect)
+- [x] News ingestion (Finnhub + FMP)
+- [x] Futures chain endpoints
+- [x] Docker + CI/CD pipeline
+- [ ] Financial sentiment scoring engine
+- [ ] News & sentiment frontend enhancement
+- [ ] Backend architecture separation (Equity / F&O packs)
+- [ ] F&O option chain + Greeks + OI analysis backend
+- [ ] Strategy builder + PCR tracker + IV surface backend
+- [ ] F&O frontend (option chain, Greeks, OI pages)
+- [ ] Home screen with pack navigation
+- [ ] F&O heatmap + expiry dashboard
 
 ## Repository structure
 
