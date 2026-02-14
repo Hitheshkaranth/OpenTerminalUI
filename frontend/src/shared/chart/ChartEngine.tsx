@@ -116,7 +116,9 @@ export function ChartEngine({
       1,
     );
 
-    chart.panes()[1]?.setStretchFactor(250);
+    // Keep price action dominant and volume compact.
+    chart.panes()[0]?.setStretchFactor(950);
+    chart.panes()[1]?.setStretchFactor(90);
 
     let oi: ISeriesApi<"Area", Time> | null = null;
     if (symbolIsFnO) {
