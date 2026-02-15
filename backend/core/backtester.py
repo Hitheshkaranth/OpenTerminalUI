@@ -9,10 +9,21 @@ import yfinance as yf
 @dataclass
 class BacktestConfig:
     lookback_days: int = 63
-    rebalance_freq: str = "M"
+    rebalance_freq: str = "ME"
     top_n: int = 10
     transaction_cost_bps: float = 10.0
     benchmark: str = "^NSEI"
+
+
+def _normalize_rebalance_freq(freq: str) -> str:
+    token = (freq or "").strip().upper()
+    mapping = {
+        "M": "ME",   # month-end
+        "Q": "QE",   # quarter-end
+        "Y": "YE",   # year-end
+        "A": "YE",   # annual alias
+    }
+    return mapping.get(token, token or "ME")
 
 
 def _max_drawdown(equity_curve: pd.Series) -> float:
@@ -40,19 +51,47 @@ def _perf_metrics(returns: pd.Series, equity_curve: pd.Series) -> dict[str, floa
 
 
 def _download_close(tickers: list[str], start: str, end: str) -> pd.DataFrame:
-    norm = []
+    norm: list[str] = []
     for t in tickers:
-        t = t.strip().upper()
-        if "." in t or t.startswith("^"):
-            norm.append(t)
+        token = t.strip().upper()
+        if not token:
+            continue
+        if "." in token or token.startswith("^"):
+            norm.append(token)
         else:
-            norm.append(f"{t}.NS")
-    data = yf.download(norm, start=start, end=end, auto_adjust=True, progress=False)
-    if data.empty:
+            norm.append(f"{token}.NS")
+    norm = list(dict.fromkeys(norm))
+    if not norm:
         return pd.DataFrame()
-    close = data["Close"] if isinstance(data.columns, pd.MultiIndex) else data
+
+    # Fast-path batch download.
+    try:
+        data = yf.download(norm, start=start, end=end, auto_adjust=True, progress=False)
+    except Exception:
+        data = pd.DataFrame()
+    close = data["Close"] if (not data.empty and isinstance(data.columns, pd.MultiIndex)) else data
     if isinstance(close, pd.Series):
         close = close.to_frame()
+
+    # Fallback: per-symbol fetch to salvage partial universe when batch fails.
+    if close is None or close.empty or len(close.columns) == 0:
+        parts: list[pd.Series] = []
+        for symbol in norm:
+            try:
+                single = yf.download(symbol, start=start, end=end, auto_adjust=True, progress=False)
+            except Exception:
+                continue
+            if single.empty:
+                continue
+            series = single.get("Close")
+            if series is None or len(series) == 0:
+                continue
+            s = pd.Series(series.values, index=single.index, name=symbol)
+            parts.append(s)
+        if not parts:
+            return pd.DataFrame()
+        close = pd.concat(parts, axis=1)
+
     rename_map = {}
     for t in close.columns:
         t_str = str(t).upper()
@@ -71,10 +110,13 @@ def backtest_momentum_rotation(
     if prices.empty or len(prices.columns) == 0:
         raise ValueError("No price data available for the selected universe/date range.")
     prices = prices.dropna(axis=1, how="all").ffill().dropna(how="all")
+    if prices.empty or len(prices.columns) == 0:
+        raise ValueError("No usable ticker data after filtering. Verify NSE symbols and date range.")
     daily_ret = prices.pct_change().fillna(0.0)
     momentum = prices.pct_change(config.lookback_days)
 
-    rebal_dates = prices.resample(config.rebalance_freq).last().index
+    rebalance_freq = _normalize_rebalance_freq(config.rebalance_freq)
+    rebal_dates = prices.resample(rebalance_freq).last().index
     rebal_dates = [d for d in rebal_dates if d in prices.index]
     if len(rebal_dates) < 2:
         raise ValueError("Insufficient data for selected rebalance frequency/date range.")

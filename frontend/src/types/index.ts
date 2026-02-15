@@ -164,6 +164,7 @@ export type PortfolioItem = {
   quantity: number;
   avg_buy_price: number;
   buy_date: string;
+  sector?: string | null;
   current_price: number | null;
   current_value: number | null;
   pnl: number | null;

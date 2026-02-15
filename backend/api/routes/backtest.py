@@ -17,7 +17,7 @@ class BacktestRequest(BaseModel):
     start: str | None = None
     end: str | None = None
     lookback_days: int = 63
-    rebalance_freq: str = "M"
+    rebalance_freq: str = "ME"
     top_n: int = 10
     transaction_cost_bps: float = 10.0
     benchmark: str = "^NSEI"

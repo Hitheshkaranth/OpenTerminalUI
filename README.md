@@ -60,6 +60,20 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - [ ] Expanded model/template library and parameter presets
 - [ ] Additional performance optimization for large watchlists and long chart sessions
 
+## Screenshots
+
+### Backtesting Control Deck
+
+![Backtesting Screen](assets/Back_testing.png)
+
+This screen shows the Momentum Rotation Backtest workflow: ticker universe input, lookback and top-N controls, strategy vs benchmark curve, and rebalance history. It is designed for quick parameter iteration with immediate visual feedback on returns, drawdown, and trade rotations.
+
+### Stock Analysis Workspace
+
+![Stock Screen](assets/Stock_Screen.png)
+
+This view highlights the terminal-style stock analysis layout with charting, indicator context, and market data panels. It is intended to keep symbol search, analytics, and execution-relevant signals on one screen for faster decision flow.
+
 ## Repository structure
 
 - `backend/` FastAPI app and business logic

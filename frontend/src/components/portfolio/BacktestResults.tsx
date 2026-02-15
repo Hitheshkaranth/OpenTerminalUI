@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import axios from "axios";
 import {
   CartesianGrid,
   Legend,
@@ -11,17 +12,33 @@ import {
 } from "recharts";
 
 import { runBacktest, type BacktestPayload, type BacktestResponse } from "../../api/client";
+import { MOMENTUM_ROTATION_BASKET_CSV } from "../../utils/constants";
 import { formatPct } from "../../utils/formatters";
 
-const DEFAULT_TICKERS = "RELIANCE,TCS,INFY,HDFCBANK,ICICIBANK,ITC,HINDUNILVR,SBIN,BHARTIARTL,LT";
+const DEFAULT_TICKERS = MOMENTUM_ROTATION_BASKET_CSV;
 
-export function BacktestResults() {
+type Props = {
+  initialTickers?: string[];
+};
+
+export function BacktestResults({ initialTickers }: Props) {
   const [tickers, setTickers] = useState(DEFAULT_TICKERS);
   const [lookback, setLookback] = useState(63);
   const [topN, setTopN] = useState(5);
   const [result, setResult] = useState<BacktestResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const bootstrappedFromPortfolioRef = useRef(false);
+
+  useEffect(() => {
+    if (bootstrappedFromPortfolioRef.current) return;
+    const symbols = Array.from(
+      new Set((initialTickers ?? []).map((t) => String(t).trim().toUpperCase()).filter(Boolean)),
+    );
+    if (symbols.length === 0) return;
+    setTickers(symbols.join(","));
+    bootstrappedFromPortfolioRef.current = true;
+  }, [initialTickers]);
 
   const handleRun = async () => {
     setLoading(true);
@@ -36,7 +53,12 @@ export function BacktestResults() {
       const res = await runBacktest(payload);
       setResult(res);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Backtest failed");
+      if (axios.isAxiosError(e)) {
+        const detail = e.response?.data?.detail;
+        setError(typeof detail === "string" ? detail : e.message || "Backtest failed");
+      } else {
+        setError(e instanceof Error ? e.message : "Backtest failed");
+      }
     } finally {
       setLoading(false);
     }

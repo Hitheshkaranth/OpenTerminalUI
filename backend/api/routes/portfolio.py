@@ -29,22 +29,24 @@ async def get_portfolio(db: Session = Depends(get_db)) -> dict[str, object]:
     holdings = db.query(Holding).all()
     sem = asyncio.Semaphore(16)
 
-    async def _price_for(ticker: str) -> float | None:
+    async def _snapshot_for(ticker: str) -> dict[str, object]:
         async with sem:
             try:
                 snap = await fetch_stock_snapshot_coalesced(ticker)
-                price = snap.get("current_price")
-                return float(price) if isinstance(price, (int, float)) else None
+                return snap if isinstance(snap, dict) else {}
             except Exception:
-                return None
+                return {}
 
-    price_tasks = {h.id: asyncio.create_task(_price_for(h.ticker)) for h in holdings}
+    snapshot_tasks = {h.id: asyncio.create_task(_snapshot_for(h.ticker)) for h in holdings}
     rows: list[dict[str, object]] = []
     total_cost = 0.0
     total_value = 0.0
     for h in holdings:
         total_cost += float(h.quantity) * float(h.avg_buy_price)
-        price = await price_tasks[h.id]
+        snapshot = await snapshot_tasks[h.id]
+        raw_price = snapshot.get("current_price")
+        price = float(raw_price) if isinstance(raw_price, (int, float)) else None
+        sector = str(snapshot.get("sector") or "").strip() or None
         current_value = float(h.quantity) * float(price) if isinstance(price, (int, float)) else None
         if current_value is not None:
             total_value += current_value
@@ -55,6 +57,7 @@ async def get_portfolio(db: Session = Depends(get_db)) -> dict[str, object]:
                 "quantity": h.quantity,
                 "avg_buy_price": h.avg_buy_price,
                 "buy_date": h.buy_date,
+                "sector": sector,
                 "current_price": price,
                 "current_value": current_value,
                 "pnl": (current_value - (float(h.quantity) * float(h.avg_buy_price))) if current_value is not None else None,

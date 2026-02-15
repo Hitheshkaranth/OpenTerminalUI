@@ -201,7 +201,6 @@ export function TopBar() {
     void handleLoad();
   }, [handleLoad, setTicker]);
   const safeTicker = (ticker || "NIFTY").toUpperCase();
-  const aboutPath = location.pathname.startsWith("/fno") ? "/fno/about" : "/equity/stocks/about";
   const topIndicators = topBarTickers?.items ?? [];
   const chartProxyTickerByKey: Record<string, string> = {
     crude: "ONGC",
@@ -297,9 +296,6 @@ export function TopBar() {
         </Link>
         <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno/heatmap?symbol=${encodeURIComponent(safeTicker)}`}>
           HEATMAP
-        </Link>
-        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={aboutPath}>
-          ABOUT
         </Link>
         <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno?symbol=${encodeURIComponent(safeTicker)}`}>
           F&O -&gt;
