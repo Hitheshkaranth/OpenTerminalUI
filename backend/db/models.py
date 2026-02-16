@@ -97,3 +97,18 @@ class BacktestRun(Base):
     error: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())
     updated_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())
+
+
+class PortfolioMutualFundHolding(Base):
+    __tablename__ = "portfolio_mutual_funds"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    scheme_code: Mapped[int] = mapped_column(Integer, index=True)
+    scheme_name: Mapped[str] = mapped_column(String(256), index=True)
+    fund_house: Mapped[str] = mapped_column(String(128), default="")
+    category: Mapped[str] = mapped_column(String(128), default="")
+    units: Mapped[float] = mapped_column(Float)
+    avg_nav: Mapped[float] = mapped_column(Float)
+    xirr: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sip_transactions: Mapped[str] = mapped_column(Text, default="[]")
+    added_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())

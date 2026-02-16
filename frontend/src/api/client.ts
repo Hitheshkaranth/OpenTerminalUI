@@ -17,9 +17,16 @@ import type {
   RelativeValuationResponse,
   ScreenerResponse,
   ScreenerRule,
+  ShareholdingPatternResponse,
   StockSnapshot,
   WatchlistItem,
   AlertRule,
+  MutualFund,
+  MutualFundCompareResponse,
+  MutualFundDetailsResponse,
+  MutualFundNavHistoryResponse,
+  MutualFundPerformance,
+  PortfolioMutualFundsResponse,
 } from "../types";
 
 const api = axios.create({
@@ -93,8 +100,16 @@ export async function runScreener(rules: ScreenerRule[], limit = 50): Promise<Sc
   return data;
 }
 
-export async function searchSymbols(q: string, market: string): Promise<Array<{ ticker: string; name: string }>> {
-  const { data } = await api.get<{ results: Array<{ ticker: string; name: string }> }>("/search", { params: { q, market } });
+export type SearchSymbolItem = {
+  ticker: string;
+  name: string;
+  exchange?: string;
+  country_code?: string;
+  flag_emoji?: string;
+};
+
+export async function searchSymbols(q: string, market: string): Promise<SearchSymbolItem[]> {
+  const { data } = await api.get<{ results: SearchSymbolItem[] }>("/search", { params: { q, market } });
   return data.results;
 }
 
@@ -110,7 +125,7 @@ export async function fetchFinancials(ticker: string, period: "annual" | "quarte
   return getFinancials(ticker, market, period);
 }
 
-export async function searchStocks(q: string, market = "NSE"): Promise<Array<{ ticker: string; name: string }>> {
+export async function searchStocks(q: string, market = "NSE"): Promise<SearchSymbolItem[]> {
   return searchSymbols(q, market);
 }
 
@@ -130,6 +145,62 @@ export async function addHolding(payload: {
 
 export async function deleteHolding(holdingId: number): Promise<void> {
   await api.delete(`/portfolio/holdings/${holdingId}`);
+}
+
+export async function searchMutualFunds(q: string, category?: string): Promise<MutualFund[]> {
+  const { data } = await api.get<{ items: MutualFund[] }>("/mutual-funds/search", { params: { q, category } });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchMutualFundDetails(schemeCode: number): Promise<MutualFundDetailsResponse> {
+  const { data } = await api.get<MutualFundDetailsResponse>(`/mutual-funds/${schemeCode}`);
+  return data;
+}
+
+export async function fetchMutualFundPerformance(schemeCode: number): Promise<MutualFundPerformance> {
+  const { data } = await api.get<MutualFundPerformance>(`/mutual-funds/${schemeCode}/performance`);
+  return data;
+}
+
+export async function fetchMutualFundNavHistory(schemeCode: number): Promise<MutualFundNavHistoryResponse> {
+  const { data } = await api.get<MutualFundNavHistoryResponse>(`/mutual-funds/${schemeCode}/nav-history`);
+  return data;
+}
+
+export async function compareMutualFunds(codes: number[], period = "1y"): Promise<MutualFundCompareResponse> {
+  const { data } = await api.get<MutualFundCompareResponse>("/mutual-funds/compare", {
+    params: { codes: codes.join(","), period },
+  });
+  return data;
+}
+
+export async function fetchTopMutualFunds(category: string, sortBy = "returns_1y", limit = 20): Promise<MutualFundPerformance[]> {
+  const { data } = await api.get<{ items: MutualFundPerformance[] }>(`/mutual-funds/top/${encodeURIComponent(category)}`, {
+    params: { sort_by: sortBy, limit },
+  });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function addMutualFundHolding(payload: {
+  scheme_code: number;
+  scheme_name: string;
+  fund_house?: string;
+  category?: string;
+  units: number;
+  avg_nav: number;
+  xirr?: number;
+  sip_transactions?: Array<Record<string, unknown>>;
+}): Promise<void> {
+  await api.post("/mutual-funds/portfolio/add", payload);
+}
+
+export async function fetchMutualFundPortfolio(): Promise<PortfolioMutualFundsResponse> {
+  const { data } = await api.get<PortfolioMutualFundsResponse>("/mutual-funds/portfolio");
+  return data;
+}
+
+export async function deleteMutualFundHolding(holdingId: string): Promise<void> {
+  await api.delete(`/mutual-funds/portfolio/${holdingId}`);
 }
 
 export async function fetchWatchlist(): Promise<WatchlistItem[]> {
@@ -206,6 +277,11 @@ export async function fetchEquityPerformance(symbol: string): Promise<EquityPerf
 
 export async function fetchPromoterHoldings(symbol: string): Promise<PromoterHoldingsResponse> {
   const { data } = await api.get<PromoterHoldingsResponse>(`/v1/equity/company/${encodeURIComponent(symbol)}/promoter-holdings`);
+  return data;
+}
+
+export async function fetchShareholdingPattern(symbol: string): Promise<ShareholdingPatternResponse> {
+  const { data } = await api.get<ShareholdingPatternResponse>(`/shareholding/${encodeURIComponent(symbol)}`);
   return data;
 }
 

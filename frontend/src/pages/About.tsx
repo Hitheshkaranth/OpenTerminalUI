@@ -64,8 +64,8 @@ export function AboutPage() {
           <ul className="space-y-1 text-xs text-terminal-text">
             <li>- Multi-timeframe chart workstation with indicators, delivery overlay, and automatic backfill.</li>
             <li>- Company intelligence stack: overview, scorecard, fundamentals, valuation, peers, reports.</li>
-            <li>- Advanced panels: promoter holdings, capex tracker, and Python execution lab.</li>
-            <li>- Operational screens: screener, portfolio, watchlist, and news/sentiment monitor.</li>
+            <li>- Advanced panels: shareholding pattern + trend, capex tracker, and Python execution lab.</li>
+            <li>- Operational screens: screener, portfolio, watchlist, mutual funds, and news/sentiment monitor.</li>
           </ul>
         </TerminalPanel>
 
@@ -92,7 +92,8 @@ export function AboutPage() {
         <ul className="space-y-1 text-xs text-terminal-muted">
           <li>- FastAPI backend + React/TypeScript terminal frontend.</li>
           <li>- Realtime quote stream with resilient snapshot fallback and scrolling market tape.</li>
-          <li>- API v1 coverage: equity analytics, indicators, crypto candles/search, and scripting.</li>
+          <li>- API v1 coverage: equity analytics, shareholding, mutual funds, indicators, crypto candles/search, and scripting.</li>
+          <li>- Cross-market symbol classification with country, exchange, currency, and F/O capability badges.</li>
           <li>- Background services: instruments loader, scheduled news ingestion, cache-aware fetchers.</li>
           <li>- Docker-first deployment with optional Redis profile for L2 caching.</li>
         </ul>

@@ -10,6 +10,7 @@ from backend.core.fmp_client import FMPClient
 from backend.core.kite_client import KiteClient
 from backend.core.nse_client import NSEClient
 from backend.core.yahoo_client import YahooClient
+from backend.shared.market_classifier import market_classifier
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ class UnifiedFetcher:
 
         # Use Yahoo as Primary for History (much better API for intervals/ranges)
         try:
-            yahoo_sym = f"{symbol}.NS" if not symbol.endswith(".NS") else symbol
+            yahoo_sym = await market_classifier.yfinance_symbol(symbol)
             data = await self.yahoo.get_chart(yahoo_sym, range_str, interval)
             if data and "chart" in data:
                  return data
@@ -106,10 +107,11 @@ class UnifiedFetcher:
     # --- PRIORITY MATRIX: QUOTE -> Kite -> NSE -> Yahoo -> FMP ---
     async def fetch_quote(self, ticker: str) -> Dict[str, Any]:
         symbol = ticker.strip().upper()
+        cls = await market_classifier.classify(symbol)
         kite_token = self.kite.resolve_access_token()
 
         # 1. Kite
-        if self.kite.api_key and kite_token:
+        if cls.country_code == "IN" and self.kite.api_key and kite_token:
             try:
                 instrument = f"NSE:{symbol}"
                 data = await self.kite.get_quote(kite_token, [instrument])
@@ -120,16 +122,17 @@ class UnifiedFetcher:
                 logger.debug(f"Kite quote failed for {symbol}: {e}")
         
         # 2. NSE
-        try:
-            data = await self.nse.get_quote_equity(symbol)
-            if data and "priceInfo" in data:
-                return data
-        except Exception as e:
-             logger.debug(f"NSE quote failed for {symbol}: {e}")
+        if cls.country_code == "IN":
+            try:
+                data = await self.nse.get_quote_equity(symbol)
+                if data and "priceInfo" in data:
+                    return data
+            except Exception as e:
+                 logger.debug(f"NSE quote failed for {symbol}: {e}")
 
         # 3. Yahoo
         try:
-            yahoo_sym = f"{symbol}.NS" if not symbol.endswith(".NS") else symbol
+            yahoo_sym = await market_classifier.yfinance_symbol(symbol)
             data = await self.yahoo.get_quotes([yahoo_sym])
             if data:
                 return data[0]
@@ -149,15 +152,16 @@ class UnifiedFetcher:
     # --- SNAPSHOT (Parallel) ---
     async def fetch_stock_snapshot(self, ticker: str) -> dict[str, Any]:
         symbol = ticker.strip().upper()
-        ysym = f"{symbol}.NS"
+        cls = await market_classifier.classify(symbol)
+        ysym = await market_classifier.yfinance_symbol(symbol)
         kite_instrument = f"NSE:{symbol}"
         kite_token = self.kite.resolve_access_token()
 
-        has_kite = self._has_kite_live()
+        has_kite = self._has_kite_live() and cls.country_code == "IN"
 
         # Launch parallel requests
-        nse_task = self.nse.get_quote_equity(symbol)
-        nse_trade_task = self.nse.get_trade_info(symbol)
+        nse_task = self.nse.get_quote_equity(symbol) if cls.country_code == "IN" else asyncio.sleep(0, result={})
+        nse_trade_task = self.nse.get_trade_info(symbol) if cls.country_code == "IN" else asyncio.sleep(0, result={})
         yahoo_summary_task = self.yahoo.get_quote_summary(
             ysym, ["financialData", "summaryDetail", "defaultKeyStatistics", "assetProfile"]
         )
@@ -230,8 +234,8 @@ class UnifiedFetcher:
         company_name = _get_val(nq, "info", "companyName") or \
                        fq.get("name") or \
                        fp.get("name")
-        exchange = _get_val(nq, "info", "exchange") or _get_val(nq, "metadata", "exchange") or "NSE"
-        country_code = "IN"
+        exchange = _get_val(nq, "info", "exchange") or _get_val(nq, "metadata", "exchange") or cls.exchange or "NSE"
+        country_code = cls.country_code
         indices: list[str] = []
         idx_meta = _get_val(nq, "metadata", "index")
         if isinstance(idx_meta, str) and idx_meta.strip():
@@ -279,6 +283,11 @@ class UnifiedFetcher:
             "industry": ap.get("industry") or fp.get("finnhubIndustry") or ap.get("sector"),
             "country_code": country_code,
             "exchange": str(exchange),
+            "currency": cls.currency,
+            "flag_emoji": cls.flag_emoji,
+            "has_futures": cls.has_futures,
+            "has_options": cls.has_options,
+            "market_status": cls.market_status,
             "indices": indices,
             "details": {
                 "nse": bool(nq),
@@ -293,7 +302,7 @@ class UnifiedFetcher:
     # --- FUNDAMENTALS: Yahoo primary, FMP fallback only if Yahoo unavailable ---
     async def fetch_10yr_financials(self, ticker: str) -> Dict[str, Any]:
         symbol = ticker.strip().upper()
-        ysym = f"{symbol}.NS"
+        ysym = await market_classifier.yfinance_symbol(symbol)
         
         y_fund: Any = {}
         try:
@@ -370,7 +379,7 @@ class UnifiedFetcher:
         # Fallback: Yahoo major holders snapshot (single point, not historical trend).
         if not history:
             try:
-                ysym = f"{symbol}.NS"
+                ysym = await market_classifier.yfinance_symbol(symbol)
                 ysum = await self.yahoo.get_quote_summary(ysym, ["majorHoldersBreakdown"])
                 mh = ysum.get("majorHoldersBreakdown", {}) if isinstance(ysum, dict) else {}
                 insiders = _to_float((mh.get("heldPercentInsiders") or {}).get("raw") if isinstance(mh.get("heldPercentInsiders"), dict) else mh.get("heldPercentInsiders"))
@@ -392,6 +401,19 @@ class UnifiedFetcher:
                     warning = (warning + " | " if warning else "") + "Showing Yahoo holders snapshot fallback"
             except Exception as exc:
                 warning = (warning + " | " if warning else "") + f"Yahoo holders fallback unavailable: {exc}"
+
+        # Last-resort deterministic fallback so UI sections still render.
+        if not history:
+            history.append(
+                {
+                    "date": "Latest",
+                    "promoter": 0.0,
+                    "fii": 0.0,
+                    "dii": 0.0,
+                    "public": 100.0,
+                }
+            )
+            warning = (warning + " | " if warning else "") + "Using default fallback distribution"
 
         payload = {"ticker": symbol, "history": history, "raw": raw}
         if warning:

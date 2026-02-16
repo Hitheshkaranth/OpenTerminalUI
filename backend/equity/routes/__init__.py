@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from backend.equity.routes import admin, alerts, backtest, backtests, chart, crypto, data, fundamentals, health, indicators, kite, news, peers, portfolio, quotes, reports, screener, scripting, search, stocks, stream, valuation
+from backend.equity.routes import admin, alerts, backtest, backtests, chart, crypto, data, fundamentals, health, indicators, kite, mutual_funds, news, peers, portfolio, quotes, reports, screener, scripting, search, shareholding, stocks, stream, valuation
 
 equity_router = APIRouter()
 equity_router.include_router(stocks.router, prefix="/api", tags=["stocks"])
@@ -27,5 +27,7 @@ equity_router.include_router(stream.router, prefix="/api", tags=["stream"])
 equity_router.include_router(indicators.router, prefix="/api", tags=["indicators"])
 equity_router.include_router(crypto.router, prefix="/api", tags=["crypto"])
 equity_router.include_router(scripting.router, prefix="/api", tags=["scripting"])
+equity_router.include_router(shareholding.router, prefix="/api", tags=["shareholding"])
+equity_router.include_router(mutual_funds.router)
 
 __all__ = ["equity_router"]

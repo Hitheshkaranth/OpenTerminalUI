@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 
 import { addWatchlistItem, deleteWatchlistItem, fetchQuotesBatch, fetchWatchlist } from "../api/client";
+import { CountryFlag } from "../components/common/CountryFlag";
 import { useDisplayCurrency } from "../hooks/useDisplayCurrency";
 import { useQuotesStore, useQuotesStream } from "../realtime/useQuotesStream";
 import { useSettingsStore } from "../store/settingsStore";
 import type { WatchlistItem } from "../types";
+import { InstrumentBadges } from "../components/common/InstrumentBadges";
 
 type SnapshotQuote = { ltp: number; change: number; change_pct: number };
 
@@ -106,6 +108,7 @@ export function WatchlistPage() {
               <tr className="border-b border-terminal-border text-terminal-muted">
                 <th className="px-2 py-1 text-left">Watchlist</th>
                 <th className="px-2 py-1 text-left">Ticker</th>
+                <th className="px-2 py-1 text-left">F&O</th>
                 <th className="px-2 py-1 text-right">LTP</th>
                 <th className="px-2 py-1 text-right">Change</th>
                 <th className="px-2 py-1 text-right">Change %</th>
@@ -126,7 +129,15 @@ export function WatchlistPage() {
                 return (
                   <tr key={item.id} className="border-b border-terminal-border/50">
                     <td className="px-2 py-1">{item.watchlist_name}</td>
-                    <td className="px-2 py-1">{item.ticker}</td>
+                    <td className="px-2 py-1">
+                      <span className="inline-flex items-center gap-1.5">
+                        <CountryFlag countryCode={item.country_code} flagEmoji={item.flag_emoji} />
+                        <span>{item.ticker}</span>
+                      </span>
+                    </td>
+                    <td className="px-2 py-1">
+                      <InstrumentBadges exchange={item.exchange} hasFutures={item.has_futures} hasOptions={item.has_options} />
+                    </td>
                     <td className="px-2 py-1 text-right tabular-nums">
                       {ltp !== null ? formatDisplayMoney(ltp) : "-"}
                     </td>

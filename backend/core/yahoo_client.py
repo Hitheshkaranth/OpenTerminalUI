@@ -278,3 +278,47 @@ class YahooClient:
         """Get asset profile (sector, industry, description)."""
         summary = await self.get_quote_summary(symbol, ["assetProfile"])
         return summary.get("assetProfile", {})
+
+    async def search_news(self, query: str, limit: int = 30) -> List[Dict[str, Any]]:
+        """
+        Query Yahoo Finance search endpoint and return raw news rows.
+        This endpoint does not require API keys and works for broad queries.
+        """
+        await self._ensure_client()
+        q = (query or "").strip()
+        if not q:
+            return []
+        try:
+            response = await self.client.get(
+                "https://query1.finance.yahoo.com/v1/finance/search",
+                params={
+                    "q": q,
+                    "newsCount": max(1, min(limit, 100)),
+                    "quotesCount": 0,
+                    "listsCount": 0,
+                },
+            )
+            if response.status_code == 401:
+                self._crumb = None
+                await self._ensure_crumb()
+                params = {
+                    "q": q,
+                    "newsCount": max(1, min(limit, 100)),
+                    "quotesCount": 0,
+                    "listsCount": 0,
+                }
+                if self._crumb:
+                    params["crumb"] = self._crumb
+                response = await self.client.get(
+                    "https://query1.finance.yahoo.com/v1/finance/search",
+                    params=params,
+                )
+            response.raise_for_status()
+            payload = response.json()
+            rows = payload.get("news") if isinstance(payload, dict) else []
+            if not isinstance(rows, list):
+                return []
+            return [x for x in rows if isinstance(x, dict)][:limit]
+        except Exception as e:
+            logger.warning(f"Yahoo news search failed for {q}: {e}")
+            return []

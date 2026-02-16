@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import hashlib
+import html
 import json
+import re
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
+from xml.etree import ElementTree as ET
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import desc, or_
 from sqlalchemy.exc import OperationalError
+import httpx
 
 from backend.api.deps import cache_instance, get_unified_fetcher
 from backend.core.ttl_policy import market_open_now, ttl_seconds
@@ -21,6 +26,8 @@ router = APIRouter()
 US_MARKETS = {"NYSE", "NASDAQ"}
 IN_MARKETS = {"NSE", "BSE"}
 SUPPORTED_MARKETS = US_MARKETS | IN_MARKETS
+
+_HTML_RE = re.compile(r"<[^>]+>")
 
 
 def _to_iso_from_epoch(value: Any) -> str | None:
@@ -127,6 +134,137 @@ def _validate_market(market: str) -> str:
     return market_code
 
 
+def _strip_html(text: str) -> str:
+    clean = _HTML_RE.sub(" ", text or "")
+    clean = html.unescape(clean)
+    return " ".join(clean.split()).strip()
+
+
+def _to_iso_from_rss_date(raw: str | None) -> str:
+    if not raw:
+        return datetime.now(timezone.utc).isoformat()
+    try:
+        dt = parsedate_to_datetime(raw)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).isoformat()
+    except Exception:
+        return datetime.now(timezone.utc).isoformat()
+
+
+def _sentiment_payload(title: str, summary: str) -> dict[str, Any]:
+    return score_financial_sentiment(_compose_news_text(title, summary))
+
+
+def _rss_item_to_payload(item: ET.Element) -> dict[str, Any] | None:
+    title = (item.findtext("title") or "").strip()
+    url = (item.findtext("link") or "").strip()
+    summary = _strip_html((item.findtext("description") or "").strip())
+    source = (item.findtext("source") or "").strip() or "Google News"
+    published_at = _to_iso_from_rss_date(item.findtext("pubDate"))
+    if not title or not url:
+        return None
+    sentiment = _sentiment_payload(title, summary)
+    return {
+        "id": _stable_id(url, title, published_at),
+        "source": source,
+        "title": title,
+        "url": url,
+        "summary": summary,
+        "image_url": "",
+        "published_at": published_at,
+        "tickers": [],
+        "sentiment": sentiment,
+    }
+
+
+async def _fetch_google_news_rss(query: str, limit: int = 50) -> list[dict[str, Any]]:
+    q = (query or "").strip()
+    if not q:
+        return []
+    url = "https://news.google.com/rss/search"
+    params = {
+        "q": q,
+        "hl": "en-US",
+        "gl": "US",
+        "ceid": "US:en",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0, trust_env=False, follow_redirects=True) as client:
+            resp = await client.get(url, params=params)
+            resp.raise_for_status()
+            root = ET.fromstring(resp.text)
+    except Exception:
+        return []
+
+    out: list[dict[str, Any]] = []
+    for node in root.findall(".//item"):
+        parsed = _rss_item_to_payload(node)
+        if parsed:
+            out.append(parsed)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _yahoo_news_row_to_payload(row: dict[str, Any]) -> dict[str, Any] | None:
+    title = str(row.get("title") or "").strip()
+    url = str(row.get("link") or row.get("url") or "").strip()
+    summary = _strip_html(str(row.get("summary") or row.get("description") or "").strip())
+    source = str(row.get("publisher") or row.get("source") or "Yahoo Finance").strip() or "Yahoo Finance"
+    published_at = _to_iso_from_epoch(row.get("providerPublishTime")) or _to_iso_from_rss_date(str(row.get("pubDate") or ""))
+    if not title or not url:
+        return None
+    sentiment = _sentiment_payload(title, summary)
+    return {
+        "id": _stable_id(url, title, published_at),
+        "source": source,
+        "title": title,
+        "url": url,
+        "summary": summary,
+        "image_url": "",
+        "published_at": published_at,
+        "tickers": [],
+        "sentiment": sentiment,
+    }
+
+
+async def _fetch_yahoo_news(query: str, limit: int = 50) -> list[dict[str, Any]]:
+    fetcher = await get_unified_fetcher()
+    rows = await fetcher.yahoo.search_news(query, limit=limit)
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        parsed = _yahoo_news_row_to_payload(row)
+        if parsed:
+            out.append(parsed)
+        if len(out) >= limit:
+            break
+    return out
+
+
+async def _fetch_news_fallback(query: str, limit: int = 50) -> list[dict[str, Any]]:
+    # Priority: Yahoo search API (usually available without keys), then Google RSS.
+    yahoo_rows = await _fetch_yahoo_news(query, limit=limit)
+    if yahoo_rows:
+        return yahoo_rows[:limit]
+    return await _fetch_google_news_rss(query, limit=limit)
+
+
+async def _fallback_latest_news(limit: int = 50) -> list[dict[str, Any]]:
+    queries = ["stock market", "business finance", "global markets"]
+    rows: list[dict[str, Any]] = []
+    for q in queries:
+        rows.extend(await _fetch_news_fallback(q, limit=limit))
+    dedup: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        url = str(row.get("url") or "").strip()
+        if url:
+            dedup[url] = row
+    items = list(dedup.values())
+    items.sort(key=lambda x: str(x.get("published_at") or ""), reverse=True)
+    return items[:limit]
+
+
 @router.get("/news/symbol")
 async def get_symbol_news(
     market: str = Query(..., description="NSE|BSE|NYSE|NASDAQ"),
@@ -177,9 +315,12 @@ async def get_latest_news(limit: int = Query(default=50, ge=1, le=200)) -> dict[
     db = SessionLocal()
     try:
         rows = db.query(NewsArticle).order_by(desc(NewsArticle.published_at)).limit(limit).all()
-        payload = {"items": [_row_to_item(row) for row in rows]}
+        items = [_row_to_item(row) for row in rows]
+        if not items:
+            items = await _fallback_latest_news(limit=limit)
+        payload = {"items": items}
     except OperationalError:
-        payload = {"items": []}
+        payload = {"items": await _fallback_latest_news(limit=limit)}
     finally:
         db.close()
 
@@ -218,9 +359,12 @@ async def search_news(
             .limit(limit)
             .all()
         )
-        payload = {"items": [_row_to_item(row) for row in rows]}
+        items = [_row_to_item(row) for row in rows]
+        if not items:
+            items = await _fetch_news_fallback(term, limit=limit)
+        payload = {"items": items}
     except OperationalError:
-        payload = {"items": []}
+        payload = {"items": await _fetch_news_fallback(term, limit=limit)}
     finally:
         db.close()
 
@@ -250,9 +394,12 @@ async def get_news_by_ticker(ticker: str, limit: int = Query(default=50, ge=1, l
             .limit(limit)
             .all()
         )
-        payload = {"items": [_row_to_item(row) for row in rows]}
+        items = [_row_to_item(row) for row in rows]
+        if not items:
+            items = await _fetch_news_fallback(f"{symbol} stock", limit=limit)
+        payload = {"items": items}
     except OperationalError:
-        payload = {"items": []}
+        payload = {"items": await _fetch_news_fallback(f"{symbol} stock", limit=limit)}
     finally:
         db.close()
 
@@ -292,28 +439,47 @@ async def get_news_sentiment(
     finally:
         db.close()
 
-    total = len(rows)
     bullish = 0
     bearish = 0
     neutral = 0
     sum_score = 0.0
     day_buckets: dict[str, list[float]] = defaultdict(list)
 
-    for row in rows:
-        sentiment = _row_sentiment(row)
-        score = float(sentiment.get("score", 0.0))
-        label = str(sentiment.get("label") or _label_from_score(score))
-        if label == "Bullish":
-            bullish += 1
-        elif label == "Bearish":
-            bearish += 1
-        else:
-            neutral += 1
-        sum_score += score
+    if rows:
+        total = len(rows)
+        for row in rows:
+            sentiment = _row_sentiment(row)
+            score = float(sentiment.get("score", 0.0))
+            label = str(sentiment.get("label") or _label_from_score(score))
+            if label == "Bullish":
+                bullish += 1
+            elif label == "Bearish":
+                bearish += 1
+            else:
+                neutral += 1
+            sum_score += score
 
-        day = _to_day(row.published_at)
-        if day:
-            day_buckets[day].append(score)
+            day = _to_day(row.published_at)
+            if day:
+                day_buckets[day].append(score)
+    else:
+        # Fallback sentiment when DB has no ingested records.
+        fallback_items = await _fetch_news_fallback(f"{symbol} stock", limit=max(20, days * 8))
+        total = len(fallback_items)
+        for item in fallback_items:
+            sent = item.get("sentiment") if isinstance(item, dict) else {}
+            score = float((sent or {}).get("score", 0.0))
+            label = str((sent or {}).get("label") or _label_from_score(score))
+            if label == "Bullish":
+                bullish += 1
+            elif label == "Bearish":
+                bearish += 1
+            else:
+                neutral += 1
+            sum_score += score
+            day = _to_day(str(item.get("published_at") or ""))
+            if day:
+                day_buckets[day].append(score)
 
     avg_score = (sum_score / total) if total else 0.0
     daily_sentiment = [

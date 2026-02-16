@@ -104,6 +104,7 @@ class StockSnapshot(BaseModel):
     beta: float | None = None
     country_code: str | None = None
     exchange: str | None = None
+    classification: dict[str, Any] | None = None
     indices: list[str] = Field(default_factory=list)
     raw: dict[str, Any] = Field(default_factory=dict)
 
@@ -213,6 +214,9 @@ class DcfResponse(BaseModel):
 class SearchResult(BaseModel):
     ticker: str
     name: str
+    exchange: str | None = None
+    country_code: str | None = None
+    flag_emoji: str | None = None
 
 
 class SearchResponse(BaseModel):

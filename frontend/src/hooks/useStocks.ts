@@ -16,6 +16,7 @@ import {
   fetchMarketStatus,
   fetchPeers,
   fetchRelativeValuation,
+  fetchShareholdingPattern,
   fetchShareholding,
   fetchStockReturns,
   fetchCryptoSearch,
@@ -37,6 +38,7 @@ import type {
   EquityPerformanceSnapshot,
   PeerResponse,
   RelativeValuationResponse,
+  ShareholdingPatternResponse,
   StockSnapshot,
 } from "../types";
 
@@ -211,6 +213,16 @@ export function usePromoterHoldings(ticker: string) {
     queryKey: ["promoter-holdings-v1", ticker],
     queryFn: () => fetchPromoterHoldings(ticker),
     enabled: Boolean(ticker),
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useShareholdingPattern(ticker: string, enabled = true) {
+  return useQuery<ShareholdingPatternResponse>({
+    queryKey: ["shareholding-pattern", ticker],
+    queryFn: () => fetchShareholdingPattern(ticker),
+    enabled: Boolean(ticker) && enabled,
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
   });

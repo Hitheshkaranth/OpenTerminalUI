@@ -64,6 +64,14 @@ export type StockSnapshot = {
   beta?: number;
   country_code?: string;
   exchange?: string;
+  classification?: {
+    exchange?: string;
+    country_code?: string;
+    flag_emoji?: string;
+    currency?: string;
+    has_futures?: boolean;
+    has_options?: boolean;
+  };
   indices?: string[];
   fifty_two_week_low?: number;
   fifty_two_week_high?: number;
@@ -168,6 +176,11 @@ export type PortfolioItem = {
   current_price: number | null;
   current_value: number | null;
   pnl: number | null;
+  exchange?: string | null;
+  country_code?: string | null;
+  flag_emoji?: string | null;
+  has_futures?: boolean;
+  has_options?: boolean;
 };
 
 export type PortfolioResponse = {
@@ -183,6 +196,11 @@ export type WatchlistItem = {
   id: number;
   watchlist_name: string;
   ticker: string;
+  exchange?: string | null;
+  country_code?: string | null;
+  flag_emoji?: string | null;
+  has_futures?: boolean;
+  has_options?: boolean;
 };
 
 export type AlertRule = {
@@ -227,6 +245,46 @@ export type PromoterHoldingPoint = {
 export type PromoterHoldingsResponse = {
   symbol: string;
   history: PromoterHoldingPoint[];
+  warning?: string | null;
+};
+
+export type ShareholdingCategory = {
+  category: string;
+  percentage: number;
+  shares?: number | null;
+  quarter: string;
+};
+
+export type ShareholdingTrendPoint = {
+  quarter: string;
+  promoter: number;
+  fii: number;
+  dii: number;
+  public: number;
+  government?: number;
+};
+
+export type InstitutionalHolder = {
+  holder: string;
+  shares: number;
+  change: number;
+  date_reported?: string;
+};
+
+export type ShareholdingPatternResponse = {
+  symbol: string;
+  total_shares: number;
+  promoter_holding: number;
+  fii_holding: number;
+  dii_holding: number;
+  public_holding: number;
+  government_holding: number;
+  categories: ShareholdingCategory[];
+  quarter: string;
+  as_of_date: string;
+  historical: ShareholdingTrendPoint[];
+  source?: "nse" | "fmp" | string;
+  institutional_holders?: InstitutionalHolder[];
   warning?: string | null;
 };
 
@@ -296,6 +354,89 @@ export type MarketStatus = {
   last: number;
   variation: number;
   percentChange: number;
+};
+
+export type MutualFund = {
+  scheme_code: number;
+  scheme_name: string;
+  isin_growth?: string | null;
+  isin_div_payout?: string | null;
+  nav: number;
+  nav_date: string;
+  fund_house: string;
+  scheme_type: string;
+  scheme_category: string;
+  scheme_sub_category: string;
+  returns_1y?: number | null;
+};
+
+export type MutualFundNavPoint = {
+  date: string;
+  nav: number;
+};
+
+export type MutualFundNavHistoryResponse = {
+  scheme_code: number;
+  scheme_name: string;
+  nav_history: MutualFundNavPoint[];
+};
+
+export type MutualFundPerformance = {
+  scheme_code: number;
+  scheme_name: string;
+  fund_house: string;
+  category: string;
+  current_nav: number;
+  returns_1m?: number | null;
+  returns_3m?: number | null;
+  returns_6m?: number | null;
+  returns_1y?: number | null;
+  returns_3y?: number | null;
+  returns_5y?: number | null;
+  returns_since_inception?: number | null;
+  expense_ratio?: number | null;
+  aum_cr?: number | null;
+  risk_rating?: string | null;
+};
+
+export type MutualFundDetailsResponse = {
+  fund: MutualFund | null;
+  nav_history: MutualFundNavHistoryResponse;
+  performance: MutualFundPerformance;
+};
+
+export type MutualFundCompareResponse = {
+  period: string;
+  funds: MutualFundPerformance[];
+  normalized: Record<string, Array<{ date: string; value: number }>>;
+};
+
+export type PortfolioMutualFund = {
+  id: string;
+  scheme_code: number;
+  scheme_name: string;
+  fund_house: string;
+  category: string;
+  units: number;
+  avg_nav: number;
+  current_nav: number;
+  invested_amount: number;
+  current_value: number;
+  pnl: number;
+  pnl_pct: number;
+  xirr?: number | null;
+  sip_transactions: Array<Record<string, unknown>>;
+  added_at: string;
+};
+
+export type PortfolioMutualFundsResponse = {
+  items: PortfolioMutualFund[];
+  summary: {
+    total_invested: number;
+    total_current_value: number;
+    total_pnl: number;
+    total_pnl_pct: number;
+  };
 };
 
 export * from "./markets";

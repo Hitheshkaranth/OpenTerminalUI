@@ -14,10 +14,13 @@ import { QuarterlyResults } from "../components/analysis/QuarterlyResults";
 import { QuarterlyReportsSection } from "../components/analysis/QuarterlyReportsSection";
 import { ScoreCard } from "../components/analysis/ScoreCard";
 import { ShareholdingChart } from "../components/analysis/ShareholdingChart";
+import { ShareholdingPanel } from "../components/ShareholdingPanel";
 import { ValuationPanel } from "../components/analysis/ValuationPanel";
 import { FuturesPanel } from "../components/market/FuturesPanel";
 import { TerminalBadge } from "../components/terminal/TerminalBadge";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
+import { CountryFlag } from "../components/common/CountryFlag";
+import { InstrumentBadges } from "../components/common/InstrumentBadges";
 import { useDeliverySeries, useEquityPerformance, useFinancials, useStock, useStockHistory, useStockReturns } from "../hooks/useStocks";
 import { useDisplayCurrency } from "../hooks/useDisplayCurrency";
 import { useQuotesStore, useQuotesStream } from "../realtime/useQuotesStream";
@@ -29,7 +32,7 @@ import type { ChartKind, ChartTimeframe, IndicatorConfig } from "../shared/chart
 import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
 
-type TabId = "overview" | "financials" | "analysis" | "peers" | "valuation";
+type TabId = "overview" | "financials" | "analysis" | "peers" | "valuation" | "shareholding";
 
 const TIMEFRAME_TO_INTERVAL: Record<ChartTimeframe, { interval: string; range: string }> = {
   "1m": { interval: "1m", range: "5d" },
@@ -66,6 +69,7 @@ export function StockDetailPage() {
   const [crosshair, setCrosshair] = useState<{ open: number; high: number; low: number; close: number; time: number } | null>(null);
   const [realtimeTick, setRealtimeTick] = useState<{ ltp: number; change_pct: number } | null>(null);
   const [tab, setTab] = useState<TabId>("overview");
+  const [shareholdingTabLoaded, setShareholdingTabLoaded] = useState(false);
   const [financialPeriod, setFinancialPeriod] = useState<"annual" | "quarterly">("annual");
   const [showVolume, setShowVolume] = useState(true);
   const [showDeliveryOverlay, setShowDeliveryOverlay] = useState(false);
@@ -150,6 +154,12 @@ export function StockDetailPage() {
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
 
+  useEffect(() => {
+    if (tab === "shareholding") {
+      setShareholdingTabLoaded(true);
+    }
+  }, [tab]);
+
   const stockForOverview = useMemo(
     () => ({
       ticker: ticker.toUpperCase(),
@@ -188,6 +198,7 @@ export function StockDetailPage() {
   const changePctText =
     displayedChangePct === null ? "-" : `${displayedChangePct >= 0 ? "+" : ""}${displayedChangePct.toFixed(2)}%`;
   const timeframe = intervalToTimeframe(interval);
+  const stockClassification = stockForOverview?.classification;
   const ohlcForToolbar =
     crosshair ??
     (chartPoints.length
@@ -265,6 +276,18 @@ export function StockDetailPage() {
     <div className="relative h-full space-y-3 overflow-y-auto px-3 py-2">
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_220px]">
         <div className="space-y-3">
+          <div className="inline-flex items-center gap-2 rounded border border-terminal-border bg-terminal-panel px-2 py-1 text-xs">
+            <CountryFlag
+              countryCode={stockClassification?.country_code || stockForOverview?.country_code}
+              flagEmoji={stockClassification?.flag_emoji}
+            />
+            <span className="font-semibold">{ticker.toUpperCase()}</span>
+            <InstrumentBadges
+              exchange={stockClassification?.exchange || stockForOverview?.exchange}
+              hasFutures={stockClassification?.has_futures}
+              hasOptions={stockClassification?.has_options}
+            />
+          </div>
           <SharedChartToolbar
             symbol={ticker}
             ltp={displayedLatestPrice}
@@ -391,7 +414,7 @@ export function StockDetailPage() {
 
       <div className="border-b border-terminal-border">
         <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-          {(["overview", "financials", "analysis", "peers", "valuation"] as TabId[]).map((t) => (
+          {(["overview", "financials", "analysis", "peers", "valuation", "shareholding"] as TabId[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -465,6 +488,7 @@ export function StockDetailPage() {
 
         {tab === "peers" && <PeersComparison ticker={ticker} />}
         {tab === "valuation" && <ValuationPanel ticker={ticker} />}
+        {tab === "shareholding" && <ShareholdingPanel ticker={ticker} enabled={shareholdingTabLoaded} />}
       </div>
       <Link
         to="/equity/stocks/about"

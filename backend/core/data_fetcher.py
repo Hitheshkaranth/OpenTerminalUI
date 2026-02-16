@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import os
+import csv
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ import requests
 import yfinance as yf
 
 _YF_CACHE_DIR = Path(__file__).resolve().parents[2] / ".yf_cache"
+_NSE_SYMBOLS_PATH = Path(__file__).resolve().parents[2] / "data" / "nse_equity_symbols_eq.csv"
 _YF_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 _HTTP = requests.Session()
 _HTTP.trust_env = False
@@ -33,12 +35,41 @@ class MarketDataFetcher:
 
     _consecutive_failures: int = 0
     _blocked_until_utc: datetime | None = None
+    _nse_symbols_cache: set[str] | None = None
+
+    def _load_nse_symbols(self) -> set[str]:
+        if self._nse_symbols_cache is not None:
+            return self._nse_symbols_cache
+        out: set[str] = set()
+        if _NSE_SYMBOLS_PATH.exists():
+            try:
+                with _NSE_SYMBOLS_PATH.open("r", encoding="utf-8") as f:
+                    rows = csv.DictReader(f)
+                    for row in rows:
+                        sym = (row.get("Symbol") or row.get("SYMBOL") or "").strip().upper()
+                        if sym:
+                            out.add(sym)
+            except Exception:
+                out = set()
+        self._nse_symbols_cache = out
+        return out
 
     def normalized_ticker(self, ticker: str) -> str:
         t = ticker.strip().upper()
         if "." not in t and self.default_exchange_suffix:
-            return f"{t}{self.default_exchange_suffix}"
+            if t in self._load_nse_symbols():
+                return f"{t}{self.default_exchange_suffix}"
+            return t
         return t
+
+    async def fetch_stock_data(self, symbol: str) -> dict[str, Any]:
+        yf_symbol = self.normalized_ticker(symbol)
+        tk = yf.Ticker(yf_symbol)
+        try:
+            info = tk.fast_info or {}
+        except Exception:
+            info = {}
+        return {"symbol": symbol.strip().upper(), "yf_symbol": yf_symbol, "info": info}
 
     def _network_allowed(self) -> bool:
         if self._blocked_until_utc is None:

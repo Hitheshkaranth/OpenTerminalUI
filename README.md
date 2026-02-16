@@ -25,8 +25,8 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 ### Equity & Fundamental Analysis Pack
 - **Chart Workstation** - multi-timeframe charts, indicator overlays, delivery overlay, and history backfill
 - **Company Analytics** - fundamentals, scorecards, trends, reports, valuation, peer comparison
-- **Advanced Research Widgets** - promoter holdings, capex tracker, and in-app Python execution
-- **Operations Screens** - screener, portfolio, watchlist, settings, and news/sentiment flows
+- **Advanced Research Widgets** - shareholding pattern panel (NSE + fallback), capex tracker, and in-app Python execution
+- **Operations Screens** - screener, portfolio, watchlist, mutual funds desk, settings, and news/sentiment flows
 
 ### Futures & Options (F&O) Analysis Pack
 - **Option Chain + Greeks + OI** - strike-level structure, Greeks, and open-interest context
@@ -43,8 +43,9 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 
 ### Platform & APIs
 - **Realtime Streaming** - WebSocket quotes with REST/snapshot fallback
-- **V1 Endpoints** - equity performance, promoter holdings, delivery series, capex tracker, indicators, crypto, scripting
+- **V1 Endpoints** - equity analytics, shareholding pattern/trends, mutual fund search/performance/portfolio, delivery series, indicators, crypto, scripting
 - **UI Reliability** - hardened chart/indicator pipelines for first-load and timeframe-switch stability
+- **Market Classification** - country/exchange badges, currency metadata, and instrument capability tags (F/O)
 - **Background Services** - instruments loader and scheduled news ingestion
 - **Deployment** - Docker compose workflow with optional Redis cache profile
 
@@ -55,6 +56,9 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - [x] Capital-aware backtesting control deck with model-based execution sizing
 - [x] Realtime quote stream with fallback and stable market tape rendering
 - [x] API v1 surface for analytics, indicators, crypto, and scripting
+- [x] Mutual funds module with compare, top funds, and portfolio holdings tracking
+- [x] Shareholding pattern and trend panel with resilient fallback path
+- [x] Cross-market classification metadata (country, exchange, currency, F/O capability)
 - [x] Dockerized deployment and CI-compatible verify flow
 - [ ] Portfolio-level backtesting and strategy comparison views
 - [ ] Expanded model/template library and parameter presets

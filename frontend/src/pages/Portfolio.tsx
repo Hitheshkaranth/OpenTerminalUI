@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Area, AreaChart, Brush, CartesianGrid, Legend, Line, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-import { addHolding, deleteHolding, fetchChart, fetchPortfolio, fetchQuarterlyReports, fetchStockReturns, searchSymbols } from "../api/client";
+import { addHolding, addMutualFundHolding, deleteHolding, fetchChart, fetchPortfolio, fetchQuarterlyReports, fetchStockReturns, searchMutualFunds, searchSymbols, type SearchSymbolItem } from "../api/client";
+import { CountryFlag } from "../components/common/CountryFlag";
+import { InstrumentBadges } from "../components/common/InstrumentBadges";
 import { AllocationChart } from "../components/portfolio/AllocationChart";
 import { BacktestResults } from "../components/portfolio/BacktestResults";
+import { MutualFundPortfolioSection } from "../components/mutualFunds/MutualFundPortfolioSection";
+import { TerminalButton } from "../components/terminal/TerminalButton";
+import { TerminalInput } from "../components/terminal/TerminalInput";
 import { useSettingsStore } from "../store/settingsStore";
-import type { ChartPoint, PortfolioResponse } from "../types";
+import type { ChartPoint, MutualFund, PortfolioResponse } from "../types";
 import { MOMENTUM_ROTATION_BASKET } from "../utils/constants";
 import { formatInr } from "../utils/formatters";
 
@@ -150,6 +155,18 @@ function daysSince(dateString: string): number | null {
 }
 
 export function PortfolioPage() {
+  const [portfolioMode, setPortfolioMode] = useState<"equity" | "mutual_funds">("equity");
+  const [mfSchemeCode, setMfSchemeCode] = useState("");
+  const [mfSchemeName, setMfSchemeName] = useState("");
+  const [mfFundHouse, setMfFundHouse] = useState("");
+  const [mfCategory, setMfCategory] = useState("");
+  const [mfUnits, setMfUnits] = useState(10);
+  const [mfAvgNav, setMfAvgNav] = useState(10);
+  const [mfSuggestions, setMfSuggestions] = useState<MutualFund[]>([]);
+  const [mfSuggestionsOpen, setMfSuggestionsOpen] = useState(false);
+  const [mfRefreshToken, setMfRefreshToken] = useState(0);
+  const [mfError, setMfError] = useState<string | null>(null);
+  const [mfMessage, setMfMessage] = useState<string | null>(null);
   const [data, setData] = useState<PortfolioResponse | null>(null);
   const [returnsMap, setReturnsMap] = useState<Record<string, { "1m"?: number | null; "1y"?: number | null }>>({});
   const [portfolioTrend, setPortfolioTrend] = useState<PortfolioTrendPoint[]>([]);
@@ -163,7 +180,7 @@ export function PortfolioPage() {
   const [buyDate, setBuyDate] = useState("2025-01-01");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tickerSuggestions, setTickerSuggestions] = useState<Array<{ ticker: string; name: string }>>([]);
+  const [tickerSuggestions, setTickerSuggestions] = useState<SearchSymbolItem[]>([]);
   const [isTickerSuggestionsOpen, setIsTickerSuggestionsOpen] = useState(false);
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
   const searchRequestRef = useRef(0);
@@ -177,7 +194,14 @@ export function PortfolioPage() {
     }
     const requestId = ++searchRequestRef.current;
     try {
-      const res = await searchSymbols(q, selectedMarket);
+      const merged = await searchSymbols(q, selectedMarket);
+      const seen = new Set<string>();
+      const res = merged.filter((item) => {
+        const key = `${(item.ticker || "").toUpperCase()}::${(item.name || "").toUpperCase()}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       if (requestId !== searchRequestRef.current) return;
       setTickerSuggestions(res);
       setIsTickerSuggestionsOpen(res.length > 0);
@@ -375,16 +399,227 @@ export function PortfolioPage() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
   }, []);
 
+  useEffect(() => {
+    if (portfolioMode !== "mutual_funds") return;
+    const q = mfSchemeCode.trim();
+    if (q.length < 2) {
+      setMfSuggestions([]);
+      setMfSuggestionsOpen(false);
+      return;
+    }
+    const handle = setTimeout(async () => {
+      try {
+        const items = await searchMutualFunds(q);
+        setMfSuggestions(items.slice(0, 12));
+        setMfSuggestionsOpen(items.length > 0);
+      } catch {
+        setMfSuggestions([]);
+        setMfSuggestionsOpen(false);
+      }
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [mfSchemeCode, portfolioMode]);
+
+  const pickMfSuggestion = (item: MutualFund) => {
+    setMfSchemeCode(String(item.scheme_code));
+    setMfSchemeName(item.scheme_name || "");
+    setMfFundHouse(item.fund_house || "");
+    setMfCategory(item.scheme_sub_category || item.scheme_category || "");
+    if (Number.isFinite(Number(item.nav)) && Number(item.nav) > 0) {
+      setMfAvgNav(Number(item.nav));
+    }
+    setMfSuggestionsOpen(false);
+  };
+
+  if (portfolioMode === "mutual_funds") {
+    return (
+      <div className="space-y-3 p-4">
+        <div className="rounded border border-terminal-border bg-terminal-panel p-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm font-semibold uppercase tracking-wide text-terminal-accent">Portfolio</div>
+            <span className="rounded border border-terminal-border bg-terminal-bg px-2 py-0.5 text-[11px] text-terminal-muted">
+              Mode: Mutual Funds
+            </span>
+          </div>
+          <div className="flex gap-1">
+            <button className="rounded border border-terminal-border px-2 py-1 text-xs text-terminal-muted" onClick={() => setPortfolioMode("equity")}>
+              Equity
+            </button>
+            <button className="rounded border border-terminal-accent px-2 py-1 text-xs text-terminal-accent">
+              Mutual Funds
+            </button>
+          </div>
+        </div>
+        <div className="rounded border border-terminal-border bg-terminal-panel p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm font-semibold uppercase tracking-wide text-terminal-accent">Add Mutual Fund Holding</div>
+            <span className="rounded border border-terminal-border bg-terminal-bg px-2 py-0.5 text-[11px] text-terminal-muted">
+              Portfolio: Mutual Funds
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <div>
+              <label className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Scheme Code</label>
+              <div className="relative">
+                <TerminalInput
+                  className="w-full text-xs"
+                  value={mfSchemeCode}
+                  onChange={(e) => setMfSchemeCode(e.target.value)}
+                  onFocus={() => {
+                    if (mfSuggestions.length > 0) setMfSuggestionsOpen(true);
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setMfSuggestionsOpen(false), 120);
+                  }}
+                />
+                {mfSuggestionsOpen && mfSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-8 z-10 max-h-64 overflow-auto rounded-sm border border-terminal-border bg-terminal-panel shadow-lg">
+                    {mfSuggestions.map((item) => (
+                      <button
+                        key={item.scheme_code}
+                        className="block w-full border-b border-terminal-border px-2 py-1 text-left hover:bg-terminal-bg"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          pickMfSuggestion(item);
+                        }}
+                      >
+                        <div className="text-xs text-terminal-text">
+                          {item.scheme_code} | {item.scheme_name}
+                        </div>
+                        <div className="text-[10px] text-terminal-muted">
+                          {item.fund_house || "Unknown Fund House"} | {item.scheme_sub_category || item.scheme_category || "Other"}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Scheme Name</label>
+              <TerminalInput className="w-full text-xs" value={mfSchemeName} onChange={(e) => setMfSchemeName(e.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Fund House</label>
+              <TerminalInput className="w-full text-xs" value={mfFundHouse} onChange={(e) => setMfFundHouse(e.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Category</label>
+              <TerminalInput className="w-full text-xs" value={mfCategory} onChange={(e) => setMfCategory(e.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Units</label>
+              <TerminalInput className="w-full text-xs" type="number" value={mfUnits} onChange={(e) => setMfUnits(Number(e.target.value))} />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Avg NAV</label>
+              <TerminalInput className="w-full text-xs" type="number" value={mfAvgNav} onChange={(e) => setMfAvgNav(Number(e.target.value))} />
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <div>
+              <label className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Action</label>
+              <TerminalButton
+                variant="accent"
+                className="w-full justify-center"
+                onClick={async () => {
+                  setMfError(null);
+                  setMfMessage(null);
+                  if (!mfSchemeCode.trim() || !/^\d+$/.test(mfSchemeCode.trim())) {
+                    setMfError("Enter a valid numeric scheme code.");
+                    return;
+                  }
+                  if (!Number.isFinite(mfUnits) || mfUnits <= 0 || !Number.isFinite(mfAvgNav) || mfAvgNav <= 0) {
+                    setMfError("Units and Avg NAV must be greater than 0.");
+                    return;
+                  }
+                  try {
+                    let resolvedName = mfSchemeName.trim();
+                    let resolvedHouse = mfFundHouse.trim();
+                    let resolvedCategory = mfCategory.trim();
+                    let resolvedAvgNav = mfAvgNav;
+                    if (!resolvedName) {
+                      const lookup = await searchMutualFunds(mfSchemeCode.trim());
+                      const exact = lookup.find((x) => String(x.scheme_code) === mfSchemeCode.trim()) || lookup[0];
+                      if (exact) {
+                        resolvedName = exact.scheme_name || resolvedName;
+                        resolvedHouse = exact.fund_house || resolvedHouse;
+                        resolvedCategory = exact.scheme_sub_category || exact.scheme_category || resolvedCategory;
+                        if (Number.isFinite(Number(exact.nav)) && Number(exact.nav) > 0) {
+                          resolvedAvgNav = Number(exact.nav);
+                          setMfAvgNav(resolvedAvgNav);
+                        }
+                        setMfSchemeName(resolvedName);
+                        setMfFundHouse(resolvedHouse);
+                        setMfCategory(resolvedCategory);
+                      }
+                    }
+                    if (!resolvedName) {
+                      setMfError("Could not resolve scheme details from scheme code. Pick a suggestion first.");
+                      return;
+                    }
+                    await addMutualFundHolding({
+                      scheme_code: Number(mfSchemeCode.trim()),
+                      scheme_name: resolvedName,
+                      fund_house: resolvedHouse || undefined,
+                      category: resolvedCategory || undefined,
+                      units: mfUnits,
+                      avg_nav: resolvedAvgNav,
+                    });
+                    setMfMessage("Mutual fund holding added.");
+                    setMfRefreshToken((n) => n + 1);
+                  } catch (e) {
+                    setMfError(e instanceof Error ? e.message : "Failed to add mutual fund holding");
+                  }
+                }}
+              >
+                Add Holding
+              </TerminalButton>
+            </div>
+            <div />
+            <div />
+            <div />
+            <div />
+          </div>
+          {mfError && <div className="mt-2 text-xs text-terminal-neg">{mfError}</div>}
+          {mfMessage && <div className="mt-2 text-xs text-terminal-pos">{mfMessage}</div>}
+        </div>
+        <MutualFundPortfolioSection refreshToken={mfRefreshToken} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3 p-4">
       <div className="rounded border border-terminal-border bg-terminal-panel p-3">
-        <div className="mb-2 text-sm font-semibold">Add Holding</div>
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm font-semibold uppercase tracking-wide text-terminal-accent">Portfolio</div>
+          <span className="rounded border border-terminal-border bg-terminal-bg px-2 py-0.5 text-[11px] text-terminal-muted">
+            Mode: Equity
+          </span>
+        </div>
+        <div className="flex gap-1">
+          <button className="rounded border border-terminal-accent px-2 py-1 text-xs text-terminal-accent">
+            Equity
+          </button>
+          <button className="rounded border border-terminal-border px-2 py-1 text-xs text-terminal-muted" onClick={() => setPortfolioMode("mutual_funds")}>
+            Mutual Funds
+          </button>
+        </div>
+      </div>
+      <div className="rounded border border-terminal-border bg-terminal-panel p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm font-semibold uppercase tracking-wide text-terminal-accent">Add Holding</div>
+          <span className="rounded border border-terminal-border bg-terminal-bg px-2 py-0.5 text-[11px] text-terminal-muted">
+            Market: {selectedMarket}
+          </span>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div>
             <label className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Ticker</label>
             <div className="relative">
-              <input
-                className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs outline-none focus:border-terminal-accent"
+              <TerminalInput
+                className="w-full text-xs"
                 value={ticker}
                 placeholder={`Search ${selectedMarket} ticker`}
                 onChange={(e) => {
@@ -411,17 +646,22 @@ export function PortfolioPage() {
                 }}
               />
               {isTickerSuggestionsOpen && tickerSuggestions.length > 0 && (
-                <div className="absolute left-0 right-0 top-8 z-10 max-h-64 overflow-auto rounded border border-terminal-border bg-terminal-panel">
+                <div className="absolute left-0 right-0 top-8 z-10 max-h-64 overflow-auto rounded-sm border border-terminal-border bg-terminal-panel shadow-lg">
                   {tickerSuggestions.map((item) => (
                     <button
-                      key={item.ticker}
-                      className="block w-full border-b border-terminal-border px-2 py-1 text-left text-xs hover:bg-terminal-bg"
+                      key={`${item.ticker}:${item.name}`}
+                      className="block w-full border-b border-terminal-border px-2 py-1 text-left text-xs text-terminal-text hover:bg-terminal-bg"
                       onMouseDown={(e) => {
                         e.preventDefault();
                         pickTicker(item.ticker);
                       }}
                     >
-                      {item.ticker} - {item.name}
+                      <span className="inline-flex items-center gap-2">
+                        <CountryFlag countryCode={item.country_code} flagEmoji={item.flag_emoji} size="sm" />
+                        <span>{item.ticker}</span>
+                        <span className="text-terminal-muted">- {item.name}</span>
+                        {item.exchange ? <span className="text-terminal-muted">({item.exchange})</span> : null}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -430,19 +670,20 @@ export function PortfolioPage() {
           </div>
           <div>
             <label className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Qty</label>
-            <input className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
+            <TerminalInput className="w-full text-xs" type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
           </div>
           <div>
             <label className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Avg Buy</label>
-            <input className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" type="number" value={avgBuyPrice} onChange={(e) => setAvgBuyPrice(Number(e.target.value))} />
+            <TerminalInput className="w-full text-xs" type="number" value={avgBuyPrice} onChange={(e) => setAvgBuyPrice(Number(e.target.value))} />
           </div>
           <div>
             <label className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Buy Date</label>
-            <input className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} />
+            <TerminalInput className="w-full text-xs" type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} />
           </div>
           <div className="flex items-end">
-            <button
-              className="w-full rounded bg-terminal-accent px-3 py-1 text-xs text-black"
+            <TerminalButton
+              variant="accent"
+              className="w-full justify-center"
               onClick={async () => {
                 try {
                   await addHolding({ ticker, quantity, avg_buy_price: avgBuyPrice, buy_date: buyDate });
@@ -452,24 +693,24 @@ export function PortfolioPage() {
                 }
               }}
             >
-              Add
-            </button>
+              Add Holding
+            </TerminalButton>
           </div>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-terminal-muted">Momentum Basket:</span>
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] uppercase tracking-wide text-terminal-muted">Quick Picks:</span>
           {MOMENTUM_ROTATION_BASKET.map((symbol) => (
-            <button
+            <TerminalButton
               key={symbol}
-              className={`rounded border px-1.5 py-0.5 text-[10px] ${
+              className={`px-1.5 py-0.5 text-[10px] normal-case tracking-normal ${
                 ticker === symbol
-                  ? "border-terminal-accent text-terminal-accent"
+                  ? "border-terminal-accent bg-terminal-accent/20 text-terminal-accent"
                   : "border-terminal-border text-terminal-muted hover:text-terminal-text"
               }`}
               onClick={() => pickTicker(symbol)}
             >
               {symbol}
-            </button>
+            </TerminalButton>
           ))}
         </div>
       </div>
@@ -478,41 +719,41 @@ export function PortfolioPage() {
       {error && <div className="rounded border border-terminal-neg bg-terminal-neg/10 p-3 text-xs text-terminal-neg">{error}</div>}
       {data && (
         <>
-          <div className="sticky top-0 z-10 rounded border border-terminal-accent/30 bg-terminal-panel/95 p-3 backdrop-blur">
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
-              <div className="rounded border border-terminal-accent/40 bg-terminal-bg p-3">
-                <div className="text-[11px] uppercase tracking-wide text-terminal-muted">Portfolio Value</div>
-                <div className="mt-1 text-xl font-semibold leading-none text-terminal-text lg:text-2xl [font-variant-numeric:tabular-nums]">
+          <div className="rounded border border-terminal-accent/40 bg-terminal-panel p-3 shadow-[0_0_0_1px_rgba(0,193,118,0.08)]">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
+              <div className="rounded border border-terminal-accent/50 bg-terminal-bg px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-terminal-muted">Portfolio Value</div>
+                <div className="mt-1 text-sm font-semibold leading-none text-terminal-text md:text-base [font-variant-numeric:tabular-nums]">
                   {formatInr(totalValue)}
                 </div>
               </div>
-              <div className="rounded border border-terminal-border bg-terminal-bg p-3">
-                <div className="text-[11px] uppercase tracking-wide text-terminal-muted">Invested</div>
-                <div className="mt-1 text-xl font-semibold leading-none text-terminal-text lg:text-2xl [font-variant-numeric:tabular-nums]">
+              <div className="rounded border border-terminal-border/80 bg-terminal-bg px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-terminal-muted">Invested</div>
+                <div className="mt-1 text-sm font-semibold leading-none text-terminal-text md:text-base [font-variant-numeric:tabular-nums]">
                   {formatInr(totalCost)}
                 </div>
               </div>
-              <div className="rounded border border-terminal-border bg-terminal-bg p-3">
-                <div className="text-[11px] uppercase tracking-wide text-terminal-muted">Unrealized P&L</div>
-                <div className={`mt-1 text-xl font-semibold leading-none lg:text-2xl [font-variant-numeric:tabular-nums] ${performanceToneClass}`}>
+              <div className={`rounded border bg-terminal-bg px-3 py-2 ${overallPnl >= 0 ? "border-terminal-pos/60" : "border-terminal-neg/60"}`}>
+                <div className="text-[10px] uppercase tracking-wide text-terminal-muted">Unrealized P&L</div>
+                <div className={`mt-1 text-sm font-semibold leading-none md:text-base [font-variant-numeric:tabular-nums] ${performanceToneClass}`}>
                   {formatInr(overallPnl)}
                 </div>
               </div>
-              <div className="rounded border border-terminal-border bg-terminal-bg p-3">
-                <div className="text-[11px] uppercase tracking-wide text-terminal-muted">Total Return</div>
-                <div className={`mt-1 text-xl font-semibold leading-none lg:text-2xl [font-variant-numeric:tabular-nums] ${performanceToneClass}`}>
+              <div className={`rounded border bg-terminal-bg px-3 py-2 ${lifetimePct >= 0 ? "border-terminal-pos/60" : "border-terminal-neg/60"}`}>
+                <div className="text-[10px] uppercase tracking-wide text-terminal-muted">Total Return</div>
+                <div className={`mt-1 text-sm font-semibold leading-none md:text-base [font-variant-numeric:tabular-nums] ${performanceToneClass}`}>
                   {formatPctValue(lifetimePct)}
                 </div>
               </div>
-              <div className="rounded border border-terminal-border bg-terminal-bg p-3">
-                <div className="text-[11px] uppercase tracking-wide text-terminal-muted">Win Rate</div>
-                <div className="mt-1 text-xl font-semibold leading-none text-terminal-text lg:text-2xl [font-variant-numeric:tabular-nums]">
+              <div className="rounded border border-terminal-border/80 bg-terminal-bg px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-terminal-muted">Win Rate</div>
+                <div className="mt-1 text-sm font-semibold leading-none text-terminal-text md:text-base [font-variant-numeric:tabular-nums]">
                   {holdingsCount > 0 ? formatPctValue((winnersCount / holdingsCount) * 100) : "-"}
                 </div>
               </div>
-              <div className="rounded border border-terminal-border bg-terminal-bg p-3">
-                <div className="text-[11px] uppercase tracking-wide text-terminal-muted">Avg Days Held</div>
-                <div className="mt-1 text-xl font-semibold leading-none text-terminal-text lg:text-2xl [font-variant-numeric:tabular-nums]">
+              <div className="rounded border border-terminal-border/80 bg-terminal-bg px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-terminal-muted">Avg Days Held</div>
+                <div className="mt-1 text-sm font-semibold leading-none text-terminal-text md:text-base [font-variant-numeric:tabular-nums]">
                   {avgHoldingDays || 0}
                 </div>
               </div>
@@ -705,18 +946,18 @@ export function PortfolioPage() {
 
             <div className="space-y-3 xl:col-span-8">
               <div className="rounded border border-terminal-border bg-terminal-panel p-3">
-                <div className="mb-2 text-sm font-semibold">Holdings</div>
-                <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px]">
-                  <span className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-terminal-muted">
+              <div className="mb-2 text-sm font-semibold">Holdings</div>
+              <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px]">
+                  <span className="rounded border border-terminal-accent/40 bg-terminal-bg px-2 py-1 text-terminal-text">
                     Total Holdings: <span className="text-terminal-text">{holdingsCount}</span>
                   </span>
-                  <span className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-terminal-muted">
+                  <span className="rounded border border-terminal-border/80 bg-terminal-bg px-2 py-1 text-terminal-text">
                     Net Invested: <span className="text-terminal-text">{formatInr(totalCost)}</span>
                   </span>
-                  <span className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-terminal-muted">
+                  <span className="rounded border border-terminal-border/80 bg-terminal-bg px-2 py-1 text-terminal-text">
                     Net Current: <span className="text-terminal-text">{formatInr(totalValue)}</span>
                   </span>
-                  <span className={`rounded border border-terminal-border bg-terminal-bg px-2 py-1 ${performanceToneClass}`}>
+                  <span className={`rounded border px-2 py-1 ${overallPnl >= 0 ? "border-terminal-pos/60 bg-terminal-pos/10 text-terminal-pos" : "border-terminal-neg/60 bg-terminal-neg/10 text-terminal-neg"}`}>
                     Net P&L: {formatInr(overallPnl)} ({lifetimePct.toFixed(2)}%)
                   </span>
                 </div>
@@ -724,7 +965,9 @@ export function PortfolioPage() {
                   <table className="min-w-full text-xs">
                 <thead>
                   <tr className="border-b border-terminal-border text-terminal-muted">
+                    <th className="px-2 py-1 text-left">Flag</th>
                     <th className="px-2 py-1 text-left">Ticker</th>
+                    <th className="px-2 py-1 text-left">F&O</th>
                     <th className="px-2 py-1 text-right">Qty</th>
                     <th className="px-2 py-1 text-right">Avg Buy</th>
                     <th className="px-2 py-1 text-left">Sector</th>
@@ -754,7 +997,13 @@ export function PortfolioPage() {
                       pnlContribPct == null ? "text-terminal-muted" : pnlContribPct >= 0 ? "text-terminal-pos" : "text-terminal-neg";
                     return (
                       <tr key={row.id} className="border-b border-terminal-border/50">
+                        <td className="px-2 py-1">
+                          <CountryFlag countryCode={row.country_code} flagEmoji={row.flag_emoji} />
+                        </td>
                         <td className="px-2 py-1">{row.ticker}</td>
+                        <td className="px-2 py-1">
+                          <InstrumentBadges exchange={row.exchange} hasFutures={row.has_futures} hasOptions={row.has_options} />
+                        </td>
                         <td className="px-2 py-1 text-right">{row.quantity}</td>
                         <td className="px-2 py-1 text-right">{formatInr(row.avg_buy_price)}</td>
                         <td className="px-2 py-1">{row.sector || "-"}</td>

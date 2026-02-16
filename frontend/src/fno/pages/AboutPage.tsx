@@ -46,6 +46,7 @@ export function FnoAboutPage() {
             <li>- Shared top market strip with live index and commodity movement.</li>
             <li>- Unified route model and quick links (including direct Heatmap access).</li>
             <li>- Common ticker context to switch Equity/F&O without re-entry.</li>
+            <li>- Shared instrument metadata badges for country, exchange, and derivatives capability.</li>
             <li>- Matching visual language, control density, and panel behavior.</li>
           </ul>
         </TerminalPanel>
@@ -79,7 +80,7 @@ export function FnoAboutPage() {
         <ul className="space-y-1 text-xs text-terminal-muted">
           <li>- FastAPI + React/TypeScript terminal architecture.</li>
           <li>- WebSocket quote stream with fallback polling path.</li>
-          <li>- Shared API v1 capabilities: indicators, scripting, crypto and equity analytics endpoints.</li>
+          <li>- Shared API v1 capabilities: equity analytics, shareholding, mutual funds, indicators, scripting, and crypto endpoints.</li>
           <li>- Background services for instruments, news, and snapshot continuity.</li>
           <li>- Docker and CI-ready build/verify workflow.</li>
         </ul>

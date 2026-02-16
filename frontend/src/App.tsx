@@ -10,6 +10,7 @@ import { WatchlistPage } from "./pages/Watchlist";
 import { NewsPage } from "./pages/News";
 import { BacktestingPage } from "./pages/Backtesting";
 import { BacktestingLayout } from "./pages/BacktestingLayout";
+import { MutualFundsPage } from "./pages/MutualFunds";
 import { EquityLayout } from "./equity/EquityLayout";
 import { HomePage } from "./home/HomePage";
 import { FnoLayout } from "./fno/FnoLayout";
@@ -35,6 +36,7 @@ function App() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="screener" element={<ScreenerPage />} />
         <Route path="portfolio" element={<PortfolioPage />} />
+        <Route path="mutual-funds" element={<MutualFundsPage />} />
         <Route path="watchlist" element={<WatchlistPage />} />
         <Route path="news" element={<NewsPage />} />
         <Route path="settings" element={<SettingsPage />} />
@@ -61,6 +63,7 @@ function App() {
       <Route path="/dashboard" element={<Navigate to="/equity/dashboard" replace />} />
       <Route path="/screener" element={<Navigate to="/equity/screener" replace />} />
       <Route path="/portfolio" element={<Navigate to="/equity/portfolio" replace />} />
+      <Route path="/mutual-funds" element={<Navigate to="/equity/mutual-funds" replace />} />
       <Route path="/watchlist" element={<Navigate to="/equity/watchlist" replace />} />
       <Route path="/news" element={<Navigate to="/equity/news" replace />} />
       <Route path="/settings" element={<Navigate to="/equity/settings" replace />} />

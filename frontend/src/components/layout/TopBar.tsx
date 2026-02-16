@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
-import { fetchCryptoSearch, searchSymbols } from "../../api/client";
+import { fetchCryptoSearch, searchSymbols, type SearchSymbolItem } from "../../api/client";
+import { CountryFlag } from "../common/CountryFlag";
 import { useMarketStatus, useTopBarTickers } from "../../hooks/useStocks";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useStockStore } from "../../store/stockStore";
@@ -40,7 +41,7 @@ export function TopBar() {
   const { data: marketStatus } = useMarketStatus();
   const { data: topBarTickers } = useTopBarTickers();
   const [query, setQuery] = useState(ticker);
-  const [results, setResults] = useState<Array<{ ticker: string; name: string }>>([]);
+  const [results, setResults] = useState<SearchSymbolItem[]>([]);
   const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const searchRequestRef = useRef(0);
@@ -125,6 +126,11 @@ export function TopBar() {
         searchInputRef.current?.select();
         return;
       }
+      if ((event.key === "m" || event.key === "M") && !editing) {
+        event.preventDefault();
+        navigate("/equity/portfolio");
+        return;
+      }
       if (event.key === "Escape") {
         if (results.length > 0) {
           setResults([]);
@@ -139,7 +145,7 @@ export function TopBar() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [results.length]);
+  }, [navigate, results.length]);
 
   useEffect(() => {
     if (!marketsForCountry.includes(selectedMarket)) {
@@ -161,7 +167,14 @@ export function TopBar() {
     const requestId = ++searchRequestRef.current;
     try {
       const [equityRes, cryptoRes] = await Promise.all([searchSymbols(q, selectedMarket), fetchCryptoSearch(q)]);
-      const res = [...equityRes, ...cryptoRes];
+      const merged = [...equityRes, ...cryptoRes];
+      const seen = new Set<string>();
+      const res = merged.filter((item) => {
+        const key = `${(item.ticker || "").toUpperCase()}::${(item.name || "").toUpperCase()}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       if (requestId !== searchRequestRef.current || suppressSuggestionsRef.current) {
         return;
       }
@@ -384,13 +397,18 @@ export function TopBar() {
           <div className="absolute left-3 right-3 top-10 z-10 max-h-72 overflow-auto rounded border border-terminal-border bg-terminal-panel">
             {results.map((item) => (
               <button
-                key={item.ticker}
+                key={`${item.ticker}:${item.name}`}
                 className="block w-full border-b border-terminal-border px-3 py-2 text-left text-sm hover:bg-terminal-bg"
                 onClick={() => {
                   selectTicker(item.ticker);
                 }}
               >
-                {item.ticker} - {item.name}
+                <span className="inline-flex items-center gap-2">
+                  <CountryFlag countryCode={item.country_code} flagEmoji={item.flag_emoji} size="sm" />
+                  <span>{item.ticker}</span>
+                  <span className="text-terminal-muted">- {item.name}</span>
+                  {item.exchange ? <span className="text-terminal-muted">({item.exchange})</span> : null}
+                </span>
               </button>
             ))}
           </div>

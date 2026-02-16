@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import csv
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -12,11 +14,32 @@ class MarketDataFetcher:
     """Fetches market and fundamental data for a ticker universe."""
 
     default_exchange_suffix: str = ".NS"
+    _nse_symbols_cache: set[str] | None = None
+
+    def _load_nse_symbols(self) -> set[str]:
+        if self._nse_symbols_cache is not None:
+            return self._nse_symbols_cache
+        path = Path(__file__).resolve().parents[1] / "data" / "nse_equity_symbols_eq.csv"
+        out: set[str] = set()
+        if path.exists():
+            try:
+                with path.open("r", encoding="utf-8") as f:
+                    rows = csv.DictReader(f)
+                    for row in rows:
+                        sym = (row.get("Symbol") or row.get("SYMBOL") or "").strip().upper()
+                        if sym:
+                            out.add(sym)
+            except Exception:
+                out = set()
+        self._nse_symbols_cache = out
+        return out
 
     def _normalized_ticker(self, ticker: str) -> str:
         t = ticker.strip().upper()
         if "." not in t and self.default_exchange_suffix:
-            return f"{t}{self.default_exchange_suffix}"
+            if t in self._load_nse_symbols():
+                return f"{t}{self.default_exchange_suffix}"
+            return t
         return t
 
     def fetch_history(

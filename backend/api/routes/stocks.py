@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from backend.api.deps import cache_instance, fetch_stock_snapshot_coalesced, get_unified_fetcher
 from backend.core.models import CapexPoint, CapexTrackerResponse, DeliveryPoint, DeliverySeriesResponse, EquityPerformanceSnapshot, PriceRange, PromoterHoldingPoint, PromoterHoldingsResponse, StockSnapshot, TopBarTicker, TopBarTickersResponse
+from backend.shared.market_classifier import market_classifier
 
 router = APIRouter()
 
@@ -127,6 +128,8 @@ def _pct_change_from_cutoff(close: pd.Series, days: int) -> float | None:
 
 @router.get("/stocks/{ticker}", response_model=StockSnapshot)
 async def get_stock(ticker: str) -> StockSnapshot:
+    classification = await market_classifier.classify(ticker)
+    yf_symbol = await market_classifier.yfinance_symbol(ticker)
     try:
         snap = await fetch_stock_snapshot_coalesced(ticker)
     except Exception as exc:
@@ -136,7 +139,7 @@ async def get_stock(ticker: str) -> StockSnapshot:
     # Map UnifiedFetcher snapshot dict to StockSnapshot model
     return StockSnapshot(
         ticker=ticker.upper(),
-        symbol=f"{ticker.upper()}.NS",
+        symbol=yf_symbol,
         company_name=snap.get("company_name"),
         sector=snap.get("sector"),
         industry=snap.get("industry") or snap.get("sector"),
@@ -157,8 +160,16 @@ async def get_stock(ticker: str) -> StockSnapshot:
         eps_growth_pct=snap.get("eps_growth_pct"),
         div_yield_pct=snap.get("div_yield_pct"),
         beta=snap.get("beta"),
-        country_code=snap.get("country_code"),
-        exchange=snap.get("exchange"),
+        country_code=snap.get("country_code") or classification.country_code,
+        exchange=snap.get("exchange") or classification.exchange,
+        classification={
+            "exchange": classification.exchange,
+            "country_code": classification.country_code,
+            "flag_emoji": classification.flag_emoji,
+            "currency": classification.currency,
+            "has_futures": classification.has_futures,
+            "has_options": classification.has_options,
+        },
         indices=snap.get("indices") or [],
         raw=snap,
     )
@@ -283,11 +294,12 @@ async def get_stocks(tickers: str) -> List[Dict[str, Any]]:
 @router.get("/stocks/{ticker}/returns")
 async def get_returns(ticker: str) -> Dict[str, Optional[float]]:
     fetcher = await get_unified_fetcher()
+    yf_symbol = await market_classifier.yfinance_symbol(ticker)
     # Priority matrix says NSE -> Yahoo. `fetch_history` implements this.
     try:
         # We need long history for returns (5y)
         # Yahoo is best for this.
-        data = await fetcher.yahoo.get_chart(f"{ticker.upper()}.NS", range_str="5y", interval="1d")
+        data = await fetcher.yahoo.get_chart(yf_symbol, range_str="5y", interval="1d")
         
         # Parse Yahoo chart
         chart = (data.get("chart") or {}).get("result") or []
@@ -336,7 +348,8 @@ async def get_returns(ticker: str) -> Dict[str, Optional[float]]:
 @router.get("/v1/equity/company/{symbol}/performance", response_model=EquityPerformanceSnapshot)
 async def get_company_performance(symbol: str) -> EquityPerformanceSnapshot:
     fetcher = await get_unified_fetcher()
-    data = await fetcher.yahoo.get_chart(f"{symbol.upper()}.NS", range_str="2y", interval="1d")
+    yf_symbol = await market_classifier.yfinance_symbol(symbol)
+    data = await fetcher.yahoo.get_chart(yf_symbol, range_str="2y", interval="1d")
     hist = _parse_yahoo_ohlc(data if isinstance(data, dict) else {})
     if hist.empty:
         raise HTTPException(status_code=404, detail="No chart history available")
@@ -403,7 +416,8 @@ async def get_delivery_series(
     range: str = Query(default="1y"),
 ) -> DeliverySeriesResponse:
     fetcher = await get_unified_fetcher()
-    data = await fetcher.yahoo.get_chart(f"{symbol.upper()}.NS", range_str=range, interval=interval)
+    yf_symbol = await market_classifier.yfinance_symbol(symbol)
+    data = await fetcher.yahoo.get_chart(yf_symbol, range_str=range, interval=interval)
     hist = _parse_yahoo_ohlc(data if isinstance(data, dict) else {})
     if hist.empty:
         raise HTTPException(status_code=404, detail="No delivery history available")
