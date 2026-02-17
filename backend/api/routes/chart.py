@@ -11,12 +11,16 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend.api.deps import cache_instance, get_unified_fetcher
-from backend.adapters.registry import get_adapter_registry
 from backend.api.deps import get_db
 from backend.auth.deps import get_current_user
 from backend.core.models import ChartResponse, IndicatorPoint, IndicatorResponse, OhlcvPoint
 from backend.core.technicals import compute_indicator
 from backend.models import ChartDrawing, ChartTemplate, User
+
+try:
+    from backend.adapters.registry import get_adapter_registry
+except Exception:  # pragma: no cover - adapter module may be absent in lightweight test envs
+    get_adapter_registry = None
 
 router = APIRouter()
 
@@ -149,13 +153,14 @@ async def get_chart(
     else:
         fetcher = await get_unified_fetcher()
         adapter_rows = []
-        try:
-            registry = get_adapter_registry()
-            end_d = date.today()
-            start_d = end_d - timedelta(days=365)
-            adapter_rows = await registry.get_adapter(market).get_history(ticker, interval, start_d, end_d)
-        except Exception:
-            adapter_rows = []
+        if get_adapter_registry is not None:
+            try:
+                registry = get_adapter_registry()
+                end_d = date.today()
+                start_d = end_d - timedelta(days=365)
+                adapter_rows = await registry.get_adapter(market).get_history(ticker, interval, start_d, end_d)
+            except Exception:
+                adapter_rows = []
         if adapter_rows:
             hist = pd.DataFrame(
                 [{"Open": r.o, "High": r.h, "Low": r.l, "Close": r.c, "Volume": r.v, "t": r.t} for r in adapter_rows]
