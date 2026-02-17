@@ -10,6 +10,8 @@ services:
     environment:
       FMP_API_KEY: "${FMP_API_KEY:-}"
       FINNHUB_API_KEY: "${FINNHUB_API_KEY:-}"
+      JWT_SECRET_KEY: "${JWT_SECRET_KEY:-dev-insecure-secret-key}"
+      DATABASE_URL: "${DATABASE_URL:-sqlite+aiosqlite:////data/openterminal.db}"
       KITE_API_KEY: "${KITE_API_KEY:-}"
       KITE_API_SECRET: "${KITE_API_SECRET:-}"
       KITE_ACCESS_TOKEN: "${KITE_ACCESS_TOKEN:-}"
@@ -41,5 +43,20 @@ services:
       - "6379:6379"
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: openterminalui-postgres
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-openterminalui}"
+      POSTGRES_USER: "${POSTGRES_USER:-openterminalui}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-openterminalui}"
+    ports:
+      - "5432:5432"
+    volumes:
+      - openterminalui_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
 volumes:
   openterminalui_data:
+  openterminalui_postgres_data:

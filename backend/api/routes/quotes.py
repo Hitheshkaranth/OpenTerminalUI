@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
+from backend.adapters.registry import get_adapter_registry
 from backend.api.deps import get_unified_fetcher
 
 router = APIRouter()
@@ -59,6 +60,29 @@ async def get_quotes(
         raise HTTPException(status_code=400, detail=f"Unsupported market: {market_code}")
 
     symbol_list = _parse_symbols(symbols)
+    registry = get_adapter_registry()
+    adapter_quotes: list[dict[str, Any]] = []
+    for symbol_item in symbol_list:
+        for adapter in registry.get_chain(market_code):
+            try:
+                quote = await adapter.get_quote(symbol_item if market_code != "CRYPTO" else f"CRYPTO:{symbol_item}")
+            except Exception:
+                quote = None
+            if quote is None:
+                continue
+            adapter_quotes.append(
+                {
+                    "symbol": symbol_item,
+                    "last": quote.price,
+                    "change": quote.change,
+                    "changePct": quote.change_pct,
+                    "ts": quote.ts or _now_iso(),
+                }
+            )
+            break
+    if adapter_quotes:
+        return {"market": market_code, "quotes": adapter_quotes}
+
     fetcher = await get_unified_fetcher()
     now_iso = _now_iso()
 

@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ErrorBoundary } from "../components/common/ErrorBoundary";
 import { StatusBar } from "../components/layout/StatusBar";
 import { TopBar } from "../components/layout/TopBar";
+import { UserAccountPanel } from "../components/layout/UserAccountPanel";
 import { useSettingsStore } from "../store/settingsStore";
 import { fetchExpiries } from "./api/fnoApi";
 import type { FnoContextValue } from "./types/fno";
@@ -93,7 +94,7 @@ export function FnoLayout() {
 
   return (
     <div className="flex h-screen min-h-screen bg-terminal-bg text-terminal-text">
-      <aside className="w-56 shrink-0 border-r border-terminal-border bg-terminal-panel p-0">
+      <aside className="flex h-full w-56 shrink-0 flex-col border-r border-terminal-border bg-terminal-panel p-0">
         <div className="border-b border-terminal-border bg-terminal-panel px-3 py-2">
           <img src={logo} alt="OpenTerminalUI" className="h-8 w-auto object-contain" />
         </div>
@@ -113,7 +114,7 @@ export function FnoLayout() {
             </NavLink>
           </div>
         </div>
-        <nav className="space-y-1 p-2 text-xs">
+        <nav className="flex-1 space-y-1 overflow-auto p-2 text-xs">
           {LINKS.map((link) => (
             <NavLink
               key={link.to}
@@ -130,6 +131,7 @@ export function FnoLayout() {
             </NavLink>
           ))}
         </nav>
+        <UserAccountPanel />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">

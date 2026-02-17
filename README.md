@@ -49,6 +49,17 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - **Background Services** - instruments loader and scheduled news ingestion
 - **Deployment** - Docker compose workflow with optional Redis cache profile
 
+## Latest additions (since previous commit)
+
+- **Authentication foundation**: JWT access/refresh flow, auth middleware, role checks, and auth pages/context in frontend.
+- **Events + earnings expansion**: corporate actions/events endpoints, earnings calendar + analysis services, and timeline/calendar UI widgets.
+- **Alert engine v2**: user-scoped alert rules, evaluator service on tick stream, alert history, REST CRUD, and websocket alert channel (`/api/ws/alerts`).
+- **Paper trading module**: virtual portfolios, orders, positions, trades, performance metrics, strategy deploy endpoint, and new Paper dashboard UI.
+- **Charting persistence/sync foundation**: chart drawings/templates backend APIs and crosshair sync context scaffolding for multi-panel charts.
+- **Multi-exchange adapter framework**: pluggable adapter base + registry (`Kite`, `Yahoo`, `Crypto`) with adapter-first routing in key quote/search/chart flows.
+- **UI updates**: unread alert badge/navigation, portfolio earnings/event enrichments, and logged-in user details panel in sidebar (Equity, F&O, Backtesting).
+- **QC + tests**: strict QC guideline, new backend tests for phase-2 routes/adapters, and Docker-integrated validation flow.
+
 ## Roadmap
 
 - [x] Equity terminal with charting, research panels, and operational workflows

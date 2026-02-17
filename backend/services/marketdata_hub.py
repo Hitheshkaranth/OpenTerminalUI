@@ -61,6 +61,8 @@ class MarketDataHub:
         self._nfo_fallback_poll_seconds = 30.0
         self._nfo_chain_last_fetch: dict[str, float] = {}
         self._nfo_quote_cache: dict[str, dict[str, Any]] = {}
+        self._tick_listeners: list = []
+        self._alert_connections: set[WebSocket] = set()
 
     async def start(self) -> None:
         async with self._lock:
@@ -84,7 +86,9 @@ class MarketDataHub:
             task = self._poll_task
             self._poll_task = None
             sockets = list(self._connections.keys())
+            alert_sockets = list(self._alert_connections)
             self._connections.clear()
+            self._alert_connections.clear()
             self._stream_symbols_to_token.clear()
             self._stream_token_to_symbol.clear()
             self._nfo_chain_last_fetch.clear()
@@ -102,6 +106,11 @@ class MarketDataHub:
             self._kite_stream = None
 
         for ws in sockets:
+            try:
+                await ws.close()
+            except Exception:
+                pass
+        for ws in alert_sockets:
             try:
                 await ws.close()
             except Exception:
@@ -177,6 +186,45 @@ class MarketDataHub:
             logger.debug("Dropped %s stale WS clients", len(stale))
             await self._sync_stream_subscriptions()
 
+    async def register_alert_socket(self, websocket: WebSocket) -> None:
+        await self.start()
+        async with self._lock:
+            self._alert_connections.add(websocket)
+
+    async def unregister_alert_socket(self, websocket: WebSocket) -> None:
+        async with self._lock:
+            self._alert_connections.discard(websocket)
+
+    async def broadcast_alert(self, payload: dict[str, Any]) -> None:
+        async with self._lock:
+            sockets = list(self._alert_connections)
+        stale: list[WebSocket] = []
+        for ws in sockets:
+            try:
+                await ws.send_json(payload)
+            except Exception:
+                stale.append(ws)
+        if stale:
+            async with self._lock:
+                for ws in stale:
+                    self._alert_connections.discard(ws)
+
+    def register_tick_listener(self, callback) -> None:
+        if callback in self._tick_listeners:
+            return
+        self._tick_listeners.append(callback)
+
+    async def _emit_tick(self, payload: dict[str, Any]) -> None:
+        if not self._tick_listeners:
+            return
+        for callback in list(self._tick_listeners):
+            try:
+                result = callback(payload)
+                if asyncio.iscoroutine(result):
+                    await result
+            except Exception:
+                logger.exception("Tick listener failed")
+
     async def _union_subscriptions(self) -> set[str]:
         async with self._lock:
             out: set[str] = set()
@@ -227,6 +275,7 @@ class MarketDataHub:
                         ticks = await self._fetch_ticks(poll_tokens)
                         for token, tick in ticks.items():
                             await self.broadcast(token, tick)
+                            await self._emit_tick(tick)
                 except Exception as exc:
                     logger.exception("MarketDataHub poll iteration failed: %s", exc)
                 await asyncio.sleep(self.poll_interval_seconds)
@@ -262,6 +311,7 @@ class MarketDataHub:
             "ts": _now_iso(),
         }
         await self.broadcast(symbol, payload)
+        await self._emit_tick(payload)
 
     async def _fetch_ticks(self, tokens: list[str]) -> dict[str, dict[str, Any]]:
         fetcher = await get_unified_fetcher()

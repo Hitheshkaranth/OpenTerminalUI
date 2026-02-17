@@ -85,6 +85,17 @@ export function FnoAboutPage() {
           <li>- Docker and CI-ready build/verify workflow.</li>
         </ul>
       </TerminalPanel>
+
+      <TerminalPanel title="Latest Additions (vs Previous Commit)">
+        <ul className="space-y-1 text-xs text-terminal-text">
+          <li>- Unified auth stack with JWT + role-protected flows across Equity, F&O, and Backtesting routes.</li>
+          <li>- Events/Earnings backend expansion with new dashboard/portfolio widgets.</li>
+          <li>- Alerts v2 with websocket push channel and history tracking.</li>
+          <li>- Paper trading engine + dashboard and strategy deploy endpoint.</li>
+          <li>- Multi-exchange adapter framework (Kite/Yahoo/Crypto) and adapter-first routing foundation.</li>
+          <li>- Sidebar user account details panel now pinned at bottom-left for F&O as well.</li>
+        </ul>
+      </TerminalPanel>
     </div>
   );
 }

@@ -19,12 +19,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from backend.api.deps import shutdown_unified_fetcher
+from backend.alerts import get_alert_evaluator_service
+from backend.auth.middleware import AuthMiddleware
 from backend.bg_services.instruments_loader import get_instruments_loader
 from backend.bg_services.news_ingestor import get_news_ingestor
 from backend.bg_services.pcr_snapshot import get_pcr_snapshot_service
 from backend.equity.routes import equity_router
 from backend.fno.routes import fno_router
 from backend.services.prefetch_worker import get_prefetch_worker
+from backend.paper_trading import get_paper_engine
 from backend.config.settings import get_settings
 from backend.shared.cache import cache as cache_instance
 from backend.shared.db import init_db
@@ -72,6 +75,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(AuthMiddleware)
 
 app.include_router(equity_router)
 app.include_router(fno_router)
@@ -100,11 +104,15 @@ async def on_startup() -> None:
         await _pcr_snapshot_service.start()
 
     await get_marketdata_hub().start()
+    get_alert_evaluator_service().start(get_marketdata_hub())
+    get_paper_engine().start(get_marketdata_hub())
 
 
 @app.on_event("shutdown")
 async def on_shutdown() -> None:
     await get_marketdata_hub().shutdown()
+    await get_alert_evaluator_service().shutdown()
+    await get_paper_engine().shutdown()
     if _pcr_snapshot_service:
         await _pcr_snapshot_service.stop()
     if _news_ingestor:

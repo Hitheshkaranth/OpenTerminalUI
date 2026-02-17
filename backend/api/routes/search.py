@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List, Dict
 
 from fastapi import APIRouter, Query
+from backend.adapters.registry import get_adapter_registry
 from backend.core.models import SearchResponse, SearchResult
 from backend.shared.market_classifier import market_classifier
 
@@ -44,7 +45,7 @@ async def _get_rows() -> List[Dict[str, str]]:
         return _SEARCH_CACHE
 
 @router.get("/search", response_model=SearchResponse)
-async def search(q: str = Query(default="")) -> SearchResponse:
+async def search(q: str = Query(default=""), market: str = Query(default="NSE")) -> SearchResponse:
     query = q.strip().lower()
     if not query:
         return SearchResponse(query=q, results=[])
@@ -71,6 +72,22 @@ async def search(q: str = Query(default="")) -> SearchResponse:
     if not matches and _TICKER_LIKE_RE.match(q.strip()):
         symbol = q.strip().upper()
         matches.append(SearchResult(ticker=symbol, name=symbol))
+
+    if not matches:
+        try:
+            registry = get_adapter_registry()
+            adapter = registry.get_adapter(market)
+            rows = await adapter.search_instruments(q.strip())
+            for row in rows[:20]:
+                matches.append(
+                    SearchResult(
+                        ticker=row.symbol,
+                        name=row.name,
+                        exchange=row.exchange,
+                    )
+                )
+        except Exception:
+            pass
 
     if matches:
         sem = asyncio.Semaphore(16)

@@ -1,0 +1,265 @@
+from __future__ import annotations
+
+import enum
+from datetime import datetime
+from uuid import uuid4
+
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
+
+from backend.db.database import Base
+
+
+class Holding(Base):
+    __tablename__ = "holdings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    ticker: Mapped[str] = mapped_column(String(32), index=True)
+    quantity: Mapped[float] = mapped_column(Float)
+    avg_buy_price: Mapped[float] = mapped_column(Float)
+    buy_date: Mapped[str] = mapped_column(String(16))
+
+
+class WatchlistItem(Base):
+    __tablename__ = "watchlist_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    watchlist_name: Mapped[str] = mapped_column(String(64), index=True)
+    ticker: Mapped[str] = mapped_column(String(32), index=True)
+
+
+class AlertRuleORM(Base):
+    __tablename__ = "alert_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    ticker: Mapped[str] = mapped_column(String(32), index=True)
+    alert_type: Mapped[str] = mapped_column(String(32), index=True)
+    condition: Mapped[str] = mapped_column(String(32))
+    threshold: Mapped[float] = mapped_column(Float)
+    note: Mapped[str] = mapped_column(String(256), default="")
+    created_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.utcnow().isoformat())
+
+
+class AlertHistoryORM(Base):
+    __tablename__ = "alert_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    rule_id: Mapped[int] = mapped_column(Integer, index=True)
+    ticker: Mapped[str] = mapped_column(String(32), index=True)
+    message: Mapped[str] = mapped_column(String(512))
+    triggered_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.utcnow().isoformat())
+
+
+class FutureContract(Base):
+    __tablename__ = "future_contracts"
+    __table_args__ = (
+        UniqueConstraint("exchange", "tradingsymbol", name="uq_future_contract_exchange_symbol"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    underlying: Mapped[str] = mapped_column(String(64), index=True)
+    expiry_date: Mapped[str] = mapped_column(String(16), index=True)
+    exchange: Mapped[str] = mapped_column(String(16), index=True)
+    tradingsymbol: Mapped[str] = mapped_column(String(64), index=True)
+    instrument_token: Mapped[int] = mapped_column(Integer, index=True)
+    lot_size: Mapped[int] = mapped_column(Integer, default=0)
+    tick_size: Mapped[float] = mapped_column(Float, default=0.0)
+    updated_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.utcnow().isoformat())
+
+
+class NewsArticle(Base):
+    __tablename__ = "news_articles"
+    __table_args__ = (
+        UniqueConstraint("url", name="uq_news_articles_url"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    source: Mapped[str] = mapped_column(String(128), index=True)
+    title: Mapped[str] = mapped_column(String(1024))
+    url: Mapped[str] = mapped_column(String(2048), index=True)
+    summary: Mapped[str] = mapped_column(String(4096), default="")
+    image_url: Mapped[str] = mapped_column(String(2048), default="")
+    published_at: Mapped[str] = mapped_column(String(40), index=True)
+    tickers: Mapped[str] = mapped_column(String(2048), default="[]")
+    sentiment_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sentiment_label: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    sentiment_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())
+
+
+class BacktestRun(Base):
+    __tablename__ = "backtest_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    run_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
+    request_json: Mapped[str] = mapped_column(Text)
+    result_json: Mapped[str] = mapped_column(Text, default="")
+    logs: Mapped[str] = mapped_column(Text, default="")
+    error: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())
+    updated_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())
+
+
+class PortfolioMutualFundHolding(Base):
+    __tablename__ = "portfolio_mutual_funds"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    scheme_code: Mapped[int] = mapped_column(Integer, index=True)
+    scheme_name: Mapped[str] = mapped_column(String(256), index=True)
+    fund_house: Mapped[str] = mapped_column(String(128), default="")
+    category: Mapped[str] = mapped_column(String(128), default="")
+    units: Mapped[float] = mapped_column(Float)
+    avg_nav: Mapped[float] = mapped_column(Float)
+    xirr: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sip_transactions: Mapped[str] = mapped_column(Text, default="[]")
+    added_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())
+
+
+class AlertConditionType(str, enum.Enum):
+    PRICE_ABOVE = "price_above"
+    PRICE_BELOW = "price_below"
+    PCT_CHANGE = "pct_change"
+    VOLUME_SPIKE = "volume_spike"
+    INDICATOR_CROSSOVER = "indicator_crossover"
+    CUSTOM_EXPRESSION = "custom_expression"
+
+
+class AlertStatus(str, enum.Enum):
+    ACTIVE = "active"
+    TRIGGERED = "triggered"
+    EXPIRED = "expired"
+    PAUSED = "paused"
+    DELETED = "deleted"
+
+
+class AlertORM(Base):
+    __tablename__ = "alerts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    condition_type: Mapped[AlertConditionType] = mapped_column(String(32), index=True)
+    parameters: Mapped[dict] = mapped_column(JSON, default=dict)
+    status: Mapped[AlertStatus] = mapped_column(String(16), index=True, default=AlertStatus.ACTIVE.value)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    triggered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cooldown_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    last_triggered_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    last_notification_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+
+class AlertTriggerORM(Base):
+    __tablename__ = "alert_triggers"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    alert_id: Mapped[str] = mapped_column(String(36), ForeignKey("alerts.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    condition_type: Mapped[str] = mapped_column(String(32), index=True)
+    triggered_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    context: Mapped[dict] = mapped_column(JSON, default=dict)
+    triggered_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
+
+class VirtualSide(str, enum.Enum):
+    LONG = "long"
+    SHORT = "short"
+    BUY = "buy"
+    SELL = "sell"
+
+
+class VirtualOrderType(str, enum.Enum):
+    MARKET = "market"
+    LIMIT = "limit"
+    SL = "sl"
+
+
+class VirtualOrderStatus(str, enum.Enum):
+    PENDING = "pending"
+    FILLED = "filled"
+    CANCELLED = "cancelled"
+    REJECTED = "rejected"
+
+
+class VirtualPortfolio(Base):
+    __tablename__ = "virtual_portfolios"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(128), default="Paper Portfolio")
+    initial_capital: Mapped[float] = mapped_column(Float)
+    current_cash: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+
+
+class VirtualPosition(Base):
+    __tablename__ = "virtual_positions"
+    __table_args__ = (
+        UniqueConstraint("portfolio_id", "symbol", name="uq_virtual_position_portfolio_symbol"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    portfolio_id: Mapped[str] = mapped_column(String(36), ForeignKey("virtual_portfolios.id", ondelete="CASCADE"), index=True)
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    quantity: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_entry_price: Mapped[float] = mapped_column(Float, default=0.0)
+    side: Mapped[str] = mapped_column(String(8), default=VirtualSide.LONG.value)
+
+
+class VirtualOrder(Base):
+    __tablename__ = "virtual_orders"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    portfolio_id: Mapped[str] = mapped_column(String(36), ForeignKey("virtual_portfolios.id", ondelete="CASCADE"), index=True)
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    side: Mapped[str] = mapped_column(String(8), index=True)
+    order_type: Mapped[str] = mapped_column(String(16), default=VirtualOrderType.MARKET.value, index=True)
+    quantity: Mapped[float] = mapped_column(Float)
+    limit_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sl_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default=VirtualOrderStatus.PENDING.value, index=True)
+    fill_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    fill_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    slippage_bps: Mapped[float] = mapped_column(Float, default=5.0)
+    commission: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    signal_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class VirtualTrade(Base):
+    __tablename__ = "virtual_trades"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    order_id: Mapped[str] = mapped_column(String(36), ForeignKey("virtual_orders.id", ondelete="CASCADE"), index=True)
+    portfolio_id: Mapped[str] = mapped_column(String(36), ForeignKey("virtual_portfolios.id", ondelete="CASCADE"), index=True)
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    side: Mapped[str] = mapped_column(String(8), index=True)
+    quantity: Mapped[float] = mapped_column(Float)
+    price: Mapped[float] = mapped_column(Float)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    pnl_realized: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
+class ChartDrawing(Base):
+    __tablename__ = "chart_drawings"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    tool_type: Mapped[str] = mapped_column(String(32), index=True)
+    coordinates: Mapped[dict] = mapped_column(JSON, default=dict)
+    style: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ChartTemplate(Base):
+    __tablename__ = "chart_templates"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(128), index=True)
+    layout_config: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

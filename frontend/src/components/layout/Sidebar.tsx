@@ -1,15 +1,20 @@
 import { NavLink } from "react-router-dom";
 import { useStockStore } from "../../store/stockStore";
 import logo from "../../assets/logo.png";
+import { useAlertsStore } from "../../store/alertsStore";
+import { UserAccountPanel } from "./UserAccountPanel";
 
 export function Sidebar() {
   const ticker = useStockStore((s) => s.ticker);
+  const unreadCount = useAlertsStore((s) => s.unreadCount);
   const nav = [
     { label: "Market", path: "/equity/stocks", key: "F1" },
     { label: "Screener", path: "/equity/screener", key: "F2" },
     { label: "Portfolio", path: "/equity/portfolio", key: "F3" },
+    { label: "Paper", path: "/equity/paper", key: "P" },
     { label: "Watchlist", path: "/equity/watchlist", key: "F4" },
     { label: "News", path: "/equity/news", key: "F5" },
+    { label: "Alerts", path: "/equity/alerts", key: "A" },
     { label: "Settings", path: "/equity/settings", key: "F6" },
     { label: "About", path: "/equity/stocks/about", key: "F7" },
     { label: "Heatmap", path: "/fno/heatmap", key: "F8" },
@@ -17,7 +22,7 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="relative z-30 w-48 shrink-0 border-r border-terminal-border bg-terminal-panel p-0">
+    <aside className="relative z-30 flex h-full w-48 shrink-0 flex-col border-r border-terminal-border bg-terminal-panel p-0">
       <div className="border-b border-terminal-border bg-terminal-panel px-3 py-2">
         <img src={logo} alt="OpenTerminalUI" className="h-8 w-auto object-contain" />
       </div>
@@ -35,7 +40,7 @@ export function Sidebar() {
           Switch To F&O {"->"}
         </NavLink>
       </div>
-      <nav className="space-y-1 p-2 text-xs">
+      <nav className="flex-1 space-y-1 overflow-auto p-2 text-xs">
         {nav.map((item) => (
           <NavLink
             key={item.path}
@@ -49,10 +54,13 @@ export function Sidebar() {
             }
           >
             <span>{item.label}</span>
-            <span className="text-[10px]">{item.key}</span>
+            <span className="text-[10px]">
+              {item.path === "/equity/alerts" && unreadCount > 0 ? `${unreadCount}` : item.key}
+            </span>
           </NavLink>
         ))}
       </nav>
+      <UserAccountPanel />
     </aside>
   );
 }

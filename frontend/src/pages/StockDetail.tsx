@@ -21,7 +21,12 @@ import { TerminalBadge } from "../components/terminal/TerminalBadge";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { CountryFlag } from "../components/common/CountryFlag";
 import { InstrumentBadges } from "../components/common/InstrumentBadges";
+import { EarningsDateBadge } from "../components/EarningsDateBadge";
+import { EarningsTrendTable } from "../components/EarningsTrendTable";
+import { EventsTimeline } from "../components/EventsTimeline";
+import { QuarterlyFinancialsChart } from "../components/QuarterlyFinancialsChart";
 import { useDeliverySeries, useEquityPerformance, useFinancials, useStock, useStockHistory, useStockReturns } from "../hooks/useStocks";
+import { useNextEarnings } from "../hooks/useStocks";
 import { useDisplayCurrency } from "../hooks/useDisplayCurrency";
 import { useQuotesStore, useQuotesStream } from "../realtime/useQuotesStream";
 import { ChartEngine } from "../shared/chart/ChartEngine";
@@ -32,7 +37,7 @@ import type { ChartKind, ChartTimeframe, IndicatorConfig } from "../shared/chart
 import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
 
-type TabId = "overview" | "financials" | "analysis" | "peers" | "valuation" | "shareholding";
+type TabId = "overview" | "financials" | "analysis" | "peers" | "valuation" | "shareholding" | "events" | "earnings";
 
 const TIMEFRAME_TO_INTERVAL: Record<ChartTimeframe, { interval: string; range: string }> = {
   "1m": { interval: "1m", range: "5d" },
@@ -86,6 +91,7 @@ export function StockDetailPage() {
   const { data: chart, isLoading: isChartLoading, error: chartError } = useStockHistory(ticker, range, interval);
   const { data: deliverySeriesData } = useDeliverySeries(ticker, interval, range);
   const { data: financials, isLoading: isFinancialsLoading } = useFinancials(ticker, financialPeriod);
+  const { data: nextEarnings } = useNextEarnings(ticker);
 
   useEffect(() => {
     setSnapshotTick(null);
@@ -287,6 +293,7 @@ export function StockDetailPage() {
               hasFutures={stockClassification?.has_futures}
               hasOptions={stockClassification?.has_options}
             />
+            <EarningsDateBadge event={nextEarnings} />
           </div>
           <SharedChartToolbar
             symbol={ticker}
@@ -414,7 +421,7 @@ export function StockDetailPage() {
 
       <div className="border-b border-terminal-border">
         <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-          {(["overview", "financials", "analysis", "peers", "valuation", "shareholding"] as TabId[]).map((t) => (
+          {(["overview", "financials", "analysis", "peers", "valuation", "shareholding", "events", "earnings"] as TabId[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -489,6 +496,13 @@ export function StockDetailPage() {
         {tab === "peers" && <PeersComparison ticker={ticker} />}
         {tab === "valuation" && <ValuationPanel ticker={ticker} />}
         {tab === "shareholding" && <ShareholdingPanel ticker={ticker} enabled={shareholdingTabLoaded} />}
+        {tab === "events" && <EventsTimeline symbol={ticker} />}
+        {tab === "earnings" && (
+          <div className="space-y-4">
+            <QuarterlyFinancialsChart symbol={ticker} />
+            <EarningsTrendTable symbol={ticker} />
+          </div>
+        )}
       </div>
       <Link
         to="/equity/stocks/about"

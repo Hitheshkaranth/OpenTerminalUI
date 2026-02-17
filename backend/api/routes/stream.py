@@ -63,3 +63,24 @@ async def ws_quotes(websocket: WebSocket) -> None:
             pass
     finally:
         await hub.unregister(websocket)
+
+
+@router.websocket("/ws/alerts")
+async def ws_alerts(websocket: WebSocket) -> None:
+    hub = get_marketdata_hub()
+    await websocket.accept()
+    await hub.register_alert_socket(websocket)
+    try:
+        while True:
+            payload = await websocket.receive_json()
+            op = str(payload.get("op") or "").strip().lower() if isinstance(payload, dict) else ""
+            if op == "ping":
+                await websocket.send_json({"type": "pong"})
+            else:
+                await websocket.send_json({"type": "info", "message": "alerts channel is push-only"})
+    except WebSocketDisconnect:
+        logger.debug("WS alerts client disconnected")
+    except Exception as exc:
+        logger.exception("WS alerts error: %s", exc)
+    finally:
+        await hub.unregister_alert_socket(websocket)

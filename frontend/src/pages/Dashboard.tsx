@@ -1,9 +1,15 @@
 import { BulkDealsTable } from "../components/market/BulkDealsTable";
 import { EventCalendar } from "../components/market/EventCalendar";
-import { useMarketStatus } from "../hooks/useStocks";
+import { useEarningsCalendar, useMarketStatus } from "../hooks/useStocks";
 
 export function DashboardPage() {
     const { data: marketStatus } = useMarketStatus();
+    const today = new Date();
+    const weekAhead = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const { data: earningsThisWeek = [] } = useEarningsCalendar({
+        from_date: today.toISOString().slice(0, 10),
+        to_date: weekAhead.toISOString().slice(0, 10),
+    });
     const hasMarketData = Array.isArray((marketStatus as { marketState?: unknown[] } | undefined)?.marketState);
 
     return (
@@ -42,6 +48,21 @@ export function DashboardPage() {
 
                 <div className="space-y-6">
                     <EventCalendar />
+                    <div className="rounded border border-terminal-border bg-terminal-panel p-4">
+                        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-terminal-accent">Events This Week</h3>
+                        {earningsThisWeek.length === 0 ? (
+                            <div className="text-xs text-terminal-muted">No earnings events available for this week.</div>
+                        ) : (
+                            <div className="space-y-2">
+                                {earningsThisWeek.slice(0, 8).map((row) => (
+                                    <div key={`${row.symbol}-${row.earnings_date}`} className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs">
+                                        <div className="font-medium text-terminal-text">{row.symbol}</div>
+                                        <div className="text-terminal-muted">{row.earnings_date} - {row.fiscal_quarter}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
                     <div className="rounded border border-terminal-border bg-terminal-panel p-4">
                         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-terminal-accent">Market Movers</h3>

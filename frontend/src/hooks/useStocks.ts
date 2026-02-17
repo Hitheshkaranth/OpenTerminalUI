@@ -12,6 +12,15 @@ import {
   fetchEquityPerformance,
   fetchPromoterHoldings,
   fetchEvents,
+  fetchStockEvents,
+  fetchUpcomingEvents,
+  fetchDividendHistory,
+  fetchPortfolioEvents,
+  fetchEarningsCalendar,
+  fetchNextEarnings,
+  fetchQuarterlyEarningsFinancials,
+  fetchEarningsAnalysis,
+  fetchPortfolioEarnings,
   fetchFundamentalScores,
   fetchMarketStatus,
   fetchPeers,
@@ -40,6 +49,10 @@ import type {
   RelativeValuationResponse,
   ShareholdingPatternResponse,
   StockSnapshot,
+  CorporateEvent,
+  EarningsDate,
+  QuarterlyFinancial,
+  EarningsAnalysis,
 } from "../types";
 
 function hasUsableSnapshot(data: StockSnapshot | undefined): boolean {
@@ -165,6 +178,42 @@ export function useEvents() {
   });
 }
 
+export function useStockEvents(symbol: string, params?: { types?: string; from_date?: string; to_date?: string }) {
+  return useQuery<CorporateEvent[]>({
+    queryKey: ["stock-events", symbol, params?.types, params?.from_date, params?.to_date],
+    queryFn: () => fetchStockEvents(symbol, params),
+    enabled: Boolean(symbol),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useUpcomingEvents(symbol: string, days = 90) {
+  return useQuery<CorporateEvent[]>({
+    queryKey: ["upcoming-events", symbol, days],
+    queryFn: () => fetchUpcomingEvents(symbol, days),
+    enabled: Boolean(symbol),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useDividendHistory(symbol: string) {
+  return useQuery<CorporateEvent[]>({
+    queryKey: ["dividend-history", symbol],
+    queryFn: () => fetchDividendHistory(symbol),
+    enabled: Boolean(symbol),
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function usePortfolioEvents(symbols: string[], days = 30) {
+  return useQuery<CorporateEvent[]>({
+    queryKey: ["portfolio-events", symbols.join(","), days],
+    queryFn: () => fetchPortfolioEvents(symbols, days),
+    enabled: symbols.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useMarketStatus() {
   return useQuery({
     queryKey: ["market-status"],
@@ -195,6 +244,50 @@ export function useStockReturns(ticker: string) {
     enabled: Boolean(ticker),
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
+  });
+}
+
+export function useEarningsCalendar(params?: { from_date?: string; to_date?: string; symbols?: string[] }) {
+  return useQuery<EarningsDate[]>({
+    queryKey: ["earnings-calendar", params?.from_date, params?.to_date, (params?.symbols || []).join(",")],
+    queryFn: () => fetchEarningsCalendar(params),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useNextEarnings(symbol: string) {
+  return useQuery<EarningsDate | null>({
+    queryKey: ["next-earnings", symbol],
+    queryFn: () => fetchNextEarnings(symbol),
+    enabled: Boolean(symbol),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useQuarterlyEarningsFinancials(symbol: string, quarters = 12) {
+  return useQuery<QuarterlyFinancial[]>({
+    queryKey: ["earnings-financials", symbol, quarters],
+    queryFn: () => fetchQuarterlyEarningsFinancials(symbol, quarters),
+    enabled: Boolean(symbol),
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function useEarningsAnalysis(symbol: string) {
+  return useQuery<EarningsAnalysis>({
+    queryKey: ["earnings-analysis", symbol],
+    queryFn: () => fetchEarningsAnalysis(symbol),
+    enabled: Boolean(symbol),
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function usePortfolioEarnings(symbols: string[], days = 30) {
+  return useQuery<EarningsDate[]>({
+    queryKey: ["portfolio-earnings", symbols.join(","), days],
+    queryFn: () => fetchPortfolioEarnings(symbols, days),
+    enabled: symbols.length > 0,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

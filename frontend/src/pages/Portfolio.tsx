@@ -1,14 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, Brush, CartesianGrid, Legend, Line, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-import { addHolding, addMutualFundHolding, deleteHolding, fetchChart, fetchPortfolio, fetchQuarterlyReports, fetchStockReturns, searchMutualFunds, searchSymbols, type SearchSymbolItem } from "../api/client";
+import { addHolding, addMutualFundHolding, deleteHolding, fetchChart, fetchPortfolio, fetchStockReturns, searchMutualFunds, searchSymbols, type SearchSymbolItem } from "../api/client";
 import { CountryFlag } from "../components/common/CountryFlag";
 import { InstrumentBadges } from "../components/common/InstrumentBadges";
 import { AllocationChart } from "../components/portfolio/AllocationChart";
 import { BacktestResults } from "../components/portfolio/BacktestResults";
+import { EarningsCalendar } from "../components/EarningsCalendar";
+import { EarningsDateBadge } from "../components/EarningsDateBadge";
 import { MutualFundPortfolioSection } from "../components/mutualFunds/MutualFundPortfolioSection";
+import { PortfolioEventsCalendar } from "../components/PortfolioEventsCalendar";
 import { TerminalButton } from "../components/terminal/TerminalButton";
 import { TerminalInput } from "../components/terminal/TerminalInput";
+import { usePortfolioEarnings } from "../hooks/useStocks";
 import { useSettingsStore } from "../store/settingsStore";
 import type { ChartPoint, MutualFund, PortfolioResponse } from "../types";
 import { MOMENTUM_ROTATION_BASKET } from "../utils/constants";
@@ -28,17 +32,6 @@ type PortfolioTrendPoint = {
   pnl: number;
   pct: number | null;
   investments: Array<{ ticker: string; date: string }>;
-};
-
-type PortfolioEventItem = {
-  id: string;
-  ticker: string;
-  dateIso: string;
-  dateLabel: string;
-  type: string;
-  title: string;
-  source: string;
-  url?: string;
 };
 
 function buildMonthSlots(items: PortfolioResponse["items"]): MonthSlot[] {
@@ -171,8 +164,6 @@ export function PortfolioPage() {
   const [returnsMap, setReturnsMap] = useState<Record<string, { "1m"?: number | null; "1y"?: number | null }>>({});
   const [portfolioTrend, setPortfolioTrend] = useState<PortfolioTrendPoint[]>([]);
   const [portfolioTrendLoading, setPortfolioTrendLoading] = useState(false);
-  const [portfolioEvents, setPortfolioEvents] = useState<PortfolioEventItem[]>([]);
-  const [portfolioEventsLoading, setPortfolioEventsLoading] = useState(false);
   const [trendRange, setTrendRange] = useState<"1Y" | "3Y" | "5Y" | "ALL">("ALL");
   const [ticker, setTicker] = useState(MOMENTUM_ROTATION_BASKET[0]);
   const [quantity, setQuantity] = useState(10);
@@ -185,6 +176,21 @@ export function PortfolioPage() {
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
   const searchRequestRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const portfolioSymbols = useMemo(
+    () => Array.from(new Set((data?.items ?? []).map((x) => x.ticker).filter(Boolean))),
+    [data?.items],
+  );
+  const { data: portfolioEarnings = [] } = usePortfolioEarnings(portfolioSymbols, 60);
+  const nextEarningsMap = useMemo(
+    () =>
+      portfolioEarnings.reduce<Record<string, (typeof portfolioEarnings)[number]>>((acc, row) => {
+        const key = (row.symbol || "").toUpperCase();
+        if (!key) return acc;
+        if (!acc[key] || row.earnings_date < acc[key].earnings_date) acc[key] = row;
+        return acc;
+      }, {}),
+    [portfolioEarnings],
+  );
 
   const doTickerSearch = useCallback(async (q: string) => {
     if (q.length < 2) {
@@ -222,7 +228,6 @@ export function PortfolioPage() {
     setLoading(true);
     setError(null);
     setPortfolioTrendLoading(true);
-    setPortfolioEventsLoading(true);
     try {
       const res = await fetchPortfolio();
       setData(res);
@@ -250,51 +255,12 @@ export function PortfolioPage() {
         }),
       );
       setPortfolioTrend(computePortfolioTrend(res.items, Object.fromEntries(chartEntries)));
-
-      const eventSymbols = (symbols.length > 0 ? symbols : MOMENTUM_ROTATION_BASKET).slice(0, 20);
-      const quarterlyRows = await Promise.all(
-        eventSymbols.map(async (symbol) => {
-          try {
-            const reports = await fetchQuarterlyReports(selectedMarket, symbol, 6);
-            return reports.map((report) => ({ symbol, report }));
-          } catch {
-            return [];
-          }
-        }),
-      );
-      const normalizedEvents = quarterlyRows
-        .flat()
-        .reduce<PortfolioEventItem[]>((acc, { symbol, report }) => {
-          const dateIso = String(report.publishedAt || report.periodEndDate || "");
-          const ts = new Date(dateIso).getTime();
-          if (!Number.isFinite(ts)) return acc;
-          acc.push({
-            id: `${symbol}-${report.id}-${dateIso}`,
-            ticker: symbol,
-            dateIso,
-            dateLabel: new Date(ts).toLocaleDateString("en-US", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            }),
-            type: String(report.reportType || "Quarterly Result"),
-            title: String(report.title || "Quarterly Update"),
-            source: String(report.source || "Exchange"),
-            url: Array.isArray(report.links) && report.links.length > 0 ? report.links[0]?.url : undefined,
-          });
-          return acc;
-        }, [])
-        .sort((a, b) => new Date(b.dateIso).getTime() - new Date(a.dateIso).getTime())
-        .slice(0, 24);
-      setPortfolioEvents(normalizedEvents);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load portfolio");
       setPortfolioTrend([]);
-      setPortfolioEvents([]);
     } finally {
       setLoading(false);
       setPortfolioTrendLoading(false);
-      setPortfolioEventsLoading(false);
     }
   };
 
@@ -788,6 +754,24 @@ export function PortfolioPage() {
             </div>
           </div>
 
+          <div className="grid gap-3 xl:grid-cols-2">
+            <div className="rounded border border-terminal-border bg-terminal-panel p-3">
+              <div className="mb-2 text-sm font-semibold text-terminal-accent">Upcoming Earnings</div>
+              <div className="space-y-2">
+                {portfolioEarnings.slice(0, 5).map((row) => (
+                  <div key={`${row.symbol}-${row.earnings_date}`} className="flex items-center justify-between rounded border border-terminal-border bg-terminal-bg px-2 py-1">
+                    <span className="text-xs text-terminal-text">{row.symbol}</span>
+                    <EarningsDateBadge event={row} />
+                  </div>
+                ))}
+                {portfolioEarnings.length === 0 ? <div className="text-xs text-terminal-muted">No upcoming earnings.</div> : null}
+              </div>
+            </div>
+            <EarningsCalendar symbols={portfolioSymbols} />
+          </div>
+
+          <PortfolioEventsCalendar symbols={portfolioSymbols} days={30} />
+
           <div className="grid gap-3 xl:grid-cols-12">
             <div className="rounded border border-terminal-border bg-terminal-panel p-3 xl:col-span-12">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -967,6 +951,7 @@ export function PortfolioPage() {
                   <tr className="border-b border-terminal-border text-terminal-muted">
                     <th className="px-2 py-1 text-left">Flag</th>
                     <th className="px-2 py-1 text-left">Ticker</th>
+                    <th className="px-2 py-1 text-left">Next Earnings</th>
                     <th className="px-2 py-1 text-left">F&O</th>
                     <th className="px-2 py-1 text-right">Qty</th>
                     <th className="px-2 py-1 text-right">Avg Buy</th>
@@ -1001,6 +986,9 @@ export function PortfolioPage() {
                           <CountryFlag countryCode={row.country_code} flagEmoji={row.flag_emoji} />
                         </td>
                         <td className="px-2 py-1">{row.ticker}</td>
+                        <td className="px-2 py-1">
+                          <EarningsDateBadge event={nextEarningsMap[row.ticker.toUpperCase()]} />
+                        </td>
                         <td className="px-2 py-1">
                           <InstrumentBadges exchange={row.exchange} hasFutures={row.has_futures} hasOptions={row.has_options} />
                         </td>
@@ -1037,57 +1025,6 @@ export function PortfolioPage() {
                 </div>
               </div>
 
-              <div className="rounded border border-terminal-border bg-terminal-panel p-3">
-                <div className="mb-2 text-sm font-semibold">Portfolio Events</div>
-                <div className="mb-2 text-[11px] text-terminal-muted">
-                  Quarterly result announcements and report events for current holdings (or momentum basket defaults).
-                </div>
-                {portfolioEventsLoading ? (
-                  <div className="text-xs text-terminal-muted">Loading portfolio events...</div>
-                ) : portfolioEvents.length === 0 ? (
-                  <div className="text-xs text-terminal-muted">No events available for current holdings.</div>
-                ) : (
-                  <div className="overflow-auto">
-                    <table className="min-w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-terminal-border text-terminal-muted">
-                      <th className="px-2 py-1 text-left">Date</th>
-                      <th className="px-2 py-1 text-left">Ticker</th>
-                      <th className="px-2 py-1 text-left">Event</th>
-                      <th className="px-2 py-1 text-left">Type</th>
-                      <th className="px-2 py-1 text-left">Source</th>
-                      <th className="px-2 py-1 text-left">Link</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {portfolioEvents.map((evt) => (
-                      <tr key={evt.id} className="border-b border-terminal-border/50">
-                        <td className="px-2 py-1">{evt.dateLabel}</td>
-                        <td className="px-2 py-1 text-terminal-accent">{evt.ticker}</td>
-                        <td className="px-2 py-1">{evt.title}</td>
-                        <td className="px-2 py-1">{evt.type}</td>
-                        <td className="px-2 py-1">{evt.source}</td>
-                        <td className="px-2 py-1">
-                          {evt.url ? (
-                            <a
-                              className="text-terminal-accent underline"
-                              href={evt.url}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Open
-                            </a>
-                          ) : (
-                            <span className="text-terminal-muted">-</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
             </div>
 
             <div className="space-y-3 xl:col-span-4">

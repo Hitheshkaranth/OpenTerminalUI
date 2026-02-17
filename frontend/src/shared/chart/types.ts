@@ -30,6 +30,7 @@ export type ChartEngineProps = {
   onRequestBackfill?: (oldestTime: number) => Promise<void> | void;
   showDeliveryOverlay?: boolean;
   deliverySeries?: Array<{ time: number; value: number }>;
+  panelId?: string;
 };
 
 export type IndicatorRegistryView = {

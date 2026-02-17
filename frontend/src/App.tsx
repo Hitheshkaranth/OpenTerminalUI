@@ -23,13 +23,20 @@ import { PCRPage } from "./fno/pages/PCRPage";
 import { HeatmapPage } from "./fno/pages/HeatmapPage";
 import { ExpiryPage } from "./fno/pages/ExpiryPage";
 import { FnoAboutPage } from "./fno/pages/AboutPage";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { LoginPage } from "./pages/Auth/LoginPage";
+import { RegisterPage } from "./pages/Auth/RegisterPage";
+import { AlertsPage } from "./pages/Alerts";
+import { PaperTradingPage } from "./pages/PaperTrading";
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
 
-      <Route path="/equity" element={<EquityLayout />}>
+      <Route path="/equity" element={<ProtectedRoute><EquityLayout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/equity/stocks" replace />} />
         <Route path="stocks" element={<StockDetailPage />} />
         <Route path="stocks/about" element={<AboutPage />} />
@@ -39,10 +46,12 @@ function App() {
         <Route path="mutual-funds" element={<MutualFundsPage />} />
         <Route path="watchlist" element={<WatchlistPage />} />
         <Route path="news" element={<NewsPage />} />
+        <Route path="alerts" element={<AlertsPage />} />
+        <Route path="paper" element={<PaperTradingPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 
-      <Route path="/fno" element={<FnoLayout />}>
+      <Route path="/fno" element={<ProtectedRoute><FnoLayout /></ProtectedRoute>}>
         <Route index element={<OptionChainPage />} />
         <Route path="greeks" element={<GreeksPage />} />
         <Route path="futures" element={<FuturesPage />} />
@@ -54,7 +63,7 @@ function App() {
         <Route path="about" element={<FnoAboutPage />} />
       </Route>
 
-      <Route path="/backtesting" element={<BacktestingLayout />}>
+      <Route path="/backtesting" element={<ProtectedRoute requiredRole="trader"><BacktestingLayout /></ProtectedRoute>}>
         <Route index element={<BacktestingPage />} />
       </Route>
 
@@ -66,6 +75,8 @@ function App() {
       <Route path="/mutual-funds" element={<Navigate to="/equity/mutual-funds" replace />} />
       <Route path="/watchlist" element={<Navigate to="/equity/watchlist" replace />} />
       <Route path="/news" element={<Navigate to="/equity/news" replace />} />
+      <Route path="/alerts" element={<Navigate to="/equity/alerts" replace />} />
+      <Route path="/paper" element={<Navigate to="/equity/paper" replace />} />
       <Route path="/settings" element={<Navigate to="/equity/settings" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

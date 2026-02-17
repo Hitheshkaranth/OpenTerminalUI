@@ -21,17 +21,42 @@ import type {
   StockSnapshot,
   WatchlistItem,
   AlertRule,
+  AlertTriggerEvent,
   MutualFund,
   MutualFundCompareResponse,
   MutualFundDetailsResponse,
   MutualFundNavHistoryResponse,
   MutualFundPerformance,
   PortfolioMutualFundsResponse,
+  CorporateEvent,
+  EarningsDate,
+  QuarterlyFinancial,
+  EarningsAnalysis,
+  PaperPortfolio,
+  PaperOrder,
+  PaperTrade,
+  PaperPosition,
+  PaperPerformance,
 } from "../types";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
   timeout: 30000,
+});
+
+let accessTokenGetter: (() => string | null) | null = null;
+
+export function setAccessTokenGetter(getter: (() => string | null) | null): void {
+  accessTokenGetter = getter;
+}
+
+api.interceptors.request.use((config) => {
+  const token = accessTokenGetter ? accessTokenGetter() : null;
+  if (token) {
+    config.headers = config.headers || {};
+    (config.headers as Record<string, string>).Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 export async function getHistory(
@@ -222,16 +247,31 @@ export async function fetchAlerts(): Promise<AlertRule[]> {
 }
 
 export async function createAlert(payload: {
-  ticker: string;
-  alert_type: string;
-  condition: string;
-  threshold: number;
-  note: string;
+  symbol?: string;
+  condition_type?: string;
+  parameters?: Record<string, unknown>;
+  cooldown_seconds?: number;
+  ticker?: string;
+  alert_type?: string;
+  condition?: string;
+  threshold?: number;
+  note?: string;
 }): Promise<void> {
   await api.post("/alerts", payload);
 }
 
-export async function deleteAlert(alertId: number): Promise<void> {
+export async function updateAlert(alertId: string, payload: { status?: string; cooldown_seconds?: number; parameters?: Record<string, unknown> }): Promise<void> {
+  await api.patch(`/alerts/${alertId}`, payload);
+}
+
+export async function fetchAlertHistory(page = 1, pageSize = 25): Promise<{ page: number; page_size: number; total: number; history: AlertTriggerEvent[] }> {
+  const { data } = await api.get<{ page: number; page_size: number; total: number; history: AlertTriggerEvent[] }>("/alerts/history", {
+    params: { page, page_size: pageSize },
+  });
+  return data;
+}
+
+export async function deleteAlert(alertId: string): Promise<void> {
   await api.delete(`/alerts/${alertId}`);
 }
 
@@ -260,6 +300,32 @@ export async function fetchEvents(): Promise<Array<{ date: string; ticker: strin
   return data;
 }
 
+export async function fetchStockEvents(
+  symbol: string,
+  params?: { types?: string; from_date?: string; to_date?: string },
+): Promise<CorporateEvent[]> {
+  const { data } = await api.get<{ items: CorporateEvent[] }>(`/events/${encodeURIComponent(symbol)}`, { params });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchUpcomingEvents(symbol: string, days = 90): Promise<CorporateEvent[]> {
+  const { data } = await api.get<{ items: CorporateEvent[] }>(`/events/${encodeURIComponent(symbol)}/upcoming`, { params: { days } });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchDividendHistory(symbol: string): Promise<CorporateEvent[]> {
+  const { data } = await api.get<{ items: CorporateEvent[] }>(`/events/${encodeURIComponent(symbol)}/dividends`);
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchPortfolioEvents(symbols: string[], days = 30): Promise<CorporateEvent[]> {
+  if (!symbols.length) return [];
+  const { data } = await api.get<{ items: CorporateEvent[] }>("/events/portfolio/upcoming", {
+    params: { symbols: symbols.join(","), days },
+  });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
 export async function fetchMarketStatus(): Promise<Record<string, unknown>> {
   const { data } = await api.get<Record<string, unknown>>("/reports/market-status");
   return data;
@@ -268,6 +334,41 @@ export async function fetchMarketStatus(): Promise<Record<string, unknown>> {
 export async function fetchStockReturns(ticker: string): Promise<{ "1m"?: number | null; "3m"?: number | null; "1y"?: number | null }> {
   const { data } = await api.get<{ "1m"?: number | null; "3m"?: number | null; "1y"?: number | null }>(`/stocks/${ticker}/returns`);
   return data ?? {};
+}
+
+export async function fetchEarningsCalendar(
+  params?: { from_date?: string; to_date?: string; symbols?: string[] },
+): Promise<EarningsDate[]> {
+  const query = {
+    from_date: params?.from_date,
+    to_date: params?.to_date,
+    symbols: params?.symbols?.length ? params.symbols.join(",") : undefined,
+  };
+  const { data } = await api.get<{ items: EarningsDate[] }>("/earnings/calendar", { params: query });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchNextEarnings(symbol: string): Promise<EarningsDate | null> {
+  const { data } = await api.get<{ item: EarningsDate | null }>(`/earnings/${encodeURIComponent(symbol)}/next`);
+  return data?.item ?? null;
+}
+
+export async function fetchQuarterlyEarningsFinancials(symbol: string, quarters = 12): Promise<QuarterlyFinancial[]> {
+  const { data } = await api.get<{ items: QuarterlyFinancial[] }>(`/earnings/${encodeURIComponent(symbol)}/financials`, { params: { quarters } });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchEarningsAnalysis(symbol: string): Promise<EarningsAnalysis> {
+  const { data } = await api.get<EarningsAnalysis>(`/earnings/${encodeURIComponent(symbol)}/analysis`);
+  return data;
+}
+
+export async function fetchPortfolioEarnings(symbols: string[], days = 30): Promise<EarningsDate[]> {
+  if (!symbols.length) return [];
+  const { data } = await api.get<{ items: EarningsDate[] }>("/earnings/portfolio", {
+    params: { symbols: symbols.join(","), days },
+  });
+  return Array.isArray(data?.items) ? data.items : [];
 }
 
 export async function fetchEquityPerformance(symbol: string): Promise<EquityPerformanceSnapshot> {
@@ -541,5 +642,62 @@ export async function fetchBacktestJobStatus(runId: string): Promise<BacktestJob
 
 export async function fetchBacktestJobResult(runId: string): Promise<BacktestJobResult> {
   const { data } = await api.get<BacktestJobResult>(`/backtests/${encodeURIComponent(runId)}/result`);
+  return data;
+}
+
+export async function createPaperPortfolio(payload: { name: string; initial_capital: number }): Promise<PaperPortfolio> {
+  const { data } = await api.post<PaperPortfolio>("/paper/portfolios", payload);
+  return data;
+}
+
+export async function fetchPaperPortfolios(): Promise<PaperPortfolio[]> {
+  const { data } = await api.get<{ items: PaperPortfolio[] }>("/paper/portfolios");
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function placePaperOrder(payload: {
+  portfolio_id: string;
+  symbol: string;
+  side: "buy" | "sell";
+  order_type: "market" | "limit" | "sl";
+  quantity: number;
+  limit_price?: number;
+  sl_price?: number;
+  slippage_bps?: number;
+  commission?: number;
+}): Promise<{ id: string; status: string; symbol: string; fill_price?: number | null; fill_time?: string | null }> {
+  const { data } = await api.post<{ id: string; status: string; symbol: string; fill_price?: number | null; fill_time?: string | null }>("/paper/orders", payload);
+  return data;
+}
+
+export async function fetchPaperPositions(portfolioId: string): Promise<PaperPosition[]> {
+  const { data } = await api.get<{ items: PaperPosition[] }>(`/paper/portfolios/${encodeURIComponent(portfolioId)}/positions`);
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchPaperOrders(portfolioId: string): Promise<PaperOrder[]> {
+  const { data } = await api.get<{ items: PaperOrder[] }>(`/paper/portfolios/${encodeURIComponent(portfolioId)}/orders`);
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchPaperTrades(portfolioId: string): Promise<PaperTrade[]> {
+  const { data } = await api.get<{ items: PaperTrade[] }>(`/paper/portfolios/${encodeURIComponent(portfolioId)}/trades`);
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchPaperPerformance(portfolioId: string): Promise<PaperPerformance> {
+  const { data } = await api.get<PaperPerformance>(`/paper/portfolios/${encodeURIComponent(portfolioId)}/performance`);
+  return data;
+}
+
+export async function deployBacktestToPaper(payload: {
+  name: string;
+  initial_capital: number;
+  symbol: string;
+  market: string;
+  strategy: string;
+  context?: Record<string, unknown>;
+}): Promise<{ portfolio_id: string; status: string }> {
+  const { data } = await api.post<{ portfolio_id: string; status: string }>("/paper/deploy-strategy", payload);
   return data;
 }

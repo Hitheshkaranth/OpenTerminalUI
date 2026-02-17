@@ -4,6 +4,7 @@ pandas
 numpy
 yfinance
 sqlalchemy
+sqlalchemy[asyncio]
 pydantic
 PyYAML
 requests
@@ -15,3 +16,11 @@ kiteconnect
 nsepython>=2.97
 nsetools>=1.0.10
 mibian>=0.1.3
+python-jose
+passlib[bcrypt]
+bcrypt==4.0.1
+alembic
+aiosqlite
+asyncpg
+pytest-cov
+pytest-asyncio

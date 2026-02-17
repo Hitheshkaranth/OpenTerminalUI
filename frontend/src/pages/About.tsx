@@ -99,6 +99,18 @@ export function AboutPage() {
         </ul>
       </TerminalPanel>
 
+      <TerminalPanel title="Latest Additions (vs Previous Commit)">
+        <ul className="space-y-1 text-xs text-terminal-text">
+          <li>- Auth foundation: JWT access/refresh, auth middleware, role protection, login/register screens.</li>
+          <li>- Corporate Events + Earnings: dedicated APIs, timeline/calendar widgets, and stock/portfolio integrations.</li>
+          <li>- Alerts v2: user-scoped rules, trigger history, live websocket alerts, and browser notification support.</li>
+          <li>- Paper Trading: virtual portfolio/order/position/trade model, performance metrics, strategy deploy API, and UI dashboard.</li>
+          <li>- Chart Foundations: chart drawings/templates persistence APIs plus multi-chart crosshair sync context scaffolding.</li>
+          <li>- Adapter Layer: pluggable multi-exchange adapter registry with Kite/Yahoo/Crypto base implementations.</li>
+          <li>- UI/Navigation: sidebar account details panel now visible in Equity, F&O, and Backtesting.</li>
+        </ul>
+      </TerminalPanel>
+
       <div className="grid gap-3 lg:grid-cols-2">
         <TerminalPanel title="Build Metadata">
           <div className="mt-2 space-y-1 text-xs tabular-nums text-terminal-text">

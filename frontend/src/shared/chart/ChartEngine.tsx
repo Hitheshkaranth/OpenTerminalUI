@@ -18,6 +18,7 @@ import { useIndicators } from "./useIndicators";
 import { useRealtimeChart } from "./useRealtimeChart";
 import type { ChartEngineProps } from "./types";
 import { terminalColors } from "../../theme/terminal";
+import { useChartSync } from "./ChartSyncContext";
 
 type SeriesRef = {
   candles: ISeriesApi<"Candlestick", Time> | null;
@@ -46,6 +47,7 @@ export function ChartEngine({
   onRequestBackfill,
   showDeliveryOverlay = false,
   deliverySeries = [],
+  panelId = "panel-default",
 }: ChartEngineProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -58,6 +60,7 @@ export function ChartEngine({
   const backfillInFlightRef = useRef(false);
   const lastBackfillOldestRef = useRef<number | null>(null);
   const [chartApi, setChartApi] = useState<IChartApi | null>(null);
+  const { event: syncEvent, publish } = useChartSync();
   const { bars, liveTick } = useRealtimeChart(market, symbol, timeframe, historicalData, enableRealtime);
   const safeBars = useMemo(
     () =>
@@ -200,6 +203,7 @@ export function ChartEngine({
         crosshairCbRef.current?.(null);
         return;
       }
+      publish({ sourceId: panelId, timestamp: t, price: Number(b.close) });
       crosshairCbRef.current?.({ open: Number(b.open), high: Number(b.high), low: Number(b.low), close: Number(b.close), time: t });
     };
 
@@ -287,6 +291,16 @@ export function ChartEngine({
   }, [safeBars, showVolume, deliverySeries, showDeliveryOverlay]);
 
   useIndicators(chartApi, safeBars, activeIndicators);
+
+  useEffect(() => {
+    if (!chartApi || !syncEvent || syncEvent.sourceId === panelId) return;
+    const from = Math.max(0, syncEvent.timestamp - 60);
+    const to = syncEvent.timestamp + 60;
+    chartApi.timeScale().setVisibleRange({
+      from: from as UTCTimestamp,
+      to: to as UTCTimestamp,
+    });
+  }, [chartApi, panelId, syncEvent]);
 
   return (
     <div className="relative z-0 h-full w-full rounded border border-terminal-border">

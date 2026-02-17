@@ -1,0 +1,24 @@
+default:
+  primary: kite
+  fallback:
+    - yahoo
+
+exchanges:
+  NSE:
+    primary: kite
+    fallback:
+      - yahoo
+  BSE:
+    primary: kite
+    fallback:
+      - yahoo
+  NASDAQ:
+    primary: yahoo
+    fallback: []
+  NYSE:
+    primary: yahoo
+    fallback: []
+  CRYPTO:
+    primary: crypto
+    fallback:
+      - yahoo

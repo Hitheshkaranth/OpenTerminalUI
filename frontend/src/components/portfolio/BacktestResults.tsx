@@ -11,7 +11,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { runBacktest, type BacktestPayload, type BacktestResponse } from "../../api/client";
+import { deployBacktestToPaper, runBacktest, type BacktestPayload, type BacktestResponse } from "../../api/client";
 import { MOMENTUM_ROTATION_BASKET_CSV } from "../../utils/constants";
 import { formatPct } from "../../utils/formatters";
 
@@ -28,6 +28,7 @@ export function BacktestResults({ initialTickers }: Props) {
   const [result, setResult] = useState<BacktestResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deployMessage, setDeployMessage] = useState<string | null>(null);
   const bootstrappedFromPortfolioRef = useRef(false);
 
   useEffect(() => {
@@ -105,6 +106,33 @@ export function BacktestResults({ initialTickers }: Props) {
         >
           {loading ? "Running..." : "Run Backtest"}
         </button>
+        {result && (
+          <button
+            className="ml-2 mt-3 rounded border border-terminal-accent px-4 py-2 text-sm font-medium text-terminal-accent"
+            onClick={() => {
+              void (async () => {
+                try {
+                  const tickersList = tickers.split(",").map((t) => t.trim()).filter(Boolean);
+                  const first = tickersList[0] || "RELIANCE";
+                  const deployed = await deployBacktestToPaper({
+                    name: `Backtest ${new Date().toLocaleDateString()}`,
+                    initial_capital: 100000,
+                    symbol: first,
+                    market: "NSE",
+                    strategy: "momentum_rotation",
+                    context: { lookback_days: lookback, top_n: topN, tickers: tickersList },
+                  });
+                  setDeployMessage(`Deployed to paper portfolio ${deployed.portfolio_id}`);
+                } catch (e) {
+                  setDeployMessage(e instanceof Error ? e.message : "Deploy failed");
+                }
+              })();
+            }}
+          >
+            Deploy To Paper
+          </button>
+        )}
+        {deployMessage && <div className="mt-2 text-xs text-terminal-muted">{deployMessage}</div>}
       </div>
 
       {error && (

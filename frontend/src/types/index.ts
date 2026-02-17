@@ -204,13 +204,86 @@ export type WatchlistItem = {
 };
 
 export type AlertRule = {
-  id: number;
+  id: string;
+  symbol?: string;
+  condition_type?: string;
+  parameters?: Record<string, unknown>;
+  status?: string;
+  triggered_at?: string | null;
+  cooldown_seconds?: number;
   ticker: string;
   alert_type: string;
   condition: string;
-  threshold: number;
+  threshold: number | null | undefined;
   note: string;
   created_at: string;
+};
+
+export type AlertTriggerEvent = {
+  id: string;
+  alert_id: string;
+  symbol: string;
+  condition_type: string;
+  triggered_value?: number | null;
+  triggered_at: string;
+};
+
+export type PaperPortfolio = {
+  id: string;
+  name: string;
+  initial_capital: number;
+  current_cash: number;
+  is_active?: boolean;
+  created_at?: string;
+};
+
+export type PaperOrder = {
+  id: string;
+  symbol: string;
+  side: string;
+  order_type: string;
+  quantity: number;
+  limit_price?: number | null;
+  sl_price?: number | null;
+  status: string;
+  fill_price?: number | null;
+  fill_time?: string | null;
+  slippage_bps?: number;
+  commission?: number;
+};
+
+export type PaperTrade = {
+  id: string;
+  order_id: string;
+  symbol: string;
+  side: string;
+  quantity: number;
+  price: number;
+  timestamp: string;
+  pnl_realized?: number | null;
+};
+
+export type PaperPosition = {
+  id: string;
+  symbol: string;
+  quantity: number;
+  avg_entry_price: number;
+  mark_price: number;
+  unrealized_pnl: number;
+};
+
+export type PaperPerformance = {
+  portfolio_id: string;
+  equity: number;
+  pnl: number;
+  cumulative_return: number;
+  daily_pnl_curve: Array<{ t: string; equity: number }>;
+  sharpe_ratio: number;
+  max_drawdown: number;
+  win_rate: number;
+  avg_win_loss_ratio: number;
+  profit_factor: number;
+  trade_count: number;
 };
 
 export type PriceRange = {
@@ -437,6 +510,89 @@ export type PortfolioMutualFundsResponse = {
     total_pnl: number;
     total_pnl_pct: number;
   };
+};
+
+export type CorporateEventType =
+  | "dividend"
+  | "bonus"
+  | "split"
+  | "rights"
+  | "agm"
+  | "egm"
+  | "board_meeting"
+  | "buyback"
+  | "delisting"
+  | "ipo"
+  | "merger"
+  | "earnings"
+  | "insider_trade"
+  | "block_deal"
+  | "bulk_deal"
+  | "credit_rating";
+
+export type CorporateEvent = {
+  symbol: string;
+  event_type: CorporateEventType;
+  title: string;
+  description: string;
+  event_date: string;
+  ex_date?: string | null;
+  record_date?: string | null;
+  payment_date?: string | null;
+  value?: string | null;
+  source: string;
+  impact: "positive" | "negative" | "neutral" | string;
+  url?: string | null;
+};
+
+export type EarningsDate = {
+  symbol: string;
+  company_name: string;
+  earnings_date: string;
+  fiscal_quarter: string;
+  fiscal_year: number;
+  quarter: number;
+  estimated_eps?: number | null;
+  actual_eps?: number | null;
+  eps_surprise?: number | null;
+  eps_surprise_pct?: number | null;
+  estimated_revenue?: number | null;
+  actual_revenue?: number | null;
+  revenue_surprise?: number | null;
+  revenue_surprise_pct?: number | null;
+  time: string;
+  source: string;
+};
+
+export type QuarterlyFinancial = {
+  symbol: string;
+  quarter: string;
+  quarter_end_date: string;
+  revenue: number;
+  revenue_qoq_pct?: number | null;
+  revenue_yoy_pct?: number | null;
+  net_profit: number;
+  net_profit_qoq_pct?: number | null;
+  net_profit_yoy_pct?: number | null;
+  operating_profit?: number | null;
+  operating_margin_pct?: number | null;
+  net_margin_pct?: number | null;
+  ebitda?: number | null;
+  eps?: number | null;
+  eps_qoq_pct?: number | null;
+  eps_yoy_pct?: number | null;
+};
+
+export type EarningsAnalysis = {
+  symbol: string;
+  company_name: string;
+  next_earnings_date?: EarningsDate | null;
+  last_earnings?: EarningsDate | null;
+  quarterly_financials: QuarterlyFinancial[];
+  revenue_trend: string;
+  profit_trend: string;
+  consecutive_beats: number;
+  avg_eps_surprise_pct: number;
 };
 
 export * from "./markets";
