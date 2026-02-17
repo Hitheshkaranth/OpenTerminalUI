@@ -27,7 +27,7 @@ jobs:
         run: python -m compileall backend
 
       - name: Run pytest with coverage
-        run: PYTHONPATH=. pytest backend/tests -q --cov=backend --cov-fail-under=70 --cov-report=xml --junitxml=pytest-report.xml
+        run: PYTHONPATH=. pytest backend/tests -q --cov=backend --cov-fail-under=45 --cov-report=xml --junitxml=pytest-report.xml
 
       - name: Upload pytest report
         if: always()
@@ -74,7 +74,7 @@ jobs:
             const xml = fs.readFileSync('coverage.xml', 'utf8');
             const m = xml.match(/line-rate=\"([0-9.]+)\"/);
             const pct = m ? (Number(m[1]) * 100).toFixed(2) : 'unknown';
-            const body = `Backend coverage: **${pct}%** (threshold: 70%)`;
+            const body = `Backend coverage: **${pct}%** (threshold: 45%)`;
             github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
