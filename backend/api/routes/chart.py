@@ -2,17 +2,39 @@ from __future__ import annotations
 
 import math
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from backend.api.deps import cache_instance, get_unified_fetcher
+from backend.adapters.registry import get_adapter_registry
+from backend.api.deps import get_db
+from backend.auth.deps import get_current_user
 from backend.core.models import ChartResponse, IndicatorPoint, IndicatorResponse, OhlcvPoint
 from backend.core.technicals import compute_indicator
+from backend.models import ChartDrawing, ChartTemplate, User
 
 router = APIRouter()
+
+
+class ChartDrawingCreate(BaseModel):
+    tool_type: str
+    coordinates: dict[str, Any] = Field(default_factory=dict)
+    style: dict[str, Any] = Field(default_factory=dict)
+
+
+class ChartDrawingUpdate(BaseModel):
+    coordinates: dict[str, Any] | None = None
+    style: dict[str, Any] | None = None
+
+
+class ChartTemplateCreate(BaseModel):
+    name: str
+    layout_config: dict[str, Any] = Field(default_factory=dict)
 
 def _synthetic_history(ticker: str, interval: str, range_val: str) -> pd.DataFrame:
     # Deterministic synthetic series for UI continuity when upstream market data is unavailable.
@@ -114,6 +136,7 @@ def _parse_yahoo_chart(data: Dict[str, Any]) -> pd.DataFrame:
 @router.get("/chart/{ticker}", response_model=ChartResponse)
 async def get_chart(
     ticker: str,
+    market: str = Query(default="NSE"),
     interval: str = Query(default="1d"),
     range: str = Query(default="1y"),
     limit: int | None = Query(default=None, ge=1, le=5000),
@@ -125,17 +148,30 @@ async def get_chart(
         payload = cached
     else:
         fetcher = await get_unified_fetcher()
-        # UnifiedFetcher.fetch_history prioritizes NSE > Yahoo > FMP
-        # But currently returns raw dict. We need to parse it.
-        # If it's Yahoo-like data:
-        raw_data = await fetcher.fetch_history(ticker, range_str=range, interval=interval)
-        
-        hist = pd.DataFrame()
-        if raw_data and "chart" in raw_data:
-            hist = _parse_yahoo_chart(raw_data)
-        elif raw_data and "historical" in raw_data: # FMP style
-            # TODO: Parse FMP if needed, but Yahoo is primary
-            pass
+        adapter_rows = []
+        try:
+            registry = get_adapter_registry()
+            end_d = date.today()
+            start_d = end_d - timedelta(days=365)
+            adapter_rows = await registry.get_adapter(market).get_history(ticker, interval, start_d, end_d)
+        except Exception:
+            adapter_rows = []
+        if adapter_rows:
+            hist = pd.DataFrame(
+                [{"Open": r.o, "High": r.h, "Low": r.l, "Close": r.c, "Volume": r.v, "t": r.t} for r in adapter_rows]
+            )
+            hist.index = pd.DatetimeIndex([datetime.fromtimestamp(int(x), tz=timezone.utc) for x in hist["t"]])
+            hist = hist.drop(columns=["t"])
+            raw_data = {}
+        else:
+            # UnifiedFetcher.fetch_history prioritizes NSE > Yahoo > FMP
+            raw_data = await fetcher.fetch_history(ticker, range_str=range, interval=interval)
+
+            hist = pd.DataFrame()
+            if raw_data and "chart" in raw_data:
+                hist = _parse_yahoo_chart(raw_data)
+            elif raw_data and "historical" in raw_data:  # FMP style currently unsupported in this parser
+                pass
             
         warnings: list[Dict[str, str]] = []
         if hist.empty:
@@ -256,3 +292,159 @@ async def get_indicator(
         points.append(IndicatorPoint(t=ts_int, values=values))
 
     return IndicatorResponse(ticker=ticker.upper(), indicator=type, params=params, data=points, meta={"warnings": warnings})
+
+
+@router.post("/chart-drawings/{symbol}")
+def create_chart_drawing(
+    symbol: str,
+    payload: ChartDrawingCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    row = ChartDrawing(
+        user_id=current_user.id,
+        symbol=symbol.strip().upper(),
+        tool_type=payload.tool_type.strip().lower(),
+        coordinates=dict(payload.coordinates),
+        style=dict(payload.style),
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {"id": row.id, "symbol": row.symbol, "tool_type": row.tool_type}
+
+
+@router.get("/chart-drawings/{symbol}")
+def list_chart_drawings(
+    symbol: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    rows = (
+        db.query(ChartDrawing)
+        .filter(ChartDrawing.user_id == current_user.id, ChartDrawing.symbol == symbol.strip().upper())
+        .order_by(ChartDrawing.created_at.asc())
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": row.id,
+                "symbol": row.symbol,
+                "tool_type": row.tool_type,
+                "coordinates": row.coordinates if isinstance(row.coordinates, dict) else {},
+                "style": row.style if isinstance(row.style, dict) else {},
+                "created_at": row.created_at.isoformat(),
+            }
+            for row in rows
+        ]
+    }
+
+
+@router.put("/chart-drawings/{symbol}/{drawing_id}")
+def update_chart_drawing(
+    symbol: str,
+    drawing_id: str,
+    payload: ChartDrawingUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    row = (
+        db.query(ChartDrawing)
+        .filter(
+            ChartDrawing.id == drawing_id,
+            ChartDrawing.user_id == current_user.id,
+            ChartDrawing.symbol == symbol.strip().upper(),
+        )
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Drawing not found")
+    if payload.coordinates is not None:
+        row.coordinates = dict(payload.coordinates)
+    if payload.style is not None:
+        row.style = dict(payload.style)
+    db.commit()
+    return {"status": "updated", "id": row.id}
+
+
+@router.delete("/chart-drawings/{symbol}/{drawing_id}")
+def delete_chart_drawing(
+    symbol: str,
+    drawing_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    row = (
+        db.query(ChartDrawing)
+        .filter(
+            ChartDrawing.id == drawing_id,
+            ChartDrawing.user_id == current_user.id,
+            ChartDrawing.symbol == symbol.strip().upper(),
+        )
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Drawing not found")
+    db.delete(row)
+    db.commit()
+    return {"status": "deleted", "id": drawing_id}
+
+
+@router.post("/chart-templates")
+def create_chart_template(
+    payload: ChartTemplateCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    row = ChartTemplate(
+        user_id=current_user.id,
+        name=payload.name.strip(),
+        layout_config=dict(payload.layout_config),
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {"id": row.id, "name": row.name}
+
+
+@router.get("/chart-templates")
+def list_chart_templates(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    defaults = [
+        {"id": "default-day-trading", "name": "Day Trading", "layout_config": {"panels": ["1min", "5min", "15min"]}},
+        {"id": "default-swing", "name": "Swing", "layout_config": {"panels": ["1d", "1wk"]}},
+        {"id": "default-scalping", "name": "Scalping", "layout_config": {"panels": ["tick", "1min"]}},
+    ]
+    rows = (
+        db.query(ChartTemplate)
+        .filter(ChartTemplate.user_id == current_user.id)
+        .order_by(ChartTemplate.created_at.desc())
+        .all()
+    )
+    items = defaults + [
+        {
+            "id": row.id,
+            "name": row.name,
+            "layout_config": row.layout_config if isinstance(row.layout_config, dict) else {},
+            "created_at": row.created_at.isoformat(),
+        }
+        for row in rows
+    ]
+    return {"items": items}
+
+
+@router.delete("/chart-templates/{template_id}")
+def delete_chart_template(
+    template_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    row = db.query(ChartTemplate).filter(ChartTemplate.id == template_id, ChartTemplate.user_id == current_user.id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Template not found")
+    db.delete(row)
+    db.commit()
+    return {"status": "deleted", "id": template_id}

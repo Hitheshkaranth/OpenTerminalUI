@@ -7,6 +7,14 @@ from backend.api.routes import peers, screener
 from backend.main import app
 
 
+def _auth_headers(client: TestClient, email: str) -> dict[str, str]:
+    password = "StrongPass123!"
+    client.post("/api/auth/register", json={"email": email, "password": password, "role": "trader"})
+    login = client.post("/api/auth/login", json={"email": email, "password": password})
+    token = login.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_peers_route_returns_payload_without_500(monkeypatch) -> None:
     class _FakeFmp:
         async def get_peers(self, symbol: str):
@@ -25,7 +33,8 @@ def test_peers_route_returns_payload_without_500(monkeypatch) -> None:
     monkeypatch.setattr(peers, "fetch_stock_snapshot_coalesced", _fake_snapshot)
 
     client = TestClient(app)
-    response = client.get("/api/peers/AAA")
+    headers = _auth_headers(client, "phase2-qc-peers@example.com")
+    response = client.get("/api/peers/AAA", headers=headers)
     assert response.status_code == 200
     body = response.json()
     assert body["ticker"] == "AAA"
@@ -47,6 +56,7 @@ def test_screener_type_mismatch_rule_does_not_500(monkeypatch) -> None:
     monkeypatch.setattr(screener, "_load_universe", lambda universe: ["AAA", "BBB"])
 
     client = TestClient(app)
+    headers = _auth_headers(client, "phase2-qc-screener@example.com")
     payload = {
         "rules": [{"field": "company_name", "op": ">", "value": 1}],
         "sort_by": "roe_pct",
@@ -54,7 +64,7 @@ def test_screener_type_mismatch_rule_does_not_500(monkeypatch) -> None:
         "limit": 5,
         "universe": "nse_eq",
     }
-    response = client.post("/api/screener/run", json=payload)
+    response = client.post("/api/screener/run", json=payload, headers=headers)
     assert response.status_code == 200
     body = response.json()
     assert "rows" in body
