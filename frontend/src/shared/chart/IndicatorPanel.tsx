@@ -192,4 +192,3 @@ export function IndicatorPanel({ symbol, activeIndicators, onChange, templateSco
     </div>
   );
 }
-

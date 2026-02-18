@@ -24,3 +24,5 @@ aiosqlite
 asyncpg
 pytest-cov
 pytest-asyncio
+openpyxl
+reportlab

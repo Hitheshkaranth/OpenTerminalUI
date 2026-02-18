@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from backend.equity.routes import admin, alerts, auth, backtest, backtests, chart, crypto, data, earnings, events, fundamentals, health, indicators, kite, mutual_funds, news, paper, peers, portfolio, quotes, reports, screener, scripting, search, shareholding, stocks, stream, valuation
+from backend.equity.routes import admin, alerts, auth, backtest, backtests, chart, crypto, data, earnings, events, export, fundamentals, health, indicators, kite, mutual_funds, news, paper, peers, plugins, portfolio, quotes, reports, screener, scripting, search, shareholding, stocks, stream, valuation
 
 equity_router = APIRouter()
 equity_router.include_router(stocks.router, prefix="/api", tags=["stocks"])
@@ -18,6 +18,8 @@ equity_router.include_router(backtest.router, prefix="/api", tags=["backtest"])
 equity_router.include_router(backtests.router, prefix="/api", tags=["backtests"])
 equity_router.include_router(alerts.router, prefix="/api", tags=["alerts"])
 equity_router.include_router(reports.router, prefix="/api", tags=["reports"])
+equity_router.include_router(export.router, prefix="/api", tags=["export"])
+equity_router.include_router(plugins.router, prefix="/api", tags=["plugins"])
 equity_router.include_router(data.router, prefix="/api", tags=["data"])
 equity_router.include_router(news.router, prefix="/api", tags=["news"])
 equity_router.include_router(health.router, prefix="/api", tags=["health"])

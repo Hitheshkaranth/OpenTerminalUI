@@ -420,4 +420,3 @@ class NSEResultsCalendar:
                 time.sleep(2.0)
             result[ticker] = self.get_upcoming_results(ticker)
         return result
-

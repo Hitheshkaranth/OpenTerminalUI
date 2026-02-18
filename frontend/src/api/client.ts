@@ -13,6 +13,15 @@ import type {
   IndicatorResponse,
   EquityPerformanceSnapshot,
   PortfolioResponse,
+  SectorAllocationResponse,
+  PortfolioRiskMetrics,
+  PortfolioCorrelationResponse,
+  PortfolioDividendTracker,
+  PortfolioBenchmarkOverlay,
+  TaxLotSummary,
+  TaxLotRealizationResponse,
+  PluginManifestItem,
+  ScheduledReport,
   PeerResponse,
   RelativeValuationResponse,
   ScreenerResponse,
@@ -156,7 +165,99 @@ export async function searchStocks(q: string, market = "NSE"): Promise<SearchSym
 
 export async function fetchPortfolio(): Promise<PortfolioResponse> {
   const { data } = await api.get<PortfolioResponse>("/portfolio");
+  const items = Array.isArray((data as any)?.items) ? (data as any).items : [];
+  const summary = (data as any)?.summary && typeof (data as any).summary === "object" ? (data as any).summary : {};
+  return {
+    items,
+    summary: {
+      total_cost: Number((summary as any).total_cost ?? 0),
+      total_value: typeof (summary as any).total_value === "number" ? (summary as any).total_value : null,
+      overall_pnl: typeof (summary as any).overall_pnl === "number" ? (summary as any).overall_pnl : null,
+    },
+  };
+}
+
+export async function fetchSectorAllocation(): Promise<SectorAllocationResponse> {
+  const { data } = await api.get<SectorAllocationResponse>("/portfolio/analytics/sector-allocation");
   return data;
+}
+
+export async function fetchPortfolioRiskMetrics(params?: { risk_free_rate?: number; benchmark?: string }): Promise<PortfolioRiskMetrics> {
+  const { data } = await api.get<PortfolioRiskMetrics>("/portfolio/analytics/risk-metrics", { params });
+  return data;
+}
+
+export async function fetchPortfolioCorrelation(params?: { window?: number }): Promise<PortfolioCorrelationResponse> {
+  const { data } = await api.get<PortfolioCorrelationResponse>("/portfolio/analytics/correlation", { params });
+  return data;
+}
+
+export async function fetchPortfolioDividends(params?: { days?: number }): Promise<PortfolioDividendTracker> {
+  const { data } = await api.get<PortfolioDividendTracker>("/portfolio/analytics/dividends", { params });
+  return data;
+}
+
+export async function fetchPortfolioBenchmarkOverlay(params?: { benchmark?: string }): Promise<PortfolioBenchmarkOverlay> {
+  const { data } = await api.get<PortfolioBenchmarkOverlay>("/portfolio/analytics/benchmark-overlay", { params });
+  return data;
+}
+
+export async function fetchTaxLots(params?: { ticker?: string }): Promise<TaxLotSummary> {
+  const { data } = await api.get<TaxLotSummary>("/portfolio/tax-lots", { params });
+  return data;
+}
+
+export async function addTaxLot(payload: { ticker: string; quantity: number; buy_price: number; buy_date: string }): Promise<void> {
+  await api.post("/portfolio/tax-lots", payload);
+}
+
+export async function realizeTaxLots(payload: {
+  ticker: string;
+  quantity: number;
+  sell_price: number;
+  sell_date: string;
+  method: "FIFO" | "LIFO" | "SPECIFIC";
+  specific_lot_ids?: number[];
+}): Promise<TaxLotRealizationResponse> {
+  const { data } = await api.post<TaxLotRealizationResponse>("/portfolio/tax-lots/realize", payload);
+  return data;
+}
+
+export async function downloadExport(dataType: string, format: "csv" | "xlsx" | "pdf"): Promise<Blob> {
+  const { data } = await api.get(`/export/${encodeURIComponent(dataType)}`, {
+    params: { format },
+    responseType: "blob",
+  });
+  return data as Blob;
+}
+
+export async function fetchScheduledReports(): Promise<ScheduledReport[]> {
+  const { data } = await api.get<{ items: ScheduledReport[] }>("/reports/scheduled");
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function createScheduledReport(payload: { report_type: string; frequency: string; email: string; data_type: string }): Promise<ScheduledReport> {
+  const { data } = await api.post<ScheduledReport>("/reports/scheduled", payload);
+  return data;
+}
+
+export async function deleteScheduledReport(configId: string): Promise<void> {
+  await api.delete(`/reports/scheduled/${encodeURIComponent(configId)}`);
+}
+
+export async function fetchPlugins(): Promise<PluginManifestItem[]> {
+  const { data } = await api.get<{ items: PluginManifestItem[] }>("/plugins");
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function setPluginEnabled(pluginId: string, enabled: boolean): Promise<void> {
+  const encoded = encodeURIComponent(pluginId);
+  await api.post(`/plugins/${encoded}/${enabled ? "enable" : "disable"}`);
+}
+
+export async function reloadPlugin(pluginId: string): Promise<void> {
+  const encoded = encodeURIComponent(pluginId);
+  await api.post(`/plugins/${encoded}/reload`);
 }
 
 export async function addHolding(payload: {
@@ -230,7 +331,7 @@ export async function deleteMutualFundHolding(holdingId: string): Promise<void> 
 
 export async function fetchWatchlist(): Promise<WatchlistItem[]> {
   const { data } = await api.get<{ items: WatchlistItem[] }>("/watchlists");
-  return data.items;
+  return Array.isArray(data?.items) ? data.items : [];
 }
 
 export async function addWatchlistItem(payload: { watchlist_name: string; ticker: string }): Promise<void> {

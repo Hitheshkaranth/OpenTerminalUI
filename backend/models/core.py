@@ -20,6 +20,17 @@ class Holding(Base):
     buy_date: Mapped[str] = mapped_column(String(16))
 
 
+class TaxLot(Base):
+    __tablename__ = "tax_lots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    ticker: Mapped[str] = mapped_column(String(32), index=True)
+    quantity: Mapped[float] = mapped_column(Float)
+    remaining_quantity: Mapped[float] = mapped_column(Float)
+    buy_price: Mapped[float] = mapped_column(Float)
+    buy_date: Mapped[str] = mapped_column(String(16), index=True)
+
+
 class WatchlistItem(Base):
     __tablename__ = "watchlist_items"
 

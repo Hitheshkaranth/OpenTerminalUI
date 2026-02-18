@@ -81,18 +81,18 @@ def _parse_yahoo_chart(data: Dict[str, Any]) -> pd.DataFrame:
         chart_result = (data.get("chart") or {}).get("result")
         if not chart_result or not isinstance(chart_result, list):
             return pd.DataFrame()
-            
+
         res = chart_result[0]
         timestamps = res.get("timestamp")
         if not timestamps:
             return pd.DataFrame()
-            
+
         quote = (res.get("indicators") or {}).get("quote")
         if not quote or not isinstance(quote, list):
             return pd.DataFrame()
-            
+
         q = quote[0]
-        
+
         # Zip and create dict
         # Filter out None values in OHLC
         opens = q.get("open") or []
@@ -100,7 +100,7 @@ def _parse_yahoo_chart(data: Dict[str, Any]) -> pd.DataFrame:
         lows = q.get("low") or []
         closes = q.get("close") or []
         volumes = q.get("volume") or []
-        
+
         # Validation
         length = len(timestamps)
         if not (len(opens) == length and len(highs) == length and len(lows) == length and len(closes) == length):
@@ -113,10 +113,10 @@ def _parse_yahoo_chart(data: Dict[str, Any]) -> pd.DataFrame:
         for i in range(length):
             ts = timestamps[i]
             o, h, l, c, v = opens[i], highs[i], lows[i], closes[i], volumes[i]
-            
-            if None in (o, h, l, c): 
+
+            if None in (o, h, l, c):
                 continue
-                
+
             dt = datetime.fromtimestamp(ts, tz=timezone.utc)
             rows.append({
                 "Open": float(o),
@@ -126,10 +126,10 @@ def _parse_yahoo_chart(data: Dict[str, Any]) -> pd.DataFrame:
                 "Volume": float(v) if v is not None else 0.0
             })
             utc_dates.append(dt)
-            
+
         if not rows:
             return pd.DataFrame()
-            
+
         df = pd.DataFrame(rows, index=pd.DatetimeIndex(utc_dates))
         return df
 
@@ -177,7 +177,7 @@ async def get_chart(
                 hist = _parse_yahoo_chart(raw_data)
             elif raw_data and "historical" in raw_data:  # FMP style currently unsupported in this parser
                 pass
-            
+
         warnings: list[Dict[str, str]] = []
         if hist.empty:
             hist = _synthetic_history(ticker=ticker, interval=interval, range_val=range)
@@ -195,11 +195,11 @@ async def get_chart(
             # idx is Timestamp
             ts_int = int(idx.timestamp())
             data.append(OhlcvPoint(
-                t=ts_int, 
-                o=float(row["Open"]), 
-                h=float(row["High"]), 
-                l=float(row["Low"]), 
-                c=float(row["Close"]), 
+                t=ts_int,
+                o=float(row["Open"]),
+                h=float(row["High"]),
+                l=float(row["Low"]),
+                c=float(row["Close"]),
                 v=float(row.get("Volume", 0) or 0)
             ))
 
@@ -258,14 +258,14 @@ async def get_indicator(
 ) -> IndicatorResponse:
     # We don't cache indicators directly logic-heavy, but underlying data is cached by get_chart logic if we reused it
     # But here we fetching history again.
-    
+
     fetcher = await get_unified_fetcher()
     raw_data = await fetcher.fetch_history(ticker, range_str=range, interval=interval)
-    
+
     hist = pd.DataFrame()
     if raw_data and "chart" in raw_data:
         hist = _parse_yahoo_chart(raw_data)
-        
+
     warnings: list[Dict[str, str]] = []
     if hist.empty:
         hist = _synthetic_history(ticker=ticker, interval=interval, range_val=range)
@@ -273,7 +273,7 @@ async def get_indicator(
             "code": "indicator_data_fallback",
             "message": "Live data unavailable; indicator computed on synthetic fallback series.",
         })
-        
+
     if hist.empty:
         raise HTTPException(status_code=404, detail="No chart data available")
 
@@ -283,7 +283,7 @@ async def get_indicator(
             params[key] = val
 
     try:
-        # compute_indicator is synchronous (pandas operations). 
+        # compute_indicator is synchronous (pandas operations).
         # Ideally run in threadpool if heavy, but for simple indicators it's fast enough.
         indicator = compute_indicator(hist, type, params)
     except ValueError as exc:

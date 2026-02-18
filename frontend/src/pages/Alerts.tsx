@@ -22,6 +22,7 @@ function alertsWsUrl(): string {
 export function AlertsPage() {
   const [alerts, setAlerts] = useState<AlertRule[]>([]);
   const [history, setHistory] = useState<AlertTriggerEvent[]>([]);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const incrementUnread = useAlertsStore((s) => s.incrementUnread);
   const resetUnread = useAlertsStore((s) => s.resetUnread);
 
@@ -69,7 +70,18 @@ export function AlertsPage() {
   const activeAlerts = useMemo(() => alerts.filter((a) => (a.status || "active") !== "deleted"), [alerts]);
 
   return (
-    <div className="space-y-3 p-3">
+    <div
+      className="space-y-3 p-3"
+      onTouchStart={(e) => setTouchStartX(e.touches[0]?.clientX ?? null)}
+      onTouchEnd={(e) => {
+        if (touchStartX == null || history.length === 0) return;
+        const delta = (e.changedTouches[0]?.clientX ?? 0) - touchStartX;
+        setTouchStartX(null);
+        if (delta < -80) {
+          setHistory((prev) => prev.slice(1));
+        }
+      }}
+    >
       <AlertCreateForm onCreated={() => void load()} />
       <AlertList alerts={activeAlerts} onChanged={() => void load()} />
       <AlertHistory history={history} />

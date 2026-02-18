@@ -36,4 +36,3 @@ growth:
     - field: net_margin_pct
       op: ">="
       value: 8
-

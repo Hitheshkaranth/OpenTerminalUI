@@ -49,7 +49,17 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - **Background Services** - instruments loader and scheduled news ingestion
 - **Deployment** - Docker compose workflow with optional Redis cache profile
 
-## Latest additions (since previous commit)
+## Latest additions (Phase 3 — Platform Maturity)
+
+- **Plugin system**: sandboxed plugin loader with YAML manifests, permission registry, enable/disable lifecycle, example plugins (RSI divergence scanner, unusual volume detector, sector rotation monitor), backend + frontend marketplace UI.
+- **Export engine**: PDF, Excel (`.xlsx`), and CSV report generation for portfolio holdings, watchlist snapshots, and analytics data via `reportlab` and `openpyxl`.
+- **Portfolio analytics suite**: benchmark overlay charting, correlation heatmap, dividend income tracker, risk metrics panel (Sharpe, Sortino, max drawdown), and tax lot manager.
+- **PWA + mobile experience**: web app manifest, service worker with offline caching, app install prompt banner, mobile bottom navigation bar, responsive card layouts, and pull-to-refresh touch gestures on watchlist and alerts.
+- **Theme system**: terminal theme CSS layer imported at app root with customizable accent colours exposed in settings.
+- **E2E mobile tests**: Playwright test suite covering swipe interactions, touch targets, and responsive breakpoint behaviour.
+- **New dependencies**: `openpyxl` and `reportlab` for server-side report generation.
+
+### Previous additions (Phase 2 — Core Expansion)
 
 - **Authentication foundation**: JWT access/refresh flow, auth middleware, role checks, and auth pages/context in frontend.
 - **Events + earnings expansion**: corporate actions/events endpoints, earnings calendar + analysis services, and timeline/calendar UI widgets.
@@ -57,8 +67,6 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - **Paper trading module**: virtual portfolios, orders, positions, trades, performance metrics, strategy deploy endpoint, and new Paper dashboard UI.
 - **Charting persistence/sync foundation**: chart drawings/templates backend APIs and crosshair sync context scaffolding for multi-panel charts.
 - **Multi-exchange adapter framework**: pluggable adapter base + registry (`Kite`, `Yahoo`, `Crypto`) with adapter-first routing in key quote/search/chart flows.
-- **UI updates**: unread alert badge/navigation, portfolio earnings/event enrichments, and logged-in user details panel in sidebar (Equity, F&O, Backtesting).
-- **QC + tests**: strict QC guideline, new backend tests for phase-2 routes/adapters, and Docker-integrated validation flow.
 
 ## Roadmap
 
@@ -71,6 +79,10 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - [x] Shareholding pattern and trend panel with resilient fallback path
 - [x] Cross-market classification metadata (country, exchange, currency, F/O capability)
 - [x] Dockerized deployment and CI-compatible verify flow
+- [x] Plugin system with sandboxed loader, YAML manifests, and marketplace UI
+- [x] Export engine for PDF, Excel, and CSV report generation
+- [x] Portfolio analytics: benchmarks, correlation, dividends, risk metrics, tax lots
+- [x] PWA shell with service worker, offline support, and mobile-optimized layouts
 - [ ] Portfolio-level backtesting and strategy comparison views
 - [ ] Expanded model/template library and parameter presets
 - [ ] Additional performance optimization for large watchlists and long chart sessions
@@ -91,8 +103,9 @@ This view highlights the terminal-style stock analysis layout with charting, ind
 
 ## Repository structure
 
-- `backend/` FastAPI app and business logic
-- `frontend/` React + Vite + TypeScript app
+- `backend/` FastAPI app, business logic, and plugin host
+- `frontend/` React + Vite + TypeScript PWA
+- `plugins/` example plugin packages (RSI scanner, volume detector, sector rotation)
 - `config/` YAML runtime config
 - `data/` symbol/reference datasets
 - `trade_screens/` optional desktop helper scripts
@@ -100,7 +113,7 @@ This view highlights the terminal-style stock analysis layout with charting, ind
 ## Prerequisites
 
 - Python 3.11+
-- Node.js 20+
+- Node.js 22+ (LTS)
 - Docker Desktop (optional, for containerized run)
 
 ## Quick start (recommended: Docker)
@@ -341,4 +354,3 @@ git diff --cached
 ```
 
 5. If any key was ever exposed, rotate it before release.
-

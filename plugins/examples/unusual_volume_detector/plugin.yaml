@@ -1,0 +1,9 @@
+name: unusual_volume_detector
+version: 0.1.0
+author: OpenTerminalUI
+description: Flags symbols with volume above two times 20 day average
+dependencies: []
+entry_point: plugins.examples.unusual_volume_detector.main
+required_permissions:
+  - read_quotes
+  - create_alerts

@@ -15,6 +15,7 @@ export function Sidebar() {
     { label: "Watchlist", path: "/equity/watchlist", key: "F4" },
     { label: "News", path: "/equity/news", key: "F5" },
     { label: "Alerts", path: "/equity/alerts", key: "A" },
+    { label: "Plugins", path: "/equity/plugins", key: "PL" },
     { label: "Settings", path: "/equity/settings", key: "F6" },
     { label: "About", path: "/equity/stocks/about", key: "F7" },
     { label: "Heatmap", path: "/fno/heatmap", key: "F8" },
@@ -64,4 +65,3 @@ export function Sidebar() {
     </aside>
   );
 }
-

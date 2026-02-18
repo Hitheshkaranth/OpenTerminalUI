@@ -14,4 +14,3 @@ default_alerts:
     op: ">="
     threshold: 35.0
     severity: "medium"
-

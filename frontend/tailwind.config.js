@@ -2,6 +2,16 @@ module.exports = {
   darkMode: "class",
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
+    screens: {
+      mobile: { max: "767px" },
+      tablet: { min: "768px", max: "1279px" },
+      desktop: { min: "1280px" },
+      sm: "640px",
+      md: "768px",
+      lg: "1024px",
+      xl: "1280px",
+      "2xl": "1536px",
+    },
     extend: {
       colors: {
         terminal: {

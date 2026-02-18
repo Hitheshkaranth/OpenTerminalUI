@@ -183,4 +183,3 @@ export function AllocationChart({ data }: Props) {
     </div>
   );
 }
-

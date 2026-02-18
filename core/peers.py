@@ -54,4 +54,3 @@ def build_peer_comparison(df: pd.DataFrame, ticker: str, metrics: list[str] | No
             }
         )
     return pd.DataFrame(rows)
-

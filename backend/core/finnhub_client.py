@@ -21,7 +21,7 @@ class FinnhubClient:
     async def initialize(self):
         if self.client:
             return
-            
+
         self.client = httpx.AsyncClient(
             timeout=self.timeout,
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),

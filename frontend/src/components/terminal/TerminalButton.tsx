@@ -16,7 +16,7 @@ export function TerminalButton({ variant = "default", className = "", ...props }
   return (
     <button
       {...props}
-      className={`rounded-sm border px-2 py-1 text-[11px] uppercase tracking-wide ${variants[variant]} ${className}`.trim()}
+      className={`min-h-11 rounded-sm border px-2 py-1 text-[11px] uppercase tracking-wide ${variants[variant]} ${className}`.trim()}
     />
   );
 }

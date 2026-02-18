@@ -113,4 +113,3 @@ export function MutualFundCompare({ selected }: Props) {
     </div>
   );
 }
-

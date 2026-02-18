@@ -1,0 +1,9 @@
+name: sector_rotation_monitor
+version: 0.1.0
+author: OpenTerminalUI
+description: Tracks sector ETF relative strength and suggests rotation
+dependencies: []
+entry_point: plugins.examples.sector_rotation_monitor.main
+required_permissions:
+  - read_quotes
+  - read_portfolio

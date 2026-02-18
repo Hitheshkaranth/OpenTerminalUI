@@ -49,4 +49,3 @@ class ScreenerEngine:
         if by not in df.columns:
             return df.head(top_n)
         return df.sort_values(by=by, ascending=ascending).head(top_n).copy()
-

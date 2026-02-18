@@ -1,11 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, Brush, CartesianGrid, Legend, Line, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-import { addHolding, addMutualFundHolding, deleteHolding, fetchChart, fetchPortfolio, fetchStockReturns, searchMutualFunds, searchSymbols, type SearchSymbolItem } from "../api/client";
+import {
+  addHolding,
+  addMutualFundHolding,
+  deleteHolding,
+  fetchChart,
+  fetchPortfolio,
+  fetchPortfolioBenchmarkOverlay,
+  fetchPortfolioCorrelation,
+  fetchPortfolioDividends,
+  fetchPortfolioRiskMetrics,
+  fetchStockReturns,
+  fetchTaxLots,
+  searchMutualFunds,
+  searchSymbols,
+  type SearchSymbolItem,
+} from "../api/client";
 import { CountryFlag } from "../components/common/CountryFlag";
 import { InstrumentBadges } from "../components/common/InstrumentBadges";
 import { AllocationChart } from "../components/portfolio/AllocationChart";
 import { BacktestResults } from "../components/portfolio/BacktestResults";
+import { BenchmarkOverlayChart } from "../components/portfolio/BenchmarkOverlayChart";
+import { CorrelationHeatmap } from "../components/portfolio/CorrelationHeatmap";
+import { DividendTracker } from "../components/portfolio/DividendTracker";
+import { RiskMetricsPanel } from "../components/portfolio/RiskMetricsPanel";
+import { TaxLotManager } from "../components/portfolio/TaxLotManager";
 import { EarningsCalendar } from "../components/EarningsCalendar";
 import { EarningsDateBadge } from "../components/EarningsDateBadge";
 import { MutualFundPortfolioSection } from "../components/mutualFunds/MutualFundPortfolioSection";
@@ -14,7 +34,16 @@ import { TerminalButton } from "../components/terminal/TerminalButton";
 import { TerminalInput } from "../components/terminal/TerminalInput";
 import { usePortfolioEarnings } from "../hooks/useStocks";
 import { useSettingsStore } from "../store/settingsStore";
-import type { ChartPoint, MutualFund, PortfolioResponse } from "../types";
+import type {
+  ChartPoint,
+  MutualFund,
+  PortfolioBenchmarkOverlay,
+  PortfolioCorrelationResponse,
+  PortfolioDividendTracker,
+  PortfolioResponse,
+  PortfolioRiskMetrics,
+  TaxLotSummary,
+} from "../types";
 import { MOMENTUM_ROTATION_BASKET } from "../utils/constants";
 import { formatInr } from "../utils/formatters";
 
@@ -165,12 +194,18 @@ export function PortfolioPage() {
   const [portfolioTrend, setPortfolioTrend] = useState<PortfolioTrendPoint[]>([]);
   const [portfolioTrendLoading, setPortfolioTrendLoading] = useState(false);
   const [trendRange, setTrendRange] = useState<"1Y" | "3Y" | "5Y" | "ALL">("ALL");
+  const [swipeStartX, setSwipeStartX] = useState<number | null>(null);
   const [ticker, setTicker] = useState(MOMENTUM_ROTATION_BASKET[0]);
   const [quantity, setQuantity] = useState(10);
   const [avgBuyPrice, setAvgBuyPrice] = useState(2500);
   const [buyDate, setBuyDate] = useState("2025-01-01");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [riskMetrics, setRiskMetrics] = useState<PortfolioRiskMetrics | null>(null);
+  const [correlation, setCorrelation] = useState<PortfolioCorrelationResponse | null>(null);
+  const [dividends, setDividends] = useState<PortfolioDividendTracker | null>(null);
+  const [taxLots, setTaxLots] = useState<TaxLotSummary | null>(null);
+  const [benchmarkOverlay, setBenchmarkOverlay] = useState<PortfolioBenchmarkOverlay | null>(null);
   const [tickerSuggestions, setTickerSuggestions] = useState<SearchSymbolItem[]>([]);
   const [isTickerSuggestionsOpen, setIsTickerSuggestionsOpen] = useState(false);
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
@@ -255,6 +290,18 @@ export function PortfolioPage() {
         }),
       );
       setPortfolioTrend(computePortfolioTrend(res.items, Object.fromEntries(chartEntries)));
+      const [riskRes, corrRes, divRes, taxRes, benchRes] = await Promise.all([
+        fetchPortfolioRiskMetrics({ benchmark: "NIFTY50", risk_free_rate: 0.06 }).catch(() => null),
+        fetchPortfolioCorrelation({ window: 60 }).catch(() => null),
+        fetchPortfolioDividends({ days: 180 }).catch(() => null),
+        fetchTaxLots().catch(() => null),
+        fetchPortfolioBenchmarkOverlay({ benchmark: "NIFTY50" }).catch(() => null),
+      ]);
+      setRiskMetrics(riskRes);
+      setCorrelation(corrRes);
+      setDividends(divRes);
+      setTaxLots(taxRes);
+      setBenchmarkOverlay(benchRes);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load portfolio");
       setPortfolioTrend([]);
@@ -755,6 +802,19 @@ export function PortfolioPage() {
           </div>
 
           <div className="grid gap-3 xl:grid-cols-2">
+            <RiskMetricsPanel metrics={riskMetrics} />
+            <CorrelationHeatmap data={correlation} />
+            <DividendTracker data={dividends} />
+            <BenchmarkOverlayChart data={benchmarkOverlay} />
+            <div className="xl:col-span-2">
+              <TaxLotManager
+                data={taxLots}
+                onRefresh={async () => {
+                  const refreshed = await fetchTaxLots();
+                  setTaxLots(refreshed);
+                }}
+              />
+            </div>
             <div className="rounded border border-terminal-border bg-terminal-panel p-3">
               <div className="mb-2 text-sm font-semibold text-terminal-accent">Upcoming Earnings</div>
               <div className="space-y-2">
@@ -797,7 +857,19 @@ export function PortfolioPage() {
               ) : trendSlice.length === 0 ? (
                 <div className="text-xs text-terminal-muted">No monthly portfolio movement data available.</div>
               ) : (
-                <div className="h-[26rem] w-full">
+                <div
+                  className="h-[26rem] w-full"
+                  onTouchStart={(e) => setSwipeStartX(e.touches[0]?.clientX ?? null)}
+                  onTouchEnd={(e) => {
+                    if (swipeStartX == null) return;
+                    const delta = (e.changedTouches[0]?.clientX ?? 0) - swipeStartX;
+                    setSwipeStartX(null);
+                    const order: Array<"1Y" | "3Y" | "5Y" | "ALL"> = ["1Y", "3Y", "5Y", "ALL"];
+                    const idx = order.indexOf(trendRange);
+                    if (delta < -60 && idx < order.length - 1) setTrendRange(order[idx + 1]);
+                    if (delta > 60 && idx > 0) setTrendRange(order[idx - 1]);
+                  }}
+                >
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={trendSlice}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#2a2f3a" />

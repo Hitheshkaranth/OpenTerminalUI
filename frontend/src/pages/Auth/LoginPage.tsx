@@ -24,7 +24,8 @@ export function LoginPage() {
     }
     try {
       await login(email, password);
-      const target = (location.state as { from?: string } | undefined)?.from || "/equity/stocks";
+      const redirectParam = new URLSearchParams(location.search).get("redirect");
+      const target = redirectParam || (location.state as { from?: string } | undefined)?.from || "/equity/stocks";
       navigate(target, { replace: true });
     } catch {
       setError("Invalid credentials");

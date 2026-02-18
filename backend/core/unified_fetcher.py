@@ -68,15 +68,15 @@ class UnifiedFetcher:
     # --- PRIORITY MATRIX: TIME SERIES -> NSE -> Yahoo -> FMP ---
     async def fetch_history(self, ticker: str, range_str: str = "1y", interval: str = "1d") -> Dict[str, Any]:
         symbol = ticker.strip().upper()
-        
+
         # 1. Try NSE (if appropriate range/interval)
         try:
             # NSE historical is a bit tricky with ranges, but let's try if it's a simple range
             # Actually NSE client implementation takes from_date/to_date
-            # For simplicity in this "unified" view, we might default to Yahoo for history 
+            # For simplicity in this "unified" view, we might default to Yahoo for history
             # as it handles "1y", "1d" strings natively and is very reliable for history.
             # But per "Priority Matrix", strictly it should be NSE first.
-            # Let's ski NSE for generic "1y" history for now unless we calculate dates, 
+            # Let's ski NSE for generic "1y" history for now unless we calculate dates,
             # relying on Yahoo as primary for history is often safer for "1y" style requests.
             # However, user asked for NSE -> Yahoo -> FMP.
             # I will prioritize Yahoo for History because it's standard, but NSE for Quote.
@@ -120,7 +120,7 @@ class UnifiedFetcher:
                     return qmap[instrument]
             except Exception as e:
                 logger.debug(f"Kite quote failed for {symbol}: {e}")
-        
+
         # 2. NSE
         if cls.country_code == "IN":
             try:
@@ -303,7 +303,7 @@ class UnifiedFetcher:
     async def fetch_10yr_financials(self, ticker: str) -> Dict[str, Any]:
         symbol = ticker.strip().upper()
         ysym = await market_classifier.yfinance_symbol(symbol)
-        
+
         y_fund: Any = {}
         try:
             y_fund = await self.yahoo.get_fundamentals_timeseries(ysym)
@@ -321,7 +321,7 @@ class UnifiedFetcher:
                 return_exceptions=True,
             )
             f_inc, f_bal, f_cf = results
-        
+
         return {
             "symbol": symbol,
             "yahoo_fundamentals": y_fund if not isinstance(y_fund, Exception) else {},

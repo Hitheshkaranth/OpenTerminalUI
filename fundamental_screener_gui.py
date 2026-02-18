@@ -6,4 +6,3 @@ from trade_screens.fundamental_gui import main
 
 if __name__ == "__main__":
     main()
-

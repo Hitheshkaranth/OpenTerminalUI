@@ -11,4 +11,3 @@ class FundamentalSnapshot:
     market_cap: float | None = None
     pe: float | None = None
     roe_pct: float | None = None
-

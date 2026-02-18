@@ -1,0 +1,9 @@
+name: rsi_divergence_scanner
+version: 0.1.0
+author: OpenTerminalUI
+description: Scans watchlist for RSI divergences and creates alerts
+dependencies: []
+entry_point: plugins.examples.rsi_divergence_scanner.main
+required_permissions:
+  - read_quotes
+  - create_alerts

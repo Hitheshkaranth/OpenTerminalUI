@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class FMPClient:
     BASE_URL = "https://financialmodelingprep.com/api/v3"
-    
+
     def __init__(self, api_key: Optional[str] = None, timeout: float = 12.0):
         self.api_key = api_key or os.getenv("FMP_API_KEY", "")
         self.timeout = timeout
@@ -20,7 +20,7 @@ class FMPClient:
     async def initialize(self):
         if self.client:
             return
-            
+
         self.client = httpx.AsyncClient(
             timeout=self.timeout,
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
@@ -45,13 +45,13 @@ class FMPClient:
             return []
         if not self.api_key:
             return []
-            
+
         if not self.client:
             await self.initialize()
 
         p = params or {}
         p["apikey"] = self.api_key
-        
+
         try:
             url = f"{self.BASE_URL}{endpoint}"
             response = await self.client.get(url, params=p)

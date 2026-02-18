@@ -18,31 +18,31 @@ async def _get_dcf_inputs(ticker: str) -> Dict[str, float]:
     snap = await fetch_stock_snapshot_coalesced(ticker)
     fetcher = await get_unified_fetcher()
     fin = await fetcher.fetch_10yr_financials(ticker)
-    
+
     # Extract latest TTM or Annual from FMP/Yahoo
     # FMP income is list of dicts
     income = fin.get("fmp_income", [])
     balance = fin.get("fmp_balance", [])
-    
+
     revenue = 0.0
     net_income = 0.0
     net_debt = 0.0
-    
+
     if income:
         latest = income[0]
         revenue = float(latest.get("revenue") or latest.get("totalRevenue") or 0.0)
         net_income = float(latest.get("netIncome") or 0.0)
-        
+
     if balance:
         latest_bal = balance[0]
         debt = float(latest_bal.get("totalDebt") or 0.0)
         cash = float(latest_bal.get("cashAndCashEquivalents") or 0.0)
         net_debt = debt - cash
-        
+
     market_cap = float(snap.get("market_cap") or 0.0)
     current_price = float(snap.get("current_price") or 0.0)
     shares = (market_cap / current_price) if current_price > 0 else 0.0
-    
+
     return {
         "revenue": revenue,
         "net_income": net_income,
@@ -60,11 +60,11 @@ async def auto_dcf(ticker: str, auto: bool = Query(default=True)) -> DcfResponse
     start_data = await _get_dcf_inputs(ticker)
     revenue = start_data["revenue"]
     net_income = start_data["net_income"]
-    
+
     # Heuristic: 8% margin if unknown
     net_margin = (net_income / revenue) if revenue > 0 else 0.08
-    
-    # Base FCF proxy: Revenue * Margin (Net Income) usually is Equity Cash Flow, 
+
+    # Base FCF proxy: Revenue * Margin (Net Income) usually is Equity Cash Flow,
     # but for FCFF we need EBIT(1-t) + Dep - Capex - dWC.
     # Simplified DcfInputs expects base_fcf. Let's use Net Income as proxy for FCFE approx or simplistic FCFF.
     # Ideally should calculate real FCFF.
@@ -73,20 +73,20 @@ async def auto_dcf(ticker: str, auto: bool = Query(default=True)) -> DcfResponse
 
     result = multi_stage_fcff_dcf(
         DcfInputs(
-            base_fcf=base_fcf, 
-            stages=[DcfStage(years=5, growth_rate=0.1, discount_rate=0.12)], 
-            terminal_growth=0.04, 
-            net_debt=start_data["net_debt"], 
+            base_fcf=base_fcf,
+            stages=[DcfStage(years=5, growth_rate=0.1, discount_rate=0.12)],
+            terminal_growth=0.04,
+            net_debt=start_data["net_debt"],
             shares_outstanding=start_data["shares"]
         )
     )
-    
+
     projection = result["projection_df"].to_dict(orient="records")
     return DcfResponse(
-        enterprise_value=float(result["enterprise_value"]), 
-        equity_value=float(result["equity_value"]), 
-        per_share_value=float(result["per_share_value"]) if result["per_share_value"] is not None else None, 
-        terminal_value=float(result["terminal_value"]), 
+        enterprise_value=float(result["enterprise_value"]),
+        equity_value=float(result["equity_value"]),
+        per_share_value=float(result["per_share_value"]) if result["per_share_value"] is not None else None,
+        terminal_value=float(result["terminal_value"]),
         projection=projection
     )
 
@@ -96,7 +96,7 @@ async def custom_dcf(ticker: str, req: DcfRequest) -> DcfResponse:
     # No IO needed for pure calculation if req has all inputs
     # But usually shares_outstanding might be missing?
     # Req model allows shares_outstanding=None. We might need to fetch it.
-    
+
     shares = req.shares_outstanding
     if shares is None:
         snap = await fetch_stock_snapshot_coalesced(ticker)
@@ -106,22 +106,22 @@ async def custom_dcf(ticker: str, req: DcfRequest) -> DcfResponse:
             shares = mc / price
         else:
             shares = 1.0 # Fallback
-            
+
     result = multi_stage_fcff_dcf(
         DcfInputs(
-            base_fcf=req.base_fcf, 
-            stages=[DcfStage(years=req.years, growth_rate=req.growth_rate, discount_rate=req.discount_rate)], 
-            terminal_growth=req.terminal_growth, 
-            net_debt=req.net_debt, 
+            base_fcf=req.base_fcf,
+            stages=[DcfStage(years=req.years, growth_rate=req.growth_rate, discount_rate=req.discount_rate)],
+            terminal_growth=req.terminal_growth,
+            net_debt=req.net_debt,
             shares_outstanding=shares
         )
     )
     projection = result["projection_df"].to_dict(orient="records")
     return DcfResponse(
-        enterprise_value=float(result["enterprise_value"]), 
-        equity_value=float(result["equity_value"]), 
-        per_share_value=float(result["per_share_value"]) if result["per_share_value"] is not None else None, 
-        terminal_value=float(result["terminal_value"]), 
+        enterprise_value=float(result["enterprise_value"]),
+        equity_value=float(result["equity_value"]),
+        per_share_value=float(result["per_share_value"]) if result["per_share_value"] is not None else None,
+        terminal_value=float(result["terminal_value"]),
         projection=projection
     )
 
@@ -129,25 +129,25 @@ async def custom_dcf(ticker: str, req: DcfRequest) -> DcfResponse:
 @router.get("/valuation/{ticker}/reverse-dcf")
 async def reverse_dcf(ticker: str) -> dict[str, float | str | None]:
     start_data = await _get_dcf_inputs(ticker)
-    
+
     market_cap = start_data["market_cap"]
     revenue = start_data["revenue"]
     net_income = start_data["net_income"]
-    
+
     net_margin = (net_income / revenue) if revenue > 0 else 0.08
     base_fcf = revenue * net_margin if revenue > 0 else market_cap * 0.03
-    
+
     implied = reverse_dcf_implied_growth(
-        target_equity_value=market_cap, 
-        base_fcf=base_fcf, 
-        years=5, 
-        discount_rate=0.12, 
-        terminal_growth=0.04, 
+        target_equity_value=market_cap,
+        base_fcf=base_fcf,
+        years=5,
+        discount_rate=0.12,
+        terminal_growth=0.04,
         net_debt=start_data["net_debt"]
     )
-    
+
     return {
-        "ticker": ticker.upper(), 
+        "ticker": ticker.upper(),
         "implied_growth_pct": (implied * 100) if implied is not None else None
     }
 
@@ -172,7 +172,7 @@ def _extract_peer_symbols(raw: Any, ticker: str) -> list[str]:
             elif isinstance(item, dict):
                  # Handle FMP variants
                  pass # Simplified loop
-                 
+
     # Dedupe
     uniq = []
     seen = set()
@@ -186,7 +186,7 @@ def _extract_peer_symbols(raw: Any, ticker: str) -> list[str]:
 async def relative_valuation(ticker: str) -> dict[str, Any]:
     symbol = ticker.strip().upper()
     unified = await get_unified_fetcher()
-    
+
     peer_raw = []
     try:
         peer_raw = await unified.fmp.get_peers(symbol) # Ensure unified wrapper exposes this or access client directly
@@ -195,12 +195,12 @@ async def relative_valuation(ticker: str) -> dict[str, Any]:
         # UnifiedFetcher doesn't expose it wrapper. Access unified.fmp directly.
     except Exception:
         pass
-        
+
     symbols = _extract_peer_symbols(peer_raw, symbol)
-    if not symbols: 
+    if not symbols:
         # Fallback peers if none
-        symbols = [symbol] 
-        
+        symbols = [symbol]
+
     snapshots = await asyncio.gather(*(fetch_stock_snapshot_coalesced(s) for s in symbols), return_exceptions=True)
 
     rows: list[dict[str, Any]] = []
@@ -215,10 +215,10 @@ async def relative_valuation(ticker: str) -> dict[str, Any]:
                 })
 
     target = next((r for r in rows if r["ticker"] == symbol), None)
-    
+
     # ... logic continues similar to original but async ...
     # Simplify for succinctness in this rewrite while keeping logic
-    
+
     if not target:
         return {
             "ticker": symbol,

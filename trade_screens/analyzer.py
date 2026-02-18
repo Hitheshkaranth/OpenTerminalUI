@@ -131,7 +131,7 @@ class NSEDataFetcher:
         self.http = requests.Session()
         self.http.trust_env = False
         self.http.headers.update({'User-Agent': 'Mozilla/5.0'})
-    
+
     def _clear_broken_proxy_env(self):
         # Some local setups set a dead loopback proxy (127.0.0.1:9),
         # which makes Yahoo requests always fail.

@@ -37,7 +37,7 @@ docker compose --profile postgres up -d --build
 Then set:
 
 ```bash
-DATABASE_URL=postgresql://openterminalui:openterminalui@postgres:5432/openterminalui
+DATABASE_URL=postgresql://<user>:<password>@postgres:5432/openterminalui
 ```
 
 ## Notes

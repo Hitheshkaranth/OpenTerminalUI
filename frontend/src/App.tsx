@@ -12,7 +12,7 @@ import { BacktestingPage } from "./pages/Backtesting";
 import { BacktestingLayout } from "./pages/BacktestingLayout";
 import { MutualFundsPage } from "./pages/MutualFunds";
 import { EquityLayout } from "./equity/EquityLayout";
-import { HomePage } from "./home/HomePage";
+import { HomePage } from "./pages/HomePage";
 import { FnoLayout } from "./fno/FnoLayout";
 import { OptionChainPage } from "./fno/pages/OptionChainPage";
 import { GreeksPage } from "./fno/pages/GreeksPage";
@@ -24,62 +24,74 @@ import { HeatmapPage } from "./fno/pages/HeatmapPage";
 import { ExpiryPage } from "./fno/pages/ExpiryPage";
 import { FnoAboutPage } from "./fno/pages/AboutPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import { LoginPage } from "./pages/Auth/LoginPage";
+import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/Auth/RegisterPage";
 import { AlertsPage } from "./pages/Alerts";
 import { PaperTradingPage } from "./pages/PaperTrading";
+import { PluginsPage } from "./pages/Plugins/Plugins";
+import { TerminalBackground } from "./components/TerminalBackground";
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+    <div className="ot-app-shell">
+      <TerminalBackground />
+      <div className="ot-vignette-overlay" />
+      <div className="ot-scanline-overlay" />
+      <div className="ot-route-layer">
+        <Routes>
+          <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+          <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
 
-      <Route path="/equity" element={<ProtectedRoute><EquityLayout /></ProtectedRoute>}>
-        <Route index element={<Navigate to="/equity/stocks" replace />} />
-        <Route path="stocks" element={<StockDetailPage />} />
-        <Route path="stocks/about" element={<AboutPage />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="screener" element={<ScreenerPage />} />
-        <Route path="portfolio" element={<PortfolioPage />} />
-        <Route path="mutual-funds" element={<MutualFundsPage />} />
-        <Route path="watchlist" element={<WatchlistPage />} />
-        <Route path="news" element={<NewsPage />} />
-        <Route path="alerts" element={<AlertsPage />} />
-        <Route path="paper" element={<PaperTradingPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-      </Route>
+          <Route path="/equity" element={<ProtectedRoute><EquityLayout /></ProtectedRoute>}>
+            <Route index element={<Navigate to="/equity/stocks" replace />} />
+            <Route path="stocks" element={<StockDetailPage />} />
+            <Route path="stocks/about" element={<AboutPage />} />
+            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="screener" element={<ScreenerPage />} />
+            <Route path="portfolio" element={<PortfolioPage />} />
+            <Route path="mutual-funds" element={<MutualFundsPage />} />
+            <Route path="watchlist" element={<WatchlistPage />} />
+            <Route path="news" element={<NewsPage />} />
+            <Route path="alerts" element={<AlertsPage />} />
+            <Route path="paper" element={<PaperTradingPage />} />
+            <Route path="plugins" element={<PluginsPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
 
-      <Route path="/fno" element={<ProtectedRoute><FnoLayout /></ProtectedRoute>}>
-        <Route index element={<OptionChainPage />} />
-        <Route path="greeks" element={<GreeksPage />} />
-        <Route path="futures" element={<FuturesPage />} />
-        <Route path="oi" element={<OIAnalysisPage />} />
-        <Route path="strategy" element={<StrategyPage />} />
-        <Route path="pcr" element={<PCRPage />} />
-        <Route path="heatmap" element={<HeatmapPage />} />
-        <Route path="expiry" element={<ExpiryPage />} />
-        <Route path="about" element={<FnoAboutPage />} />
-      </Route>
+          <Route path="/fno" element={<ProtectedRoute><FnoLayout /></ProtectedRoute>}>
+            <Route index element={<OptionChainPage />} />
+            <Route path="greeks" element={<GreeksPage />} />
+            <Route path="futures" element={<FuturesPage />} />
+            <Route path="oi" element={<OIAnalysisPage />} />
+            <Route path="strategy" element={<StrategyPage />} />
+            <Route path="pcr" element={<PCRPage />} />
+            <Route path="heatmap" element={<HeatmapPage />} />
+            <Route path="expiry" element={<ExpiryPage />} />
+            <Route path="about" element={<FnoAboutPage />} />
+          </Route>
 
-      <Route path="/backtesting" element={<ProtectedRoute requiredRole="trader"><BacktestingLayout /></ProtectedRoute>}>
-        <Route index element={<BacktestingPage />} />
-      </Route>
+          <Route path="/backtesting" element={<ProtectedRoute requiredRole="trader"><BacktestingLayout /></ProtectedRoute>}>
+            <Route index element={<BacktestingPage />} />
+          </Route>
 
-      <Route path="/stocks" element={<Navigate to="/equity/stocks" replace />} />
-      <Route path="/stocks/about" element={<Navigate to="/equity/stocks/about" replace />} />
-      <Route path="/dashboard" element={<Navigate to="/equity/dashboard" replace />} />
-      <Route path="/screener" element={<Navigate to="/equity/screener" replace />} />
-      <Route path="/portfolio" element={<Navigate to="/equity/portfolio" replace />} />
-      <Route path="/mutual-funds" element={<Navigate to="/equity/mutual-funds" replace />} />
-      <Route path="/watchlist" element={<Navigate to="/equity/watchlist" replace />} />
-      <Route path="/news" element={<Navigate to="/equity/news" replace />} />
-      <Route path="/alerts" element={<Navigate to="/equity/alerts" replace />} />
-      <Route path="/paper" element={<Navigate to="/equity/paper" replace />} />
-      <Route path="/settings" element={<Navigate to="/equity/settings" replace />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+          <Route path="/stocks" element={<Navigate to="/equity/stocks" replace />} />
+          <Route path="/stocks/about" element={<Navigate to="/equity/stocks/about" replace />} />
+          <Route path="/dashboard" element={<Navigate to="/equity/dashboard" replace />} />
+          <Route path="/screener" element={<Navigate to="/equity/screener" replace />} />
+          <Route path="/portfolio" element={<Navigate to="/equity/portfolio" replace />} />
+          <Route path="/mutual-funds" element={<Navigate to="/equity/mutual-funds" replace />} />
+          <Route path="/watchlist" element={<Navigate to="/equity/watchlist" replace />} />
+          <Route path="/news" element={<Navigate to="/equity/news" replace />} />
+          <Route path="/alerts" element={<Navigate to="/equity/alerts" replace />} />
+          <Route path="/paper" element={<Navigate to="/equity/paper" replace />} />
+          <Route path="/settings" element={<Navigate to="/equity/settings" replace />} />
+          <Route path="/plugins" element={<Navigate to="/equity/plugins" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+    </div>
   );
 }
 

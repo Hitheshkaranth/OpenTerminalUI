@@ -19,15 +19,15 @@ def is_market_hours() -> bool:
     # IST = UTC + 5:30
     now_utc = datetime.now(timezone.utc)
     now_ist = now_utc + timedelta(hours=5, minutes=30)
-    
+
     # Weekends
     if now_ist.weekday() >= 5:
         return False
-        
+
     t = now_ist.time()
     start = t.replace(hour=MARKET_START[0], minute=MARKET_START[1], second=0, microsecond=0)
     end = t.replace(hour=MARKET_END[0], minute=MARKET_END[1], second=0, microsecond=0)
-    
+
     return start <= t <= end
 
 def get_db_tickers() -> List[str]:
@@ -80,7 +80,7 @@ class PrefetchWorker:
                 await self._prefetch()
             else:
                 logger.debug("event=prefetch_cycle_skip market_open=false")
-            
+
             # Wait for interval or stop
             try:
                 await asyncio.wait_for(self._stop_event.wait(), timeout=self.interval)
@@ -92,17 +92,17 @@ class PrefetchWorker:
         targets = set(NIFTY_50)
         targets.update(get_db_tickers())
         ticker_list = list(targets)
-        
+
         logger.info("event=prefetch_symbols count=%s", len(ticker_list))
-        
+
         # 2. Fetch/Cache in batches
         sem = asyncio.Semaphore(10) # Concurrency limit
-        
+
         async def work(ticker):
             async with sem:
                 try:
                     # We assume fetch_stock_snapshot does validity checks
-                    # We need to explicitly CACHE it. 
+                    # We need to explicitly CACHE it.
                     # UnifiedFetcher doesn't cache internally yet, so we do it here?
                     # Or we update UnifiedFetcher to cache?
                     # User request 1F says "Cache key schema: lts:{data_type}:{symbol}:{params_hash}" in Cache class
@@ -111,7 +111,7 @@ class PrefetchWorker:
                     # using the same key schema the route would use.
                     # Route likely calls: cache.get(...) -> if none -> fetcher.fetch() -> cache.set()
                     # So here I just simulate that: cache.set(key, fetcher.fetch())
-                    
+
                     data = await self.fetcher.fetch_stock_snapshot(ticker)
                     if data:
                         # Emulate the key the route will use

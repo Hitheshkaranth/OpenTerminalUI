@@ -4,10 +4,10 @@
 
 body {
   margin: 0;
-  font-family: Consolas, "IBM Plex Mono", "Lucida Console", monospace;
+  font-family: "JetBrains Mono", "IBM Plex Mono", "Courier New", monospace;
   letter-spacing: 0.01em;
-  background: #05070b;
-  color: #d8dde7;
+  background: #0a0a0a;
+  color: #cccccc;
   text-rendering: geometricPrecision;
 }
 

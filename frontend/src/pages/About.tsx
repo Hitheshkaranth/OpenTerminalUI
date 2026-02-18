@@ -90,16 +90,30 @@ export function AboutPage() {
 
       <TerminalPanel title="Infrastructure">
         <ul className="space-y-1 text-xs text-terminal-muted">
-          <li>- FastAPI backend + React/TypeScript terminal frontend.</li>
+          <li>- FastAPI backend + React/TypeScript terminal frontend with PWA offline support.</li>
           <li>- Realtime quote stream with resilient snapshot fallback and scrolling market tape.</li>
-          <li>- API v1 coverage: equity analytics, shareholding, mutual funds, indicators, crypto candles/search, and scripting.</li>
+          <li>- API v1 coverage: equity analytics, shareholding, mutual funds, indicators, crypto, scripting, export, and plugins.</li>
+          <li>- Plugin architecture: sandboxed execution, YAML manifests, permission model, and marketplace UI.</li>
           <li>- Cross-market symbol classification with country, exchange, currency, and F/O capability badges.</li>
           <li>- Background services: instruments loader, scheduled news ingestion, cache-aware fetchers.</li>
+          <li>- Mobile-first responsive layouts with touch gestures and installable PWA shell.</li>
           <li>- Docker-first deployment with optional Redis profile for L2 caching.</li>
         </ul>
       </TerminalPanel>
 
-      <TerminalPanel title="Latest Additions (vs Previous Commit)">
+      <TerminalPanel title="Phase 3: Platform Maturity">
+        <ul className="space-y-1 text-xs text-terminal-text">
+          <li>- Plugin System: sandboxed loader, permission registry, YAML manifests, and marketplace UI with enable/disable controls.</li>
+          <li>- Export Engine: PDF, Excel, and CSV report generation for portfolios, watchlists, and analytics data.</li>
+          <li>- Portfolio Analytics: benchmark overlay charting, correlation heatmap, dividend tracker, risk metrics panel, and tax lot manager.</li>
+          <li>- PWA + Mobile: service worker with offline caching, web app manifest, install prompt, mobile bottom nav, and responsive card layouts.</li>
+          <li>- Pull-to-Refresh: touch gesture support on watchlist and alerts for mobile-native feel.</li>
+          <li>- Theme System: terminal theme CSS layer with customizable accent colours in settings.</li>
+          <li>- E2E Mobile Tests: Playwright test suite covering swipe, touch, and responsive breakpoints.</li>
+        </ul>
+      </TerminalPanel>
+
+      <TerminalPanel title="Phase 2: Core Expansion">
         <ul className="space-y-1 text-xs text-terminal-text">
           <li>- Auth foundation: JWT access/refresh, auth middleware, role protection, login/register screens.</li>
           <li>- Corporate Events + Earnings: dedicated APIs, timeline/calendar widgets, and stock/portfolio integrations.</li>
@@ -107,7 +121,6 @@ export function AboutPage() {
           <li>- Paper Trading: virtual portfolio/order/position/trade model, performance metrics, strategy deploy API, and UI dashboard.</li>
           <li>- Chart Foundations: chart drawings/templates persistence APIs plus multi-chart crosshair sync context scaffolding.</li>
           <li>- Adapter Layer: pluggable multi-exchange adapter registry with Kite/Yahoo/Crypto base implementations.</li>
-          <li>- UI/Navigation: sidebar account details panel now visible in Equity, F&O, and Backtesting.</li>
         </ul>
       </TerminalPanel>
 

@@ -18,7 +18,7 @@ router = APIRouter()
 def _process_timeseries(data: Dict[str, Any], metric_map: Dict[str, str]) -> List[Dict[str, Any]]:
     # data is like { "annualTotalRevenue": { "timestamp": [...], "value": [...] } }
     # we need [{ "metric": "revenue", "2023-03-31": 100, ... }]
-    
+
     if not data:
         return []
 
@@ -33,42 +33,42 @@ def _process_timeseries(data: Dict[str, Any], metric_map: Dict[str, str]) -> Lis
                 # Actually my YahooClient.get_fundamentals_timeseries returns what API returns.
                 # Yahoo timeseries API returns "asOfDate" usually in meta or just "timestamp" list.
                 # Let's assume standard Yahoo format handling for dates.
-                all_dates.add(str(t)) 
-    
+                all_dates.add(str(t))
+
     sorted_dates = sorted(list(all_dates), reverse=True)
-    
+
     results = []
     for mod, display_name in metric_map.items():
         if mod not in data:
             continue
-            
+
         series = data[mod]
         timestamps = series.get("timestamp") or []
         values = series.get("value") or []
-        
+
         row = {"metric": display_name}
         has_val = False
-        
+
         # Create map for this metric
         t_v_map = {}
         for t, v in zip(timestamps, values):
             t_v_map[str(t)] = v
-            
+
         for d in sorted_dates:
             val = t_v_map.get(d)
             if val is not None:
                 row[d] = val
                 has_val = True
-                
+
         if has_val:
             results.append(row)
-            
+
     return results
 
 def _process_fmp_list(data: List[Dict[str, Any]], field_map: Dict[str, str]) -> List[Dict[str, Any]]:
     if not data:
         return []
-        
+
     results = []
     for fmp_field, display_name in field_map.items():
         row = {"metric": display_name}
@@ -81,7 +81,7 @@ def _process_fmp_list(data: List[Dict[str, Any]], field_map: Dict[str, str]) -> 
                 has_val = True
         if has_val:
             results.append(row)
-            
+
     return results
 
 
@@ -144,7 +144,7 @@ async def get_stock(ticker: str) -> StockSnapshot:
     except Exception as exc:
         snap = {}
         # In case of total failure
-    
+
     # Map UnifiedFetcher snapshot dict to StockSnapshot model
     return StockSnapshot(
         ticker=ticker.upper(),
@@ -283,7 +283,7 @@ async def get_financials(ticker: str, period: str = Query(default="annual", patt
 @router.get("/stocks")
 async def get_stocks(tickers: str) -> List[Dict[str, Any]]:
     names = [x.strip().upper() for x in tickers.split(",") if x.strip()]
-    
+
     async def _fetch_one(t: str):
         try:
             s = await fetch_stock_snapshot_coalesced(t)
@@ -297,7 +297,7 @@ async def get_stocks(tickers: str) -> List[Dict[str, Any]]:
             }
         except:
             return {"ticker": t, "error": "Fetch failed"}
-            
+
     return await asyncio.gather(*(_fetch_one(t) for t in names))
 
 @router.get("/stocks/{ticker}/returns")
@@ -309,29 +309,29 @@ async def get_returns(ticker: str) -> Dict[str, Optional[float]]:
         # We need long history for returns (5y)
         # Yahoo is best for this.
         data = await fetcher.yahoo.get_chart(yf_symbol, range_str="5y", interval="1d")
-        
+
         # Parse Yahoo chart
         chart = (data.get("chart") or {}).get("result") or []
         if not chart:
             return {}
-            
+
         timestamps = chart[0].get("timestamp", [])
         indicators = chart[0].get("indicators", {}).get("quote", [{}])[0]
         closes = indicators.get("close", [])
-        
+
         if not closes:
             return {}
-            
+
         # Create Series-like structure
         # Filter None
         valid = [(t, c) for t, c in zip(timestamps, closes) if c is not None]
         if not valid:
             return {}
-            
+
         # Sort by time
         valid.sort(key=lambda x: x[0])
         vals = [v[1] for v in valid]
-        
+
         # Helper for return calc
         def _calc_ret(days_lookback):
             if len(vals) < days_lookback + 1:
@@ -340,7 +340,7 @@ async def get_returns(ticker: str) -> Dict[str, Optional[float]]:
             prev = vals[-(days_lookback + 1)]
             if prev == 0: return 0.0
             return ((curr - prev) / prev) * 100.0
-            
+
         # Approximation: 252 trading days = 1y
         return {
             "1m": _calc_ret(21),

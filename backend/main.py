@@ -85,7 +85,7 @@ app.include_router(fno_router)
 async def on_startup() -> None:
     _install_windows_loop_exception_filter()
     init_db()
-    
+
     global _prefetch_worker, _instruments_loader, _news_ingestor, _pcr_snapshot_service
     from backend.api.deps import get_unified_fetcher
     fetcher = await get_unified_fetcher()
@@ -93,7 +93,7 @@ async def on_startup() -> None:
     _instruments_loader = get_instruments_loader()
     _news_ingestor = get_news_ingestor()
     _pcr_snapshot_service = get_pcr_snapshot_service()
-    
+
     if _prefetch_enabled:
         await _prefetch_worker.start()
     if _instruments_loader:

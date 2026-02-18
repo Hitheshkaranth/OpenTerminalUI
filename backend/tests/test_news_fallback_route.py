@@ -77,4 +77,3 @@ def test_sentiment_uses_fallback_when_db_empty(monkeypatch) -> None:
     assert result["bullish_pct"] == 50.0
     assert result["bearish_pct"] == 50.0
     assert len(result["daily_sentiment"]) == 1
-

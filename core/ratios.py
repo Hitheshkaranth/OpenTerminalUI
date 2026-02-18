@@ -68,4 +68,3 @@ def compute_ratios(row: dict[str, Any]) -> dict[str, Any]:
         else None
     )
     return out
-

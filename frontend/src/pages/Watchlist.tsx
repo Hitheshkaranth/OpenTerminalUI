@@ -20,6 +20,8 @@ export function WatchlistPage() {
   const [ticker, setTicker] = useState("INFY");
   const [error, setError] = useState<string | null>(null);
   const [snapshotByTicker, setSnapshotByTicker] = useState<Record<string, SnapshotQuote>>({});
+  const [pullStartY, setPullStartY] = useState<number | null>(null);
+  const [pullHint, setPullHint] = useState("");
 
   const load = async () => {
     try {
@@ -72,7 +74,26 @@ export function WatchlistPage() {
   }, [items, selectedMarket, subscribe, unsubscribe]);
 
   return (
-    <div className="space-y-3 p-4">
+    <div
+      className="space-y-3 p-4"
+      onTouchStart={(e) => {
+        if (window.scrollY <= 0) setPullStartY(e.touches[0]?.clientY ?? null);
+      }}
+      onTouchMove={(e) => {
+        if (pullStartY == null) return;
+        const delta = (e.touches[0]?.clientY ?? 0) - pullStartY;
+        if (delta > 70) setPullHint("Release to refresh");
+        else if (delta > 20) setPullHint("Pull to refresh");
+      }}
+      onTouchEnd={async (e) => {
+        if (pullStartY == null) return;
+        const delta = (e.changedTouches[0]?.clientY ?? 0) - pullStartY;
+        setPullStartY(null);
+        if (delta > 70) await load();
+        setPullHint("");
+      }}
+    >
+      {pullHint ? <div className="text-center text-xs text-terminal-muted">{pullHint}</div> : null}
       <div className="rounded border border-terminal-border bg-terminal-panel p-3">
         <div className="mb-2 text-sm font-semibold">Add to Watchlist</div>
         <div className="grid grid-cols-1 gap-2 lg:grid-cols-3">
@@ -102,7 +123,34 @@ export function WatchlistPage() {
             LIVE
           </span>
         </div>
-        <div className="overflow-auto">
+        <div className="space-y-2 md:hidden">
+          {items.map((item) => {
+            const symbol = item.ticker.toUpperCase();
+            const token = `${selectedMarket}:${symbol}`;
+            const live = ticksByToken[token];
+            const snapshot = snapshotByTicker[symbol];
+            const ltp = live?.ltp ?? snapshot?.ltp ?? null;
+            const changePct = live?.change_pct ?? snapshot?.change_pct ?? null;
+            const moveClass =
+              changePct === null ? "text-terminal-muted" : changePct >= 0 ? "text-terminal-pos" : "text-terminal-neg";
+            return (
+              <div key={`m-${item.id}`} className="rounded border border-terminal-border bg-terminal-bg p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5">
+                    <CountryFlag countryCode={item.country_code} flagEmoji={item.flag_emoji} />
+                    <span className="font-semibold">{item.ticker}</span>
+                  </span>
+                  <span className={moveClass}>{changePct == null ? "-" : `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%`}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between">
+                  <span className="text-terminal-muted">{item.watchlist_name}</span>
+                  <span className="text-terminal-text">{ltp !== null ? formatDisplayMoney(ltp) : "-"}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="hidden overflow-auto md:block">
           <table className="min-w-full text-xs">
             <thead>
               <tr className="border-b border-terminal-border text-terminal-muted">

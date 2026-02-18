@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 # Constants for Fundamental Timeseries modules
 ANNUAL_MODULES = [
     "annualTotalRevenue",
-    "annualNetIncome", 
+    "annualNetIncome",
     "annualEbitda",
     "annualOperatingIncome",
     "annualDilutedEPS",
@@ -194,7 +194,7 @@ class YahooClient:
         Get chart data (OHLCV) with dividends and splits.
         """
         await self._ensure_client()
-        
+
         try:
             # v8/finance/chart
             response = await self.client.get(
@@ -250,9 +250,9 @@ class YahooClient:
         for i in range(0, len(all_modules), chunk_size):
             chunk = all_modules[i : i + chunk_size]
             tasks.append(fetch_chunk(chunk))
-            
+
         results_lists = await asyncio.gather(*tasks)
-        
+
         # Merge results
         for lst in results_lists:
             for item in lst:

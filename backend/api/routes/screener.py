@@ -31,10 +31,10 @@ async def run_screener(request: ScreenerRunRequest) -> ScreenerRunResponse:
     all_tickers = _load_universe(request.universe)
     sample_size = min(len(all_tickers), max(50, min(300, request.limit * 8)))
     tickers = all_tickers[:sample_size]
-    
+
     warnings = []
     skipped = 0
-    
+
     if sample_size < len(all_tickers):
         warnings.append({
             "code": "screener_sampled_universe",
@@ -42,20 +42,20 @@ async def run_screener(request: ScreenerRunRequest) -> ScreenerRunResponse:
         })
 
     df = load_screener_df(tickers)
-    
+
     stored_tickers = set(df["ticker"].astype(str).str.upper()) if not df.empty else set()
     missing = [t for t in tickers if t not in stored_tickers]
-    
+
     if missing:
-        refresh_batch = missing[:30] 
+        refresh_batch = missing[:30]
         if len(missing) > len(refresh_batch):
              warnings.append({
                 "code": "screener_partial_refresh",
                 "message": f"Refreshing {len(refresh_batch)} of {len(missing)} missing symbols."
             })
-            
+
         sem = asyncio.Semaphore(16)
-        
+
         async def _fetch_row(sym: str) -> Optional[dict]:
             async with sem:
                 try:
@@ -88,11 +88,11 @@ async def run_screener(request: ScreenerRunRequest) -> ScreenerRunResponse:
         fetched = await asyncio.gather(*(_fetch_row(t) for t in refresh_batch))
         rows = [r for r in fetched if r is not None]
         skipped += len(refresh_batch) - len(rows)
-        
+
         if rows:
             upsert_screener_rows(rows)
             df = load_screener_df(tickers)
-            
+
     if df.empty:
         return ScreenerRunResponse(count=0, rows=[], meta={"warnings": warnings + [{"code": "screener_empty", "message": "No data available."}]})
 
@@ -104,12 +104,12 @@ async def run_screener(request: ScreenerRunRequest) -> ScreenerRunResponse:
         rules = [Rule(field=r.field, op=r.op, value=r.value) for r in request.rules]
         filtered = engine.apply_rules(rules)
         ranked = engine.rank(
-            filtered, 
-            by=request.sort_by, 
-            ascending=(request.sort_order.lower() == "asc"), 
+            filtered,
+            by=request.sort_by,
+            ascending=(request.sort_order.lower() == "asc"),
             top_n=request.limit
         )
-        
+
         # Convert to list of dicts, handle NaN
         out_rows = ranked.where(pd.notnull(ranked), None).to_dict(orient="records")
         return ScreenerRunResponse(

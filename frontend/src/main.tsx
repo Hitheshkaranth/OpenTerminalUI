@@ -8,6 +8,7 @@ import { ChartSyncProvider } from "./shared/chart/ChartSyncContext";
 
 import App from "./App";
 import "./index.css";
+import "./styles/terminal-theme.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -22,3 +23,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </React.StrictMode>
 );
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js");
+  });
+}

@@ -16,4 +16,3 @@ storage:
   raw_path: "data/raw"
   processed_path: "data/processed"
   cache_path: "data/cache"
-

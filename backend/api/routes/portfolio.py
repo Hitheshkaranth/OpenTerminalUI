@@ -3,11 +3,12 @@ from __future__ import annotations
 import asyncio
 
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from backend.api.deps import fetch_stock_snapshot_coalesced, get_db
 from backend.db.models import Holding, WatchlistItem
+from backend.services.portfolio_analytics import portfolio_analytics_service
 from backend.shared.market_classifier import market_classifier
 
 router = APIRouter()
@@ -23,6 +24,22 @@ class HoldingCreate(BaseModel):
 class WatchlistCreate(BaseModel):
     watchlist_name: str
     ticker: str
+
+
+class TaxLotCreate(BaseModel):
+    ticker: str
+    quantity: float = Field(gt=0)
+    buy_price: float = Field(gt=0)
+    buy_date: str
+
+
+class TaxLotRealizeRequest(BaseModel):
+    ticker: str
+    quantity: float = Field(gt=0)
+    sell_price: float = Field(gt=0)
+    sell_date: str
+    method: str = Field(default="FIFO", pattern="^(FIFO|LIFO|SPECIFIC|fifo|lifo|specific)$")
+    specific_lot_ids: list[int] | None = None
 
 
 @router.get("/portfolio")
@@ -87,6 +104,49 @@ async def get_portfolio(db: Session = Depends(get_db)) -> dict[str, object]:
     }
 
 
+@router.get("/portfolio/analytics/sector-allocation")
+async def get_sector_allocation(db: Session = Depends(get_db)) -> dict[str, object]:
+    holdings = db.query(Holding).all()
+    return await portfolio_analytics_service.sector_allocation(holdings)
+
+
+@router.get("/portfolio/analytics/risk-metrics")
+async def get_risk_metrics(
+    risk_free_rate: float = Query(default=0.06, ge=0, le=0.25),
+    benchmark: str = Query(default="NIFTY50"),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    holdings = db.query(Holding).all()
+    return await portfolio_analytics_service.risk_metrics(holdings, risk_free_rate=risk_free_rate, benchmark=benchmark)
+
+
+@router.get("/portfolio/analytics/correlation")
+async def get_correlation_matrix(
+    window: int = Query(default=60, ge=10, le=252),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    holdings = db.query(Holding).all()
+    return await portfolio_analytics_service.correlation_matrix(holdings, window=window)
+
+
+@router.get("/portfolio/analytics/dividends")
+async def get_dividend_tracker(
+    days: int = Query(default=180, ge=1, le=730),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    holdings = db.query(Holding).all()
+    return await portfolio_analytics_service.dividend_tracker(holdings, days=days)
+
+
+@router.get("/portfolio/analytics/benchmark-overlay")
+async def get_benchmark_overlay(
+    benchmark: str = Query(default="NIFTY50"),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    holdings = db.query(Holding).all()
+    return await portfolio_analytics_service.benchmark_overlay(holdings, benchmark=benchmark)
+
+
 @router.post("/portfolio/holdings")
 def add_holding(payload: HoldingCreate, db: Session = Depends(get_db)) -> dict[str, object]:
     row = Holding(
@@ -109,6 +169,42 @@ def delete_holding(holding_id: int, db: Session = Depends(get_db)) -> dict[str, 
     db.delete(row)
     db.commit()
     return {"status": "deleted", "id": holding_id}
+
+
+@router.get("/portfolio/tax-lots")
+async def get_tax_lots(
+    ticker: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    return await portfolio_analytics_service.tax_lot_summary(db, ticker=ticker)
+
+
+@router.post("/portfolio/tax-lots")
+def create_tax_lot(payload: TaxLotCreate, db: Session = Depends(get_db)) -> dict[str, object]:
+    row = portfolio_analytics_service.add_tax_lot(
+        db=db,
+        ticker=payload.ticker,
+        quantity=payload.quantity,
+        buy_price=payload.buy_price,
+        buy_date=payload.buy_date,
+    )
+    return {"status": "created", "lot": {"id": row.id, "ticker": row.ticker}}
+
+
+@router.post("/portfolio/tax-lots/realize")
+def realize_tax_lot(payload: TaxLotRealizeRequest, db: Session = Depends(get_db)) -> dict[str, object]:
+    try:
+        return portfolio_analytics_service.realize_tax_lots(
+            db=db,
+            ticker=payload.ticker,
+            sell_quantity=payload.quantity,
+            sell_price=payload.sell_price,
+            sell_date=payload.sell_date,
+            method=payload.method,
+            specific_lot_ids=payload.specific_lot_ids,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/watchlists")

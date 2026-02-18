@@ -160,4 +160,3 @@ export function MutualFundDetail({ fund, onAdded }: Props) {
     </div>
   );
 }
-

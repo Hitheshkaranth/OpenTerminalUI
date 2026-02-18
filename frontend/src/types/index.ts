@@ -192,6 +192,107 @@ export type PortfolioResponse = {
   };
 };
 
+export type SectorAllocationResponse = {
+  total_value: number;
+  sectors: Array<{ sector: string; value: number; weight_pct: number }>;
+  industries: Array<{ industry: string; value: number; weight_pct: number }>;
+};
+
+export type PortfolioRiskMetrics = {
+  sharpe_ratio: number;
+  sortino_ratio: number;
+  max_drawdown: number;
+  beta: number;
+  alpha: number;
+  information_ratio: number;
+};
+
+export type PortfolioCorrelationResponse = {
+  symbols: string[];
+  matrix: Array<Array<{ x: string; y: string; value: number }>>;
+  rolling: Array<{ date: string; pair: string; value: number }>;
+};
+
+export type PortfolioDividendTracker = {
+  upcoming: Array<{
+    symbol: string;
+    event_date: string;
+    ex_date?: string | null;
+    payment_date?: string | null;
+    dividend_per_share: number;
+    position_qty: number;
+    projected_income: number;
+    title: string;
+  }>;
+  annual_income_projection: number;
+};
+
+export type PortfolioBenchmarkOverlay = {
+  benchmark: string;
+  equity_curve: Array<{ date: string; portfolio: number; benchmark: number }>;
+  alpha: number;
+  tracking_error: number;
+};
+
+export type TaxLotRow = {
+  id: number;
+  ticker: string;
+  quantity: number;
+  remaining_quantity: number;
+  buy_price: number;
+  buy_date: string;
+  current_price?: number | null;
+  unrealized_gain?: number | null;
+};
+
+export type TaxLotSummary = {
+  lots: TaxLotRow[];
+  unrealized_gain_total: number;
+};
+
+export type TaxLotRealizationResponse = {
+  symbol: string;
+  method: string;
+  sell_quantity: number;
+  sell_price: number;
+  sell_date: string;
+  realizations: Array<{
+    lot_id: number;
+    ticker: string;
+    quantity: number;
+    buy_price: number;
+    sell_price: number;
+    buy_date: string;
+    sell_date: string;
+    holding_days: number;
+    holding_period: "short_term" | "long_term";
+    realized_gain: number;
+  }>;
+  realized_gain_total: number;
+  short_term_gain: number;
+  long_term_gain: number;
+};
+
+export type PluginManifestItem = {
+  id: string;
+  name: string;
+  version: string;
+  author: string;
+  description: string;
+  entry_point: string;
+  required_permissions: string[];
+  enabled: boolean;
+};
+
+export type ScheduledReport = {
+  id: string;
+  report_type: string;
+  frequency: string;
+  email: string;
+  data_type: string;
+  enabled: boolean;
+};
+
 export type WatchlistItem = {
   id: number;
   watchlist_name: string;

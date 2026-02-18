@@ -18,7 +18,7 @@ type SelectProps = SharedProps &
 type Props = InputProps | SelectProps;
 
 const baseClass =
-  "rounded-sm border border-terminal-border bg-terminal-bg px-2 py-1 text-[11px] outline-none focus:border-terminal-accent";
+  "min-h-11 rounded-sm border border-terminal-border bg-terminal-bg px-2 py-1 text-[11px] outline-none focus:border-terminal-accent";
 
 export function TerminalInput(props: Props) {
   if (props.as === "select") {

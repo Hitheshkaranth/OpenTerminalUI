@@ -51,4 +51,3 @@ def normalize_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "payout_ratio": _safe_get(info, "payoutRatio"),
         "beta": _safe_get(info, "beta"),
     }
-

@@ -417,5 +417,3 @@ export function TopBar() {
     </div>
   );
 }
-
-

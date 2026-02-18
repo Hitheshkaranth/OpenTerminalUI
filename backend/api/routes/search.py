@@ -23,25 +23,25 @@ async def _get_rows() -> List[Dict[str, str]]:
     global _SEARCH_CACHE
     if _SEARCH_CACHE:
         return _SEARCH_CACHE
-        
+
     async with _CACHE_LOCK:
         if _SEARCH_CACHE:
             return _SEARCH_CACHE
-            
+
         if not DATA_PATH.exists():
             return []
-            
+
         # Offload file IO to thread
         def _read():
             with DATA_PATH.open("r", encoding="utf-8") as f:
                 return list(csv.DictReader(f))
-                
+
         try:
             rows = await asyncio.to_thread(_read)
             _SEARCH_CACHE = rows
         except Exception:
             _SEARCH_CACHE = []
-            
+
         return _SEARCH_CACHE
 
 @router.get("/search", response_model=SearchResponse)
@@ -49,45 +49,73 @@ async def search(q: str = Query(default=""), market: str = Query(default="NSE"))
     query = q.strip().lower()
     if not query:
         return SearchResponse(query=q, results=[])
-        
+
+    selected_market = market.strip().upper() or "NSE"
     rows = await _get_rows()
     matches: List[SearchResult] = []
-    
+    seen: set[str] = set()
+
+    def _append_match(item: SearchResult) -> None:
+        key = f"{item.ticker.upper()}::{(item.exchange or '').upper()}"
+        if key in seen:
+            return
+        seen.add(key)
+        matches.append(item)
+
     # Simple search
     for row in rows:
         ticker = (row.get("Symbol") or row.get("SYMBOL") or row.get("symbol") or "").upper()
         name = row.get("Company Name") or row.get("NAME OF COMPANY") or row.get("name") or ticker
-        
+
         # Check startswith for ticker for higher relevance match
         t_low = ticker.lower()
         n_low = name.lower()
-        
+
         if query in t_low or query in n_low:
-            matches.append(SearchResult(ticker=ticker, name=name))
-            
-        if len(matches) >= 20:
+            _append_match(SearchResult(ticker=ticker, name=name, exchange="NSE"))
+
+        if len(matches) >= 12:
             break
 
     # If no local NSE match, still allow direct symbol queries (e.g. AAPL, TSLA).
     if not matches and _TICKER_LIKE_RE.match(q.strip()):
         symbol = q.strip().upper()
-        matches.append(SearchResult(ticker=symbol, name=symbol))
+        _append_match(SearchResult(ticker=symbol, name=symbol))
 
-    if not matches:
-        try:
-            registry = get_adapter_registry()
-            adapter = registry.get_adapter(market)
-            rows = await adapter.search_instruments(q.strip())
-            for row in rows[:20]:
-                matches.append(
-                    SearchResult(
-                        ticker=row.symbol,
-                        name=row.name,
-                        exchange=row.exchange,
+    try:
+        registry = get_adapter_registry()
+        target_markets: list[str] = [selected_market]
+        for m in ("NASDAQ", "NYSE"):
+            if m not in target_markets:
+                target_markets.append(m)
+
+        async def _search_market(mkt: str) -> list[SearchResult]:
+            try:
+                adapter = registry.get_adapter(mkt)
+                rows = await adapter.search_instruments(q.strip())
+                out: list[SearchResult] = []
+                for row in rows[:15]:
+                    out.append(
+                        SearchResult(
+                            ticker=row.symbol,
+                            name=row.name,
+                            exchange=row.exchange,
+                        )
                     )
-                )
-        except Exception:
-            pass
+                return out
+            except Exception:
+                return []
+
+        found_batches = await asyncio.gather(*(_search_market(mkt) for mkt in target_markets))
+        for batch in found_batches:
+            for item in batch:
+                _append_match(item)
+                if len(matches) >= 30:
+                    break
+            if len(matches) >= 30:
+                break
+    except Exception:
+        pass
 
     if matches:
         sem = asyncio.Semaphore(16)
@@ -106,6 +134,6 @@ async def search(q: str = Query(default=""), market: str = Query(default="NSE"))
                 except Exception:
                     return entry
 
-        matches = await asyncio.gather(*(_classify(item) for item in matches))
+        matches = await asyncio.gather(*(_classify(item) for item in matches[:30]))
 
     return SearchResponse(query=q, results=matches)

@@ -28,7 +28,7 @@ class NSESession:
     async def initialize(self):
         if self.client:
             await self.client.aclose()
-        
+
         headers = {
             "User-Agent": self.user_agent,
             "Accept": "*/*",
@@ -38,7 +38,7 @@ class NSESession:
             "Connection": "keep-alive",
             "Referer": "https://www.nseindia.com/",
         }
-        
+
         self.client = httpx.AsyncClient(
             http2=True,
             timeout=self.timeout,
@@ -51,7 +51,7 @@ class NSESession:
     async def ensure_cookies(self):
         if not self.client:
             await self.initialize()
-        
+
         if self.cookies_loaded:
             return
 
@@ -89,23 +89,23 @@ class NSEClient:
                     session = NSESession(ua, timeout=10.0)
                     await session.initialize()
                     self.sessions.append(session)
-            
+
             # Rotate sessions
             session = self.sessions[self._session_idx]
             self._session_idx = (self._session_idx + 1) % len(self.sessions)
-            
+
             # Rate limiting
             now = time.time()
             elapsed = now - self._last_request_time
             if elapsed < self.rate_limit_delay:
                 await asyncio.sleep(self.rate_limit_delay - elapsed)
             self._last_request_time = time.time()
-            
+
             return session
 
     async def _request(self, endpoint: str, params: dict = None, attempt: int = 1) -> Any:
         session = await self._get_session()
-        
+
         try:
             await session.ensure_cookies()
             if not session.client:
@@ -113,7 +113,7 @@ class NSEClient:
 
             url = f"{self.API_BASE_URL}{endpoint}"
             response = await session.client.get(url, params=params)
-            
+
             if response.status_code == 401 or response.status_code == 403:
                 # Cookie expiry or blocking
                 logger.warning(f"NSE {response.status_code} for {endpoint}. Refreshing session.")
@@ -191,7 +191,7 @@ class NSEClient:
     async def get_corp_info(self, symbol: str) -> dict:
         """Corporate announcements, board meetings etc"""
         return await self._request("/quote-equity", {"symbol": symbol, "section": "corp_info"})
-    
+
     async def get_chart_data(self, symbol: str, pre_open: bool = False) -> dict:
         """
         Get chart data endpoint used by NSE's own charts.

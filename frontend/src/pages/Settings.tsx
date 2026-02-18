@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { createAlert, deleteAlert, fetchAlerts } from "../api/client";
+import { createAlert, createScheduledReport, deleteAlert, deleteScheduledReport, downloadExport, fetchAlerts, fetchScheduledReports } from "../api/client";
 import { TerminalButton } from "../components/terminal/TerminalButton";
 import { TerminalInput } from "../components/terminal/TerminalInput";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
@@ -8,6 +8,7 @@ import { TerminalTable } from "../components/terminal/TerminalTable";
 import { useSettingsStore } from "../store/settingsStore";
 import { COUNTRY_MARKETS } from "../types";
 import type { AlertRule, CountryCode, MarketCode } from "../types";
+import type { ScheduledReport } from "../types";
 
 export function SettingsPage() {
   const selectedCountry = useSettingsStore((s) => s.selectedCountry);
@@ -30,13 +31,20 @@ export function SettingsPage() {
   const [threshold, setThreshold] = useState(3000);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [scheduled, setScheduled] = useState<ScheduledReport[]>([]);
+  const [reportType, setReportType] = useState("portfolio_summary");
+  const [frequency, setFrequency] = useState("daily");
+  const [email, setEmail] = useState("");
+  const [dataType, setDataType] = useState("positions");
 
   const marketOptions = useMemo(() => COUNTRY_MARKETS[selectedCountry], [selectedCountry]);
 
   const load = async () => {
     try {
       setError(null);
-      setAlerts(await fetchAlerts());
+      const [alertsRes, reportsRes] = await Promise.all([fetchAlerts(), fetchScheduledReports()]);
+      setAlerts(alertsRes);
+      setScheduled(reportsRes);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load alerts");
     }
@@ -150,6 +158,80 @@ export function SettingsPage() {
             },
           ]}
         />
+      </TerminalPanel>
+
+      <TerminalPanel title="Scheduled Reports">
+        <div className="grid grid-cols-1 gap-2 lg:grid-cols-5">
+          <TerminalInput value={reportType} onChange={(e) => setReportType(e.target.value)} placeholder="report type" />
+          <TerminalInput as="select" value={frequency} onChange={(e) => setFrequency(e.target.value)}>
+            <option value="daily">daily</option>
+            <option value="weekly">weekly</option>
+          </TerminalInput>
+          <TerminalInput value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" />
+          <TerminalInput as="select" value={dataType} onChange={(e) => setDataType(e.target.value)}>
+            <option value="positions">positions</option>
+            <option value="watchlist">watchlist</option>
+            <option value="trades">trades</option>
+            <option value="screening_results">screening_results</option>
+            <option value="backtest_trades">backtest_trades</option>
+          </TerminalInput>
+          <TerminalButton
+            variant="accent"
+            onClick={async () => {
+              try {
+                await createScheduledReport({ report_type: reportType, frequency, email, data_type: dataType });
+                await load();
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Failed to save schedule");
+              }
+            }}
+          >
+            Save
+          </TerminalButton>
+        </div>
+        <div className="mt-3 space-y-2 text-xs">
+          {scheduled.map((row) => (
+            <div key={row.id} className="flex items-center justify-between rounded border border-terminal-border bg-terminal-bg px-2 py-1">
+              <span className="text-terminal-muted">{row.report_type} | {row.frequency} | {row.email} | {row.data_type}</span>
+              <TerminalButton
+                variant="danger"
+                onClick={async () => {
+                  await deleteScheduledReport(row.id);
+                  await load();
+                }}
+              >
+                Delete
+              </TerminalButton>
+            </div>
+          ))}
+          {!scheduled.length ? <div className="text-terminal-muted">No schedules configured.</div> : null}
+        </div>
+      </TerminalPanel>
+
+      <TerminalPanel title="Data Export">
+        <div className="flex flex-wrap gap-2">
+          {["watchlist", "positions", "trades", "screening_results", "backtest_trades"].map((kind) => (
+            <div key={kind} className="flex items-center gap-1 rounded border border-terminal-border bg-terminal-bg px-2 py-1">
+              <span className="text-xs text-terminal-muted">{kind}</span>
+              {(["csv", "xlsx", "pdf"] as const).map((fmt) => (
+                <TerminalButton
+                  key={`${kind}-${fmt}`}
+                  onClick={async () => {
+                    const blob = await downloadExport(kind, fmt);
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `${kind}.${fmt}`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                >
+                  {fmt}
+                </TerminalButton>
+              ))}
+            </div>
+          ))}
+        </div>
       </TerminalPanel>
     </div>
   );

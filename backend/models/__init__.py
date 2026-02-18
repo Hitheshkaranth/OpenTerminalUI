@@ -12,6 +12,7 @@ from backend.models.core import (
     ChartTemplate,
     FutureContract,
     Holding,
+    TaxLot,
     NewsArticle,
     PortfolioMutualFundHolding,
     VirtualOrder,
@@ -27,6 +28,7 @@ from backend.models.user import RefreshToken, User, UserRole
 
 __all__ = [
     "Holding",
+    "TaxLot",
     "WatchlistItem",
     "AlertRuleORM",
     "AlertHistoryORM",
