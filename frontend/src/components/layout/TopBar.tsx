@@ -399,6 +399,10 @@ export function TopBar() {
               <button
                 key={`${item.ticker}:${item.name}`}
                 className="block w-full border-b border-terminal-border px-3 py-2 text-left text-sm hover:bg-terminal-bg"
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  selectTicker(item.ticker);
+                }}
                 onClick={() => {
                   selectTicker(item.ticker);
                 }}

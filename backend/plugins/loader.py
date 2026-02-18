@@ -26,7 +26,23 @@ class PluginRecord:
 
 class PluginLoader:
     def __init__(self, plugins_root: str = "plugins") -> None:
-        self.plugins_root = Path(plugins_root)
+        root = Path(plugins_root)
+        if root.is_absolute():
+            self.plugins_root = root
+        else:
+            cwd_root = (Path.cwd() / root).resolve()
+            repo_root = (Path(__file__).resolve().parents[2] / root).resolve()
+
+            def has_manifests(path: Path) -> bool:
+                return path.exists() and any(path.rglob("plugin.yaml"))
+
+            if has_manifests(cwd_root):
+                self.plugins_root = cwd_root
+            elif has_manifests(repo_root):
+                self.plugins_root = repo_root
+            else:
+                # Default to cwd-relative behavior when no manifests exist yet.
+                self.plugins_root = cwd_root
         self.records: dict[str, PluginRecord] = {}
 
     def discover(self) -> list[PluginRecord]:
