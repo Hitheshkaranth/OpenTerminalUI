@@ -17,10 +17,10 @@ async function registerAndLogin(
   }
 
   await page.goto(`/login?redirect=${encodeURIComponent(targetPath)}`);
-  await page.getByPlaceholder("Email").fill(email);
-  await page.getByPlaceholder("Password").fill(password);
-  await page.getByRole("button", { name: /sign in/i }).click();
-  await page.waitForURL(new RegExp(targetPath.replace("/", "\\/")));
+  await page.getByPlaceholder("Enter user ID...").fill(email);
+  await page.getByPlaceholder("Enter password...").fill(password);
+  await page.getByRole("button", { name: /access terminal/i }).click();
+  await page.waitForURL(new RegExp(targetPath.replace("/", "\\/")), { timeout: 15000 });
 }
 
 async function dispatchTouch(
