@@ -50,7 +50,8 @@ async def search(q: str = Query(default=""), market: str = Query(default="NSE"))
     if not query:
         return SearchResponse(query=q, results=[])
 
-    selected_market = market.strip().upper() or "NSE"
+    _market = market if isinstance(market, str) else "NSE"
+    selected_market = _market.strip().upper() or "NSE"
     rows = await _get_rows()
     matches: List[SearchResult] = []
     seen: set[str] = set()

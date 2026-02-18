@@ -207,6 +207,7 @@ def test_search_results_include_flag_and_exchange(monkeypatch) -> None:
 
     monkeypatch.setattr(search, "_get_rows", _fake_rows)
     monkeypatch.setattr(search.market_classifier, "classify", _fake_classify)
+    monkeypatch.setattr(search, "get_adapter_registry", lambda: (_ for _ in ()).throw(RuntimeError("no adapter")))
 
     out = asyncio.run(search.search(q="reli"))
     assert len(out.results) == 1
@@ -225,6 +226,7 @@ def test_search_fallback_includes_direct_us_ticker_query(monkeypatch) -> None:
 
     monkeypatch.setattr(search, "_get_rows", _fake_rows)
     monkeypatch.setattr(search.market_classifier, "classify", _fake_classify)
+    monkeypatch.setattr(search, "get_adapter_registry", lambda: (_ for _ in ()).throw(RuntimeError("no adapter")))
 
     out = asyncio.run(search.search(q="AAPL"))
     assert len(out.results) == 1
