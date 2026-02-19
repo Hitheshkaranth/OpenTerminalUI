@@ -82,9 +82,11 @@ export function AboutPage() {
       <TerminalPanel title="Backtesting Control Deck">
         <ul className="space-y-1 text-xs text-terminal-text">
           <li>- Asset input + trade capital input with model presets or custom Python signals.</li>
+          <li>- Built-in advanced preset: Pure-Jump Markov Volatility (particle-filtered jump-vol stress + trend gating).</li>
           <li>- Capital-aware execution sizing: share quantity derives from capital and model allocation.</li>
           <li>- Performance block tracks initial capital, final equity, net P/L, and ending cash.</li>
           <li>- Chart-first review with buy/sell markers, indicator overlays, and trade blotter.</li>
+          <li>- Visual workflow tabs include chart, equity, drawdown, distribution, rolling metrics, trade analysis, and compare.</li>
         </ul>
       </TerminalPanel>
 

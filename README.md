@@ -343,6 +343,44 @@ Without valid Kite credentials:
   - `GET /api/news/by-ticker/{ticker}`
 - News responses are cached with TTL policy `news_latest`.
 
+## Pure-Jump Markov Volatility model
+
+This repo includes a pure-jump volatility model with state-dependent jump intensity and asymmetric jump kernel:
+
+- Model package: `models/pure_jump_vol`
+- Backtesting strategy key: `example:pure_jump_markov_vol`
+- CLIs:
+  - `python cli/fit_pjv.py --csv path/to/data.csv`
+  - `python cli/signal_pjv.py --csv path/to/data.csv --params-json fitted.json`
+  - `python cli/backtest_pjv.py --csv path/to/data.csv --params-json fitted.json`
+
+Input CSV format:
+
+- Required columns: `date,open,high,low,close,volume`
+
+What it does:
+
+- Filters latent volatility via particle filter
+- Builds stress score from filtered volatility and jump intensity
+- Applies trend gating using SMA(50)-SMA(200)
+- Emits risk-on/risk-off position signal for backtests
+
+Important limitations:
+
+- This is an experimental statistical model, not investment advice
+- Parameter estimates can be unstable on short/noisy samples
+- Backtests are sensitive to slippage, costs, and signal execution lag
+
+### Backtesting UI access
+
+From the Backtesting screen:
+
+1. Open `Model` dropdown.
+2. Select `Pure-Jump Markov Volatility`.
+3. Click `Run`.
+
+The strategy is submitted as `example:pure_jump_markov_vol` and runs through the same job flow (`/api/backtests` submit, status poll, result fetch) as other built-in models.
+
 ## Troubleshooting
 
 ### WS not connecting

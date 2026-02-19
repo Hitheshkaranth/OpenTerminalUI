@@ -37,6 +37,17 @@ def test_additional_example_strategies_run() -> None:
     assert set(int(v) for v in ema.signals.tolist()).issubset({-1, 0, 1})
 
 
+def test_pure_jump_markov_vol_strategy_runs() -> None:
+    runner = StrategyRunner()
+    out = runner.run(
+        "example:pure_jump_markov_vol",
+        _frame(),
+        {"n_particles": 64, "lookback": 20, "seed": 9},
+    )
+    assert len(out.signals) == len(_frame())
+    assert set(int(v) for v in out.signals.tolist()).issubset({-1, 0, 1})
+
+
 def test_inline_strategy_captures_stdout() -> None:
     code = """
 def generate_signals(df, context):
@@ -50,10 +61,20 @@ def generate_signals(df, context):
 
 def test_inline_strategy_timeout() -> None:
     code = """
-import time
 def generate_signals(df, context):
-    time.sleep(0.3)
+    for _ in range(10**8):
+        pass
     return [0 for _ in range(len(df))]
 """
     with pytest.raises(TimeoutError):
         StrategyRunner(timeout_seconds=0.05).run(code, _frame(), {})
+
+
+def test_inline_strategy_blocks_imports() -> None:
+    code = """
+import os
+def generate_signals(df, context):
+    return [0 for _ in range(len(df))]
+"""
+    with pytest.raises(ValueError):
+        StrategyRunner(timeout_seconds=0.2).run(code, _frame(), {})
