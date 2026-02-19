@@ -26,3 +26,10 @@ pytest-cov
 pytest-asyncio
 openpyxl
 reportlab
+empyrical
+pyarrow
+hmmlearn
+optuna
+statsmodels
+xgboost
+polygon-api-client

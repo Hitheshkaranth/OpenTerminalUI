@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import ast
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from statistics import mean
@@ -26,6 +27,43 @@ def _safe_float(value: Any) -> float | None:
         return out
     except (TypeError, ValueError):
         return None
+
+
+_ALLOWED_AST_NODES = (
+    ast.Expression,
+    ast.BoolOp,
+    ast.BinOp,
+    ast.UnaryOp,
+    ast.Compare,
+    ast.Name,
+    ast.Load,
+    ast.Constant,
+    ast.Subscript,
+    ast.Dict,
+    ast.List,
+    ast.Tuple,
+    ast.And,
+    ast.Or,
+    ast.Not,
+    ast.Add,
+    ast.Sub,
+    ast.Mult,
+    ast.Div,
+    ast.Mod,
+    ast.Pow,
+    ast.USub,
+    ast.UAdd,
+    ast.Eq,
+    ast.NotEq,
+    ast.Lt,
+    ast.LtE,
+    ast.Gt,
+    ast.GtE,
+    ast.In,
+    ast.NotIn,
+    ast.Is,
+    ast.IsNot,
+)
 
 
 class AlertEvaluatorService:
@@ -260,11 +298,25 @@ class AlertEvaluatorService:
 
     @staticmethod
     def _eval_custom(expression: str, context: dict[str, Any]) -> bool:
+        try:
+            tree = ast.parse(expression, mode="eval")
+        except SyntaxError:
+            return False
+        for node in ast.walk(tree):
+            if not isinstance(node, _ALLOWED_AST_NODES):
+                return False
+            if isinstance(node, ast.Call):
+                return False
+            if isinstance(node, ast.Attribute):
+                return False
+            if isinstance(node, ast.Name) and node.id not in {"tick", "ltp", "volume", "change_pct", "None", "True", "False"}:
+                return False
         safe_globals = {"__builtins__": {}}
         safe_locals = {"tick": context, **context}
         try:
-            result = eval(expression, safe_globals, safe_locals)  # noqa: S307
-            return bool(result)
+            compiled = compile(tree, "<alert_expr>", "eval")
+            result = eval(compiled, safe_globals, safe_locals)  # noqa: S307
+            return isinstance(result, bool) and result
         except Exception:
             return False
 

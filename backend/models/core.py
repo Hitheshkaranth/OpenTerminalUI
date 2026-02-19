@@ -112,6 +112,30 @@ class BacktestRun(Base):
     updated_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())
 
 
+class NseFnoBhavcopy(Base):
+    __tablename__ = "nse_fno_bhavcopy"
+    __table_args__ = (
+        UniqueConstraint("trade_date", "symbol", "expiry_date", "option_type", "strike_price", name="uq_nse_fno_bhavcopy_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    trade_date: Mapped[str] = mapped_column(String(16), index=True)
+    instrument: Mapped[str] = mapped_column(String(16), index=True)
+    symbol: Mapped[str] = mapped_column(String(32), index=True)
+    expiry_date: Mapped[str] = mapped_column(String(16), index=True)
+    strike_price: Mapped[float] = mapped_column(Float, default=0.0)
+    option_type: Mapped[str] = mapped_column(String(8), default="")
+    open_price: Mapped[float] = mapped_column(Float, default=0.0)
+    high_price: Mapped[float] = mapped_column(Float, default=0.0)
+    low_price: Mapped[float] = mapped_column(Float, default=0.0)
+    close_price: Mapped[float] = mapped_column(Float, default=0.0)
+    settle_price: Mapped[float] = mapped_column(Float, default=0.0)
+    contracts: Mapped[int] = mapped_column(Integer, default=0)
+    value_lakh: Mapped[float] = mapped_column(Float, default=0.0)
+    open_interest: Mapped[int] = mapped_column(Integer, default=0)
+    change_in_oi: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class PortfolioMutualFundHolding(Base):
     __tablename__ = "portfolio_mutual_funds"
 

@@ -5,6 +5,7 @@ import { TerminalButton } from "../components/terminal/TerminalButton";
 import { TerminalInput } from "../components/terminal/TerminalInput";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { TerminalTable } from "../components/terminal/TerminalTable";
+import { DataManager } from "../components/settings/DataManager";
 import { useSettingsStore } from "../store/settingsStore";
 import { COUNTRY_MARKETS } from "../types";
 import type { AlertRule, CountryCode, MarketCode } from "../types";
@@ -232,6 +233,10 @@ export function SettingsPage() {
             </div>
           ))}
         </div>
+      </TerminalPanel>
+
+      <TerminalPanel title="Backtest Data">
+        <DataManager />
       </TerminalPanel>
     </div>
   );

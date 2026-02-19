@@ -44,5 +44,25 @@ class BacktestResult(BaseModel):
     total_return: float
     max_drawdown: float
     sharpe: float
+    sortino: float = 0.0
+    calmar: float = 0.0
+    omega: float = 0.0
+    profit_factor: float = 0.0
+    win_rate: float = 0.0
+    avg_win: float = 0.0
+    avg_loss: float = 0.0
+    var_95: float = 0.0
+    var_99: float = 0.0
+    cvar_95: float = 0.0
+    cvar_99: float = 0.0
+    tail_ratio: float = 0.0
+    max_consecutive_losses: int = 0
+    return_stability_r2: float = 0.0
+    drawdown_start: str | None = None
+    drawdown_trough: str | None = None
+    drawdown_recovery: str | None = None
+    daily_returns: list[float] = Field(default_factory=list)
+    drawdown_series: list[float] = Field(default_factory=list)
+    rolling_metrics: list[dict[str, float | str]] = Field(default_factory=list)
     trades: list[TradeRecord]
     equity_curve: list[EquityPoint]

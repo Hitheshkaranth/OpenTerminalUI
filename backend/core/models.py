@@ -68,8 +68,8 @@ class IndicatorComputeRequest(BaseModel):
 
 
 class PythonExecuteRequest(BaseModel):
-    code: str
-    timeout_seconds: float = 2.0
+    code: str = Field(min_length=1, max_length=20000)
+    timeout_seconds: float = Field(default=2.0, ge=0.1, le=10.0)
 
 
 class PythonExecuteResponse(BaseModel):

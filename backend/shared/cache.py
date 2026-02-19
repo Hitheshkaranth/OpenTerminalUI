@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import hashlib
 import json
 import logging
@@ -22,6 +23,8 @@ class MultiTierCache:
         self._l1_cache: dict[str, Tuple[float, Any]] = {}
         self._redis: Optional[aioredis.Redis] = None
         self._db_conn: Optional[sqlite3.Connection] = None
+        key = os.getenv("CACHE_SIGNING_KEY", "openterminalui-dev-cache-key")
+        self._signing_key = key.encode("utf-8")
 
     async def initialize(self):
         if self.redis_url:
@@ -66,7 +69,10 @@ class MultiTierCache:
             return None
         try:
             data = await self._redis.get(key)
-            return pickle.loads(data) if data else None
+            if not data:
+                return None
+            decoded = self._decode_blob(data)
+            return decoded
         except Exception as e:
             logger.warning("L2 get error: %s", e)
             return None
@@ -75,7 +81,7 @@ class MultiTierCache:
         if not self._redis:
             return
         try:
-            await self._redis.setex(key, ttl, pickle.dumps(value))
+            await self._redis.setex(key, ttl, self._encode_blob(value))
         except Exception as e:
             logger.warning("L2 set error: %s", e)
 
@@ -89,7 +95,7 @@ class MultiTierCache:
             if row:
                 blob, expiry = row
                 if time.time() < expiry:
-                    return pickle.loads(blob)
+                    return self._decode_blob(blob)
                 self._db_conn.execute("DELETE FROM cache WHERE key = ?", (key,))
                 self._db_conn.commit()
             return None
@@ -102,7 +108,7 @@ class MultiTierCache:
 
         def _write():
             expiry = time.time() + ttl
-            blob = pickle.dumps(value)
+            blob = self._encode_blob(value)
             self._db_conn.execute(
                 "INSERT OR REPLACE INTO cache (key, value, expiry) VALUES (?, ?, ?)",
                 (key, blob, expiry),
@@ -139,6 +145,26 @@ class MultiTierCache:
         p_str = json.dumps(params or {}, sort_keys=True)
         h = hashlib.md5(p_str.encode()).hexdigest()
         return f"openterminalui:{data_type}:{s}:{h}"
+
+    def _encode_blob(self, value: Any) -> bytes:
+        payload = pickle.dumps(value)
+        signature = hmac.new(self._signing_key, payload, hashlib.sha256).digest()
+        return b"v1:" + signature + payload
+
+    def _decode_blob(self, blob: bytes) -> Any:
+        if not isinstance(blob, (bytes, bytearray)):
+            return None
+        if not blob.startswith(b"v1:") or len(blob) < 3 + 32:
+            return None
+        signature = blob[3:35]
+        payload = blob[35:]
+        expected = hmac.new(self._signing_key, payload, hashlib.sha256).digest()
+        if not hmac.compare_digest(signature, expected):
+            return None
+        try:
+            return pickle.loads(payload)
+        except Exception:
+            return None
 
 
 cache = MultiTierCache()

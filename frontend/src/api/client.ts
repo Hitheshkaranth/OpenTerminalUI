@@ -746,6 +746,26 @@ export async function fetchBacktestJobResult(runId: string): Promise<BacktestJob
   return data;
 }
 
+export async function submitBacktestV1(payload: BacktestJobSubmitPayload): Promise<BacktestJobStatus> {
+  const { data } = await api.post<BacktestJobStatus>("/v1/backtest/submit", payload);
+  return data;
+}
+
+export async function fetchBacktestV1Status(runId: string): Promise<BacktestJobStatus> {
+  const { data } = await api.get<BacktestJobStatus>(`/v1/backtest/status/${encodeURIComponent(runId)}`);
+  return data;
+}
+
+export async function fetchBacktestV1Result(runId: string): Promise<BacktestJobResult> {
+  const { data } = await api.get<BacktestJobResult>(`/v1/backtest/result/${encodeURIComponent(runId)}`);
+  return data;
+}
+
+export async function fetchBacktestV1Presets(): Promise<Array<Record<string, unknown>>> {
+  const { data } = await api.get<{ items: Array<Record<string, unknown>> }>("/v1/backtest/presets");
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
 export async function createPaperPortfolio(payload: { name: string; initial_capital: number }): Promise<PaperPortfolio> {
   const { data } = await api.post<PaperPortfolio>("/paper/portfolios", payload);
   return data;
