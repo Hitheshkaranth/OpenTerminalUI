@@ -63,6 +63,15 @@ type PortfolioTrendPoint = {
   investments: Array<{ ticker: string; date: string }>;
 };
 
+const EMPTY_PORTFOLIO: PortfolioResponse = {
+  items: [],
+  summary: {
+    total_cost: 0,
+    total_value: 0,
+    overall_pnl: 0,
+  },
+};
+
 function buildMonthSlots(items: PortfolioResponse["items"]): MonthSlot[] {
   const now = new Date();
   let start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -189,7 +198,7 @@ export function PortfolioPage() {
   const [mfRefreshToken, setMfRefreshToken] = useState(0);
   const [mfError, setMfError] = useState<string | null>(null);
   const [mfMessage, setMfMessage] = useState<string | null>(null);
-  const [data, setData] = useState<PortfolioResponse | null>(null);
+  const [data, setData] = useState<PortfolioResponse>(EMPTY_PORTFOLIO);
   const [returnsMap, setReturnsMap] = useState<Record<string, { "1m"?: number | null; "1y"?: number | null }>>({});
   const [portfolioTrend, setPortfolioTrend] = useState<PortfolioTrendPoint[]>([]);
   const [portfolioTrendLoading, setPortfolioTrendLoading] = useState(false);
@@ -730,7 +739,7 @@ export function PortfolioPage() {
 
       {loading && <div className="text-xs text-terminal-muted">Loading portfolio...</div>}
       {error && <div className="rounded border border-terminal-neg bg-terminal-neg/10 p-3 text-xs text-terminal-neg">{error}</div>}
-      {data && (
+      {(
         <>
           <div className="rounded border border-terminal-accent/40 bg-terminal-panel p-3 shadow-[0_0_0_1px_rgba(0,193,118,0.08)]">
             <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
@@ -852,24 +861,24 @@ export function PortfolioPage() {
                   ))}
                 </div>
               </div>
-              {portfolioTrendLoading ? (
-                <div className="text-xs text-terminal-muted">Loading monthly portfolio movement...</div>
-              ) : trendSlice.length === 0 ? (
-                <div className="text-xs text-terminal-muted">No monthly portfolio movement data available.</div>
-              ) : (
-                <div
-                  className="h-[26rem] w-full"
-                  onTouchStart={(e) => setSwipeStartX(e.touches[0]?.clientX ?? null)}
-                  onTouchEnd={(e) => {
-                    if (swipeStartX == null) return;
-                    const delta = (e.changedTouches[0]?.clientX ?? 0) - swipeStartX;
-                    setSwipeStartX(null);
-                    const order: Array<"1Y" | "3Y" | "5Y" | "ALL"> = ["1Y", "3Y", "5Y", "ALL"];
-                    const idx = order.indexOf(trendRange);
-                    if (delta < -60 && idx < order.length - 1) setTrendRange(order[idx + 1]);
-                    if (delta > 60 && idx > 0) setTrendRange(order[idx - 1]);
-                  }}
-                >
+              <div
+                className="h-[26rem] w-full"
+                onTouchStart={(e) => setSwipeStartX(e.touches[0]?.clientX ?? null)}
+                onTouchEnd={(e) => {
+                  if (swipeStartX == null) return;
+                  const delta = (e.changedTouches[0]?.clientX ?? 0) - swipeStartX;
+                  setSwipeStartX(null);
+                  const order: Array<"1Y" | "3Y" | "5Y" | "ALL"> = ["1Y", "3Y", "5Y", "ALL"];
+                  const idx = order.indexOf(trendRange);
+                  if (delta < -60 && idx < order.length - 1) setTrendRange(order[idx + 1]);
+                  if (delta > 60 && idx > 0) setTrendRange(order[idx - 1]);
+                }}
+              >
+                {portfolioTrendLoading ? (
+                  <div className="text-xs text-terminal-muted">Loading monthly portfolio movement...</div>
+                ) : trendSlice.length === 0 ? (
+                  <div className="text-xs text-terminal-muted">No monthly portfolio movement data available.</div>
+                ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={trendSlice}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#2a2f3a" />
@@ -993,8 +1002,8 @@ export function PortfolioPage() {
                       )}
                     </AreaChart>
                   </ResponsiveContainer>
-                </div>
-              )}
+                )}
+              </div>
               <div className="mt-2 text-[11px] text-terminal-muted">
                 Historical monthly returns are now derived from full available price history and shown as Return % (right axis).
               </div>
