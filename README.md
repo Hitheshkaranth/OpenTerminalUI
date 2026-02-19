@@ -112,9 +112,45 @@ This view highlights the terminal-style stock analysis layout with charting, ind
 
 ## Prerequisites
 
-- Python 3.11+
-- Node.js 22+ (LTS)
-- Docker Desktop (optional, for containerized run)
+- Docker Desktop (Compose v2) for containerized install
+- Python 3.11+ and Node.js 22+ only for non-Docker local development
+
+## One-command Docker setup (new machine)
+
+Full guide: `docs/INSTALLATION.md`
+
+Windows PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\docker-up.ps1
+```
+
+macOS/Linux:
+
+```bash
+sh ./scripts/docker-up.sh
+```
+
+What this does:
+- validates Docker + Docker Compose are available and running
+- creates `.env` from `.env.example` if missing
+- builds and starts containers in detached mode
+- waits for service health when supported by your Compose version
+- does not require local Python/Node installs (Docker only)
+
+Optional profiles:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\docker-up.ps1 -Redis
+powershell -ExecutionPolicy Bypass -File .\scripts\docker-up.ps1 -Redis -Postgres
+powershell -ExecutionPolicy Bypass -File .\scripts\docker-up.ps1 -Port 8010
+```
+
+```bash
+sh ./scripts/docker-up.sh --redis
+sh ./scripts/docker-up.sh --redis --postgres
+sh ./scripts/docker-up.sh --port 8010
+```
 
 ## Quick start (recommended: Docker)
 
@@ -165,6 +201,14 @@ set REDIS_URL=redis://redis:6379/0
 docker compose --profile redis up --build
 docker compose --profile redis watch
 ```
+
+## First-run troubleshooting (Docker)
+
+- `docker compose version` fails: update Docker Desktop to a Compose v2 build.
+- Docker daemon is not running: start Docker Desktop, wait for "Engine running", then rerun script.
+- API keys are missing: edit root `.env` and set your real keys before starting if you need live market provider data.
+- PowerShell blocks script execution: use `powershell -ExecutionPolicy Bypass -File .\scripts\docker-up.ps1`.
+- Port `8000` already in use: run with `-Port 8010` (PowerShell) or `--port 8010` (sh).
 
 ## Local development setup (without Docker)
 
@@ -334,23 +378,35 @@ Without valid Kite credentials:
 
 Before pushing:
 
-1. Keep real secrets only in local `backend/.env` and `.env` (both ignored).
-2. Confirm no private env files are tracked:
+1. Run quality gate (must pass):
+
+```bash
+python -m compileall backend
+PYTHONPATH=. pytest backend/tests -q --cov=backend --cov-fail-under=45 --cov-report=xml --junitxml=pytest-report.xml
+npm ci --prefix frontend
+npm run build --prefix frontend
+npm run test --prefix frontend
+npx playwright install --with-deps chromium
+npm run test:e2e --prefix frontend
+```
+
+2. Keep real secrets only in local `backend/.env` and `.env` (both ignored).
+3. Confirm no private env files are tracked:
 
 ```bash
 git ls-files | findstr /R "\.env$ \.env\."
 ```
 
-3. Confirm build/runtime artifacts are not tracked:
+4. Confirm build/runtime artifacts are not tracked:
 
 ```bash
 git ls-files | findstr /R "node_modules dist \.db$ \.sqlite$ \.sqlite3$"
 ```
 
-4. Review staged changes:
+5. Review staged changes:
 
 ```bash
 git diff --cached
 ```
 
-5. If any key was ever exposed, rotate it before release.
+6. If any key was ever exposed, rotate it before release.

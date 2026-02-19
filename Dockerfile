@@ -4,7 +4,7 @@ FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
 
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm install
+RUN npm ci
 
 COPY frontend/ ./
 RUN npm run build
@@ -23,7 +23,7 @@ COPY nlp/ ./nlp/
 COPY config/ ./config/
 COPY data/ ./data/
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
-RUN chmod +x backend/entrypoint.sh
+RUN sed -i 's/\r$//' backend/entrypoint.sh && chmod +x backend/entrypoint.sh
 
 EXPOSE 8000
 
