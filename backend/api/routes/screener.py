@@ -6,14 +6,31 @@ from typing import Any, List, Optional
 
 import pandas as pd
 from fastapi import APIRouter
+from pydantic import BaseModel, Field
 
 from backend.api.deps import fetch_stock_snapshot_coalesced
 from backend.core.models import ScreenerRunRequest, ScreenerRunResponse
 from backend.core.screener import ScreenerEngine, Rule
+from backend.equity.screener_v2 import FactorEngine, FactorSpec
 from backend.services.materialized_store import load_screener_df, upsert_screener_rows
 
 router = APIRouter()
 DATA_DIR = Path(__file__).resolve().parents[3] / "data"
+
+
+class FactorConfigRequest(BaseModel):
+    field: str
+    weight: float = Field(default=1.0, ge=0.0, le=10.0)
+    higher_is_better: bool = True
+
+
+class ScreenerV2RunRequest(BaseModel):
+    rules: list[Any] = Field(default_factory=list)
+    factors: list[FactorConfigRequest] = Field(default_factory=list)
+    sort_order: str = "desc"
+    limit: int = 50
+    universe: str = "nse_eq"
+    sector_neutral: bool = False
 
 def _load_universe(universe: str) -> List[str]:
     path = DATA_DIR / ("nse_equity_symbols_eq.txt" if universe == "nse_eq" else "sample_tickers.txt")
@@ -120,3 +137,71 @@ async def run_screener(request: ScreenerRunRequest) -> ScreenerRunResponse:
     except Exception as e:
         warnings.append({"code": "screener_error", "message": str(e)})
         return ScreenerRunResponse(count=0, rows=[], meta={"warnings": warnings})
+
+
+@router.post("/screener/run-v2")
+async def run_screener_v2(request: ScreenerV2RunRequest) -> dict[str, Any]:
+    all_tickers = _load_universe(request.universe)
+    sample_size = min(len(all_tickers), max(50, min(400, request.limit * 10)))
+    tickers = all_tickers[:sample_size]
+    warnings: list[dict[str, str]] = []
+
+    if sample_size < len(all_tickers):
+        warnings.append(
+            {
+                "code": "screener_sampled_universe",
+                "message": f"Screened first {sample_size} symbols from {len(all_tickers)} universe.",
+            }
+        )
+
+    df = load_screener_df(tickers)
+    if df.empty:
+        return {"count": 0, "rows": [], "meta": {"warnings": warnings}}
+
+    if request.rules:
+        rules = []
+        for raw in request.rules:
+            if not isinstance(raw, dict):
+                continue
+            field = str(raw.get("field") or "").strip()
+            op = str(raw.get("op") or "").strip()
+            value = raw.get("value")
+            if not field or not op:
+                continue
+            rules.append(Rule(field=field, op=op, value=value))
+        if rules:
+            df = ScreenerEngine(df).apply_rules(rules)
+
+    if df.empty:
+        return {"count": 0, "rows": [], "meta": {"warnings": warnings}}
+
+    factors = [
+        FactorSpec(name=f.field, weight=float(f.weight), higher_is_better=bool(f.higher_is_better))
+        for f in request.factors
+    ]
+    if not factors:
+        factors = [
+            FactorSpec("roe_pct", weight=0.35, higher_is_better=True),
+            FactorSpec("rev_growth_pct", weight=0.25, higher_is_better=True),
+            FactorSpec("eps_growth_pct", weight=0.20, higher_is_better=True),
+            FactorSpec("pe", weight=0.20, higher_is_better=False),
+        ]
+
+    scored = FactorEngine(df).score(factors, sector_neutral=request.sector_neutral)
+    ranked = scored.sort_values(
+        "composite_score", ascending=(request.sort_order.lower() == "asc")
+    ).head(max(1, min(request.limit, 200)))
+
+    factor_columns = [f"factor_{f.name}_z" for f in factors]
+    heatmap = FactorEngine.heatmap_matrix(ranked, factor_columns=factor_columns, top_n=25)
+    out_rows = ranked.where(pd.notnull(ranked), None).to_dict(orient="records")
+    return {
+        "count": len(out_rows),
+        "rows": out_rows,
+        "meta": {
+            "warnings": warnings,
+            "factors": [f.__dict__ for f in factors],
+            "sector_neutral": request.sector_neutral,
+            "heatmap": heatmap,
+        },
+    }

@@ -1,0 +1,48 @@
+# Polling intervals by market segment (seconds)
+india_equity:
+  market_hours:
+    start: "09:15"
+    end: "15:30"
+    tz: "Asia/Kolkata"
+  interval_live: 5
+  interval_post_market: 300
+  interval_holiday: 3600
+
+india_fno:
+  market_hours:
+    start: "09:15"
+    end: "15:30"
+    tz: "Asia/Kolkata"
+  interval_live: 3
+  interval_post_market: 300
+  interval_holiday: 3600
+
+us_equity:
+  market_hours:
+    start: "09:30"
+    end: "16:00"
+    tz: "America/New_York"
+  pre_market:
+    start: "04:00"
+    end: "09:30"
+  after_hours:
+    start: "16:00"
+    end: "20:00"
+  interval_live: 5
+  interval_extended: 15
+  interval_closed: 600
+
+us_futures:
+  market_hours:
+    start: "18:00"
+    end: "17:00"
+    tz: "America/New_York"
+  interval_live: 3
+  interval_closed: 300
+
+# Rate limit safety
+rate_limit:
+  max_retries: 5
+  base_backoff_sec: 2
+  max_backoff_sec: 300
+  jitter_factor: 0.3

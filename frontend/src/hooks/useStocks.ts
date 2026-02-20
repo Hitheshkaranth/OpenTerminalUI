@@ -35,6 +35,7 @@ import {
   searchSymbols,
 } from "../api/client";
 import { useSettingsStore } from "../store/settingsStore";
+import { normalizeTicker } from "../utils/ticker";
 import type {
   ChartResponse,
   DcfResponse,
@@ -67,34 +68,36 @@ function hasUsableSnapshot(data: StockSnapshot | undefined): boolean {
 }
 
 export function useStock(ticker: string) {
+  const normalizedTicker = normalizeTicker(ticker);
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
-  const isCrypto = /-USD$/i.test(ticker || "");
+  const isCrypto = /-USD$/i.test(normalizedTicker || "");
   return useQuery<StockSnapshot>({
-    queryKey: ["quote", selectedMarket, ticker, isCrypto ? "crypto" : "equity"],
+    queryKey: ["quote", selectedMarket, normalizedTicker, isCrypto ? "crypto" : "equity"],
     queryFn: () =>
       isCrypto
         ? Promise.resolve({
-            ticker: ticker.toUpperCase(),
-            symbol: ticker.toUpperCase(),
-            company_name: `${ticker.toUpperCase()} Crypto`,
+            ticker: normalizedTicker.toUpperCase(),
+            symbol: normalizedTicker.toUpperCase(),
+            company_name: `${normalizedTicker.toUpperCase()} Crypto`,
             exchange: "CRYPTO",
             country_code: "US",
             indices: [],
           } as StockSnapshot)
-        : getQuote(ticker, selectedMarket),
-    enabled: Boolean(ticker),
+        : getQuote(normalizedTicker, selectedMarket),
+    enabled: Boolean(normalizedTicker),
     staleTime: 60 * 1000,
     refetchInterval: (query) => (hasUsableSnapshot(query.state.data as StockSnapshot | undefined) ? false : 5000),
   });
 }
 
 export function useStockHistory(ticker: string, range = "1y", interval = "1d") {
+  const normalizedTicker = normalizeTicker(ticker);
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
-  const isCrypto = /-USD$/i.test(ticker || "");
+  const isCrypto = /-USD$/i.test(normalizedTicker || "");
   return useQuery<ChartResponse>({
-    queryKey: ["history", selectedMarket, ticker, range, interval, isCrypto ? "crypto" : "equity"],
-    queryFn: () => (isCrypto ? fetchCryptoCandles(ticker, interval, range) : getHistory(ticker, selectedMarket, interval, range)),
-    enabled: Boolean(ticker),
+    queryKey: ["history", selectedMarket, normalizedTicker, range, interval, isCrypto ? "crypto" : "equity"],
+    queryFn: () => (isCrypto ? fetchCryptoCandles(normalizedTicker, interval, range) : getHistory(normalizedTicker, selectedMarket, interval, range)),
+    enabled: Boolean(normalizedTicker),
     staleTime: 5 * 60 * 1000,
   });
 }

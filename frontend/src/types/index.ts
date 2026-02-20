@@ -102,6 +102,25 @@ export type ScreenerResponse = {
   };
 };
 
+export type ScreenerFactorConfig = {
+  field: string;
+  weight: number;
+  higher_is_better: boolean;
+};
+
+export type ScreenerV2Meta = {
+  warnings?: Array<{ code: string; message: string }>;
+  factors?: ScreenerFactorConfig[];
+  sector_neutral?: boolean;
+  heatmap?: Array<{ id: string; data: Array<{ x: string; y: number }> }>;
+};
+
+export type ScreenerV2Response = {
+  count: number;
+  rows: Array<Record<string, string | number | null>>;
+  meta?: ScreenerV2Meta;
+};
+
 export type PeerMetric = {
   metric: string;
   target_value: number;

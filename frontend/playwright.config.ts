@@ -17,14 +17,14 @@ export default defineConfig({
     : [
         {
           command: `python -m uvicorn backend.main:app --host 127.0.0.1 --port ${e2eBackendPort}`,
-          port: e2eBackendPort,
+          url: `http://127.0.0.1:${e2eBackendPort}/health`,
           cwd: "..",
           reuseExistingServer: true,
           timeout: 120_000,
         },
         {
-          command: `npm run dev -- --host 127.0.0.1 --port ${e2eFrontendPort} --strictPort`,
-          port: e2eFrontendPort,
+          command: `npm.cmd run dev -- --host 127.0.0.1 --port ${e2eFrontendPort} --strictPort`,
+          url: `http://127.0.0.1:${e2eFrontendPort}/login`,
           cwd: ".",
           env: {
             VITE_API_BASE_URL: `http://127.0.0.1:${e2eBackendPort}/api`,

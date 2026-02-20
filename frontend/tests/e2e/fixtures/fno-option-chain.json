@@ -1,0 +1,43 @@
+{
+  "expiries": {
+    "symbol": "NIFTY",
+    "expiries": ["2026-03-27", "2026-04-24"]
+  },
+  "summary": {
+    "symbol": "NIFTY",
+    "expiry_date": "2026-03-27",
+    "spot_price": 22850,
+    "atm_strike": 22850,
+    "atm_iv": 12.5,
+    "pcr": { "pcr_oi": 1.05, "pcr_volume": 1.08, "pcr_oi_change": 0.02, "signal": "neutral" },
+    "max_pain": 22800,
+    "support_resistance": { "support": [22700, 22650], "resistance": [22950, 23000] }
+  },
+  "chain": {
+    "symbol": "NIFTY",
+    "expiry_date": "2026-03-27",
+    "spot_price": 22850,
+    "atm_strike": 22850,
+    "timestamp": "2026-02-20T10:10:00Z",
+    "strikes": [
+      {
+        "strike_price": 22800,
+        "ce": { "oi": 2100000, "oi_change": 14000, "volume": 95000, "iv": 12.2, "ltp": 165, "bid": 164, "ask": 166, "greeks": { "delta": 0.52, "gamma": 0.0012, "theta": -15.4, "vega": 9.8, "rho": 1.2 } },
+        "pe": { "oi": 1600000, "oi_change": -5000, "volume": 64000, "iv": 12.7, "ltp": 120, "bid": 119, "ask": 121, "greeks": { "delta": -0.45, "gamma": 0.0011, "theta": -14.0, "vega": 10.2, "rho": -1.0 } }
+      },
+      {
+        "strike_price": 22850,
+        "ce": { "oi": 1900000, "oi_change": 11000, "volume": 86000, "iv": 12.3, "ltp": 150, "bid": 149, "ask": 151, "greeks": { "delta": 0.50, "gamma": 0.0013, "theta": -15.0, "vega": 10.0, "rho": 1.1 } },
+        "pe": { "oi": 1700000, "oi_change": 8000, "volume": 70000, "iv": 12.8, "ltp": 160, "bid": 159, "ask": 161, "greeks": { "delta": -0.50, "gamma": 0.0013, "theta": -15.1, "vega": 10.1, "rho": -1.1 } }
+      }
+    ],
+    "totals": {
+      "ce_oi_total": 4000000,
+      "pe_oi_total": 3300000,
+      "ce_volume_total": 181000,
+      "pe_volume_total": 134000,
+      "pcr_oi": 0.83,
+      "pcr_volume": 0.74
+    }
+  }
+}

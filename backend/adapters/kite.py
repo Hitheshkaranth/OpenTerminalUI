@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Any
 
-from backend.adapters.base import DataAdapter, Instrument, OHLCV, QuoteResponse
+from backend.adapters.base import DataAdapter, FuturesContract, Instrument, OHLCV, OptionChain, QuoteResponse
 from backend.core.kite_client import KiteClient
 from backend.core.nse_client import NSEClient
 from backend.core.yahoo_client import YahooClient
@@ -83,3 +83,9 @@ class KiteAdapter(DataAdapter):
 
     async def supports_streaming(self) -> bool:
         return bool(self.kite.api_key and self.kite.resolve_access_token())
+
+    async def get_option_chain(self, underlying: str, expiry: date) -> OptionChain | None:
+        return None
+
+    async def get_futures_chain(self, underlying: str) -> list[FuturesContract]:
+        return []

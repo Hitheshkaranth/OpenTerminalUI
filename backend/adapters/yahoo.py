@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from backend.adapters.base import DataAdapter, Instrument, OHLCV, QuoteResponse
+from backend.adapters.base import DataAdapter, FuturesContract, Instrument, OHLCV, OptionChain, QuoteResponse
 from backend.core.yahoo_client import YahooClient
 
 
@@ -71,3 +71,9 @@ class YahooFinanceAdapter(DataAdapter):
 
     async def supports_streaming(self) -> bool:
         return False
+
+    async def get_option_chain(self, underlying: str, expiry: date) -> OptionChain | None:
+        return None
+
+    async def get_futures_chain(self, underlying: str) -> list[FuturesContract]:
+        return []

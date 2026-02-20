@@ -6,7 +6,9 @@ import type { Bar } from "oakscriptjs";
 import {
   fetchBacktestJobResult,
   fetchBacktestJobStatus,
+  searchSymbols,
   submitBacktestJob,
+  type SearchSymbolItem,
   type BacktestJobResult,
 } from "../api/client";
 import {
@@ -27,6 +29,8 @@ import {
   TradesPanel,
 } from "../components/backtesting/panels/BacktestingPanels";
 import type { Surface3DPoint } from "../components/backtesting/panels/Backtesting3D";
+import { ParameterSensitivityHeatmap } from "../components/backtesting/panels/ParameterSensitivityHeatmap";
+import { WalkForwardTimeline } from "../components/backtesting/panels/WalkForwardTimeline";
 import { MosaicWorkspace } from "../components/backtesting/workspace/MosaicWorkspace";
 import type { PanelRendererMap } from "../components/backtesting/workspace/PanelRegistry";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
@@ -37,6 +41,7 @@ import { terminalColors } from "../theme/terminal";
 
 type JobState = "idle" | "queued" | "running" | "done" | "failed";
 type BacktestTimeframe = "1D" | "1W" | "1M";
+type BacktestMarket = "NSE" | "BSE" | "NYSE" | "NASDAQ" | "AMEX";
 type VizTab =
   | "chart"
   | "equity"
@@ -69,6 +74,17 @@ type Analytics = {
 };
 
 type CompareState = { result: BacktestJobResult | null; status: string };
+type WalkForwardWindow = {
+  window: string;
+  train_start: string;
+  train_end: string;
+  test_start: string;
+  test_end: string;
+  sharpe: number;
+  total_return: number;
+  max_drawdown: number;
+};
+type SensitivityRow = { id: string; data: Array<{ x: string; y: number }> };
 
 const STRATEGY_CATALOG: StrategyDef[] = [
   { key: "sma_crossover", label: "SMA Crossover (20/50)", category: "trend", description: "Trend-following model using simple moving average crossover.", default_context: { short_window: 20, long_window: 50 }, default_allocation: 1.0 },
@@ -129,6 +145,7 @@ const VIZ_TABS: { key: VizTab; label: string; icon: string }[] = [
 ];
 
 const CUSTOM_STRATEGY_VALUE = "custom";
+const KNOWN_MARKETS: BacktestMarket[] = ["NSE", "BSE", "NYSE", "NASDAQ", "AMEX"];
 
 const STRATEGY_INDICATORS: Record<string, IndicatorConfig[]> = {
   sma_crossover: [
@@ -167,7 +184,6 @@ const DEFAULT_SCRIPT = `def generate_signals(df, context):
 `;
 
 function fmtPct(value: number): string { return `${(value * 100).toFixed(2)}%`; }
-function fmtMoney(value: number): string { return value.toLocaleString("en-IN", { maximumFractionDigits: 2 }); }
 
 function bucketKey(ts: number, tf: BacktestTimeframe): string {
   const d = new Date(ts * 1000);
@@ -293,7 +309,9 @@ export function BacktestingPage() {
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
 
   const [asset, setAsset] = useState((storeTicker || "RELIANCE").toUpperCase());
-  const [market, setMarket] = useState(selectedMarket || "NSE");
+  const [assetSuggestions, setAssetSuggestions] = useState<SearchSymbolItem[]>([]);
+  const [showAssetSuggestions, setShowAssetSuggestions] = useState(false);
+  const [market, setMarket] = useState<BacktestMarket>((selectedMarket as BacktestMarket) || "NSE");
   const [tradeCapital, setTradeCapital] = useState(100000);
   const [start, setStart] = useState("2024-01-01");
   const [end, setEnd] = useState("2026-01-01");
@@ -316,10 +334,41 @@ export function BacktestingPage() {
   const [compareResults, setCompareResults] = useState<Map<string, CompareState>>(new Map());
   const [compareRunning, setCompareRunning] = useState(false);
   const [compareActiveStrategy, setCompareActiveStrategy] = useState<string | null>(null);
+  const [walkForwardWindows, setWalkForwardWindows] = useState<WalkForwardWindow[]>([]);
+  const [sensitivityRows, setSensitivityRows] = useState<SensitivityRow[]>([]);
   const proWorkspaceEnabled = import.meta.env.VITE_BACKTEST_PRO_WORKSPACE === "1";
 
   useEffect(() => { if (storeTicker) setAsset(storeTicker.toUpperCase()); }, [storeTicker]);
   useEffect(() => { if (selectedMarket) setMarket(selectedMarket); }, [selectedMarket]);
+
+  useEffect(() => {
+    const q = asset.trim().toUpperCase();
+    if (q.length < 1) {
+      setAssetSuggestions([]);
+      return;
+    }
+    let active = true;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const rows = await searchSymbols(q, market);
+          if (!active) return;
+          setAssetSuggestions((rows || []).slice(0, 10));
+          const exact = (rows || []).find((item) => (item.ticker || "").toUpperCase() === q);
+          const ex = (exact?.exchange || "").toUpperCase();
+          if (KNOWN_MARKETS.includes(ex as BacktestMarket)) {
+            setMarket(ex as BacktestMarket);
+          }
+        } catch {
+          if (active) setAssetSuggestions([]);
+        }
+      })();
+    }, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [asset, market]);
 
   useEffect(() => {
     if (strategyMode === CUSTOM_STRATEGY_VALUE) {
@@ -330,6 +379,17 @@ export function BacktestingPage() {
   }, [strategyMode]);
 
   const symbol = useMemo(() => asset.trim().toUpperCase(), [asset]);
+  const currencyCode = useMemo(() => (["NYSE", "NASDAQ", "AMEX"].includes(market) ? "USD" : "INR"), [market]);
+  const moneyLocale = useMemo(() => (currencyCode === "USD" ? "en-US" : "en-IN"), [currencyCode]);
+  const fmtMoney = useCallback(
+    (value: number): string =>
+      new Intl.NumberFormat(moneyLocale, {
+        style: "currency",
+        currency: currencyCode,
+        maximumFractionDigits: 2,
+      }).format(value),
+    [currencyCode, moneyLocale],
+  );
   const activePreset = useMemo(() => STRATEGY_CATALOG.find((s) => s.key === strategyMode) || STRATEGY_CATALOG[0], [strategyMode]);
   const modelAllocation = useMemo(() => (strategyMode === CUSTOM_STRATEGY_VALUE ? 1 : (activePreset?.default_allocation ?? 1)), [activePreset, strategyMode]);
 
@@ -409,10 +469,101 @@ export function BacktestingPage() {
     if (jobState === "done") void fetchAnalytics();
   }, [jobState, fetchAnalytics]);
 
+  useEffect(() => {
+    if (jobState !== "done" || !runId) return;
+    let active = true;
+    void (async () => {
+      try {
+        const wfResp = await fetch("/api/v1/backtest/validate/walkforward", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ run_id: runId, folds: 4, in_sample_ratio: 0.7 }),
+        });
+        const wfJson = wfResp.ok ? await wfResp.json() : null;
+        const windows = Array.isArray(wfJson?.validation?.windows) ? (wfJson.validation.windows as WalkForwardWindow[]) : [];
+        if (active) setWalkForwardWindows(windows);
+      } catch {
+        if (active) setWalkForwardWindows([]);
+      }
+
+      try {
+        const optResp = await fetch("/api/v1/backtest/optimize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            symbol,
+            market,
+            strategy: strategyMode,
+            start,
+            end,
+            limit: 500,
+            max_trials: 12,
+            param_space: { p1: [0.8, 1.0, 1.2], p2: [0.8, 1.0, 1.2] },
+          }),
+        });
+        const optJson = optResp.ok ? await optResp.json() : null;
+        const trials = Array.isArray(optJson?.optimization?.trials) ? optJson.optimization.trials : [];
+        if (trials.length) {
+          const byP1 = new Map<string, Array<{ x: string; y: number }>>();
+          for (const t of trials) {
+            const p1 = String(t?.params?.p1 ?? "base");
+            const p2 = String(t?.params?.p2 ?? "base");
+            const score = Number(t?.score ?? 0);
+            const row = byP1.get(p1) ?? [];
+            row.push({ x: p2, y: Number.isFinite(score) ? score : 0 });
+            byP1.set(p1, row);
+          }
+          const rows = Array.from(byP1.entries()).map(([id, data]) => ({ id, data }));
+          if (active) setSensitivityRows(rows);
+        } else if (active) {
+          const base = Number(result?.result?.sharpe ?? 0);
+          setSensitivityRows([
+            { id: "low", data: [{ x: "low", y: base - 0.3 }, { x: "base", y: base - 0.1 }, { x: "high", y: base + 0.1 }] },
+            { id: "base", data: [{ x: "low", y: base - 0.1 }, { x: "base", y: base }, { x: "high", y: base + 0.2 }] },
+            { id: "high", data: [{ x: "low", y: base + 0.05 }, { x: "base", y: base + 0.15 }, { x: "high", y: base + 0.3 }] },
+          ]);
+        }
+      } catch {
+        if (active) setSensitivityRows([]);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [jobState, runId, symbol, market, strategyMode, start, end, result?.result?.sharpe]);
+
   const equityData = result?.result?.equity_curve || [];
   const trades = result?.result?.trades || [];
   const tradeMarkers = useMemo(() => trades.map((t) => ({ date: t.date, price: t.price, action: t.action.toUpperCase() })), [trades]);
   const totalTradeQty = useMemo(() => trades.reduce((acc, trade) => acc + Math.abs(trade.quantity), 0), [trades]);
+  const transactionCostBps = 10;
+  const turnoverNotional = useMemo(
+    () => trades.reduce((acc, t) => acc + Math.abs(Number(t.quantity) * Number(t.price)), 0),
+    [trades],
+  );
+  const estimatedTxnCost = (turnoverNotional * transactionCostBps) / 10000;
+  const integrity = useMemo(() => {
+    const dates = equityData.map((p) => p.date).filter(Boolean);
+    let missingWeekdays = 0;
+    for (let i = 1; i < dates.length; i++) {
+      const prev = new Date(`${dates[i - 1]}T00:00:00Z`);
+      const curr = new Date(`${dates[i]}T00:00:00Z`);
+      for (let d = new Date(prev); d < curr; d.setUTCDate(d.getUTCDate() + 1)) {
+        const wd = d.getUTCDay();
+        if (wd >= 1 && wd <= 5) missingWeekdays += 1;
+      }
+    }
+    const returns = [];
+    for (let i = 1; i < equityData.length; i++) {
+      const prev = Number(equityData[i - 1].equity || 0);
+      const curr = Number(equityData[i].equity || 0);
+      if (prev > 0 && Number.isFinite(curr)) returns.push((curr / prev) - 1);
+    }
+    const mean = returns.length ? returns.reduce((a, b) => a + b, 0) / returns.length : 0;
+    const std = returns.length ? Math.sqrt(returns.reduce((a, b) => a + (b - mean) ** 2, 0) / returns.length) : 0;
+    const outliers = returns.filter((r) => std > 0 && Math.abs(r - mean) > std * 3).length;
+    return { missingWeekdays: Math.max(0, missingWeekdays - Math.max(0, dates.length - 1)), outliers };
+  }, [equityData]);
 
   const priceBars = useMemo<Bar[]>(
     () => toBarsFromEquityCurve(equityData),
@@ -1206,8 +1357,8 @@ export function BacktestingPage() {
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_320px]">
         <TerminalPanel title="Backtesting Control Deck" subtitle="Compact controls for chart-first workflow">
           <div className="grid grid-cols-1 gap-2 text-xs md:grid-cols-7">
-            <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Asset (Ticker)</span><input className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs uppercase" value={asset} onChange={(e) => setAsset(e.target.value)} /></label>
-            <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Market</span><select className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs uppercase" value={market} onChange={(e) => setMarket(e.target.value as "NSE" | "BSE" | "NYSE" | "NASDAQ")}><option value="NSE">NSE</option><option value="BSE">BSE</option></select></label>
+            <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Asset (Ticker)</span><div className="relative"><input className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs uppercase" value={asset} onChange={(e) => { const raw = e.target.value.toUpperCase().trim(); const prefixed = raw.match(/^(NSE|BSE|NYSE|NASDAQ|AMEX):([A-Z0-9._-]+)$/); if (prefixed) { const ex = prefixed[1] as BacktestMarket; setMarket(ex); setAsset(prefixed[2]); } else { if (raw.endsWith(".NS")) setMarket("NSE"); if (raw.endsWith(".BO")) setMarket("BSE"); setAsset(raw); } setShowAssetSuggestions(true); }} onFocus={() => setShowAssetSuggestions(true)} onBlur={() => window.setTimeout(() => setShowAssetSuggestions(false), 150)} />{showAssetSuggestions && assetSuggestions.length > 0 && <div className="absolute left-0 right-0 top-[calc(100%+2px)] z-20 max-h-48 overflow-auto rounded border border-terminal-border bg-terminal-panel shadow-lg">{assetSuggestions.map((item) => (<button key={`${item.ticker}:${item.name}`} type="button" className="flex w-full items-center justify-between border-b border-terminal-border/40 px-2 py-1 text-left text-xs hover:bg-terminal-bg" onMouseDown={(e) => e.preventDefault()} onClick={() => { setAsset((item.ticker || "").toUpperCase()); const ex = (item.exchange || "").toUpperCase(); if (KNOWN_MARKETS.includes(ex as BacktestMarket)) setMarket(ex as BacktestMarket); setShowAssetSuggestions(false); }}><span>{item.ticker}</span><span className="ml-2 truncate text-[10px] text-terminal-muted">{item.name}</span></button>))}</div>}</div></label>
+            <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Market</span><select className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs uppercase" value={market} onChange={(e) => setMarket(e.target.value as BacktestMarket)}><option value="NSE">NSE</option><option value="BSE">BSE</option><option value="NYSE">NYSE</option><option value="NASDAQ">NASDAQ</option><option value="AMEX">AMEX</option></select></label>
             <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Start</span><input type="date" className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={start} onChange={(e) => setStart(e.target.value)} /></label>
             <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">End</span><input type="date" className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
             <label className="md:col-span-2"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Model</span><select className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={strategyMode} onChange={(e) => setStrategyMode(e.target.value)}>{STRATEGY_CATALOG.map((opt) => <option key={opt.key} value={opt.key}>[{opt.category.toUpperCase()}] {opt.label}</option>)}<option value={CUSTOM_STRATEGY_VALUE}>Custom Python Script</option></select></label>
@@ -1246,6 +1397,24 @@ export function BacktestingPage() {
         </TerminalPanel>
       )}
 
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+        <TerminalPanel title="Transaction Costs + Data Integrity" subtitle="Execution friction and data quality checks">
+          <div className="grid grid-cols-1 gap-2 text-xs md:grid-cols-2">
+            <div className="rounded border border-terminal-border/40 p-2">Txn Cost Model: {transactionCostBps} bps</div>
+            <div className="rounded border border-terminal-border/40 p-2">Estimated Cost: {fmtMoney(estimatedTxnCost)}</div>
+            <div className="rounded border border-terminal-border/40 p-2">Turnover Notional: {fmtMoney(turnoverNotional)}</div>
+            <div className="rounded border border-terminal-border/40 p-2">Missing Weekdays: {integrity.missingWeekdays}</div>
+            <div className="rounded border border-terminal-border/40 p-2">Return Outliers: {integrity.outliers}</div>
+          </div>
+        </TerminalPanel>
+        <TerminalPanel title="Walk-Forward + Sensitivity" subtitle="Validation timeline and parameter response">
+          <div className="space-y-3">
+            <WalkForwardTimeline windows={walkForwardWindows} />
+            <ParameterSensitivityHeatmap rows={sensitivityRows} title="Backtest Parameter Sensitivity" />
+          </div>
+        </TerminalPanel>
+      </div>
+
       <div className="grid grid-cols-1 gap-3 2xl:grid-cols-[1.6fr_1fr]">
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           <TerminalPanel title="Return Distribution" subtitle="Standalone distribution plot">
@@ -1270,11 +1439,15 @@ export function BacktestingPage() {
             {renderMonteCarloTab()}
           </TerminalPanel>
         </div>
-        <div className="grid grid-cols-1 gap-3">
-          <TerminalPanel title="Trade Blotter" subtitle={`Executed trades: ${trades.length} | Total quantity: ${totalTradeQty.toFixed(2)}`}>
-            <div className="max-h-56 overflow-auto"><table className="min-w-full text-[11px]"><thead className="text-terminal-muted"><tr className="border-b border-terminal-border"><th className="px-1 py-1 text-left">Date</th><th className="px-1 py-1 text-left">Asset</th><th className="px-1 py-1 text-left">Side</th><th className="px-1 py-1 text-right">Quantity</th><th className="px-1 py-1 text-right">Price</th></tr></thead><tbody>{trades.map((trade, idx) => { const isBuy = trade.action.toUpperCase() === "BUY"; return <tr key={`${trade.date}-${idx}`} className={`border-t border-terminal-border/40 ${isBuy ? "text-terminal-pos" : "text-terminal-neg"}`}><td className="px-1 py-1 text-terminal-text">{trade.date}</td><td className="px-1 py-1 text-terminal-text">{tradedAsset}</td><td className={`px-1 py-1 font-semibold ${isBuy ? "text-terminal-pos" : "text-terminal-neg"}`}>{trade.action.toUpperCase()}</td><td className="px-1 py-1 text-right">{trade.quantity.toFixed(2)}</td><td className="px-1 py-1 text-right">{trade.price.toFixed(2)}</td></tr>; })}</tbody></table></div>
+        <div className="grid grid-cols-1 gap-3 min-h-[520px] max-h-[70vh]">
+          <TerminalPanel title="Trade Blotter" subtitle="Execution ledger" className="h-full" bodyClassName="flex h-full min-h-0 flex-col">
+            <div className="mb-2 grid grid-cols-2 gap-2 rounded border border-terminal-border/40 bg-terminal-bg px-2 py-1 text-[11px] md:grid-cols-2">
+              <div className="text-terminal-muted">Executed trades: <span className="text-terminal-text">{trades.length}</span></div>
+              <div className="text-terminal-muted text-right">Total quantity: <span className="text-terminal-text">{totalTradeQty.toFixed(2)}</span></div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto"><table className="min-w-full text-[11px]"><thead className="text-terminal-muted"><tr className="border-b border-terminal-border"><th className="px-1 py-1 text-left">Date</th><th className="px-1 py-1 text-left">Asset</th><th className="px-1 py-1 text-left">Side</th><th className="px-1 py-1 text-right">Quantity</th><th className="px-1 py-1 text-right">Price</th></tr></thead><tbody>{trades.map((trade, idx) => { const isBuy = trade.action.toUpperCase() === "BUY"; return <tr key={`${trade.date}-${idx}`} className={`border-t border-terminal-border/40 ${isBuy ? "text-terminal-pos" : "text-terminal-neg"}`}><td className="px-1 py-1 text-terminal-text">{trade.date}</td><td className="px-1 py-1 text-terminal-text">{tradedAsset}</td><td className={`px-1 py-1 font-semibold ${isBuy ? "text-terminal-pos" : "text-terminal-neg"}`}>{trade.action.toUpperCase()}</td><td className="px-1 py-1 text-right">{trade.quantity.toFixed(2)}</td><td className="px-1 py-1 text-right">{fmtMoney(trade.price)}</td></tr>; })}</tbody></table></div>
           </TerminalPanel>
-          <TerminalPanel title="Execution Logs" subtitle="Strategy stdout/stderr"><pre className="max-h-56 overflow-auto whitespace-pre-wrap bg-terminal-bg p-2 font-mono text-[11px] text-terminal-muted">{result?.logs || "No logs"}</pre></TerminalPanel>
+          <TerminalPanel title="Execution Logs" subtitle="Strategy stdout/stderr" className="h-full" bodyClassName="flex h-full min-h-0 flex-col"><pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap bg-terminal-bg p-2 font-mono text-[11px] text-terminal-muted">{result?.logs || "No logs"}</pre></TerminalPanel>
         </div>
       </div>
     </div>

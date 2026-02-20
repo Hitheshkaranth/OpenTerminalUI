@@ -9,6 +9,7 @@ import yaml
 from backend.adapters.base import DataAdapter
 from backend.adapters.crypto import CryptoDataAdapter
 from backend.adapters.kite import KiteAdapter
+from backend.adapters.mock import MockDataAdapter
 from backend.adapters.yahoo import YahooFinanceAdapter
 
 
@@ -27,6 +28,7 @@ class AdapterRegistry:
             "kite": lambda: KiteAdapter(),
             "yahoo": lambda: YahooFinanceAdapter(),
             "crypto": lambda: CryptoDataAdapter(),
+            "mock": lambda: MockDataAdapter(),
         }
 
     def _load_config(self) -> dict[str, Any]:

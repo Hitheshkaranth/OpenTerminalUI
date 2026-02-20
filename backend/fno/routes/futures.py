@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 from sqlalchemy import distinct, func
 
+from backend.adapters.registry import get_adapter_registry
 from backend.api.deps import get_unified_fetcher
 from backend.core.ttl_policy import market_open_now, ttl_seconds
 from backend.db.models import FutureContract
@@ -13,6 +14,13 @@ from backend.shared.cache import cache as cache_instance
 from backend.shared.db import SessionLocal
 
 router = APIRouter()
+DEFAULT_FUTURES_UNDERLYINGS = [
+    "NIFTY",
+    "BANKNIFTY",
+    "FINNIFTY",
+    "MIDCPNIFTY",
+    "NIFTYNXT50",
+]
 
 
 def _to_float(value: Any) -> float | None:
@@ -38,6 +46,9 @@ async def list_futures_underlyings(
             stmt = stmt.filter(func.upper(FutureContract.underlying).like(f"{query_text}%"))
         values = stmt.order_by(FutureContract.underlying.asc()).limit(limit).all()
         items = [str(row[0]).upper() for row in values if row and row[0]]
+        if not items:
+            fallback = [u for u in DEFAULT_FUTURES_UNDERLYINGS if (not query_text or u.startswith(query_text))]
+            items = fallback[:limit]
         return {"count": len(items), "items": items}
     finally:
         db.close()
@@ -63,6 +74,52 @@ async def get_futures_chain(underlying: str) -> dict[str, Any]:
         )
     finally:
         db.close()
+
+    if not rows:
+        try:
+            mock = get_adapter_registry()._instance("mock")
+            fallback_contracts = await mock.get_futures_chain(key_underlying)
+        except Exception:
+            fallback_contracts = []
+
+        contracts = []
+        ws_symbols: list[str] = []
+        token_to_ws_symbol: dict[str, str] = {}
+        for idx, c in enumerate(fallback_contracts):
+            ws_symbol = c.symbol
+            ws_symbols.append(ws_symbol)
+            token = str(-(idx + 1))
+            token_to_ws_symbol[token] = ws_symbol
+            contracts.append(
+                {
+                    "expiry_date": c.expiry,
+                    "tradingsymbol": c.symbol.split(":")[-1],
+                    "exchange": c.symbol.split(":")[0],
+                    "ws_symbol": ws_symbol,
+                    "instrument_token": int(token),
+                    "lot_size": c.lot_size,
+                    "tick_size": None,
+                    "ltp": c.ltp,
+                    "change": c.change,
+                    "change_pct": c.change_pct,
+                    "oi": c.oi,
+                    "volume": c.volume,
+                }
+            )
+
+        response = {
+            "underlying": key_underlying,
+            "count": len(contracts),
+            "ws_symbols": ws_symbols,
+            "token_to_ws_symbol": token_to_ws_symbol,
+            "contracts": contracts,
+        }
+        await cache_instance.set(
+            cache_key,
+            response,
+            ttl=ttl_seconds("futures_chain", market_open_now()),
+        )
+        return response
 
     instruments = [f"{row.exchange}:{row.tradingsymbol}" for row in rows]
     quotes_by_instrument: dict[str, dict[str, Any]] = {}

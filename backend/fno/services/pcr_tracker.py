@@ -64,26 +64,83 @@ class PCRTracker:
             )
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_pcr_snapshots_symbol_date ON pcr_snapshots(symbol, snapshot_date)"))
 
+    def _signal_for_pcr(self, pcr_oi: float) -> str:
+        if pcr_oi > 1.0:
+            return "Bullish"
+        if pcr_oi < 0.7:
+            return "Bearish"
+        return "Neutral"
+
+    def _empty_current(self, symbol: str, expiry: str | None = None) -> dict[str, Any]:
+        return {
+            "symbol": symbol.strip().upper(),
+            "expiry_date": expiry or "",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "pcr_oi": 0.0,
+            "pcr_vol": 0.0,
+            "pcr_oi_change": 0.0,
+            "signal": "Neutral",
+            "total_ce_oi": 0,
+            "total_pe_oi": 0,
+        }
+
+    def _latest_snapshot(self, symbol: str) -> dict[str, Any] | None:
+        self._ensure_table()
+        with engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT snapshot_date, pcr_oi, pcr_vol, total_ce_oi, total_pe_oi, created_at
+                    FROM pcr_snapshots
+                    WHERE symbol = :symbol
+                    ORDER BY snapshot_date DESC, id DESC
+                    LIMIT 1
+                    """
+                ),
+                {"symbol": symbol.strip().upper()},
+            ).fetchone()
+        if not row:
+            return None
+        pcr_oi = float(row[1] or 0.0)
+        return {
+            "symbol": symbol.strip().upper(),
+            "expiry_date": "",
+            "timestamp": str(row[5] or datetime.now(timezone.utc).isoformat()),
+            "pcr_oi": pcr_oi,
+            "pcr_vol": float(row[2] or 0.0),
+            "pcr_oi_change": 0.0,
+            "signal": self._signal_for_pcr(pcr_oi),
+            "total_ce_oi": float(row[3] or 0.0),
+            "total_pe_oi": float(row[4] or 0.0),
+        }
+
     async def get_current_pcr(self, symbol: str, expiry: str | None = None) -> dict[str, Any]:
         """Current PCR (OI-based and volume-based) with signal."""
-        chain = await self._fetcher.get_option_chain(symbol, expiry=expiry, strike_range=20)
-        pcr = self._analyzer.get_pcr(chain)
-        totals = chain.get("totals") if isinstance(chain.get("totals"), dict) else {}
-        return {
-            "symbol": chain.get("symbol"),
-            "expiry_date": chain.get("expiry_date"),
-            "timestamp": chain.get("timestamp"),
-            "pcr_oi": pcr.get("pcr_oi", 0.0),
-            "pcr_vol": pcr.get("pcr_volume", 0.0),
-            "pcr_oi_change": pcr.get("pcr_oi_change", 0.0),
-            "signal": pcr.get("signal", "Neutral"),
-            "total_ce_oi": totals.get("ce_oi_total", 0),
-            "total_pe_oi": totals.get("pe_oi_total", 0),
-        }
+        symbol_u = symbol.strip().upper()
+        try:
+            chain = await self._fetcher.get_option_chain(symbol_u, expiry=expiry, strike_range=20)
+            pcr = self._analyzer.get_pcr(chain)
+            totals = chain.get("totals") if isinstance(chain.get("totals"), dict) else {}
+            return {
+                "symbol": chain.get("symbol") or symbol_u,
+                "expiry_date": chain.get("expiry_date"),
+                "timestamp": chain.get("timestamp"),
+                "pcr_oi": pcr.get("pcr_oi", 0.0),
+                "pcr_vol": pcr.get("pcr_volume", 0.0),
+                "pcr_oi_change": pcr.get("pcr_oi_change", 0.0),
+                "signal": pcr.get("signal", "Neutral"),
+                "total_ce_oi": totals.get("ce_oi_total", 0),
+                "total_pe_oi": totals.get("pe_oi_total", 0),
+            }
+        except Exception:
+            return self._latest_snapshot(symbol_u) or self._empty_current(symbol_u, expiry)
 
     async def get_pcr_by_strike(self, symbol: str, expiry: str | None = None) -> list[dict[str, Any]]:
         """PCR at each individual strike."""
-        chain = await self._fetcher.get_option_chain(symbol, expiry=expiry, strike_range=50)
+        try:
+            chain = await self._fetcher.get_option_chain(symbol, expiry=expiry, strike_range=50)
+        except Exception:
+            return []
         out: list[dict[str, Any]] = []
         for row in chain.get("strikes", []) if isinstance(chain.get("strikes"), list) else []:
             if not isinstance(row, dict):
@@ -241,15 +298,22 @@ class PCRTracker:
                 ).fetchall()
 
         if not rows:
-            current = await self.store_snapshot(symbol_u)
-            rows = [(date.today().isoformat(), current.get("pcr_oi", 0.0), current.get("pcr_vol", 0.0))]
+            try:
+                current = await self.store_snapshot(symbol_u)
+                rows = [(date.today().isoformat(), current.get("pcr_oi", 0.0), current.get("pcr_vol", 0.0))]
+            except Exception:
+                last = self._latest_snapshot(symbol_u)
+                if last:
+                    rows = [(date.today().isoformat(), last.get("pcr_oi", 0.0), last.get("pcr_vol", 0.0))]
+                else:
+                    rows = [(date.today().isoformat(), 0.0, 0.0)]
 
         out = []
         for row in rows:
             day = str(row[0])
             pcr_oi = float(row[1] or 0.0)
             pcr_vol = float(row[2] or 0.0)
-            signal = "Bullish" if pcr_oi > 1.0 else ("Bearish" if pcr_oi < 0.7 else "Neutral")
+            signal = self._signal_for_pcr(pcr_oi)
             out.append({"date": day, "pcr_oi": round(pcr_oi, 4), "pcr_vol": round(pcr_vol, 4), "signal": signal})
         return out
 

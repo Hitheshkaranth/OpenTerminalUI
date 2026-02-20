@@ -5,6 +5,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createPortfolioDefinition, listPortfolioDefinitions, type RebalanceFrequency, type WeightingMethod } from "../api/portfolioLab";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 
+function normalizeIsoDate(input: string): string {
+  const value = input.trim();
+  if (!value) return value;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const dmy = value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (dmy) {
+    const [, dd, mm, yyyy] = dmy;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return value;
+}
+
 export function PortfolioLabPage() {
   const queryClient = useQueryClient();
   const [name, setName] = useState("Core Multi-Asset");
@@ -18,6 +30,7 @@ export function PortfolioLabPage() {
   const [weightingMethod, setWeightingMethod] = useState<WeightingMethod>("RISK_PARITY");
   const [maxWeight, setMaxWeight] = useState(0.25);
   const [cashBuffer, setCashBuffer] = useState(0);
+  const [createMessage, setCreateMessage] = useState<string | null>(null);
 
   const portfolios = useQuery({
     queryKey: ["portfolio-lab", "portfolios"],
@@ -26,8 +39,19 @@ export function PortfolioLabPage() {
 
   const createMutation = useMutation({
     mutationFn: createPortfolioDefinition,
-    onSuccess: () => {
+    onSuccess: (created) => {
+      setCreateMessage(`Portfolio created: ${created.name}`);
       void queryClient.invalidateQueries({ queryKey: ["portfolio-lab", "portfolios"] });
+    },
+    onError: (err: unknown) => {
+      let detail = "Failed to create portfolio";
+      if (typeof err === "object" && err && "response" in err) {
+        const maybeResponse = (err as { response?: { data?: { detail?: string } } }).response;
+        if (maybeResponse?.data?.detail) detail = maybeResponse.data.detail;
+      } else if (err instanceof Error && err.message) {
+        detail = err.message;
+      }
+      setCreateMessage(detail);
     },
   });
 
@@ -38,14 +62,17 @@ export function PortfolioLabPage() {
 
   const onCreate = (event: FormEvent) => {
     event.preventDefault();
+    setCreateMessage(null);
+    const normalizedStart = normalizeIsoDate(startDate);
+    const normalizedEnd = normalizeIsoDate(endDate);
     createMutation.mutate({
-      name,
+      name: name.trim(),
       description,
       tags: tags.split(",").map((row) => row.trim()).filter(Boolean),
       universe_json: { tickers: tickerList },
-      benchmark_symbol: benchmark || undefined,
-      start_date: startDate,
-      end_date: endDate,
+      benchmark_symbol: benchmark.trim().toUpperCase() || undefined,
+      start_date: normalizedStart,
+      end_date: normalizedEnd,
       rebalance_frequency: rebalanceFrequency,
       weighting_method: weightingMethod,
       constraints_json: {
@@ -81,6 +108,7 @@ export function PortfolioLabPage() {
         <TerminalPanel title="Portfolio Definitions" subtitle="Saved universes and construction policies">
           <div className="space-y-2 text-xs">
             {portfolios.isLoading && <div className="text-terminal-muted">Loading portfolios...</div>}
+            {portfolios.isError && <div className="text-terminal-neg">Failed to load portfolios.</div>}
             {(portfolios.data || []).map((portfolio) => (
               <div className="rounded border border-terminal-border/50 p-2" key={portfolio.id}>
                 <div className="flex items-center justify-between">
@@ -133,6 +161,11 @@ export function PortfolioLabPage() {
             <button type="submit" className="rounded border border-terminal-accent bg-terminal-accent/10 px-3 py-1 font-semibold text-terminal-accent" disabled={createMutation.isPending}>
               {createMutation.isPending ? "Saving..." : "Create Portfolio"}
             </button>
+            {createMessage && (
+              <div className={`rounded border px-2 py-1 ${createMutation.isError ? "border-terminal-neg/60 text-terminal-neg" : "border-terminal-pos/60 text-terminal-pos"}`}>
+                {createMessage}
+              </div>
+            )}
           </form>
         </TerminalPanel>
       </div>

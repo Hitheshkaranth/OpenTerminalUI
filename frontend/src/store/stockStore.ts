@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { fetchChart, fetchStock } from "../api/client";
 import { useSettingsStore } from "./settingsStore";
 import type { ChartResponse, StockSnapshot } from "../types";
+import { normalizeTicker } from "../utils/ticker";
 
 type StockState = {
   ticker: string;
@@ -29,17 +30,18 @@ export const useStockStore = create<StockState>()(
       chart: null,
       loading: false,
       error: null,
-      setTicker: (ticker) => set({ ticker: ticker.toUpperCase() }),
+      setTicker: (ticker) => set({ ticker: normalizeTicker(ticker) }),
       setInterval: (interval) => set({ interval }),
       setRange: (range) => set({ range }),
       load: async () => {
         const { ticker, interval, range } = get();
+        const normalizedTicker = normalizeTicker(ticker);
         const market = useSettingsStore.getState().selectedMarket;
         set({ loading: true, error: null });
         try {
           const [stockResult, chartResult] = await Promise.allSettled([
-            fetchStock(ticker, market),
-            fetchChart(ticker, interval, range, market),
+            fetchStock(normalizedTicker, market),
+            fetchChart(normalizedTicker, interval, range, market),
           ]);
           const nextStock = stockResult.status === "fulfilled" ? stockResult.value : get().stock;
           const nextChart = chartResult.status === "fulfilled" ? chartResult.value : get().chart;

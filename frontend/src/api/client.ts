@@ -25,6 +25,8 @@ import type {
   PeerResponse,
   RelativeValuationResponse,
   ScreenerResponse,
+  ScreenerFactorConfig,
+  ScreenerV2Response,
   ScreenerRule,
   ShareholdingPatternResponse,
   StockSnapshot,
@@ -130,6 +132,22 @@ export async function runScreener(rules: ScreenerRule[], limit = 50): Promise<Sc
     sort_order: "desc",
     limit,
     universe: "nse_eq",
+  });
+  return data;
+}
+
+export async function runScreenerV2(
+  rules: ScreenerRule[],
+  factors: ScreenerFactorConfig[],
+  opts?: { limit?: number; sectorNeutral?: boolean; universe?: string }
+): Promise<ScreenerV2Response> {
+  const { data } = await api.post<ScreenerV2Response>("/screener/run-v2", {
+    rules,
+    factors,
+    sort_order: "desc",
+    limit: opts?.limit ?? 50,
+    universe: opts?.universe ?? "nse_eq",
+    sector_neutral: opts?.sectorNeutral ?? false,
   });
   return data;
 }

@@ -54,7 +54,7 @@ export function AboutPage() {
           <img src={logo} alt="OpenTerminalUI Logo" className="h-16 w-auto object-contain" />
           <div className="text-xs text-terminal-muted">
             Analyze. Trade. Optimize.
-            <div className="mt-1">Open-source trading analytics workspace with integrated Equity, F&O, and Backtesting flows.</div>
+            <div className="mt-1">Open-source Indian and US stock analytics workspace with integrated Equity, F&O, and Backtesting flows.</div>
           </div>
         </div>
       </TerminalPanel>
@@ -66,6 +66,7 @@ export function AboutPage() {
             <li>- Company intelligence stack: overview, scorecard, fundamentals, valuation, peers, reports.</li>
             <li>- Advanced panels: shareholding pattern + trend, capex tracker, and Python execution lab.</li>
             <li>- Operational screens: screener, portfolio, watchlist, mutual funds, and news/sentiment monitor.</li>
+            <li>- US Market integration: NYSE/NASDAQ/AMEX support with US stock ticker search and routing.</li>
           </ul>
         </TerminalPanel>
 
@@ -113,19 +114,7 @@ export function AboutPage() {
         </ul>
       </TerminalPanel>
 
-      <TerminalPanel title="Phase 3: Platform Maturity">
-        <ul className="space-y-1 text-xs text-terminal-text">
-          <li>- Plugin System: sandboxed loader, permission registry, YAML manifests, and marketplace UI with enable/disable controls.</li>
-          <li>- Export Engine: PDF, Excel, and CSV report generation for portfolios, watchlists, and analytics data.</li>
-          <li>- Portfolio Analytics: benchmark overlay charting, correlation heatmap, dividend tracker, risk metrics panel, and tax lot manager.</li>
-          <li>- PWA + Mobile: service worker with offline caching, web app manifest, install prompt, mobile bottom nav, and responsive card layouts.</li>
-          <li>- Pull-to-Refresh: touch gesture support on watchlist and alerts for mobile-native feel.</li>
-          <li>- Theme System: terminal theme CSS layer with customizable accent colours in settings.</li>
-          <li>- E2E Mobile Tests: Playwright test suite covering swipe, touch, and responsive breakpoints.</li>
-        </ul>
-      </TerminalPanel>
-
-      <TerminalPanel title="Phase 2: Core Expansion">
+      <TerminalPanel title="Features">
         <ul className="space-y-1 text-xs text-terminal-text">
           <li>- Auth foundation: JWT access/refresh, auth middleware, role protection, login/register screens.</li>
           <li>- Corporate Events + Earnings: dedicated APIs, timeline/calendar widgets, and stock/portfolio integrations.</li>
@@ -133,6 +122,14 @@ export function AboutPage() {
           <li>- Paper Trading: virtual portfolio/order/position/trade model, performance metrics, strategy deploy API, and UI dashboard.</li>
           <li>- Chart Foundations: chart drawings/templates persistence APIs plus multi-chart crosshair sync context scaffolding.</li>
           <li>- Adapter Layer: pluggable multi-exchange adapter registry with Kite/Yahoo/Crypto base implementations.</li>
+          <li>- US stock ticker integration: autocomplete + market-aware symbol routing for US tickers in chart/backtest workflows.</li>
+          <li>- Plugin System: sandboxed loader, permission registry, YAML manifests, and marketplace UI with enable/disable controls.</li>
+          <li>- Export Engine: PDF, Excel, and CSV report generation for portfolios, watchlists, and analytics data.</li>
+          <li>- Portfolio Analytics: benchmark overlay charting, correlation heatmap, dividend tracker, risk metrics panel, and tax lot manager.</li>
+          <li>- PWA + Mobile: service worker with offline caching, web app manifest, install prompt, mobile bottom nav, and responsive card layouts.</li>
+          <li>- Pull-to-Refresh: touch gesture support on watchlist and alerts for mobile-native feel.</li>
+          <li>- Theme System: terminal theme CSS layer with customizable accent colours in settings.</li>
+          <li>- E2E Mobile Tests: Playwright test suite covering swipe, touch, and responsive breakpoints.</li>
         </ul>
       </TerminalPanel>
 

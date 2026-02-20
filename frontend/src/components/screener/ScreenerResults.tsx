@@ -8,6 +8,11 @@ export function ScreenerResults({ rows }: Props) {
   return (
     <div className="rounded border border-terminal-border bg-terminal-panel p-3">
       <div className="mb-2 text-sm font-semibold">Screener Results ({rows.length})</div>
+      {rows.length === 0 && (
+        <div className="mb-2 rounded border border-terminal-border/50 bg-terminal-bg p-2 text-xs text-terminal-muted">
+          No companies matched this filter set. Adjust rules and run again.
+        </div>
+      )}
       <div className="max-h-[480px] overflow-auto">
         <table className="min-w-full text-xs">
           <thead>

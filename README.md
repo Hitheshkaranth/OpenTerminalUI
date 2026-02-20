@@ -1,10 +1,10 @@
-<p align="center">
+﻿<p align="center">
   <img src="assets/logo.png" alt="OpenTerminal Logo" width="600" />
 </p>
 
 <p align="center">
   <strong>Analyze. Trade. Optimize.</strong><br>
-  Open-source NSE trading analytics workspace
+  Open-source Indian and US stock trading analytics workspace
 </p>
 
 <p align="center">
@@ -27,6 +27,7 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - **Company Analytics** - fundamentals, scorecards, trends, reports, valuation, peer comparison
 - **Advanced Research Widgets** - shareholding pattern panel (NSE + fallback), capex tracker, and in-app Python execution
 - **Operations Screens** - screener, portfolio, watchlist, mutual funds desk, settings, and news/sentiment flows
+- **US Market Integration** - NYSE/NASDAQ/AMEX market support with US stock ticker search and selection workflow
 
 ### Futures & Options (F&O) Analysis Pack
 - **Option Chain + Greeks + OI** - strike-level structure, Greeks, and open-interest context
@@ -61,17 +62,7 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - **Background Services** - instruments loader and scheduled news ingestion
 - **Deployment** - Docker compose workflow with optional Redis cache profile
 
-## Latest additions (Phase 3 — Platform Maturity)
-
-- **Plugin system**: sandboxed plugin loader with YAML manifests, permission registry, enable/disable lifecycle, example plugins (RSI divergence scanner, unusual volume detector, sector rotation monitor), backend + frontend marketplace UI.
-- **Export engine**: PDF, Excel (`.xlsx`), and CSV report generation for portfolio holdings, watchlist snapshots, and analytics data via `reportlab` and `openpyxl`.
-- **Portfolio analytics suite**: benchmark overlay charting, correlation heatmap, dividend income tracker, risk metrics panel (Sharpe, Sortino, max drawdown), and tax lot manager.
-- **PWA + mobile experience**: web app manifest, service worker with offline caching, app install prompt banner, mobile bottom navigation bar, responsive card layouts, and pull-to-refresh touch gestures on watchlist and alerts.
-- **Theme system**: terminal theme CSS layer imported at app root with customizable accent colours exposed in settings.
-- **E2E mobile tests**: Playwright test suite covering swipe interactions, touch targets, and responsive breakpoint behaviour.
-- **New dependencies**: `openpyxl` and `reportlab` for server-side report generation.
-
-### Previous additions (Phase 2 — Core Expansion)
+## Features
 
 - **Authentication foundation**: JWT access/refresh flow, auth middleware, role checks, and auth pages/context in frontend.
 - **Events + earnings expansion**: corporate actions/events endpoints, earnings calendar + analysis services, and timeline/calendar UI widgets.
@@ -79,7 +70,14 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - **Paper trading module**: virtual portfolios, orders, positions, trades, performance metrics, strategy deploy endpoint, and new Paper dashboard UI.
 - **Charting persistence/sync foundation**: chart drawings/templates backend APIs and crosshair sync context scaffolding for multi-panel charts.
 - **Multi-exchange adapter framework**: pluggable adapter base + registry (`Kite`, `Yahoo`, `Crypto`) with adapter-first routing in key quote/search/chart flows.
-
+- **US stock ticker integration**: autocomplete + market-aware symbol routing for US tickers across charting and backtesting flows.
+- **Plugin system**: sandboxed plugin loader with YAML manifests, permission registry, enable/disable lifecycle, example plugins (RSI divergence scanner, unusual volume detector, sector rotation monitor), backend + frontend marketplace UI.
+- **Export engine**: PDF, Excel (`.xlsx`), and CSV report generation for portfolio holdings, watchlist snapshots, and analytics data via `reportlab` and `openpyxl`.
+- **Portfolio analytics suite**: benchmark overlay charting, correlation heatmap, dividend income tracker, risk metrics panel (Sharpe, Sortino, max drawdown), and tax lot manager.
+- **PWA + mobile experience**: web app manifest, service worker with offline caching, app install prompt banner, mobile bottom navigation bar, responsive card layouts, and pull-to-refresh touch gestures on watchlist and alerts.
+- **Theme system**: terminal theme CSS layer imported at app root with customizable accent colours exposed in settings.
+- **E2E mobile tests**: Playwright test suite covering swipe interactions, touch targets, and responsive breakpoint behaviour.
+- **New dependencies**: `openpyxl` and `reportlab` for server-side report generation.
 ## Roadmap
 
 - [x] Equity terminal with charting, research panels, and operational workflows

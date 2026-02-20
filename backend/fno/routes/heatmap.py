@@ -17,8 +17,11 @@ async def heatmap_oi() -> dict[str, Any]:
     fetcher = get_option_chain_fetcher()
     rows: list[dict[str, Any]] = []
     for symbol in tracker.snapshot_universe()[:20]:
-        chain = await fetcher.get_option_chain(symbol, strike_range=20)
-        totals = chain.get("totals") if isinstance(chain.get("totals"), dict) else {}
+        try:
+            chain = await fetcher.get_option_chain(symbol, strike_range=20)
+            totals = chain.get("totals") if isinstance(chain.get("totals"), dict) else {}
+        except Exception:
+            totals = {}
         rows.append(
             {
                 "symbol": symbol,
@@ -37,7 +40,10 @@ async def heatmap_iv() -> dict[str, Any]:
     iv_engine = get_iv_engine()
     rows: list[dict[str, Any]] = []
     for symbol in tracker.snapshot_universe()[:20]:
-        iv = await iv_engine.get_iv_data(symbol)
+        try:
+            iv = await iv_engine.get_iv_data(symbol)
+        except Exception:
+            iv = {}
         rows.append({"symbol": symbol, "atm_iv": iv.get("atm_iv", 0.0), "iv_rank": iv.get("iv_rank", 0.0)})
     rows.sort(key=lambda x: float(x.get("atm_iv", 0.0) or 0.0), reverse=True)
     return {"items": rows}

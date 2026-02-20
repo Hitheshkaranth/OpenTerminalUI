@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from backend.api.routes import options
 from backend.equity.routes import admin, alerts, auth, backtest, backtests, chart, crypto, data, earnings, events, export, fundamentals, health, indicators, kite, mutual_funds, news, paper, peers, plugins, portfolio, quotes, reports, screener, scripting, search, shareholding, stocks, stream, valuation
 from backend.model_lab import router as model_lab_router
 from backend.portfolio_lab import router as portfolio_lab_router
@@ -33,6 +34,7 @@ equity_router.include_router(crypto.router, prefix="/api", tags=["crypto"])
 equity_router.include_router(paper.router, prefix="/api", tags=["paper"])
 equity_router.include_router(scripting.router, prefix="/api", tags=["scripting"])
 equity_router.include_router(shareholding.router, prefix="/api", tags=["shareholding"])
+equity_router.include_router(options.router)
 equity_router.include_router(model_lab_router, prefix="/api", tags=["model-lab"])
 equity_router.include_router(portfolio_lab_router, prefix="/api", tags=["portfolio-lab"])
 equity_router.include_router(mutual_funds.router)
