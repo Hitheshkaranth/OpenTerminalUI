@@ -41,6 +41,18 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - **Result Accounting** - initial capital, final equity, net P/L, and ending cash shown in performance block
 - **Trade Audit** - buy/sell markers, execution logs, and full trade blotter by asset
 
+### Model Lab
+- **Experiment Registry** - first-class experiment objects with tags, model params, date windows, benchmark, and cost model
+- **Research Reports** - persisted metrics/timeseries tear-sheet with equity, drawdown, rolling sharpe, monthly heatmap, and return distribution
+- **Run Comparison** - multi-run compare table, curve overlays, scatter plots, and Pareto highlighting
+- **Robustness Tools** - walk-forward validation and bounded parameter sweep endpoints
+
+### Portfolio Lab
+- **Portfolio Definitions** - reusable universes with rebalance policy, weighting method, constraints, and benchmark
+- **Strategy Blending** - multi-model blend registry (weighted return blending MVP)
+- **Portfolio Backtesting** - portfolio-level orchestration across many assets and blended strategy streams
+- **Institutional Analytics** - equity/drawdown, rolling metrics, contribution and turnover series, monthly heatmap, and correlation matrix
+
 ### Platform & APIs
 - **Realtime Streaming** - WebSocket quotes with REST/snapshot fallback
 - **V1 Endpoints** - equity analytics, shareholding pattern/trends, mutual fund search/performance/portfolio, delivery series, indicators, crypto, scripting
@@ -73,6 +85,8 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - [x] Equity terminal with charting, research panels, and operational workflows
 - [x] F&O terminal with option chain, Greeks, OI, strategy, PCR, heatmap, and expiry views
 - [x] Capital-aware backtesting control deck with model-based execution sizing
+- [x] Model Lab experiments, reports, compare view, and robustness checks
+- [x] Portfolio Lab portfolio backtesting, blending, risk parity, and analytics visuals
 - [x] Realtime quote stream with fallback and stable market tape rendering
 - [x] API v1 surface for analytics, indicators, crypto, and scripting
 - [x] Mutual funds module with compare, top funds, and portfolio holdings tracking
@@ -86,6 +100,21 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - [ ] Portfolio-level backtesting and strategy comparison views
 - [ ] Expanded model/template library and parameter presets
 - [ ] Additional performance optimization for large watchlists and long chart sessions
+
+## Recent UX and workflow updates
+
+- **Home terminal revamp**: portfolio overview now relays live aggregate data from Equity valuation, F&O chain summary, backtest presets, watchlist coverage, and settings state.
+- **Live market pulse**: home market pulse table now uses backend quote polling instead of synthetic/random ticks.
+- **Auth recovery flow**: added dedicated `Forgot access` screen and backend reset endpoint; login recovery is separated from registration.
+- **Register alignment**: registration page now uses the same terminal visual language and layout system as login.
+- **Portfolio navigation consolidation**: equity + mutual-funds modes now run through one portfolio screen (`/equity/portfolio?mode=...`), removing duplicate mutual-funds flow.
+- **Backtesting workspace expansion**: removed linked analytics strip in chart tab, added active Research Suites highlighting, and introduced standalone 3D analytics panels:
+  - Drawdown terrain
+  - Regime efficacy
+  - Orderbook liquidity engine
+  - Implied volatility surface
+  - Volatility surface
+  - Monte Carlo simulation
 
 ## Screenshots
 

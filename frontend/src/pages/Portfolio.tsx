@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Area, AreaChart, Brush, CartesianGrid, Legend, Line, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import {
@@ -186,7 +187,10 @@ function daysSince(dateString: string): number | null {
 }
 
 export function PortfolioPage() {
-  const [portfolioMode, setPortfolioMode] = useState<"equity" | "mutual_funds">("equity");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [portfolioMode, setPortfolioMode] = useState<"equity" | "mutual_funds">(
+    () => (searchParams.get("mode") === "mutual_funds" ? "mutual_funds" : "equity"),
+  );
   const [mfSchemeCode, setMfSchemeCode] = useState("");
   const [mfSchemeName, setMfSchemeName] = useState("");
   const [mfFundHouse, setMfFundHouse] = useState("");
@@ -235,6 +239,21 @@ export function PortfolioPage() {
       }, {}),
     [portfolioEarnings],
   );
+
+  useEffect(() => {
+    const mode = searchParams.get("mode") === "mutual_funds" ? "mutual_funds" : "equity";
+    setPortfolioMode(mode);
+  }, [searchParams]);
+
+  const switchPortfolioMode = useCallback((mode: "equity" | "mutual_funds") => {
+    setPortfolioMode(mode);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (mode === "mutual_funds") next.set("mode", "mutual_funds");
+      else next.delete("mode");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const doTickerSearch = useCallback(async (q: string) => {
     if (q.length < 2) {
@@ -463,13 +482,16 @@ export function PortfolioPage() {
               Mode: Mutual Funds
             </span>
           </div>
-          <div className="flex gap-1">
-            <button className="rounded border border-terminal-border px-2 py-1 text-xs text-terminal-muted" onClick={() => setPortfolioMode("equity")}>
+          <div className="flex flex-wrap gap-1">
+            <button className="rounded border border-terminal-border px-2 py-1 text-xs text-terminal-muted" onClick={() => switchPortfolioMode("equity")}>
               Equity
             </button>
             <button className="rounded border border-terminal-accent px-2 py-1 text-xs text-terminal-accent">
               Mutual Funds
             </button>
+            <Link className="rounded border border-terminal-border px-2 py-1 text-xs text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent" to="/equity/portfolio/lab">
+              Open Portfolio Lab
+            </Link>
           </div>
         </div>
         <div className="rounded border border-terminal-border bg-terminal-panel p-4">
@@ -620,13 +642,16 @@ export function PortfolioPage() {
             Mode: Equity
           </span>
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           <button className="rounded border border-terminal-accent px-2 py-1 text-xs text-terminal-accent">
             Equity
           </button>
-          <button className="rounded border border-terminal-border px-2 py-1 text-xs text-terminal-muted" onClick={() => setPortfolioMode("mutual_funds")}>
+          <button className="rounded border border-terminal-border px-2 py-1 text-xs text-terminal-muted" onClick={() => switchPortfolioMode("mutual_funds")}>
             Mutual Funds
           </button>
+          <Link className="rounded border border-terminal-border px-2 py-1 text-xs text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent" to="/equity/portfolio/lab">
+            Open Portfolio Lab
+          </Link>
         </div>
       </div>
       <div className="rounded border border-terminal-border bg-terminal-panel p-4">

@@ -125,3 +125,37 @@ def test_role_authorization() -> None:
 
     allowed = client.get("/api/admin-only", headers={"Authorization": f"Bearer {admin_access}"})
     assert allowed.status_code == 200
+
+
+def test_forgot_access_resets_password_and_revokes_refresh_tokens() -> None:
+    app, SessionLocal = _build_test_app()
+    client = TestClient(app)
+    email = "u5@example.com"
+    old_password = "password123"
+    new_password = "newpassword123"
+    tokens = _register_and_login(client, email=email, password=old_password)
+
+    reset = client.post("/api/auth/forgot-access", json={"email": email, "new_password": new_password})
+    assert reset.status_code == 204
+
+    old_login = client.post("/api/auth/login", json={"email": email, "password": old_password})
+    assert old_login.status_code == 401
+
+    new_login = client.post("/api/auth/login", json={"email": email, "password": new_password})
+    assert new_login.status_code == 200
+
+    refresh_with_old = client.post("/api/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
+    assert refresh_with_old.status_code == 401
+
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        assert user is not None
+        active_tokens = (
+            db.query(RefreshToken)
+            .filter(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))
+            .count()
+        )
+        assert active_tokens == 1
+    finally:
+        db.close()

@@ -10,7 +10,6 @@ import { WatchlistPage } from "./pages/Watchlist";
 import { NewsPage } from "./pages/News";
 import { BacktestingPage } from "./pages/Backtesting";
 import { BacktestingLayout } from "./pages/BacktestingLayout";
-import { MutualFundsPage } from "./pages/MutualFunds";
 import { EquityLayout } from "./equity/EquityLayout";
 import { HomePage } from "./pages/HomePage";
 import { FnoLayout } from "./fno/FnoLayout";
@@ -26,10 +25,21 @@ import { FnoAboutPage } from "./fno/pages/AboutPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/Auth/RegisterPage";
+import { ForgotAccessPage } from "./pages/Auth/ForgotAccessPage";
 import { AlertsPage } from "./pages/Alerts";
 import { PaperTradingPage } from "./pages/PaperTrading";
 import { PluginsPage } from "./pages/Plugins/Plugins";
 import { TerminalBackground } from "./components/TerminalBackground";
+import { ModelLabPage } from "./pages/ModelLab";
+import { ModelLabExperimentDetailPage } from "./pages/ModelLabExperimentDetail";
+import { ModelLabRunReportPage } from "./pages/ModelLabRunReport";
+import { ModelLabComparePage } from "./pages/ModelLabCompare";
+import { PortfolioLabPage } from "./pages/PortfolioLab";
+import { PortfolioLabDetailPage } from "./pages/PortfolioLabDetail";
+import { PortfolioLabRunReportPage } from "./pages/PortfolioLabRunReport";
+import { PortfolioLabBlendsPage } from "./pages/PortfolioLabBlends";
+import { AccountPage } from "./pages/Account";
+import { AccountLayout } from "./pages/AccountLayout";
 
 function App() {
   return (
@@ -43,6 +53,7 @@ function App() {
           <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-access" element={<ForgotAccessPage />} />
 
           <Route path="/equity" element={<ProtectedRoute><EquityLayout /></ProtectedRoute>}>
             <Route index element={<Navigate to="/equity/stocks" replace />} />
@@ -51,7 +62,11 @@ function App() {
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="screener" element={<ScreenerPage />} />
             <Route path="portfolio" element={<PortfolioPage />} />
-            <Route path="mutual-funds" element={<MutualFundsPage />} />
+            <Route path="portfolio/lab" element={<ProtectedRoute requiredRole="trader"><PortfolioLabPage /></ProtectedRoute>} />
+            <Route path="portfolio/lab/portfolios/:id" element={<ProtectedRoute requiredRole="trader"><PortfolioLabDetailPage /></ProtectedRoute>} />
+            <Route path="portfolio/lab/runs/:runId" element={<ProtectedRoute requiredRole="trader"><PortfolioLabRunReportPage /></ProtectedRoute>} />
+            <Route path="portfolio/lab/blends" element={<ProtectedRoute requiredRole="trader"><PortfolioLabBlendsPage /></ProtectedRoute>} />
+            <Route path="mutual-funds" element={<Navigate to="/equity/portfolio?mode=mutual_funds" replace />} />
             <Route path="watchlist" element={<WatchlistPage />} />
             <Route path="news" element={<NewsPage />} />
             <Route path="alerts" element={<AlertsPage />} />
@@ -74,14 +89,31 @@ function App() {
 
           <Route path="/backtesting" element={<ProtectedRoute requiredRole="trader"><BacktestingLayout /></ProtectedRoute>}>
             <Route index element={<BacktestingPage />} />
+            <Route path="model-lab" element={<ModelLabPage />} />
+            <Route path="model-lab/experiments/:id" element={<ModelLabExperimentDetailPage />} />
+            <Route path="model-lab/runs/:runId" element={<ModelLabRunReportPage />} />
+            <Route path="model-lab/compare" element={<ModelLabComparePage />} />
           </Route>
+
+          <Route path="/account" element={<ProtectedRoute><AccountLayout /></ProtectedRoute>}>
+            <Route index element={<AccountPage />} />
+          </Route>
+
+          <Route path="/model-lab" element={<ProtectedRoute requiredRole="trader"><ModelLabPage /></ProtectedRoute>} />
+          <Route path="/model-lab/experiments/:id" element={<ProtectedRoute requiredRole="trader"><ModelLabExperimentDetailPage /></ProtectedRoute>} />
+          <Route path="/model-lab/runs/:runId" element={<ProtectedRoute requiredRole="trader"><ModelLabRunReportPage /></ProtectedRoute>} />
+          <Route path="/model-lab/compare" element={<ProtectedRoute requiredRole="trader"><ModelLabComparePage /></ProtectedRoute>} />
+          <Route path="/portfolio-lab" element={<ProtectedRoute requiredRole="trader"><PortfolioLabPage /></ProtectedRoute>} />
+          <Route path="/portfolio-lab/portfolios/:id" element={<ProtectedRoute requiredRole="trader"><PortfolioLabDetailPage /></ProtectedRoute>} />
+          <Route path="/portfolio-lab/runs/:runId" element={<ProtectedRoute requiredRole="trader"><PortfolioLabRunReportPage /></ProtectedRoute>} />
+          <Route path="/portfolio-lab/blends" element={<ProtectedRoute requiredRole="trader"><PortfolioLabBlendsPage /></ProtectedRoute>} />
 
           <Route path="/stocks" element={<Navigate to="/equity/stocks" replace />} />
           <Route path="/stocks/about" element={<Navigate to="/equity/stocks/about" replace />} />
           <Route path="/dashboard" element={<Navigate to="/equity/dashboard" replace />} />
           <Route path="/screener" element={<Navigate to="/equity/screener" replace />} />
           <Route path="/portfolio" element={<Navigate to="/equity/portfolio" replace />} />
-          <Route path="/mutual-funds" element={<Navigate to="/equity/mutual-funds" replace />} />
+          <Route path="/mutual-funds" element={<Navigate to="/equity/portfolio?mode=mutual_funds" replace />} />
           <Route path="/watchlist" element={<Navigate to="/equity/watchlist" replace />} />
           <Route path="/news" element={<Navigate to="/equity/news" replace />} />
           <Route path="/alerts" element={<Navigate to="/equity/alerts" replace />} />

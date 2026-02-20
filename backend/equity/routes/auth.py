@@ -34,6 +34,11 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class ForgotAccessRequest(BaseModel):
+    email: str
+    new_password: str
+
+
 class UserResponse(BaseModel):
     id: str
     email: str
@@ -153,3 +158,23 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenPair
     db.commit()
 
     return _build_token_pair(db, user)
+
+
+@router.post("/forgot-access", status_code=204)
+def forgot_access(payload: ForgotAccessRequest, db: Session = Depends(get_db)) -> None:
+    email = _normalize_email(payload.email)
+    _validate_email(email)
+    _validate_password(payload.new_password)
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        # Keep response generic to avoid leaking whether an account exists.
+        return None
+
+    user.hashed_password = pwd_context.hash(payload.new_password)
+    db.query(RefreshToken).filter(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None)).update(
+        {RefreshToken.revoked_at: datetime.now(timezone.utc).replace(tzinfo=None)},
+        synchronize_session=False,
+    )
+    db.commit()
+    return None

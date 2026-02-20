@@ -29,32 +29,6 @@ function buildPolylinePoints(values: number[]): string {
   return values.map((v, i) => `${((i / Math.max(values.length - 1, 1)) * 100).toFixed(2)},${(95 - ((v - min) / span) * 90).toFixed(2)}`).join(" ");
 }
 
-function toReturnsPct(bars: Bar[]): number[] {
-  const out: number[] = [];
-  for (let i = 1; i < bars.length; i += 1) {
-    const prev = Number(bars[i - 1]?.close ?? 0);
-    const curr = Number(bars[i]?.close ?? 0);
-    if (!Number.isFinite(prev) || !Number.isFinite(curr) || prev === 0) continue;
-    out.push(((curr - prev) / prev) * 100);
-  }
-  return out;
-}
-
-function histogram(values: number[], bins = 20): { centers: number[]; counts: number[] } {
-  if (!values.length) return { centers: [], counts: [] };
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const width = span / bins;
-  const counts = new Array<number>(bins).fill(0);
-  const centers = new Array<number>(bins).fill(0).map((_, i) => min + width * (i + 0.5));
-  for (const v of values) {
-    const idx = Math.max(0, Math.min(bins - 1, Math.floor((v - min) / width)));
-    counts[idx] += 1;
-  }
-  return { centers, counts };
-}
-
 export type ChartTabProps = {
   timeframe: BacktestTimeframe;
   setTimeframe: Dispatch<SetStateAction<BacktestTimeframe>>;
@@ -93,7 +67,6 @@ export function ChartTabPanel(props: ChartTabProps) {
     symbol,
     setActiveIndicators,
   } = props;
-  const [linkedTab, setLinkedTab] = useState<"distribution" | "terrain3d" | "regime3d">("distribution");
   const [visibleLogicalRange, setVisibleLogicalRange] = useState<{ from: number; to: number } | null>(null);
   const [brushMode, setBrushMode] = useState(false);
   const [lockedBrushRange, setLockedBrushRange] = useState<{ from: number; to: number } | null>(null);
@@ -109,7 +82,7 @@ export function ChartTabPanel(props: ChartTabProps) {
   }, [displayedBars, visibleLogicalRange, lockedBrushRange]);
 
   const selectionLabel = useMemo(() => {
-    if (!selectedBars.length) return "No visible selection";
+    if (!selectedBars.length) return "";
     const first = new Date(Number(selectedBars[0].time) * 1000).toISOString().slice(0, 10);
     const last = new Date(Number(selectedBars[selectedBars.length - 1].time) * 1000).toISOString().slice(0, 10);
     return `${first} -> ${last} (${selectedBars.length} bars)`;
@@ -123,77 +96,6 @@ export function ChartTabPanel(props: ChartTabProps) {
     const last = new Date(Number(displayedBars[to].time) * 1000).toISOString().slice(0, 10);
     return `${first} -> ${last}`;
   }, [previewBrushRange, displayedBars]);
-
-  const fullReturns = useMemo(() => toReturnsPct(displayedBars), [displayedBars]);
-  const selectedReturns = useMemo(() => toReturnsPct(selectedBars), [selectedBars]);
-  const fullHist = useMemo(() => histogram(fullReturns, 22), [fullReturns]);
-  const selectedHist = useMemo(() => histogram(selectedReturns, 22), [selectedReturns]);
-
-  const terrainPoints = useMemo<Surface3DPoint[]>(() => {
-    if (selectedBars.length < 12) return [];
-    const closes = selectedBars.map((b) => Number(b.close));
-    const points: Surface3DPoint[] = [];
-    const chunk = Math.max(3, Math.floor(closes.length / 6));
-    for (let i = 0; i < 6; i += 1) {
-      const seg = closes.slice(i * chunk, Math.min(closes.length, (i + 1) * chunk));
-      if (!seg.length) continue;
-      for (let j = 2; j <= 7; j += 1) {
-        const look = seg.slice(Math.max(0, seg.length - j));
-        const peak = Math.max(...look);
-        const trough = Math.min(...look);
-        const dd = peak > 0 ? ((trough - peak) / peak) * 100 : 0;
-        points.push({
-          x: i,
-          y: j - 2,
-          z: Math.abs(dd),
-          color: dd < -6 ? terminalColors.negative : terminalColors.warning,
-        });
-      }
-    }
-    return points;
-  }, [selectedBars]);
-
-  const regimePoints = useMemo<Surface3DPoint[]>(() => {
-    if (selectedReturns.length < 20) return [];
-    const vol: number[] = [];
-    const drift: number[] = [];
-    for (let i = 0; i < selectedReturns.length; i += 1) {
-      const w = selectedReturns.slice(Math.max(0, i - 9), i + 1);
-      const mean = w.reduce((a, b) => a + b, 0) / Math.max(w.length, 1);
-      const variance = w.reduce((a, b) => a + ((b - mean) ** 2), 0) / Math.max(w.length, 1);
-      vol.push(Math.sqrt(variance));
-      drift.push(mean);
-    }
-    const volSorted = [...vol].sort((a, b) => a - b);
-    const driftSorted = [...drift].sort((a, b) => a - b);
-    const v1 = volSorted[Math.floor(volSorted.length * 0.33)] ?? 0;
-    const v2 = volSorted[Math.floor(volSorted.length * 0.66)] ?? 0;
-    const d1 = driftSorted[Math.floor(driftSorted.length * 0.33)] ?? 0;
-    const d2 = driftSorted[Math.floor(driftSorted.length * 0.66)] ?? 0;
-    const buckets: Record<string, number[]> = {};
-    for (let i = 0; i < selectedReturns.length; i += 1) {
-      const vx = vol[i] <= v1 ? 0 : vol[i] <= v2 ? 1 : 2;
-      const dy = drift[i] <= d1 ? 0 : drift[i] <= d2 ? 1 : 2;
-      const key = `${vx}-${dy}`;
-      const arr = buckets[key] ?? [];
-      arr.push(selectedReturns[i]);
-      buckets[key] = arr;
-    }
-    const points: Surface3DPoint[] = [];
-    for (let x = 0; x < 3; x += 1) {
-      for (let y = 0; y < 3; y += 1) {
-        const vals = buckets[`${x}-${y}`] ?? [];
-        const expectancy = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-        points.push({
-          x,
-          y,
-          z: expectancy,
-          color: expectancy >= 0 ? terminalColors.positive : terminalColors.negative,
-        });
-      }
-    }
-    return points;
-  }, [selectedReturns]);
 
   return (
     <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_300px]">
@@ -233,10 +135,7 @@ export function ChartTabPanel(props: ChartTabProps) {
         </div>
         <div className="mt-3 rounded border border-terminal-border/40 bg-terminal-bg/50 p-2">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-            <div className="text-terminal-muted">
-              Linked analytics window: {selectionLabel}
-              {previewSelectionLabel ? ` | Dragging: ${previewSelectionLabel}` : ""}
-            </div>
+            <div className="text-terminal-muted">{selectionLabel ? `Selection: ${selectionLabel}` : "Selection idle"}{previewSelectionLabel ? ` | Dragging: ${previewSelectionLabel}` : ""}</div>
             <div className="flex items-center gap-2">
               <button className={`rounded border px-2 py-1 ${brushMode ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted"}`} onClick={() => setBrushMode((v) => !v)}>{brushMode ? "Selecting..." : "Brush Select"}</button>
               <button
@@ -248,44 +147,8 @@ export function ChartTabPanel(props: ChartTabProps) {
               >
                 Clear Selection
               </button>
-              <button className={`rounded border px-2 py-1 ${linkedTab === "distribution" ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted"}`} onClick={() => setLinkedTab("distribution")}>Distribution</button>
-              <button className={`rounded border px-2 py-1 ${linkedTab === "terrain3d" ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted"}`} onClick={() => setLinkedTab("terrain3d")}>3D Terrain</button>
-              <button className={`rounded border px-2 py-1 ${linkedTab === "regime3d" ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted"}`} onClick={() => setLinkedTab("regime3d")}>3D Regimes</button>
             </div>
           </div>
-
-          {linkedTab === "distribution" && (
-            <div className="h-[24vh] min-h-[150px] rounded border border-terminal-border/30 bg-terminal-bg/60 p-2">
-              {!fullHist.counts.length ? (
-                <div className="flex h-full items-center justify-center text-[11px] text-terminal-muted">Not enough data for distribution.</div>
-              ) : (
-                <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
-                  {fullHist.counts.map((count, i) => {
-                    const w = 100 / fullHist.counts.length;
-                    const maxC = Math.max(...fullHist.counts, 1);
-                    const h = (count / maxC) * 85;
-                    return <rect key={`full-${i}`} x={(i * w).toFixed(2)} y={(95 - h).toFixed(2)} width={(w * 0.88).toFixed(2)} height={h.toFixed(2)} fill={terminalColors.border} opacity="0.5" />;
-                  })}
-                  {selectedHist.counts.map((count, i) => {
-                    const w = 100 / selectedHist.counts.length;
-                    const maxC = Math.max(...selectedHist.counts, 1);
-                    const h = (count / maxC) * 85;
-                    const bin = selectedHist.centers[i] ?? 0;
-                    const color = bin >= 0 ? terminalColors.positive : terminalColors.negative;
-                    return <rect key={`sel-${i}`} x={(i * w + (w * 0.2)).toFixed(2)} y={(95 - h).toFixed(2)} width={(w * 0.48).toFixed(2)} height={h.toFixed(2)} fill={color} opacity="0.85" />;
-                  })}
-                </svg>
-              )}
-            </div>
-          )}
-
-          {linkedTab === "terrain3d" && (
-            <ThreeDSurface points={terrainPoints} emptyText="Zoom into price chart to generate drawdown terrain." />
-          )}
-
-          {linkedTab === "regime3d" && (
-            <ThreeDSurface points={regimePoints} emptyText="Zoom into price chart to generate regime efficacy map." />
-          )}
         </div>
       </div>
       <div>{showIndicators ? <IndicatorPanel symbol={symbol} activeIndicators={activeIndicators} onChange={setActiveIndicators} /> : <div className="rounded border border-terminal-border/40 p-3 text-[11px] text-terminal-muted">Indicators hidden. Use the chart toolbar toggle to show.</div>}</div>
@@ -610,6 +473,117 @@ export function RegimeEfficacy3DPanel(props: {
       <ThreeDSurface points={points} emptyText="Need enough bars to estimate regime efficacy cube." />
       <div className="rounded border border-terminal-border/40 p-2 text-[11px] text-terminal-muted">
         Regime states: {regimeCount} | Color: green=positive expectancy, red=negative expectancy
+      </div>
+    </div>
+  );
+}
+
+export function OrderbookLiquidity3DPanel(props: {
+  points: Surface3DPoint[];
+  avgDepth: number;
+  estimatedSpreadBps: number;
+}) {
+  const { points, avgDepth, estimatedSpreadBps } = props;
+  return (
+    <div className="space-y-2">
+      <ThreeDSurface points={points} emptyText="Run a backtest to build liquidity depth map." />
+      <div className="grid grid-cols-2 gap-2 text-[11px]">
+        <div className="rounded border border-terminal-border/40 p-2">Avg Depth: {avgDepth.toFixed(2)}</div>
+        <div className="rounded border border-terminal-border/40 p-2">Est. Spread: {estimatedSpreadBps.toFixed(2)} bps</div>
+      </div>
+    </div>
+  );
+}
+
+export function ImpliedVolatilitySurface3DPanel(props: {
+  points: Surface3DPoint[];
+  atmIvPct: number;
+  ivSkew: number;
+}) {
+  const { points, atmIvPct, ivSkew } = props;
+  return (
+    <div className="space-y-2">
+      <ThreeDSurface points={points} emptyText="Run a backtest to estimate implied volatility surface." />
+      <div className="grid grid-cols-2 gap-2 text-[11px]">
+        <div className="rounded border border-terminal-border/40 p-2">ATM IV: {atmIvPct.toFixed(2)}%</div>
+        <div className="rounded border border-terminal-border/40 p-2">IV Skew: {ivSkew.toFixed(2)}</div>
+      </div>
+    </div>
+  );
+}
+
+export function VolatilitySurface3DPanel(props: {
+  points: Surface3DPoint[];
+  realizedVolPct: number;
+  termSlope: number;
+}) {
+  const { points, realizedVolPct, termSlope } = props;
+  return (
+    <div className="space-y-2">
+      <ThreeDSurface points={points} emptyText="Run a backtest to estimate realized volatility surface." />
+      <div className="grid grid-cols-2 gap-2 text-[11px]">
+        <div className="rounded border border-terminal-border/40 p-2">Realized Vol: {realizedVolPct.toFixed(2)}%</div>
+        <div className="rounded border border-terminal-border/40 p-2">Term Slope: {termSlope.toFixed(2)}</div>
+      </div>
+    </div>
+  );
+}
+
+export function MonteCarloSimulationPanel(props: {
+  medianPath: number[];
+  p10Path: number[];
+  p90Path: number[];
+  startValue: number;
+  endMedian: number;
+}) {
+  const { medianPath, p10Path, p90Path, startValue, endMedian } = props;
+  const hasData = medianPath.length > 1 && p10Path.length === medianPath.length && p90Path.length === medianPath.length;
+  const fmt = (n: number) => n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+
+  const toPoints = (arr: number[], min: number, max: number) => {
+    const span = max - min || 1;
+    return arr
+      .map((v, i) => `${((i / Math.max(arr.length - 1, 1)) * 100).toFixed(2)},${(95 - ((v - min) / span) * 90).toFixed(2)}`)
+      .join(" ");
+  };
+
+  if (!hasData) {
+    return (
+      <div className="space-y-2">
+        <div className="flex h-[32vh] min-h-[220px] items-center justify-center rounded border border-terminal-border/40 bg-terminal-bg/50 text-[11px] text-terminal-muted">
+          Not enough data to run Monte Carlo simulation.
+        </div>
+      </div>
+    );
+  }
+
+  const min = Math.min(...p10Path, ...medianPath, ...p90Path);
+  const max = Math.max(...p10Path, ...medianPath, ...p90Path);
+  const p10Points = toPoints(p10Path, min, max);
+  const p90Points = toPoints(p90Path, min, max);
+  const medianPoints = toPoints(medianPath, min, max);
+  const bandPolygon = `0,95 ${p90Points} 100,95 ${p10Path
+    .map((v, i) => {
+      const idx = p10Path.length - 1 - i;
+      const x = (idx / Math.max(p10Path.length - 1, 1)) * 100;
+      const y = 95 - ((v - min) / (max - min || 1)) * 90;
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(" ")}`;
+
+  return (
+    <div className="space-y-2">
+      <div className="h-[34vh] min-h-[230px] rounded border border-terminal-border/40 bg-terminal-bg/50 p-2">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
+          <polygon points={bandPolygon} fill={terminalColors.info} opacity="0.12" />
+          <polyline fill="none" stroke={terminalColors.info} strokeWidth="1.1" points={p10Points} opacity="0.7" />
+          <polyline fill="none" stroke={terminalColors.info} strokeWidth="1.1" points={p90Points} opacity="0.7" />
+          <polyline fill="none" stroke={terminalColors.warning} strokeWidth="1.8" points={medianPoints} />
+        </svg>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-[11px]">
+        <div className="rounded border border-terminal-border/40 p-2">Start: {fmt(startValue)}</div>
+        <div className="rounded border border-terminal-border/40 p-2">Median End: {fmt(endMedian)}</div>
       </div>
     </div>
   );

@@ -626,7 +626,8 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-areas:
     "portfolio portfolio market"
-    "orders performance command";
+    "orders performance command"
+    "nav nav nav";
   gap: 6px;
   padding: 8px;
 }
@@ -664,6 +665,10 @@
 
 .ot-panel-command {
   grid-area: command;
+}
+
+.ot-panel-nav {
+  grid-area: nav;
 }
 
 .ot-panel-header {
@@ -705,6 +710,37 @@
   color: var(--ot-muted);
   font-size: 10px;
   letter-spacing: 0.04em;
+}
+
+.ot-valuation-strip {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ot-valuation-chip {
+  border: 1px solid var(--ot-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
+  color: var(--ot-white);
+  text-align: left;
+  padding: 8px;
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.ot-valuation-chip:hover {
+  border-color: rgba(255, 149, 0, 0.65);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.28);
+  transform: translateY(-1px);
+}
+
+.ot-chip-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ot-muted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
 }
 
 .ot-market-table {
@@ -765,6 +801,17 @@
   animation: otOrderSlide 0.24s ease;
 }
 
+.ot-highlight-note {
+  margin-top: 10px;
+  border: 1px solid rgba(255, 149, 0, 0.5);
+  background: rgba(255, 149, 0, 0.1);
+  color: #ffd084;
+  padding: 7px 8px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .ot-performance-chart {
   margin-top: 8px;
   width: 100%;
@@ -804,6 +851,10 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
+}
+
+.ot-command-actions-single {
+  grid-template-columns: 1fr;
 }
 
 .ot-action-button {
@@ -854,6 +905,66 @@
 .ot-system-health {
   margin: 10px 0 0;
   font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.ot-nav-card-sections {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.ot-nav-section-title {
+  margin: 0 0 8px;
+  font-size: 10px;
+  color: var(--ot-muted);
+  letter-spacing: 0.1em;
+}
+
+.ot-nav-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.ot-nav-card {
+  border: 1px solid var(--ot-border);
+  color: var(--ot-text);
+  background: rgba(18, 18, 18, 0.95);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  border-radius: 2px;
+  min-height: 54px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: border-color 0.14s ease, color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+}
+
+.ot-nav-card:hover {
+  border-color: rgba(255, 149, 0, 0.6);
+  color: var(--ot-white);
+  background: rgba(26, 26, 26, 0.96);
+  box-shadow: 0 0 0 1px rgba(255, 149, 0, 0.18) inset;
+}
+
+.ot-nav-card-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ot-nav-card-badge {
+  border: 1px solid var(--ot-border);
+  background: rgba(8, 8, 8, 0.75);
+  color: var(--ot-muted);
+  border-radius: 2px;
+  min-width: 30px;
+  text-align: center;
+  padding: 1px 6px;
+  font-size: 9px;
   letter-spacing: 0.08em;
 }
 
@@ -1061,10 +1172,15 @@
       "market"
       "orders"
       "performance"
-      "command";
+      "command"
+      "nav";
   }
 
   .ot-portfolio-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ot-valuation-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

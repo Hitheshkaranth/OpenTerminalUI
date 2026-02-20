@@ -90,6 +90,16 @@ export function AboutPage() {
         </ul>
       </TerminalPanel>
 
+      <TerminalPanel title="Recent Product Updates">
+        <ul className="space-y-1 text-xs text-terminal-text">
+          <li>- Home terminal refreshed with live portfolio relay and backend-driven market pulse.</li>
+          <li>- Unified portfolio navigation: Equity and Mutual Funds are now mode-switched in one portfolio screen.</li>
+          <li>- Research Suites highlighting now indicates active backtesting/model-lab screen.</li>
+          <li>- Backtesting includes standalone 3D analytics: terrain, regimes, orderbook liquidity, IV surface, volatility surface, and Monte Carlo simulation.</li>
+          <li>- Auth recovery upgraded with dedicated Forgot Access flow and backend reset endpoint.</li>
+        </ul>
+      </TerminalPanel>
+
       <TerminalPanel title="Infrastructure">
         <ul className="space-y-1 text-xs text-terminal-muted">
           <li>- FastAPI backend + React/TypeScript terminal frontend with PWA offline support.</li>

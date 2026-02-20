@@ -185,7 +185,7 @@ export function LoginPage() {
                 <span className="ot-checkbox-mark" />
                 <span>Remember terminal</span>
               </label>
-              <Link to="/register" className="ot-forgot-link">Forgot access?</Link>
+              <Link to="/forgot-access" className="ot-forgot-link">Forgot access?</Link>
             </div>
 
             <button type="submit" className="ot-login-submit ot-stagger" style={{ ["--stagger-index" as string]: 7 }} disabled={authenticating || isLoading}>

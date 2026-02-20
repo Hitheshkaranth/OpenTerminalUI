@@ -112,6 +112,126 @@ class BacktestRun(Base):
     updated_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())
 
 
+class ModelExperiment(Base):
+    __tablename__ = "model_experiments"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    tags: Mapped[list] = mapped_column(JSON, default=list)
+    model_key: Mapped[str] = mapped_column(String(120), index=True)
+    params_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    universe_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    benchmark_symbol: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    start_date: Mapped[str] = mapped_column(String(16), index=True)
+    end_date: Mapped[str] = mapped_column(String(16), index=True)
+    cost_model_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat(), index=True)
+
+
+class ModelRun(Base):
+    __tablename__ = "model_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    experiment_id: Mapped[str] = mapped_column(String(36), ForeignKey("model_experiments.id", ondelete="CASCADE"), index=True)
+    backtest_run_id: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
+    started_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat(), index=True)
+    finished_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ModelRunMetrics(Base):
+    __tablename__ = "model_run_metrics"
+
+    run_id: Mapped[str] = mapped_column(String(36), ForeignKey("model_runs.id", ondelete="CASCADE"), primary_key=True)
+    metrics_json: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class ModelRunTimeseries(Base):
+    __tablename__ = "model_run_timeseries"
+
+    run_id: Mapped[str] = mapped_column(String(36), ForeignKey("model_runs.id", ondelete="CASCADE"), primary_key=True)
+    series_json: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class RebalanceFrequency(str, enum.Enum):
+    DAILY = "DAILY"
+    WEEKLY = "WEEKLY"
+    MONTHLY = "MONTHLY"
+
+
+class WeightingMethod(str, enum.Enum):
+    EQUAL = "EQUAL"
+    VOL_TARGET = "VOL_TARGET"
+    RISK_PARITY = "RISK_PARITY"
+
+
+class BlendMethod(str, enum.Enum):
+    WEIGHTED_SUM_SIGNALS = "WEIGHTED_SUM_SIGNALS"
+    WEIGHTED_SUM_RETURNS = "WEIGHTED_SUM_RETURNS"
+
+
+class PortfolioDefinition(Base):
+    __tablename__ = "portfolio_definitions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    tags: Mapped[list] = mapped_column(JSON, default=list)
+    universe_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    benchmark_symbol: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    start_date: Mapped[str] = mapped_column(String(16), index=True)
+    end_date: Mapped[str] = mapped_column(String(16), index=True)
+    rebalance_frequency: Mapped[str] = mapped_column(String(16), default=RebalanceFrequency.WEEKLY.value, index=True)
+    weighting_method: Mapped[str] = mapped_column(String(16), default=WeightingMethod.EQUAL.value, index=True)
+    constraints_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat(), index=True)
+
+
+class StrategyBlend(Base):
+    __tablename__ = "strategy_blends"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    strategies_json: Mapped[list] = mapped_column(JSON, default=list)
+    blend_method: Mapped[str] = mapped_column(String(32), default=BlendMethod.WEIGHTED_SUM_RETURNS.value, index=True)
+    created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat(), index=True)
+
+
+class PortfolioRun(Base):
+    __tablename__ = "portfolio_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    portfolio_id: Mapped[str] = mapped_column(String(36), ForeignKey("portfolio_definitions.id", ondelete="CASCADE"), index=True)
+    blend_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("strategy_blends.id", ondelete="SET NULL"), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
+    started_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat(), index=True)
+    finished_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class PortfolioRunMetrics(Base):
+    __tablename__ = "portfolio_run_metrics"
+
+    run_id: Mapped[str] = mapped_column(String(36), ForeignKey("portfolio_runs.id", ondelete="CASCADE"), primary_key=True)
+    metrics_json: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class PortfolioRunTimeseries(Base):
+    __tablename__ = "portfolio_run_timeseries"
+
+    run_id: Mapped[str] = mapped_column(String(36), ForeignKey("portfolio_runs.id", ondelete="CASCADE"), primary_key=True)
+    series_json: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class PortfolioRunMatrices(Base):
+    __tablename__ = "portfolio_run_matrices"
+
+    run_id: Mapped[str] = mapped_column(String(36), ForeignKey("portfolio_runs.id", ondelete="CASCADE"), primary_key=True)
+    matrices_json: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
 class NseFnoBhavcopy(Base):
     __tablename__ = "nse_fno_bhavcopy"
     __table_args__ = (

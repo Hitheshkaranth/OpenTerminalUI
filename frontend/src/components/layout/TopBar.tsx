@@ -12,13 +12,8 @@ import type { CountryCode, MarketCode } from "../../types";
 type DisplayCurrency = "INR" | "USD";
 
 const COUNTRY_FLAGS: Record<CountryCode, string> = {
-  IN: "IN",
-  US: "US",
-};
-
-const CURRENCY_FLAGS: Record<DisplayCurrency, string> = {
-  INR: "INR",
-  USD: "USD",
+  IN: "🇮🇳",
+  US: "🇺🇸",
 };
 
 const COUNTRY_DEFAULT_MARKET: Record<CountryCode, MarketCode> = {
@@ -26,7 +21,11 @@ const COUNTRY_DEFAULT_MARKET: Record<CountryCode, MarketCode> = {
   US: "NASDAQ",
 };
 
-export function TopBar() {
+type TopBarProps = {
+  hideTickerLoader?: boolean;
+};
+
+export function TopBar({ hideTickerLoader = false }: TopBarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const setTicker = useStockStore((s) => s.setTicker);
@@ -313,55 +312,63 @@ export function TopBar() {
         <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno?symbol=${encodeURIComponent(safeTicker)}`}>
           F&O -&gt;
         </Link>
-        <input
-          ref={searchInputRef}
-          className="min-w-0 flex-1 rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs outline-none focus:border-terminal-accent"
-          placeholder={`Search ${selectedMarket} symbol ( / )`}
-          value={query}
-          onChange={(e) => {
-            const next = e.target.value.toUpperCase();
-            suppressSuggestionsRef.current = false;
-            setQuery(next);
-            setIsSuggestionsOpen(next.length >= 2);
-            if (debounceRef.current) clearTimeout(debounceRef.current);
-            debounceRef.current = setTimeout(() => {
-              void doSearch(next);
-            }, 300);
-          }}
-          onFocus={() => {
-            if (results.length > 0 && query.length >= 2) {
-              setIsSuggestionsOpen(true);
-            }
-          }}
-          onBlur={() => {
-            setTimeout(() => setIsSuggestionsOpen(false), 120);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              selectTicker(query);
-            }
-            if (e.key === "Escape") {
-              setResults([]);
-              setIsSuggestionsOpen(false);
-            }
-          }}
-        />
-        <button
-          className="rounded bg-terminal-accent px-2 py-1 text-xs font-medium text-black"
-          onClick={() => {
-            selectTicker(query);
-          }}
-        >
-          Load
-        </button>
+        {!hideTickerLoader ? (
+          <>
+            <input
+              ref={searchInputRef}
+              className="min-w-0 flex-1 rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs outline-none focus:border-terminal-accent"
+              placeholder={`Search ${selectedMarket} symbol ( / )`}
+              value={query}
+              onChange={(e) => {
+                const next = e.target.value.toUpperCase();
+                suppressSuggestionsRef.current = false;
+                setQuery(next);
+                setIsSuggestionsOpen(next.length >= 2);
+                if (debounceRef.current) clearTimeout(debounceRef.current);
+                debounceRef.current = setTimeout(() => {
+                  void doSearch(next);
+                }, 300);
+              }}
+              onFocus={() => {
+                if (results.length > 0 && query.length >= 2) {
+                  setIsSuggestionsOpen(true);
+                }
+              }}
+              onBlur={() => {
+                setTimeout(() => setIsSuggestionsOpen(false), 120);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  selectTicker(query);
+                }
+                if (e.key === "Escape") {
+                  setResults([]);
+                  setIsSuggestionsOpen(false);
+                }
+              }}
+            />
+            <button
+              className="rounded bg-terminal-accent px-2 py-1 text-xs font-medium text-black"
+              onClick={() => {
+                selectTicker(query);
+              }}
+            >
+              Load
+            </button>
+          </>
+        ) : (
+          <div className="min-w-0 flex-1 rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs text-terminal-muted">
+            Account details mode: ticker loader hidden
+          </div>
+        )}
         <div className="flex items-center gap-1 border-l border-terminal-border pl-2">
           <select
             className="w-[88px] rounded border border-terminal-border bg-terminal-bg px-1 py-1 text-[11px] uppercase text-terminal-text outline-none"
             value={selectedCountry}
             onChange={(e) => setSelectedCountry(e.target.value as CountryCode)}
           >
-            <option value="IN">{COUNTRY_FLAGS.IN}</option>
-            <option value="US">{COUNTRY_FLAGS.US}</option>
+            <option value="IN">{COUNTRY_FLAGS.IN} IN</option>
+            <option value="US">{COUNTRY_FLAGS.US} US</option>
           </select>
           <select
             className="w-[86px] rounded border border-terminal-border bg-terminal-bg px-1 py-1 text-[11px] uppercase text-terminal-text outline-none"
@@ -376,8 +383,8 @@ export function TopBar() {
           </select>
         </div>
         <div className="flex items-center gap-1 border-l border-terminal-border pl-2">
-          <span className="text-[11px] leading-none" title="Display currency">
-            {CURRENCY_FLAGS[displayCurrency]}
+          <span className="text-[11px] leading-none text-terminal-muted" title="Display currency">
+            Currency
           </span>
           <select
             className="w-[72px] rounded border border-terminal-border bg-terminal-bg px-1 py-1 text-[11px] uppercase text-terminal-text outline-none"
@@ -390,10 +397,13 @@ export function TopBar() {
             <option value="USD">USD</option>
           </select>
         </div>
-        <div className="border-l border-terminal-border pl-2 text-[11px] uppercase tracking-wide text-terminal-muted">
-          {selectedCountry} | {selectedMarket} | {displayCurrency}
+        <div className="inline-flex items-center gap-1 border-l border-terminal-border pl-2 text-[11px] uppercase tracking-wide text-terminal-muted">
+          <CountryFlag countryCode={selectedCountry} size="sm" />
+          <span>{selectedMarket}</span>
+          <span>|</span>
+          <span>{displayCurrency}</span>
         </div>
-        {isSuggestionsOpen && results.length > 0 && (
+        {!hideTickerLoader && isSuggestionsOpen && results.length > 0 && (
           <div className="absolute left-3 right-3 top-10 z-10 max-h-72 overflow-auto rounded border border-terminal-border bg-terminal-panel">
             {results.map((item) => (
               <button

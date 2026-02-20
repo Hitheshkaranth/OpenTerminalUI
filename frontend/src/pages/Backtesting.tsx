@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import type { Bar } from "oakscriptjs";
 
 import {
@@ -18,6 +20,10 @@ import {
   ParameterSurface3DPanel,
   RegimeEfficacy3DPanel,
   RollingMetricsPanel,
+  OrderbookLiquidity3DPanel,
+  ImpliedVolatilitySurface3DPanel,
+  VolatilitySurface3DPanel,
+  MonteCarloSimulationPanel,
   TradesPanel,
 } from "../components/backtesting/panels/BacktestingPanels";
 import type { Surface3DPoint } from "../components/backtesting/panels/Backtesting3D";
@@ -36,13 +42,10 @@ type VizTab =
   | "equity"
   | "drawdown"
   | "monthly"
-  | "distribution"
   | "rolling"
   | "trades"
   | "compare"
-  | "surface3d"
-  | "terrain3d"
-  | "regime3d";
+  | "surface3d";
 
 type StrategyDef = {
   key: string;
@@ -119,13 +122,10 @@ const VIZ_TABS: { key: VizTab; label: string; icon: string }[] = [
   { key: "equity", label: "Equity Curve", icon: "" },
   { key: "drawdown", label: "Drawdown", icon: "" },
   { key: "monthly", label: "Monthly Returns", icon: "" },
-  { key: "distribution", label: "Distribution", icon: "" },
   { key: "rolling", label: "Rolling Metrics", icon: "" },
   { key: "trades", label: "Trade Analysis", icon: "" },
   { key: "compare", label: "Compare", icon: "CMP" },
   { key: "surface3d", label: "3D Surface", icon: "3D" },
-  { key: "terrain3d", label: "3D Terrain", icon: "3D" },
-  { key: "regime3d", label: "3D Regimes", icon: "3D" },
 ];
 
 const CUSTOM_STRATEGY_VALUE = "custom";
@@ -288,6 +288,7 @@ function computePremarketOrbLines(
 }
 
 export function BacktestingPage() {
+  const location = useLocation();
   const storeTicker = useStockStore((s) => s.ticker);
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
 
@@ -737,6 +738,170 @@ export function BacktestingPage() {
     return points;
   }, [dailyReturnsPct]);
 
+  const orderbookLiquidityPoints = useMemo<Surface3DPoint[]>(() => {
+    const curve = result?.result?.equity_curve || [];
+    const tradesSeries = result?.result?.trades || [];
+    if (!curve.length || !tradesSeries.length) return [];
+    const bucketX = 8;
+    const bucketY = 8;
+    const points: Surface3DPoint[] = [];
+    for (let x = 0; x < bucketX; x += 1) {
+      const tradeStart = Math.floor((x / bucketX) * tradesSeries.length);
+      const tradeEnd = Math.max(tradeStart + 1, Math.floor(((x + 1) / bucketX) * tradesSeries.length));
+      const tradeSlice = tradesSeries.slice(tradeStart, tradeEnd);
+      const avgPrice = tradeSlice.length
+        ? tradeSlice.reduce((acc, t) => acc + Number(t.price || 0), 0) / tradeSlice.length
+        : 0;
+      for (let y = 0; y < bucketY; y += 1) {
+        const curveStart = Math.floor((y / bucketY) * curve.length);
+        const curveEnd = Math.max(curveStart + 1, Math.floor(((y + 1) / bucketY) * curve.length));
+        const curveSlice = curve.slice(curveStart, curveEnd);
+        const avgEquity = curveSlice.length
+          ? curveSlice.reduce((acc, p) => acc + Number(p.equity || 0), 0) / curveSlice.length
+          : 0;
+        const depthProxy = Math.max(0, (tradeSlice.length * 8) + (avgEquity > 0 ? (avgEquity / 100000) : 0));
+        const spreadProxy = avgPrice > 0 ? (1 / avgPrice) * 10000 : 0;
+        const z = depthProxy / (1 + spreadProxy);
+        points.push({
+          x,
+          y,
+          z,
+          color: z >= 20 ? terminalColors.positive : z >= 10 ? terminalColors.warning : terminalColors.negative,
+        });
+      }
+    }
+    return points;
+  }, [result]);
+
+  const orderbookAvgDepth = useMemo(() => {
+    if (!orderbookLiquidityPoints.length) return 0;
+    return orderbookLiquidityPoints.reduce((acc, p) => acc + p.z, 0) / orderbookLiquidityPoints.length;
+  }, [orderbookLiquidityPoints]);
+
+  const orderbookSpreadBps = useMemo(() => {
+    const tradesSeries = result?.result?.trades || [];
+    if (!tradesSeries.length) return 0;
+    const avgPrice = tradesSeries.reduce((acc, t) => acc + Number(t.price || 0), 0) / tradesSeries.length;
+    return avgPrice > 0 ? (1 / avgPrice) * 10000 : 0;
+  }, [result]);
+
+  const impliedVolatilitySurfacePoints = useMemo<Surface3DPoint[]>(() => {
+    if (dailyReturnsPct.length < 25) return [];
+    const points: Surface3DPoint[] = [];
+    const buckets = 8;
+    for (let tenor = 0; tenor < buckets; tenor += 1) {
+      for (let moneyness = 0; moneyness < buckets; moneyness += 1) {
+        const start = Math.max(0, dailyReturnsPct.length - (tenor + 2) * 10);
+        const slice = dailyReturnsPct.slice(start);
+        const mean = slice.reduce((acc, r) => acc + r, 0) / Math.max(slice.length, 1);
+        const variance = slice.reduce((acc, r) => acc + ((r - mean) ** 2), 0) / Math.max(slice.length, 1);
+        const realized = Math.sqrt(Math.max(0, variance));
+        const skewAdj = ((moneyness - 3.5) / 4) * 0.6;
+        const termAdj = ((tenor + 1) / buckets) * 0.35;
+        const iv = Math.max(0.05, realized * 1.15 + termAdj + skewAdj);
+        points.push({
+          x: tenor,
+          y: moneyness,
+          z: iv * 10,
+          color: iv > 2.2 ? terminalColors.negative : iv > 1.2 ? terminalColors.warning : terminalColors.positive,
+        });
+      }
+    }
+    return points;
+  }, [dailyReturnsPct]);
+
+  const impliedAtmIvPct = useMemo(() => {
+    if (!impliedVolatilitySurfacePoints.length) return 0;
+    const atm = impliedVolatilitySurfacePoints.filter((p) => p.y === 3 || p.y === 4);
+    const avg = atm.length ? atm.reduce((acc, p) => acc + p.z, 0) / atm.length : 0;
+    return avg * 10;
+  }, [impliedVolatilitySurfacePoints]);
+
+  const impliedSkew = useMemo(() => {
+    if (!impliedVolatilitySurfacePoints.length) return 0;
+    const left = impliedVolatilitySurfacePoints.filter((p) => p.y <= 2);
+    const right = impliedVolatilitySurfacePoints.filter((p) => p.y >= 5);
+    const leftAvg = left.length ? left.reduce((acc, p) => acc + p.z, 0) / left.length : 0;
+    const rightAvg = right.length ? right.reduce((acc, p) => acc + p.z, 0) / right.length : 0;
+    return leftAvg - rightAvg;
+  }, [impliedVolatilitySurfacePoints]);
+
+  const volatilitySurfacePoints = useMemo<Surface3DPoint[]>(() => {
+    if (dailyReturnsPct.length < 30) return [];
+    const points: Surface3DPoint[] = [];
+    const xBuckets = 8;
+    const yBuckets = 8;
+    for (let horizon = 0; horizon < xBuckets; horizon += 1) {
+      const lookback = 5 + horizon * 4;
+      for (let regime = 0; regime < yBuckets; regime += 1) {
+        const tail = dailyReturnsPct.slice(Math.max(0, dailyReturnsPct.length - lookback));
+        const mean = tail.reduce((acc, r) => acc + r, 0) / Math.max(tail.length, 1);
+        const variance = tail.reduce((acc, r) => acc + ((r - mean) ** 2), 0) / Math.max(tail.length, 1);
+        const realized = Math.sqrt(Math.max(0, variance));
+        const regimeAdj = (regime / (yBuckets - 1)) * 0.9;
+        const z = (realized + regimeAdj) * 11;
+        points.push({
+          x: horizon,
+          y: regime,
+          z,
+          color: z > 22 ? terminalColors.negative : z > 14 ? terminalColors.warning : terminalColors.positive,
+        });
+      }
+    }
+    return points;
+  }, [dailyReturnsPct]);
+
+  const realizedVolPct = useMemo(() => {
+    if (!volatilitySurfacePoints.length) return 0;
+    const avg = volatilitySurfacePoints.reduce((acc, p) => acc + p.z, 0) / volatilitySurfacePoints.length;
+    return avg * 1.5;
+  }, [volatilitySurfacePoints]);
+
+  const volatilityTermSlope = useMemo(() => {
+    if (!volatilitySurfacePoints.length) return 0;
+    const near = volatilitySurfacePoints.filter((p) => p.x <= 1);
+    const far = volatilitySurfacePoints.filter((p) => p.x >= 6);
+    const nearAvg = near.length ? near.reduce((acc, p) => acc + p.z, 0) / near.length : 0;
+    const farAvg = far.length ? far.reduce((acc, p) => acc + p.z, 0) / far.length : 0;
+    return farAvg - nearAvg;
+  }, [volatilitySurfacePoints]);
+
+  const monteCarlo = useMemo(() => {
+    if (dailyReturnsPct.length < 20) {
+      return { median: [] as number[], p10: [] as number[], p90: [] as number[], start: initialCapital, endMedian: initialCapital };
+    }
+    const horizon = Math.min(126, Math.max(40, dailyReturnsPct.length));
+    const paths = 160;
+    const start = Number(result?.result?.initial_cash ?? initialCapital ?? 100000);
+    const sortedReturns = [...dailyReturnsPct].sort((a, b) => a - b);
+    const sampleOne = () => {
+      const idx = Math.floor(Math.random() * sortedReturns.length);
+      return sortedReturns[Math.max(0, Math.min(sortedReturns.length - 1, idx))] / 100;
+    };
+    const all: number[][] = [];
+    for (let p = 0; p < paths; p += 1) {
+      let equity = start;
+      const series = [equity];
+      for (let t = 0; t < horizon; t += 1) {
+        const r = sampleOne();
+        equity *= 1 + r;
+        series.push(equity);
+      }
+      all.push(series);
+    }
+    const median: number[] = [];
+    const p10: number[] = [];
+    const p90: number[] = [];
+    for (let t = 0; t <= horizon; t += 1) {
+      const slice = all.map((row) => row[t]).sort((a, b) => a - b);
+      const n = slice.length;
+      median.push(slice[Math.floor(n * 0.5)] ?? start);
+      p10.push(slice[Math.floor(n * 0.1)] ?? start);
+      p90.push(slice[Math.floor(n * 0.9)] ?? start);
+    }
+    return { median, p10, p90, start, endMedian: median[median.length - 1] ?? start };
+  }, [dailyReturnsPct, initialCapital, result]);
+
   const runComparison = async () => {
     if (!compareStrategies.length || compareStrategies.length > 6 || compareRunning) return;
     setCompareRunning(true);
@@ -949,19 +1114,50 @@ export function BacktestingPage() {
     <RegimeEfficacy3DPanel points={regimeEfficacyPoints} regimeCount={regimeEfficacyPoints.length} />
   );
 
+  const renderOrderbook3DTab = () => (
+    <OrderbookLiquidity3DPanel
+      points={orderbookLiquidityPoints}
+      avgDepth={orderbookAvgDepth}
+      estimatedSpreadBps={orderbookSpreadBps}
+    />
+  );
+
+  const renderImpliedVol3DTab = () => (
+    <ImpliedVolatilitySurface3DPanel
+      points={impliedVolatilitySurfacePoints}
+      atmIvPct={impliedAtmIvPct}
+      ivSkew={impliedSkew}
+    />
+  );
+
+  const renderVolatilitySurface3DTab = () => (
+    <VolatilitySurface3DPanel
+      points={volatilitySurfacePoints}
+      realizedVolPct={realizedVolPct}
+      termSlope={volatilityTermSlope}
+    />
+  );
+
+  const renderMonteCarloTab = () => (
+    <MonteCarloSimulationPanel
+      medianPath={monteCarlo.median}
+      p10Path={monteCarlo.p10}
+      p90Path={monteCarlo.p90}
+      startValue={monteCarlo.start}
+      endMedian={monteCarlo.endMedian}
+    />
+  );
+
   const renderActiveTab = () => {
     if (analyticsLoading && activeTab !== "chart" && activeTab !== "compare" && !resolvedAnalytics.monthly_returns.length) return emptyState("*", "Loading analytics...");
     if (activeTab === "chart") return renderChartTab();
     if (activeTab === "equity") return renderEquityTab();
     if (activeTab === "drawdown") return renderDrawdownTab();
     if (activeTab === "monthly") return renderMonthlyTab();
-    if (activeTab === "distribution") return renderDistributionTab();
     if (activeTab === "rolling") return renderRollingTab();
     if (activeTab === "trades") return renderTradesTab();
     if (activeTab === "compare") return renderCompareTab();
-    if (activeTab === "surface3d") return renderSurface3DTab();
-    if (activeTab === "terrain3d") return renderTerrain3DTab();
-    return renderRegime3DTab();
+    return renderSurface3DTab();
   };
 
   const proRenderers: PanelRendererMap = {
@@ -984,13 +1180,10 @@ export function BacktestingPage() {
       if (normalized.includes("equity")) setActiveTab("equity");
       else if (normalized.includes("drawdown")) setActiveTab("drawdown");
       else if (normalized.includes("monthly")) setActiveTab("monthly");
-      else if (normalized.includes("distribution")) setActiveTab("distribution");
       else if (normalized.includes("rolling")) setActiveTab("rolling");
       else if (normalized.includes("trade")) setActiveTab("trades");
       else if (normalized.includes("compare")) setActiveTab("compare");
       else if (normalized.includes("surface")) setActiveTab("surface3d");
-      else if (normalized.includes("terrain")) setActiveTab("terrain3d");
-      else if (normalized.includes("regime")) setActiveTab("regime3d");
       else setActiveTab("chart");
       return;
     }
@@ -1000,6 +1193,16 @@ export function BacktestingPage() {
 
   return (
     <div className="h-full space-y-3 overflow-y-auto px-3 py-2 pb-4">
+      <TerminalPanel title="Research Suites" subtitle="Backtesting + Model Lab">
+        <div className="flex flex-wrap gap-2 text-xs">
+          <Link className={`rounded border px-2 py-1 ${location.pathname.startsWith("/backtesting/model-lab") ? "border-terminal-border text-terminal-muted hover:text-terminal-text" : "border-terminal-accent bg-terminal-accent/10 text-terminal-accent"}`} to="/backtesting">
+            Backtesting Console
+          </Link>
+          <Link className={`rounded border px-2 py-1 ${location.pathname.startsWith("/backtesting/model-lab") ? "border-terminal-accent bg-terminal-accent/10 text-terminal-accent" : "border-terminal-border text-terminal-muted hover:text-terminal-text"}`} to="/backtesting/model-lab">
+            Open Model Lab
+          </Link>
+        </div>
+      </TerminalPanel>
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_320px]">
         <TerminalPanel title="Backtesting Control Deck" subtitle="Compact controls for chart-first workflow">
           <div className="grid grid-cols-1 gap-2 text-xs md:grid-cols-7">
@@ -1043,11 +1246,36 @@ export function BacktestingPage() {
         </TerminalPanel>
       )}
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-        <TerminalPanel title="Trade Blotter" subtitle={`Executed trades: ${trades.length} | Total quantity: ${totalTradeQty.toFixed(2)}`}>
-          <div className="max-h-56 overflow-auto"><table className="min-w-full text-[11px]"><thead className="text-terminal-muted"><tr className="border-b border-terminal-border"><th className="px-1 py-1 text-left">Date</th><th className="px-1 py-1 text-left">Asset</th><th className="px-1 py-1 text-left">Side</th><th className="px-1 py-1 text-right">Quantity</th><th className="px-1 py-1 text-right">Price</th></tr></thead><tbody>{trades.map((trade, idx) => { const isBuy = trade.action.toUpperCase() === "BUY"; return <tr key={`${trade.date}-${idx}`} className={`border-t border-terminal-border/40 ${isBuy ? "text-terminal-pos" : "text-terminal-neg"}`}><td className="px-1 py-1 text-terminal-text">{trade.date}</td><td className="px-1 py-1 text-terminal-text">{tradedAsset}</td><td className={`px-1 py-1 font-semibold ${isBuy ? "text-terminal-pos" : "text-terminal-neg"}`}>{trade.action.toUpperCase()}</td><td className="px-1 py-1 text-right">{trade.quantity.toFixed(2)}</td><td className="px-1 py-1 text-right">{trade.price.toFixed(2)}</td></tr>; })}</tbody></table></div>
-        </TerminalPanel>
-        <TerminalPanel title="Execution Logs" subtitle="Strategy stdout/stderr"><pre className="max-h-56 overflow-auto whitespace-pre-wrap bg-terminal-bg p-2 font-mono text-[11px] text-terminal-muted">{result?.logs || "No logs"}</pre></TerminalPanel>
+      <div className="grid grid-cols-1 gap-3 2xl:grid-cols-[1.6fr_1fr]">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <TerminalPanel title="Return Distribution" subtitle="Standalone distribution plot">
+            {renderDistributionTab()}
+          </TerminalPanel>
+          <TerminalPanel title="3D Terrain" subtitle="Standalone drawdown terrain">
+            {renderTerrain3DTab()}
+          </TerminalPanel>
+          <TerminalPanel title="3D Regimes" subtitle="Standalone regime efficacy">
+            {renderRegime3DTab()}
+          </TerminalPanel>
+          <TerminalPanel title="Orderbook Liquidity Engine 3D" subtitle="Independent depth + spread topology">
+            {renderOrderbook3DTab()}
+          </TerminalPanel>
+          <TerminalPanel title="Implied Volatility Surface 3D" subtitle="Synthetic IV smile + term surface">
+            {renderImpliedVol3DTab()}
+          </TerminalPanel>
+          <TerminalPanel title="Volatility Surface 3D" subtitle="Realized volatility regime surface">
+            {renderVolatilitySurface3DTab()}
+          </TerminalPanel>
+          <TerminalPanel title="Monte Carlo Simulation" subtitle="Bootstrapped forward equity scenarios">
+            {renderMonteCarloTab()}
+          </TerminalPanel>
+        </div>
+        <div className="grid grid-cols-1 gap-3">
+          <TerminalPanel title="Trade Blotter" subtitle={`Executed trades: ${trades.length} | Total quantity: ${totalTradeQty.toFixed(2)}`}>
+            <div className="max-h-56 overflow-auto"><table className="min-w-full text-[11px]"><thead className="text-terminal-muted"><tr className="border-b border-terminal-border"><th className="px-1 py-1 text-left">Date</th><th className="px-1 py-1 text-left">Asset</th><th className="px-1 py-1 text-left">Side</th><th className="px-1 py-1 text-right">Quantity</th><th className="px-1 py-1 text-right">Price</th></tr></thead><tbody>{trades.map((trade, idx) => { const isBuy = trade.action.toUpperCase() === "BUY"; return <tr key={`${trade.date}-${idx}`} className={`border-t border-terminal-border/40 ${isBuy ? "text-terminal-pos" : "text-terminal-neg"}`}><td className="px-1 py-1 text-terminal-text">{trade.date}</td><td className="px-1 py-1 text-terminal-text">{tradedAsset}</td><td className={`px-1 py-1 font-semibold ${isBuy ? "text-terminal-pos" : "text-terminal-neg"}`}>{trade.action.toUpperCase()}</td><td className="px-1 py-1 text-right">{trade.quantity.toFixed(2)}</td><td className="px-1 py-1 text-right">{trade.price.toFixed(2)}</td></tr>; })}</tbody></table></div>
+          </TerminalPanel>
+          <TerminalPanel title="Execution Logs" subtitle="Strategy stdout/stderr"><pre className="max-h-56 overflow-auto whitespace-pre-wrap bg-terminal-bg p-2 font-mono text-[11px] text-terminal-muted">{result?.logs || "No logs"}</pre></TerminalPanel>
+        </div>
       </div>
     </div>
   );
