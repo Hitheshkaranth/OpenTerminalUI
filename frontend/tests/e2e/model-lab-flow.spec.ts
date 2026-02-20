@@ -166,18 +166,20 @@ test("model lab e2e: create -> run -> report -> compare", async ({ page }) => {
   );
 
   await page.goto("/model-lab");
-  await expect(page.getByText("Model Lab")).toBeVisible();
+  await expect(page.getByText("Model Lab", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Create Experiment" }).click();
-  await expect(page.getByRole("link", { name: "Open" }).first()).toBeVisible();
+  const openExperimentLink = page.getByRole("link", { name: "Open", exact: true }).first();
+  await expect(openExperimentLink).toBeVisible();
 
-  await page.getByRole("link", { name: "Open" }).first().click();
+  await openExperimentLink.click();
+  await expect(page).toHaveURL(/\/model-lab\/experiments\//);
   await expect(page.getByText("Model Lab / Experiment")).toBeVisible();
 
-  await page.goto("/model-lab/runs/run_1");
+  await page.goto("/model-lab/runs/run_1", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByText("Model Lab / Report")).toBeVisible();
-  await page.goto("/model-lab/compare?runs=run_1,run_2");
+  await page.goto("/model-lab/compare?runs=run_1,run_2", { waitUntil: "domcontentloaded" });
   await page.locator("input[placeholder='run_id_1,run_id_2,run_id_3']").fill("run_1,run_2");
   await page.getByRole("button", { name: "Compare" }).click();
   await expect(page.getByText("Metric Comparison")).toBeVisible();

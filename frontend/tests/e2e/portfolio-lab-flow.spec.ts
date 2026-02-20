@@ -111,10 +111,10 @@ test("portfolio lab e2e: create portfolio -> run -> report and create blend", as
 
   await page.getByRole("button", { name: "Create Portfolio" }).click();
 
-  await page.goto("/portfolio-lab/runs/pr_1");
+  await page.goto("/portfolio-lab/runs/pr_1", { waitUntil: "domcontentloaded" });
   await expect(page.getByText("Portfolio Lab / Report")).toBeVisible();
 
-  await page.goto("/portfolio-lab/blends");
+  await page.goto("/portfolio-lab/blends", { waitUntil: "domcontentloaded" });
   await expect(page.getByText("Blend Builder")).toBeVisible();
   await page.getByRole("button", { name: "Save Blend" }).click();
   await expect(page.getByText("Saved Blends")).toBeVisible();

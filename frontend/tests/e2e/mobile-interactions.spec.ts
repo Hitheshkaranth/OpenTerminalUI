@@ -1,26 +1,27 @@
 import { expect, test } from "@playwright/test";
 
-async function registerAndLogin(
-  page: import("@playwright/test").Page,
-  request: import("@playwright/test").APIRequestContext,
-  seed: string,
-  targetPath: string,
-) {
-  const email = `mobile.e2e.${seed}@example.com`;
-  const password = "StrongPass123!";
+function makeJwt(payload: Record<string, unknown>): string {
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `x.${encoded}.y`;
+}
 
-  const registerResp = await request.post("http://127.0.0.1:8010/api/auth/register", {
-    data: { email, password, role: "trader" },
+async function loginAndOpen(page: import("@playwright/test").Page, targetPath: string) {
+  const accessToken = makeJwt({
+    sub: "mobile-e2e-user",
+    email: "mobile.e2e@example.com",
+    role: "trader",
+    exp: Math.floor(Date.now() / 1000) + 3600,
   });
-  if (![200, 409].includes(registerResp.status())) {
-    throw new Error(`Failed to prepare user: ${registerResp.status()}`);
-  }
-
-  await page.goto(`/login?redirect=${encodeURIComponent(targetPath)}`);
-  await page.getByPlaceholder("Enter user ID...").fill(email);
-  await page.getByPlaceholder("Enter password...").fill(password);
-  await page.getByRole("button", { name: /access terminal/i }).click();
-  await page.waitForURL(new RegExp(targetPath.replace("/", "\\/")), { timeout: 15000 });
+  const refreshToken = makeJwt({ exp: Math.floor(Date.now() / 1000) + 7200 });
+  await page.addInitScript(
+    ([at, rt]) => {
+      localStorage.setItem("ot-access-token", at);
+      localStorage.setItem("ot-refresh-token", rt);
+    },
+    [accessToken, refreshToken],
+  );
+  await page.goto(targetPath);
+  await expect(page).toHaveURL(new RegExp(targetPath.replace("/", "\\/")));
 }
 
 async function dispatchTouch(
@@ -52,8 +53,8 @@ test.describe("mobile interactions", () => {
     test.skip(testInfo.project.name !== "mobile-chromium", "Mobile-only interaction suite");
   });
 
-  test("bottom nav switches views", async ({ page, request }) => {
-    await registerAndLogin(page, request, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`, "/equity/watchlist");
+  test("bottom nav switches views", async ({ page }) => {
+    await loginAndOpen(page, "/equity/watchlist");
 
     await expect(page.locator("nav.fixed.bottom-0")).toBeVisible();
     await expect(page.getByText("Add to Watchlist")).toBeVisible();
@@ -64,8 +65,8 @@ test.describe("mobile interactions", () => {
     await expect(page.getByText("Portfolio Movement & Historical Return")).toBeVisible();
   });
 
-  test("watchlist pull-to-refresh hint appears", async ({ page, request }) => {
-    await registerAndLogin(page, request, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`, "/equity/watchlist");
+  test("watchlist pull-to-refresh hint appears", async ({ page }) => {
+    await loginAndOpen(page, "/equity/watchlist");
 
     const rootSel = "div.space-y-3.p-4";
     await dispatchTouch(page, rootSel, "touchstart", 120, 50);
@@ -77,8 +78,8 @@ test.describe("mobile interactions", () => {
     await dispatchTouch(page, rootSel, "touchend", 120, 140);
   });
 
-  test("portfolio swipe changes timeframe", async ({ page, request }) => {
-    await registerAndLogin(page, request, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`, "/equity/portfolio");
+  test("portfolio swipe changes timeframe", async ({ page }) => {
+    await loginAndOpen(page, "/equity/portfolio");
 
     const allBtn = page.getByRole("button", { name: "ALL" });
     const fiveYBtn = page.getByRole("button", { name: "5Y" });

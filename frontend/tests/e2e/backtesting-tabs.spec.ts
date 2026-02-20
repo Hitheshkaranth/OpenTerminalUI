@@ -39,8 +39,7 @@ test("backtesting tabs and compare panel render with mocked jobs", async ({ page
   await page.getByRole("button", { name: "Monthly Returns" }).click();
   await expect(page.getByText("Run a backtest to see monthly return heatmap")).toBeVisible();
 
-  await page.getByRole("button", { name: "Distribution" }).click();
-  await expect(page.getByText("Distribution Shift")).toBeVisible();
+  await expect(page.getByText("Return Distribution")).toBeVisible();
 
   await page.getByRole("button", { name: "Rolling Metrics" }).click();
   await expect(page.getByText("Run a backtest to see rolling metrics")).toBeVisible();
