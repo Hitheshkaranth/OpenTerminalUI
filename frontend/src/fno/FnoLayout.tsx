@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet, useOutletContext, useSearchParams } from "react-router-dom";
+import { NavLink, Outlet, useOutletContext, useSearchParams, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { ErrorBoundary } from "../components/common/ErrorBoundary";
@@ -121,8 +121,7 @@ export function FnoLayout() {
               to={link.to}
               end={link.to === "/fno"}
               className={({ isActive }) =>
-                `flex items-center justify-between rounded px-2 py-2 ${
-                  isActive ? "bg-terminal-accent/20 text-terminal-accent" : "text-terminal-muted hover:bg-terminal-bg hover:text-terminal-text"
+                `flex items-center justify-between rounded px-2 py-2 ${isActive ? "bg-terminal-accent/20 text-terminal-accent" : "text-terminal-muted hover:bg-terminal-bg hover:text-terminal-text"
                 }`
               }
             >
@@ -136,60 +135,63 @@ export function FnoLayout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
-        <div className="sticky top-0 z-20 border-b border-terminal-border bg-terminal-panel px-3 py-2">
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
-            <label className="text-[11px]">
-              <span className="mb-1 block uppercase tracking-wide text-terminal-muted">Symbol</span>
-              <select
-                className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs outline-none focus:border-terminal-accent"
-                value={symbol}
-                onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-              >
-                {[...new Set([...(DEFAULT_FNO_SYMBOLS as readonly string[]), symbol])].map((item) => (
-                  <option key={item} value={item}>{item}</option>
-                ))}
-              </select>
-            </label>
+        {/* F&O specific header - hide on about page */}
+        {!location.pathname.endsWith("/about") && (
+          <div className="sticky top-0 z-20 border-b border-terminal-border bg-terminal-panel px-3 py-2">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+              <label className="text-[11px]">
+                <span className="mb-1 block uppercase tracking-wide text-terminal-muted">Symbol</span>
+                <select
+                  className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs outline-none focus:border-terminal-accent"
+                  value={symbol}
+                  onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                >
+                  {[...new Set([...(DEFAULT_FNO_SYMBOLS as readonly string[]), symbol])].map((item) => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </select>
+              </label>
 
-            <label className="text-[11px]">
-              <span className="mb-1 block uppercase tracking-wide text-terminal-muted">Expiry</span>
-              <select
-                className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs outline-none focus:border-terminal-accent"
-                value={expiry}
-                onChange={(e) => setExpiry(e.target.value)}
-              >
-                {expiries.map((item) => (
-                  <option key={item} value={item}>{item}</option>
-                ))}
-                {!expiries.length && <option value="">No expiry</option>}
-              </select>
-            </label>
+              <label className="text-[11px]">
+                <span className="mb-1 block uppercase tracking-wide text-terminal-muted">Expiry</span>
+                <select
+                  className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs outline-none focus:border-terminal-accent"
+                  value={expiry}
+                  onChange={(e) => setExpiry(e.target.value)}
+                >
+                  {expiries.map((item) => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                  {!expiries.length && <option value="">No expiry</option>}
+                </select>
+              </label>
 
-            <div className="text-[11px]">
-              <span className="mb-1 block uppercase tracking-wide text-terminal-muted">Data</span>
-              <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs">
-                {expiryQuery.isFetching ? "Refreshing..." : "Live cache 60s"}
+              <div className="text-[11px]">
+                <span className="mb-1 block uppercase tracking-wide text-terminal-muted">Data</span>
+                <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs">
+                  {expiryQuery.isFetching ? "Refreshing..." : "Live cache 60s"}
+                </div>
+              </div>
+
+              <div className="text-[11px]">
+                <span className="mb-1 block uppercase tracking-wide text-terminal-muted">Universe</span>
+                <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs">NSE F&O</div>
               </div>
             </div>
-
-            <div className="text-[11px]">
-              <span className="mb-1 block uppercase tracking-wide text-terminal-muted">Universe</span>
-              <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs">NSE F&O</div>
+            <div className="mt-2 flex flex-wrap items-center gap-1">
+              <span className="mr-1 text-[10px] uppercase tracking-wide text-terminal-muted">Popular Indices</span>
+              {POPULAR_FNO_INDICES.map((idx) => (
+                <button
+                  key={idx}
+                  className={`rounded border px-2 py-1 text-[11px] ${symbol === idx ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted hover:text-terminal-text"}`}
+                  onClick={() => setSymbol(idx)}
+                >
+                  {idx}
+                </button>
+              ))}
             </div>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-1">
-            <span className="mr-1 text-[10px] uppercase tracking-wide text-terminal-muted">Popular Indices</span>
-            {POPULAR_FNO_INDICES.map((idx) => (
-              <button
-                key={idx}
-                className={`rounded border px-2 py-1 text-[11px] ${symbol === idx ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted hover:text-terminal-text"}`}
-                onClick={() => setSymbol(idx)}
-              >
-                {idx}
-              </button>
-            ))}
-          </div>
-        </div>
+        )}
 
         <div className="min-h-0 flex-1 overflow-auto p-3">
           <ErrorBoundary>

@@ -19,6 +19,20 @@ const api = axios.create({
   timeout: 30000,
 });
 
+let accessTokenGetter: (() => string | null) | null = null;
+export function setAccessTokenGetter(getter: (() => string | null) | null): void {
+  accessTokenGetter = getter;
+}
+
+api.interceptors.request.use((config) => {
+  const token = accessTokenGetter ? accessTokenGetter() : null;
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export async function fetchOptionChain(symbol: string, expiry?: string, range = 20): Promise<OptionChainResponse> {
   const { data } = await api.get<OptionChainResponse>(`/fno/chain/${encodeURIComponent(symbol.trim().toUpperCase())}`, {
     params: { expiry, range },
@@ -126,14 +140,16 @@ export async function fetchExpiryDashboard(): Promise<Array<{
   max_pain: number;
   support_resistance: { support: number[]; resistance: number[] };
 }>> {
-  const { data } = await api.get<{ items: Array<{
-    symbol: string;
-    expiry_date: string;
-    days_to_expiry: number;
-    atm_iv: number;
-    pcr: { pcr_oi: number; pcr_volume: number; pcr_oi_change: number; signal: string };
-    max_pain: number;
-    support_resistance: { support: number[]; resistance: number[] };
-  }> }>("/fno/expiry/dashboard");
+  const { data } = await api.get<{
+    items: Array<{
+      symbol: string;
+      expiry_date: string;
+      days_to_expiry: number;
+      atm_iv: number;
+      pcr: { pcr_oi: number; pcr_volume: number; pcr_oi_change: number; signal: string };
+      max_pain: number;
+      support_resistance: { support: number[]; resistance: number[] };
+    }>
+  }>("/fno/expiry/dashboard");
   return Array.isArray(data?.items) ? data.items : [];
 }

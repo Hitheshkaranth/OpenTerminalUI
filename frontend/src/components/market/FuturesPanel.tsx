@@ -3,6 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchFuturesChain, fetchFuturesUnderlyings, type FuturesChainContract } from "../../api/client";
 import { useDisplayCurrency } from "../../hooks/useDisplayCurrency";
 import { useQuotesStore, useQuotesStream } from "../../realtime/useQuotesStream";
+import { useStockHistory } from "../../hooks/useStocks";
+import { ChartEngine } from "../../shared/chart/ChartEngine";
+import { chartPointsToBars } from "../../shared/chart/chartUtils";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 
 type FuturesRow = FuturesChainContract & {
@@ -28,6 +31,9 @@ export function FuturesPanel() {
   const [chainContracts, setChainContracts] = useState<FuturesChainContract[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const { data: chart } = useStockHistory(selectedUnderlying, "3mo", "1d");
+  const chartPoints = chart?.data ?? [];
 
   useEffect(() => {
     const term = query.trim().toUpperCase();
@@ -157,44 +163,61 @@ export function FuturesPanel() {
         {loading && <div className="text-xs text-terminal-muted">Loading chain...</div>}
         {error && <div className="text-xs text-terminal-neg">{error}</div>}
 
-        <div className="max-h-72 overflow-auto">
-          <table className="min-w-full text-xs">
-            <thead className="sticky top-0 bg-terminal-panel">
-              <tr className="border-b border-terminal-border text-terminal-muted">
-                <th className="px-2 py-1 text-left">Expiry</th>
-                <th className="px-2 py-1 text-right">LTP</th>
-                <th className="px-2 py-1 text-right">Chg%</th>
-                <th className="px-2 py-1 text-right">OI</th>
-                <th className="px-2 py-1 text-right">Vol</th>
-                <th className="px-2 py-1 text-left">Tradingsymbol</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const moveClass =
-                  row.changePct === null ? "text-terminal-muted" : row.changePct >= 0 ? "text-terminal-pos" : "text-terminal-neg";
-                return (
-                  <tr key={`${row.instrument_token}`} className="border-b border-terminal-border/40">
-                    <td className="px-2 py-1">{row.expiry_date || "-"}</td>
-                    <td className="px-2 py-1 text-right tabular-nums">{row.ltp !== null ? formatDisplayMoney(row.ltp) : "-"}</td>
-                    <td className={`px-2 py-1 text-right tabular-nums ${moveClass}`}>
-                      {row.changePct !== null ? `${row.changePct >= 0 ? "+" : ""}${row.changePct.toFixed(2)}%` : "-"}
-                    </td>
-                    <td className="px-2 py-1 text-right tabular-nums">{fmtNum(row.oi, 0)}</td>
-                    <td className="px-2 py-1 text-right tabular-nums">{fmtNum(row.volume, 0)}</td>
-                    <td className="px-2 py-1">{row.tradingsymbol}</td>
-                  </tr>
-                );
-              })}
-              {!loading && rows.length === 0 && (
-                <tr>
-                  <td className="px-2 py-2 text-center text-terminal-muted" colSpan={6}>
-                    No contracts
-                  </td>
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          {selectedUnderlying && chartPoints.length > 0 && (
+            <div className="h-72 w-full max-h-72 rounded border border-terminal-border">
+              <ChartEngine
+                symbol={selectedUnderlying}
+                timeframe="1D"
+                historicalData={chartPointsToBars(chartPoints)}
+                market="NSE"
+                activeIndicators={[]}
+                chartType="candle"
+                showVolume={true}
+                enableRealtime={true}
+                height={285}
+              />
+            </div>
+          )}
+          <div className="max-h-72 overflow-auto w-full border border-terminal-border rounded">
+            <table className="min-w-full text-xs">
+              <thead className="sticky top-0 bg-terminal-panel">
+                <tr className="border-b border-terminal-border text-terminal-muted">
+                  <th className="px-2 py-1 text-left">Expiry</th>
+                  <th className="px-2 py-1 text-right">LTP</th>
+                  <th className="px-2 py-1 text-right">Chg%</th>
+                  <th className="px-2 py-1 text-right">OI</th>
+                  <th className="px-2 py-1 text-right">Vol</th>
+                  <th className="px-2 py-1 text-left">Tradingsymbol</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const moveClass =
+                    row.changePct === null ? "text-terminal-muted" : row.changePct >= 0 ? "text-terminal-pos" : "text-terminal-neg";
+                  return (
+                    <tr key={`${row.instrument_token}`} className="border-b border-terminal-border/40">
+                      <td className="px-2 py-1">{row.expiry_date || "-"}</td>
+                      <td className="px-2 py-1 text-right tabular-nums">{row.ltp !== null ? formatDisplayMoney(row.ltp) : "-"}</td>
+                      <td className={`px-2 py-1 text-right tabular-nums ${moveClass}`}>
+                        {row.changePct !== null ? `${row.changePct >= 0 ? "+" : ""}${row.changePct.toFixed(2)}%` : "-"}
+                      </td>
+                      <td className="px-2 py-1 text-right tabular-nums">{fmtNum(row.oi, 0)}</td>
+                      <td className="px-2 py-1 text-right tabular-nums">{fmtNum(row.volume, 0)}</td>
+                      <td className="px-2 py-1">{row.tradingsymbol}</td>
+                    </tr>
+                  );
+                })}
+                {!loading && rows.length === 0 && (
+                  <tr>
+                    <td className="px-2 py-2 text-center text-terminal-muted" colSpan={6}>
+                      No contracts
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </TerminalPanel>

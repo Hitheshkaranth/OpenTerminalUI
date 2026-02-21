@@ -77,8 +77,25 @@ app.add_middleware(
 )
 app.add_middleware(AuthMiddleware)
 
+from backend.cockpit.routes import router as cockpit_router
+from backend.portfolio_backtests.routes import router as portfolio_backtests_router
+from backend.risk_engine.routes import router as risk_router
+from backend.experiments.routes import router as experiments_router
+from backend.instruments.routes import router as instruments_router
+from backend.data_quality.routes import router as data_quality_router
+from backend.tca.routes import router as tca_router
+
 app.include_router(equity_router)
 app.include_router(fno_router)
+
+# Quant Feature Pack Routers (Swarm 0 Stubs)
+app.include_router(cockpit_router, prefix="/api")
+app.include_router(portfolio_backtests_router, prefix="/api")
+app.include_router(risk_router, prefix="/api")
+app.include_router(experiments_router, prefix="/api")
+app.include_router(instruments_router, prefix="/api")
+app.include_router(data_quality_router, prefix="/api")
+app.include_router(tca_router, prefix="/api")
 
 
 @app.on_event("startup")

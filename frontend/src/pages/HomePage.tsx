@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { fetchBacktestV1Presets, fetchPortfolio, fetchQuotesBatch, fetchWatchlist } from "../api/client";
+import { fetchBacktestV1Presets, fetchPortfolio, fetchQuotesBatch, fetchWatchlist, fetchLatestNews, fetchPortfolioBenchmarkOverlay, type NewsLatestApiItem } from "../api/client";
 import { StatusBar } from "../components/StatusBar";
 import { useAuth } from "../contexts/AuthContext";
 import { fetchChainSummary } from "../fno/api/fnoApi";
@@ -10,21 +10,13 @@ import logo from "../assets/logo.png";
 
 type MarketRow = {
   symbol: string;
+  label?: string;
   ltp: number;
   chg: number;
   chgPct: number;
   flash: "up" | "down" | null;
 };
 
-type OrderEntry = {
-  id: string;
-  time: string;
-  side: "BUY" | "SELL";
-  symbol: string;
-  qty: number;
-  price: number;
-  status: "FILLED" | "PARTIAL" | "QUEUED";
-};
 
 type DashboardSnapshot = {
   equityValue: number | null;
@@ -106,27 +98,17 @@ const NAV_CARD_SECTIONS: Array<{ title: string; cards: NavCard[] }> = [
 ];
 
 const INITIAL_MARKET_ROWS: MarketRow[] = [
-  { symbol: "NIFTY", ltp: 24856.5, chg: 124.3, chgPct: 0.5, flash: null },
-  { symbol: "SENSEX", ltp: 81234.1, chg: -89.4, chgPct: -0.11, flash: null },
-  { symbol: "BANKNIFTY", ltp: 52120, chg: 310.55, chgPct: 0.6, flash: null },
-  { symbol: "RELIANCE", ltp: 2891.5, chg: 12.3, chgPct: 0.43, flash: null },
-  { symbol: "TCS", ltp: 4120.8, chg: -18.9, chgPct: -0.46, flash: null },
-  { symbol: "INFY", ltp: 1890.2, chg: 8.45, chgPct: 0.45, flash: null },
-  { symbol: "HDFCBANK", ltp: 1732.2, chg: -4.2, chgPct: -0.24, flash: null },
-  { symbol: "ITC", ltp: 487.45, chg: 2.76, chgPct: 0.57, flash: null },
+  { symbol: "^NSEI", label: "NIFTY 50", ltp: 0, chg: 0, chgPct: 0, flash: null },
+  { symbol: "^BSESN", label: "SENSEX", ltp: 0, chg: 0, chgPct: 0, flash: null },
+  { symbol: "^IXIC", label: "NASDAQ", ltp: 0, chg: 0, chgPct: 0, flash: null },
+  { symbol: "^GSPC", label: "S&P 500", ltp: 0, chg: 0, chgPct: 0, flash: null },
+  { symbol: "GC=F", label: "GOLD", ltp: 0, chg: 0, chgPct: 0, flash: null },
+  { symbol: "SI=F", label: "SILVER", ltp: 0, chg: 0, chgPct: 0, flash: null },
+  { symbol: "CL=F", label: "CRUDE OIL", ltp: 0, chg: 0, chgPct: 0, flash: null },
 ];
 const MARKET_PULSE_SYMBOLS = INITIAL_MARKET_ROWS.map((row) => row.symbol);
 
-const INITIAL_ORDER_LOG: OrderEntry[] = [
-  { id: "1", time: "09:31:02", side: "BUY", symbol: "RELIANCE", qty: 50, price: 2890.5, status: "FILLED" },
-  { id: "2", time: "09:29:48", side: "SELL", symbol: "TCS", qty: 20, price: 4122.1, status: "FILLED" },
-  { id: "3", time: "09:26:11", side: "BUY", symbol: "INFY", qty: 65, price: 1888.95, status: "PARTIAL" },
-  { id: "4", time: "09:23:54", side: "BUY", symbol: "HDFCBANK", qty: 40, price: 1731.8, status: "FILLED" },
-  { id: "5", time: "09:22:17", side: "SELL", symbol: "ITC", qty: 130, price: 486.2, status: "QUEUED" },
-  { id: "6", time: "09:19:03", side: "BUY", symbol: "NIFTY", qty: 25, price: 24811.55, status: "FILLED" },
-];
-
-const PERFORMANCE_POINTS = [
+const FALLBACK_PERFORMANCE_POINTS = [
   24300000, 24200000, 24400000, 24500000, 24450000, 24680000, 24720000, 24610000, 24790000, 24840000,
   24770000, 24890000, 24950000, 24810000, 24780000, 24910000, 25030000, 24980000, 25120000, 25190000,
   25150000, 25230000, 25310000, 25280000, 25390000, 25470000, 25420000, 25510000, 25590000, 25670000,
@@ -173,32 +155,6 @@ function buildAreaPath(points: number[], width: number, height: number): string 
   return `${line} L ${width} ${height} L 0 ${height} Z`;
 }
 
-function nextOrderEntry(): OrderEntry {
-  const symbols = ["RELIANCE", "TCS", "INFY", "HDFCBANK", "ITC", "NIFTY"];
-  const side = Math.random() > 0.52 ? "BUY" : "SELL";
-  const symbol = symbols[Math.floor(Math.random() * symbols.length)];
-  const qty = 10 + Math.floor(Math.random() * 140);
-  const price = 480 + Math.random() * 4200;
-  const status: OrderEntry["status"] = Math.random() > 0.8 ? "QUEUED" : Math.random() > 0.4 ? "FILLED" : "PARTIAL";
-  const now = new Date();
-  const time = new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Kolkata",
-  }).format(now);
-
-  return {
-    id: `${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
-    time,
-    side,
-    symbol,
-    qty,
-    price,
-    status,
-  };
-}
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -211,16 +167,18 @@ export function HomePage() {
   const newsRefreshSec = useSettingsStore((s) => s.newsRefreshSec);
 
   const [marketRows, setMarketRows] = useState<MarketRow[]>(INITIAL_MARKET_ROWS);
-  const [orderLog, setOrderLog] = useState<OrderEntry[]>(INITIAL_ORDER_LOG);
+  const [newsLog, setNewsLog] = useState<NewsLatestApiItem[]>([]);
   const [snapshot, setSnapshot] = useState<DashboardSnapshot>(EMPTY_SNAPSHOT);
+  const [performancePoints, setPerformancePoints] = useState<number[]>(FALLBACK_PERFORMANCE_POINTS);
   const [initializing, setInitializing] = useState(() => sessionStorage.getItem(TRANSITION_FLAG_KEY) === "1");
 
   const loadSnapshot = useCallback(async () => {
-    const [portfolioRes, watchlistRes, backtestRes, chainRes] = await Promise.allSettled([
+    const [portfolioRes, watchlistRes, backtestRes, chainRes, benchmarkRes] = await Promise.allSettled([
       fetchPortfolio(),
       fetchWatchlist(),
       fetchBacktestV1Presets(),
       fetchChainSummary("NIFTY"),
+      fetchPortfolioBenchmarkOverlay(),
     ]);
 
     let next = { ...EMPTY_SNAPSHOT };
@@ -234,8 +192,8 @@ export function HomePage() {
         typeof data.summary.overall_pnl === "number"
           ? data.summary.overall_pnl
           : next.equityValue != null
-          ? next.equityValue - next.equityCost
-          : null;
+            ? next.equityValue - next.equityCost
+            : null;
       next.holdingsCount = data.items.length;
     }
 
@@ -253,6 +211,12 @@ export function HomePage() {
       next.fnoSpot = Number.isFinite(chainRes.value.spot_price) ? chainRes.value.spot_price : null;
       next.fnoPcr = Number.isFinite(chainRes.value.pcr?.pcr_oi) ? chainRes.value.pcr.pcr_oi : null;
       next.fnoSignal = String(chainRes.value.pcr?.signal || "NA").toUpperCase();
+    }
+
+    if (benchmarkRes.status === "fulfilled" && benchmarkRes.value?.equity_curve?.length > 0) {
+      const curve = benchmarkRes.value.equity_curve;
+      const last30 = curve.slice(-30);
+      setPerformancePoints(last30.map((pt) => pt.portfolio));
     }
 
     next.updatedAt = Date.now();
@@ -313,11 +277,28 @@ export function HomePage() {
   }, [selectedMarket]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setOrderLog((prev) => [nextOrderEntry(), ...prev].slice(0, 18));
-    }, 5000);
-    return () => window.clearInterval(timer);
-  }, []);
+    let active = true;
+    const loadNews = async () => {
+      try {
+        const items = await fetchLatestNews(15);
+        if (active && items.length) {
+          setNewsLog(items);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    void loadNews();
+    if (newsAutoRefresh) {
+      const timer = window.setInterval(() => {
+        void loadNews();
+      }, newsRefreshSec * 1000);
+      return () => window.clearInterval(timer);
+    }
+    return () => {
+      active = false;
+    };
+  }, [newsAutoRefresh, newsRefreshSec]);
 
   useEffect(() => {
     if (!initializing) return;
@@ -333,8 +314,8 @@ export function HomePage() {
     return (snapshot.equityPnl / snapshot.equityCost) * 100;
   }, [snapshot.equityCost, snapshot.equityPnl]);
 
-  const perfLinePath = useMemo(() => buildLinePath(PERFORMANCE_POINTS, 360, 128), []);
-  const perfAreaPath = useMemo(() => buildAreaPath(PERFORMANCE_POINTS, 360, 128), []);
+  const perfLinePath = useMemo(() => buildLinePath(performancePoints, 360, 128), [performancePoints]);
+  const perfAreaPath = useMemo(() => buildAreaPath(performancePoints, 360, 128), [performancePoints]);
 
   const activeTab = location.pathname.startsWith("/home") || location.pathname === "/" ? "OVERVIEW" : "";
   const updatedLabel = snapshot.updatedAt ? new Date(snapshot.updatedAt).toLocaleTimeString("en-IN", { hour12: false }) : "--:--:--";
@@ -424,10 +405,10 @@ export function HomePage() {
                   const isUp = row.chg >= 0;
                   return (
                     <tr key={row.symbol} className={row.flash ? `ot-flash-${row.flash}` : ""}>
-                      <td>{row.symbol}</td>
-                      <td className="ot-align-right">{formatPrice(row.ltp)}</td>
-                      <td className={`ot-align-right ${isUp ? "ot-value-up" : "ot-value-down"}`}>{isUp ? "+" : ""}{formatPrice(row.chg)}</td>
-                      <td className={`ot-align-right ${isUp ? "ot-value-up" : "ot-value-down"}`}>{isUp ? "+" : ""}{row.chgPct.toFixed(2)}%</td>
+                      <td>{row.label || row.symbol}</td>
+                      <td className="ot-align-right">{row.ltp > 0 ? formatPrice(row.ltp) : "--"}</td>
+                      <td className={`ot-align-right ${isUp ? "ot-value-up" : "ot-value-down"}`}>{isUp && row.chg > 0 ? "+" : ""}{row.chg !== 0 ? formatPrice(row.chg) : "--"}</td>
+                      <td className={`ot-align-right ${isUp ? "ot-value-up" : "ot-value-down"}`}>{isUp && row.chgPct > 0 ? "+" : ""}{row.chgPct !== 0 ? `${row.chgPct.toFixed(2)}%` : "--"}</td>
                     </tr>
                   );
                 })}
@@ -437,19 +418,20 @@ export function HomePage() {
 
           <section className="ot-panel ot-panel-orders ot-stagger-cell" style={{ ["--cell-delay" as string]: "0.25s" }}>
             <header className="ot-panel-header">
-              <span className="ot-panel-header-title">ORDER LOG</span>
+              <span className="ot-panel-header-title">GLOBAL NEWS</span>
               <span className="ot-live-dot ot-live-dot-amber" />
             </header>
-            <div className="ot-order-list" role="log" aria-live="polite">
-              {orderLog.map((entry, index) => (
-                <p key={entry.id} className={`ot-order-entry ${index === 0 ? "ot-order-new" : ""}`}>
-                  <span className="ot-muted">{entry.time}</span>{" "}
-                  <span className={entry.side === "BUY" ? "ot-value-up" : "ot-value-down"}>{entry.side}</span>{" "}
-                  <span className="ot-white">{entry.symbol}</span>{" "}
-                  <span>x{entry.qty}</span>{" "}
-                  <span>@{formatPrice(entry.price)}</span>{" "}
-                  <span className="ot-value-cyan">{entry.status}</span>
-                </p>
+            <div className="ot-order-list" role="log" aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              {newsLog.map((entry, index) => (
+                <a key={entry.id} href={entry.url} target="_blank" rel="noreferrer" className={`ot-order-entry ${index === 0 ? "ot-order-new" : ""}`} style={{ textDecoration: "none", display: "block", background: "rgba(255,255,255,0.03)", padding: "0.5rem", borderRadius: "0.25rem", border: "1px solid rgba(255,255,255,0.1)" }}>
+                  <div style={{ fontSize: "0.75rem", marginBottom: "0.25rem", color: "#FF9500" }}>{entry.source} &bull; {entry.published_at ? new Date(entry.published_at).toLocaleTimeString() : ""}</div>
+                  <div style={{ color: "#ffffff", fontWeight: 600, fontSize: "0.8rem", whiteSpace: "normal" }}>{entry.title}</div>
+                  {entry.sentiment && (
+                    <div style={{ marginTop: "0.25rem", fontSize: "0.7rem", color: entry.sentiment.label === "Bullish" ? "#34C759" : entry.sentiment.label === "Bearish" ? "#FF3B30" : "#8E8E93" }}>
+                      {entry.sentiment.label} ({Math.round(entry.sentiment.confidence * 100)}%)
+                    </div>
+                  )}
+                </a>
               ))}
             </div>
             <div className="ot-highlight-note">

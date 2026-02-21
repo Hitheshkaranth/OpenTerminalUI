@@ -104,17 +104,30 @@ export function AboutPage() {
           <li>- OMS / Compliance dashboard: order management, restricted list, fill tracking, and audit log.</li>
           <li>- Model Governance page: run registration, multi-run comparison, and model promotion workflow.</li>
           <li>- Ops Dashboard: data feed health status and kill-switch controls.</li>
+          <li>- Quant Analytics Pack: cockpit dashboard, async portfolio backtest jobs, risk compute module, experiment registry, instrument search, data quality monitoring, and paper TCA.</li>
         </ul>
       </TerminalPanel>
 
       <TerminalPanel title="Risk, OMS &amp; Governance">
         <ul className="space-y-1 text-xs text-terminal-text">
           <li>- Risk Engine: portfolio VaR/CVaR, backtest risk attribution, and configurable stress scenario analysis.</li>
+          <li>- Risk Compute: EWMA volatility, beta, rolling correlation, and PCA factor decomposition endpoints.</li>
           <li>- Execution Simulator: transaction cost modeling with commission, slippage, spread, and market-impact parameters.</li>
           <li>- OMS / Compliance: order lifecycle management, fill tracking, restricted-list enforcement, and audit log.</li>
           <li>- Model Governance: run registration with code hash + data version, multi-run comparison, and model promotion workflow.</li>
           <li>- Ops Dashboard: real-time data feed health monitoring and kill-switch controls.</li>
           <li>- Technical Screener: pattern-based screener engine with breakout scanner and real-time scanner alert delivery.</li>
+        </ul>
+      </TerminalPanel>
+
+      <TerminalPanel title="Quant Analytics Pack">
+        <ul className="space-y-1 text-xs text-terminal-text">
+          <li>- Cockpit Dashboard: aggregated ops view — portfolio snapshot, signal summary, risk summary, events, and news in one screen.</li>
+          <li>- Portfolio Backtest Jobs: async job-based portfolio backtesting with status polling and result retrieval (equity curve, drawdown, turnover, metrics).</li>
+          <li>- Experiment Registry: named experiments with config, code hash + data hash binding, compare table, delta scoring, and paper-promotion workflow.</li>
+          <li>- Instrument Search: cross-exchange canonical instrument lookup with exact-match → prefix → fuzzy ranked results.</li>
+          <li>- Data Quality: scan-based data quality monitoring — run scans per dataset, track history, and aggregate dashboard.</li>
+          <li>- TCA (Transaction Cost Analysis): paper trading execution cost breakdown — fills, gross P&amp;L, commission, slippage, and net P&amp;L per lot.</li>
         </ul>
       </TerminalPanel>
 

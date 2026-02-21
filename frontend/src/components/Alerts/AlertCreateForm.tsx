@@ -28,8 +28,9 @@ export function AlertCreateForm({ onCreated }: Props) {
     setLoading(true);
     setError(null);
     try {
+      // Fire-and-forget: don't block the alert creation on the notification permission dialog.
       if (typeof Notification !== "undefined" && Notification.permission === "default") {
-        await Notification.requestPermission();
+        void Notification.requestPermission().catch(() => undefined);
       }
       const parameters: Record<string, unknown> = {};
       if (conditionType === "custom_expression") {

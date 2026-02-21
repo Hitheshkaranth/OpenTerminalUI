@@ -10,7 +10,62 @@ import {
   updateScannerPreset,
 } from "../api/client";
 import { useStockStore } from "../store/stockStore";
+import { useCapexTracker, useShareholdingPattern, useStock } from "../hooks/useStocks";
 import type { ScannerPreset, ScannerPresetPayload } from "../types";
+
+function formatPct(val?: number | null) {
+  if (val == null) return "--";
+  return `${val.toFixed(2)}%`;
+}
+
+function formatVal(val?: number | null) {
+  if (val == null) return "--";
+  return val.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+}
+
+function ScreenerFundamentals({ symbol }: { symbol: string }) {
+  const { data: stock } = useStock(symbol);
+  const { data: capex } = useCapexTracker(symbol);
+  const { data: shareholding } = useShareholdingPattern(symbol);
+
+  const latestCapex = capex?.points && capex.points.length > 0 ? capex.points[capex.points.length - 1].capex : null;
+
+  return (
+    <div className="rounded border border-terminal-border bg-terminal-bg p-2 space-y-2 mt-2">
+      <div className="font-semibold text-terminal-accent">Fundamentals & Flow</div>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div>
+          <div className="text-terminal-muted">P/E Ratio</div>
+          <div>{formatVal(stock?.pe)}</div>
+        </div>
+        <div>
+          <div className="text-terminal-muted">P/B Ratio</div>
+          <div>{formatVal(stock?.pb_calc)}</div>
+        </div>
+        <div>
+          <div className="text-terminal-muted">Div Yield</div>
+          <div>{formatPct(stock?.div_yield_pct)}</div>
+        </div>
+        <div>
+          <div className="text-terminal-muted">Latest Capex</div>
+          <div>{latestCapex ? `${formatVal(latestCapex)} Cr` : "--"}</div>
+        </div>
+        <div>
+          <div className="text-terminal-muted">FII Holding</div>
+          <div>{formatPct(shareholding?.fii_holding)}</div>
+        </div>
+        <div>
+          <div className="text-terminal-muted">DII Holding</div>
+          <div>{formatPct(shareholding?.dii_holding)}</div>
+        </div>
+        <div>
+          <div className="text-terminal-muted">Promoter</div>
+          <div>{formatPct(shareholding?.promoter_holding)}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const EMPTY_PRESET: ScannerPresetPayload = {
   name: "New Preset",
@@ -252,7 +307,7 @@ export function ScreenerPage() {
             <div className="rounded border border-terminal-border bg-terminal-bg p-2">
               <div className="mb-1 font-medium">Rule Steps</div>
               {Array.isArray((selectedRow.explain as { steps?: Array<Record<string, unknown>> } | undefined)?.steps) &&
-              ((selectedRow.explain as { steps?: Array<Record<string, unknown>> }).steps || []).length > 0 ? (
+                ((selectedRow.explain as { steps?: Array<Record<string, unknown>> }).steps || []).length > 0 ? (
                 ((selectedRow.explain as { steps?: Array<Record<string, unknown>> }).steps || []).map((step, i) => (
                   <div key={i} className="mb-1 rounded border border-terminal-border/60 p-1">
                     <div>{String(step.rule || "-")}</div>
@@ -295,9 +350,10 @@ export function ScreenerPage() {
                 </button>
               </div>
             </div>
+            {selectedRow.symbol && <ScreenerFundamentals symbol={String(selectedRow.symbol)} />}
           </>
         )}
-        <div className="text-terminal-muted">Run ID: {runId || "-"}</div>
+        <div className="text-terminal-muted mt-2">Run ID: {runId || "-"}</div>
         <div className="text-terminal-muted">Preset: {selectedPreset?.name || "-"}</div>
       </section>
     </div>

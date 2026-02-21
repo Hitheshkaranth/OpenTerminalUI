@@ -36,13 +36,14 @@ class PaperTradingEngine:
     def __init__(self) -> None:
         self._started = False
         self._mark_prices: dict[str, float] = {}
-        self._queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=5000)
+        self._queue: asyncio.Queue[dict[str, Any]] | None = None
         self._worker_task: asyncio.Task | None = None
         self._hub: MarketDataHub | None = None
 
     def start(self, hub: MarketDataHub | None = None) -> None:
         if self._started:
             return
+        self._queue = asyncio.Queue(maxsize=5000)
         self._started = True
         self._hub = hub or get_marketdata_hub()
         self._hub.register_tick_listener(self._on_tick)
@@ -50,20 +51,18 @@ class PaperTradingEngine:
 
     async def shutdown(self) -> None:
         self._started = False
-        if self._worker_task:
-            self._worker_task.cancel()
-            try:
-                await self._worker_task
-            except asyncio.CancelledError:
-                pass
-            self._worker_task = None
+        task = self._worker_task
+        self._worker_task = None
+        self._queue = None
+        if task is not None:
+            task.cancel()
 
     def _on_tick(self, tick: dict[str, Any]) -> None:
         symbol = str(tick.get("symbol") or "").strip().upper()
         ltp = _f(tick.get("ltp"), default=float("nan"))
         if symbol and ltp == ltp:
             self._mark_prices[symbol] = ltp
-        if not self._started:
+        if not self._started or self._queue is None:
             return
         try:
             self._queue.put_nowait(tick)
@@ -72,7 +71,10 @@ class PaperTradingEngine:
 
     async def _worker(self) -> None:
         while self._started:
-            tick = await self._queue.get()
+            try:
+                tick = await self._queue.get()
+            except (asyncio.CancelledError, RuntimeError):
+                break
             try:
                 await self._evaluate_pending_orders(tick)
             except Exception:

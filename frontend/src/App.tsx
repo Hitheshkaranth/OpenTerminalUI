@@ -44,6 +44,7 @@ import { RiskDashboardPage } from "./pages/RiskDashboard";
 import { OmsCompliancePage } from "./pages/OmsCompliance";
 import { OpsDashboardPage } from "./pages/OpsDashboard";
 import { ModelGovernancePage } from "./pages/ModelGovernance";
+import CockpitDashboard from "./pages/Cockpit";
 
 function App() {
   return (
@@ -107,6 +108,7 @@ function App() {
             <Route index element={<AccountPage />} />
           </Route>
 
+          <Route path="/cockpit" element={<ProtectedRoute requiredRole="trader"><CockpitDashboard /></ProtectedRoute>} />
           <Route path="/model-lab" element={<ProtectedRoute requiredRole="trader"><ModelLabPage /></ProtectedRoute>} />
           <Route path="/model-lab/experiments/:id" element={<ProtectedRoute requiredRole="trader"><ModelLabExperimentDetailPage /></ProtectedRoute>} />
           <Route path="/model-lab/runs/:runId" element={<ProtectedRoute requiredRole="trader"><ModelLabRunReportPage /></ProtectedRoute>} />

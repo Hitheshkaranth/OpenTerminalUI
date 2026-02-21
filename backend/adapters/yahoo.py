@@ -33,12 +33,28 @@ class YahooFinanceAdapter(DataAdapter):
             change=_f(row.get("regularMarketChange")) or 0.0,
             change_pct=_f(row.get("regularMarketChangePercent")) or 0.0,
             currency=str(row.get("currency") or "USD"),
+            company_name=row.get("shortName") or row.get("longName"),
         )
 
     async def get_history(self, symbol: str, timeframe: str, start: date, end: date) -> list[OHLCV]:
         rng_days = max(1, (end - start).days)
+        # To provide at least 30m resolution for backtesting charts, request 30m or finer if within allowed Yahoo windows
+        # Yahoo limits: 1m (7 days), 5m/15m/30m (60 days), 60m (730 days).
+        # We will try '30m' for 60-day ranges, '60m' (or '1h') for up to 730 days, else '1d'.
+        if timeframe in ["1d", "1wk", "1mo"]:
+            interval_str = timeframe
+        else:
+            if rng_days <= 7:
+                interval_str = timeframe if timeframe in ["1m", "5m", "15m", "30m", "60m", "1h"] else "1m"
+            elif rng_days <= 60:
+                interval_str = timeframe if timeframe in ["5m", "15m", "30m", "60m", "1h"] else "30m"
+            elif rng_days <= 730:
+                interval_str = timeframe if timeframe in ["60m", "1h"] else "1h"
+            else:
+                interval_str = "1d"
+
         range_str = "1y" if rng_days > 220 else "6mo" if rng_days > 120 else "3mo" if rng_days > 45 else "1mo"
-        row = await self.yahoo.get_chart(symbol.strip().upper(), range_str=range_str, interval=timeframe or "1d")
+        row = await self.yahoo.get_chart(symbol.strip().upper(), range_str=range_str, interval=interval_str)
         chart = ((row or {}).get("chart") or {}).get("result") or []
         if not chart:
             return []
@@ -61,10 +77,25 @@ class YahooFinanceAdapter(DataAdapter):
         return out
 
     async def search_instruments(self, query: str) -> list[Instrument]:
-        q = query.strip().upper()
-        if not q:
+        q = query.strip()
+        if not q or len(q) < 2:
             return []
-        return [Instrument(symbol=q, name=q, exchange=self.exchange, currency="USD")]
+
+        results = await self.yahoo.search_symbols(q, limit=15)
+        out = []
+        for r in results:
+            sym = r.get("symbol")
+            if not sym:
+                continue
+            name = r.get("shortname") or r.get("longname") or sym
+            exch = r.get("exchange") or self.exchange
+            out.append(Instrument(symbol=sym, name=name, exchange=exch, currency="USD"))
+
+        # Fallback to echo if no results found, to support direct ticker entry
+        if not out and q.upper() == q and len(q) <= 5:
+            return [Instrument(symbol=q.upper(), name=q.upper(), exchange=self.exchange, currency="USD")]
+
+        return out
 
     async def get_fundamentals(self, symbol: str) -> dict[str, Any]:
         return await self.yahoo.get_quote_summary(symbol.strip().upper(), ["financialData", "summaryDetail", "defaultKeyStatistics", "assetProfile"])

@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import axios from "axios";
 
 import { setAccessTokenGetter } from "../api/client";
+import { setAccessTokenGetter as setQuantAccessTokenGetter } from "../api/quantClient";
+import { setAccessTokenGetter as setFnoAccessTokenGetter } from "../fno/api/fnoApi";
 
 export type AuthRole = "admin" | "trader" | "viewer";
 
@@ -163,9 +165,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setAccessTokenGetter(() => accessToken);
+    setQuantAccessTokenGetter(() => accessToken);
+    setFnoAccessTokenGetter(() => accessToken);
     scheduleRefresh(accessToken);
     return () => {
       setAccessTokenGetter(null);
+      setQuantAccessTokenGetter(null);
+      setFnoAccessTokenGetter(null);
       clearRefreshTimer();
     };
   }, [accessToken, clearRefreshTimer, scheduleRefresh]);

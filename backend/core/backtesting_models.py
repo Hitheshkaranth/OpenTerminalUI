@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class BacktestConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     initial_cash: float = Field(100000.0, gt=0)
     fee_bps: float = Field(0.0, ge=0)
     slippage_bps: float = Field(0.0, ge=0)

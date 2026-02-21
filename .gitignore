@@ -42,3 +42,11 @@ Thumbs.db
 .idea/
 
 .claude/
+
+# Dev/debug utility scripts (not for public repo)
+check_db.py
+test_backtest.py
+
+# Internal swarm agent planning docs
+docs/swarm_quant_feature_pack.md
+docs/verification/

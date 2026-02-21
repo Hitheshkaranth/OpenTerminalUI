@@ -62,8 +62,8 @@ function hasUsableSnapshot(data: StockSnapshot | undefined): boolean {
     typeof data.current_price === "number"
       ? data.current_price
       : Number.isFinite(Number(data.current_price))
-      ? Number(data.current_price)
-      : null;
+        ? Number(data.current_price)
+        : null;
   return Boolean(data.company_name || data.sector || (currentPrice !== null && currentPrice > 0));
 }
 
@@ -76,13 +76,13 @@ export function useStock(ticker: string) {
     queryFn: () =>
       isCrypto
         ? Promise.resolve({
-            ticker: normalizedTicker.toUpperCase(),
-            symbol: normalizedTicker.toUpperCase(),
-            company_name: `${normalizedTicker.toUpperCase()} Crypto`,
-            exchange: "CRYPTO",
-            country_code: "US",
-            indices: [],
-          } as StockSnapshot)
+          ticker: normalizedTicker.toUpperCase(),
+          symbol: normalizedTicker.toUpperCase(),
+          company_name: `${normalizedTicker.toUpperCase()} Crypto`,
+          exchange: "CRYPTO",
+          country_code: "US",
+          indices: [],
+        } as StockSnapshot)
         : getQuote(normalizedTicker, selectedMarket),
     enabled: Boolean(normalizedTicker),
     staleTime: 60 * 1000,
@@ -99,6 +99,7 @@ export function useStockHistory(ticker: string, range = "1y", interval = "1d") {
     queryFn: () => (isCrypto ? fetchCryptoCandles(normalizedTicker, interval, range) : getHistory(normalizedTicker, selectedMarket, interval, range)),
     enabled: Boolean(normalizedTicker),
     staleTime: 5 * 60 * 1000,
+    refetchInterval: 60 * 1000, // 1 minute realtime update interval
   });
 }
 

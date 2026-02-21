@@ -322,3 +322,31 @@ class YahooClient:
         except Exception as e:
             logger.warning(f"Yahoo news search failed for {q}: {e}")
             return []
+
+    async def search_symbols(self, query: str, limit: int = 15) -> List[Dict[str, Any]]:
+        """
+        Query Yahoo Finance search endpoint and return ticker quotes.
+        """
+        await self._ensure_client()
+        q = (query or "").strip()
+        if not q or len(q) < 2:
+            return []
+        try:
+            response = await self.client.get(
+                "https://query2.finance.yahoo.com/v1/finance/search",
+                params={
+                    "q": q,
+                    "quotesCount": max(1, min(limit, 20)),
+                    "newsCount": 0,
+                    "listsCount": 0,
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+            quotes = payload.get("quotes") if isinstance(payload, dict) else []
+            if not isinstance(quotes, list):
+                return []
+            return [x for x in quotes if isinstance(x, dict)][:limit]
+        except Exception as e:
+            logger.warning(f"Yahoo symbol search failed for {q}: {e}")
+            return []

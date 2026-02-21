@@ -56,11 +56,21 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 
 ### Risk, OMS & Governance Pack
 - **Risk Engine** - portfolio VaR/CVaR, backtest risk attribution, and configurable stress scenario analysis
+- **Risk Compute Module** - EWMA volatility, beta, rolling correlation, and PCA factor decomposition endpoints
 - **Execution Simulator** - transaction cost modeling with commission, slippage, spread, and market-impact parameters integrated into backtest runs
 - **OMS / Compliance** - order lifecycle management, fill tracking, restricted-list enforcement, and full audit log
 - **Model Governance** - run registration with code hash + data version binding, multi-run comparison, and model promotion workflow
 - **Ops Dashboard** - real-time data feed health monitoring and kill-switch controls
 - **Technical Screener** - pattern-based screener engine with breakout scanner and real-time scanner alert delivery
+
+### Quant Analytics Pack
+
+- **Cockpit Dashboard** - aggregated ops view: portfolio snapshot, signal summary, risk summary, upcoming events, and latest news in one screen
+- **Portfolio Backtest Jobs** - async job-based portfolio backtesting: submit job, poll status, retrieve equity curve, drawdown, turnover, and metrics
+- **Experiment Registry** - named experiments with config, code hash + data hash binding, compare table, delta scoring, and paper-promotion workflow
+- **Instrument Search** - cross-exchange canonical instrument lookup with exact-match → prefix → fuzzy ranked results
+- **Data Quality** - scan-based data quality monitoring: run scans per dataset, track history, and aggregate dashboard
+- **TCA (Transaction Cost Analysis)** - paper trading execution cost breakdown: fills, gross P&L, commission, slippage, and net P&L per lot
 
 ### Platform & APIs
 - **Realtime Streaming** - WebSocket quotes with REST/snapshot fallback
@@ -93,6 +103,8 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - **OMS / Compliance**: order management with fill tracking, restricted-list enforcement, and audit log via `/api/oms/` and `/api/audit`.
 - **Model Governance**: run registration with code hash + data version binding, multi-run comparison, and model promotion via `/api/governance/`.
 - **Ops Dashboard**: feed health status and kill-switch controls via `/api/ops/`; new Ops Dashboard UI page.
+- **Quant Analytics Pack**: cockpit summary aggregator, async portfolio backtest jobs, risk compute module (EWMA vol, beta, correlation, PCA), experiment registry with hash-bound configs, cross-exchange instrument search, data quality scan dashboard, and paper trading TCA breakdown.
+- **Cockpit Dashboard UI**: new frontend page aggregating portfolio snapshot, signal summary, risk summary, events, and news into a single quant ops view.
 
 ## Roadmap
 
@@ -118,6 +130,7 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - [x] OMS / Compliance: order management, restricted list, fill tracking, and audit log
 - [x] Model Governance: run registration, multi-run comparison, and model promotion workflow
 - [x] Ops Dashboard: data feed health monitoring and kill-switch controls
+- [x] Quant Analytics Pack: cockpit dashboard, async portfolio backtest jobs, risk compute (EWMA, beta, correlation, PCA), experiment registry, instrument search, data quality monitoring, and paper TCA
 - [ ] Expanded model/template library and parameter presets
 - [ ] Additional performance optimization for large watchlists and long chart sessions
 

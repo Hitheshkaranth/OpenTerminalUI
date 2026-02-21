@@ -14,7 +14,17 @@ from backend.shared.market_classifier import market_classifier
 
 router = APIRouter()
 DATA_PATH = Path(__file__).resolve().parents[3] / "data" / "nse_equity_symbols_eq.csv"
-_TICKER_LIKE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9._-]{0,9}$")
+_TICKER_LIKE_RE = re.compile(r"^[\^A-Za-z][A-Za-z0-9._=-]{0,12}$")
+
+GLOBAL_INDICES = [
+    SearchResult(ticker="^NSEI", name="NIFTY 50", exchange="NSE"),
+    SearchResult(ticker="^BSESN", name="SENSEX", exchange="BSE"),
+    SearchResult(ticker="^IXIC", name="NASDAQ", exchange="NASDAQ"),
+    SearchResult(ticker="^GSPC", name="S&P 500", exchange="NYSE"),
+    SearchResult(ticker="GC=F", name="GOLD", exchange="AMEX"),
+    SearchResult(ticker="SI=F", name="SILVER", exchange="AMEX"),
+    SearchResult(ticker="CL=F", name="CRUDE OIL", exchange="AMEX"),
+]
 
 # Global Cache
 _SEARCH_CACHE: List[Dict[str, str]] = []
@@ -63,6 +73,11 @@ async def search(q: str = Query(default=""), market: str = Query(default="NSE"))
             return
         seen.add(key)
         matches.append(item)
+
+    # Check global indices first
+    for gi in GLOBAL_INDICES:
+        if query in gi.ticker.lower() or query in gi.name.lower():
+            _append_match(gi)
 
     # Simple search
     for row in rows:

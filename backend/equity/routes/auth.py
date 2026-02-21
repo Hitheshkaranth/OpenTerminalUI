@@ -22,7 +22,8 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 class RegisterRequest(BaseModel):
     email: str
     password: str
-    role: UserRole = UserRole.VIEWER
+    # NOTE: role is intentionally NOT accepted from the registration payload.
+    # All accounts start as VIEWER. Role elevation must be done by an admin.
 
 
 class LoginRequest(BaseModel):
@@ -100,7 +101,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> UserRes
     user = User(
         email=email,
         hashed_password=pwd_context.hash(payload.password),
-        role=payload.role,
+        role=UserRole.VIEWER,  # Always start as VIEWER; role escalation is admin-only
     )
     db.add(user)
     db.commit()

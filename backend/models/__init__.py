@@ -53,6 +53,9 @@ from backend.models.core import (
     BlendMethod,
     WatchlistItem,
 )
+from backend.portfolio_backtests.models import PortfolioBacktestJob
+from backend.experiments.models import Experiment, ExperimentArtifact
+from backend.instruments.models import InstrumentMaster
 from backend.models.user import RefreshToken, User, UserRole
 
 __all__ = [
@@ -110,4 +113,8 @@ __all__ = [
     "User",
     "UserRole",
     "RefreshToken",
+    "PortfolioBacktestJob",
+    "Experiment",
+    "ExperimentArtifact",
+    "InstrumentMaster",
 ]
