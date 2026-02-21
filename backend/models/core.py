@@ -318,6 +318,69 @@ class AlertTriggerORM(Base):
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
 
 
+class ScanPresetORM(Base):
+    __tablename__ = "scan_presets"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(128), index=True)
+    universe: Mapped[str] = mapped_column(String(64), index=True)
+    timeframe: Mapped[str] = mapped_column(String(16), default="1d")
+    liquidity_gate_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    rules_json: Mapped[list] = mapped_column(JSON, default=list)
+    ranking_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class ScanRunORM(Base):
+    __tablename__ = "scan_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    preset_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("scan_presets.id", ondelete="SET NULL"), nullable=True, index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(16), default="running", index=True)
+    meta_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    summary_json: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class ScanResultORM(Base):
+    __tablename__ = "scan_results"
+    __table_args__ = (UniqueConstraint("run_id", "symbol", "setup_type", name="uq_scan_result_run_symbol_setup"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    run_id: Mapped[str] = mapped_column(String(36), ForeignKey("scan_runs.id", ondelete="CASCADE"), index=True)
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    setup_type: Mapped[str] = mapped_column(String(64), index=True)
+    score: Mapped[float] = mapped_column(Float, default=0.0, index=True)
+    signal_ts: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    levels_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    features_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    explain_json: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class ScanAlertRuleORM(Base):
+    __tablename__ = "scan_alert_rules"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    preset_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("scan_presets.id", ondelete="SET NULL"), nullable=True, index=True)
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    setup_type: Mapped[str] = mapped_column(String(64), index=True)
+    trigger_level: Mapped[float] = mapped_column(Float, default=0.0)
+    invalidation_level: Mapped[float | None] = mapped_column(Float, nullable=True)
+    near_trigger_pct: Mapped[float] = mapped_column(Float, default=0.003)
+    dedupe_minutes: Mapped[int] = mapped_column(Integer, default=15)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    last_event_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    last_event_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    meta_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
 class VirtualSide(str, enum.Enum):
     LONG = "long"
     SHORT = "short"

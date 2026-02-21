@@ -16,7 +16,7 @@ export function AlertHistory({ history }: Props) {
             <div key={row.id} className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs">
               <div className="font-medium text-terminal-text">{row.symbol}</div>
               <div className="text-terminal-muted">
-                {row.condition_type} | value: {row.triggered_value ?? "-"} | {new Date(row.triggered_at).toLocaleString()}
+                [{row.source || "manual"}:{row.event_type || "triggered"}] {row.condition_type} | value: {row.triggered_value ?? "-"} | {new Date(row.triggered_at).toLocaleString()}
               </div>
             </div>
           ))}

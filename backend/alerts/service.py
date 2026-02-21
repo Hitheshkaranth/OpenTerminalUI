@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 from sqlalchemy.orm import Session
 
+from backend.alerts.scanner_rules import process_scanner_tick
 from backend.db.database import SessionLocal
 from backend.models import AlertConditionType, AlertORM, AlertStatus, AlertTriggerORM
 from backend.services.marketdata_hub import MarketDataHub, get_marketdata_hub
@@ -156,6 +157,8 @@ class AlertEvaluatorService:
                 db.commit()
                 await self._emit_alert_event(alert, triggered_value, now)
                 await self._send_telegram_if_configured(alert, triggered_value, now)
+            if self._hub is not None:
+                await process_scanner_tick(db, self._hub, tick)
         finally:
             db.close()
 

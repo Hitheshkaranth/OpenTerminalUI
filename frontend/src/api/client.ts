@@ -28,6 +28,10 @@ import type {
   ScreenerFactorConfig,
   ScreenerV2Response,
   ScreenerRule,
+  ScannerPreset,
+  ScannerPresetPayload,
+  ScannerResult,
+  ScannerRun,
   ShareholdingPatternResponse,
   StockSnapshot,
   WatchlistItem,
@@ -150,6 +154,59 @@ export async function runScreenerV2(
     sector_neutral: opts?.sectorNeutral ?? false,
   });
   return data;
+}
+
+export async function fetchScannerPresets(): Promise<ScannerPreset[]> {
+  const { data } = await api.get<{ items: ScannerPreset[] }>("/v1/screener/presets");
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function createScannerPreset(payload: ScannerPresetPayload): Promise<ScannerPreset> {
+  const { data } = await api.post<ScannerPreset>("/v1/screener/presets", payload);
+  return data;
+}
+
+export async function updateScannerPreset(id: string, payload: ScannerPresetPayload): Promise<ScannerPreset> {
+  const { data } = await api.put<ScannerPreset>(`/v1/screener/presets/${encodeURIComponent(id)}`, payload);
+  return data;
+}
+
+export async function deleteScannerPreset(id: string): Promise<void> {
+  await api.delete(`/v1/screener/presets/${encodeURIComponent(id)}`);
+}
+
+export async function runScanner(payload: { preset_id?: string; inline_preset?: ScannerPresetPayload; limit?: number; offset?: number }): Promise<{
+  run_id: string;
+  count: number;
+  rows: Array<Record<string, unknown>>;
+  summary: Record<string, unknown>;
+}> {
+  const { data } = await api.post("/v1/screener/run", payload);
+  return data;
+}
+
+export async function fetchScannerRuns(limit = 20, offset = 0): Promise<ScannerRun[]> {
+  const { data } = await api.get<{ items: ScannerRun[] }>("/v1/screener/runs", { params: { limit, offset } });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchScannerResults(runId: string, limit = 100, offset = 0): Promise<ScannerResult[]> {
+  const { data } = await api.get<{ items: ScannerResult[] }>("/v1/screener/results", { params: { run_id: runId, limit, offset } });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function createScannerAlertRule(payload: {
+  preset_id?: string;
+  symbol: string;
+  setup_type: string;
+  trigger_level: number;
+  invalidation_level?: number;
+  near_trigger_pct?: number;
+  dedupe_minutes?: number;
+  enabled?: boolean;
+  meta_json?: Record<string, unknown>;
+}): Promise<void> {
+  await api.post("/v1/alerts/scanner-rules", payload);
 }
 
 export type SearchSymbolItem = {

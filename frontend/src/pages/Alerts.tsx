@@ -22,6 +22,7 @@ function alertsWsUrl(): string {
 export function AlertsPage() {
   const [alerts, setAlerts] = useState<AlertRule[]>([]);
   const [history, setHistory] = useState<AlertTriggerEvent[]>([]);
+  const [tab, setTab] = useState<"all" | "near_trigger" | "triggered" | "invalidation">("all");
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const incrementUnread = useAlertsStore((s) => s.incrementUnread);
   const resetUnread = useAlertsStore((s) => s.resetUnread);
@@ -52,6 +53,9 @@ export function AlertsPage() {
             condition_type: String(payload.condition || ""),
             triggered_value: typeof payload.triggered_value === "number" ? payload.triggered_value : null,
             triggered_at: String(payload.timestamp || new Date().toISOString()),
+            source: String(payload.source || "manual"),
+            event_type: String(payload.event_type || "triggered"),
+            payload: payload.payload && typeof payload.payload === "object" ? payload.payload : undefined,
           },
           ...prev,
         ]);
@@ -68,6 +72,10 @@ export function AlertsPage() {
   }, [incrementUnread]);
 
   const activeAlerts = useMemo(() => alerts.filter((a) => (a.status || "active") !== "deleted"), [alerts]);
+  const filteredHistory = useMemo(
+    () => (tab === "all" ? history : history.filter((item) => String(item.event_type || "triggered") === tab)),
+    [history, tab],
+  );
 
   return (
     <div
@@ -84,7 +92,21 @@ export function AlertsPage() {
     >
       <AlertCreateForm onCreated={() => void load()} />
       <AlertList alerts={activeAlerts} onChanged={() => void load()} />
-      <AlertHistory history={history} />
+      <div className="flex gap-2 text-xs">
+        <button className="rounded border border-terminal-border px-2 py-1" onClick={() => setTab("all")}>
+          All
+        </button>
+        <button className="rounded border border-terminal-border px-2 py-1" onClick={() => setTab("near_trigger")}>
+          Near
+        </button>
+        <button className="rounded border border-terminal-border px-2 py-1" onClick={() => setTab("triggered")}>
+          Triggered
+        </button>
+        <button className="rounded border border-terminal-border px-2 py-1" onClick={() => setTab("invalidation")}>
+          Invalidated
+        </button>
+      </div>
+      <AlertHistory history={filteredHistory} />
     </div>
   );
 }

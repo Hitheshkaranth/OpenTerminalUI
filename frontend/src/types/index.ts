@@ -121,6 +121,55 @@ export type ScreenerV2Response = {
   meta?: ScreenerV2Meta;
 };
 
+export type ScannerDetectorRule = {
+  type: string;
+  params: Record<string, unknown>;
+};
+
+export type ScannerPreset = {
+  id: string;
+  name: string;
+  universe: string;
+  timeframe: string;
+  liquidity_gate: {
+    min_price: number;
+    min_avg_volume: number;
+    min_avg_traded_value: number;
+  };
+  rules: ScannerDetectorRule[];
+  ranking: {
+    mode: string;
+    params: Record<string, unknown>;
+  };
+  created_at: string;
+  updated_at: string;
+};
+
+export type ScannerPresetPayload = Omit<ScannerPreset, "id" | "created_at" | "updated_at">;
+
+export type ScannerRun = {
+  id: string;
+  preset_id?: string | null;
+  started_at: string;
+  finished_at?: string | null;
+  status: string;
+  summary: Record<string, unknown>;
+};
+
+export type ScannerResult = {
+  run_id: string;
+  symbol: string;
+  setup_type: string;
+  score: number;
+  signal_ts?: string | null;
+  levels: Record<string, unknown>;
+  features: Record<string, unknown>;
+  explain: {
+    steps?: Array<{ rule: string; passed: boolean; value: unknown; expected: string }>;
+    event_type?: string;
+  };
+};
+
 export type PeerMetric = {
   metric: string;
   target_value: number;
@@ -346,6 +395,9 @@ export type AlertTriggerEvent = {
   condition_type: string;
   triggered_value?: number | null;
   triggered_at: string;
+  source?: string;
+  event_type?: string;
+  payload?: Record<string, unknown>;
 };
 
 export type PaperPortfolio = {
