@@ -67,10 +67,10 @@ function App() {
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="screener" element={<ScreenerPage />} />
             <Route path="portfolio" element={<PortfolioPage />} />
-            <Route path="portfolio/lab" element={<ProtectedRoute requiredRole="trader"><PortfolioLabPage /></ProtectedRoute>} />
-            <Route path="portfolio/lab/portfolios/:id" element={<ProtectedRoute requiredRole="trader"><PortfolioLabDetailPage /></ProtectedRoute>} />
-            <Route path="portfolio/lab/runs/:runId" element={<ProtectedRoute requiredRole="trader"><PortfolioLabRunReportPage /></ProtectedRoute>} />
-            <Route path="portfolio/lab/blends" element={<ProtectedRoute requiredRole="trader"><PortfolioLabBlendsPage /></ProtectedRoute>} />
+            <Route path="portfolio/lab" element={<PortfolioLabPage />} />
+            <Route path="portfolio/lab/portfolios/:id" element={<PortfolioLabDetailPage />} />
+            <Route path="portfolio/lab/runs/:runId" element={<PortfolioLabRunReportPage />} />
+            <Route path="portfolio/lab/blends" element={<PortfolioLabBlendsPage />} />
             <Route path="mutual-funds" element={<Navigate to="/equity/portfolio?mode=mutual_funds" replace />} />
             <Route path="watchlist" element={<WatchlistPage />} />
             <Route path="news" element={<NewsPage />} />
@@ -95,7 +95,7 @@ function App() {
             <Route path="about" element={<FnoAboutPage />} />
           </Route>
 
-          <Route path="/backtesting" element={<ProtectedRoute requiredRole="trader"><BacktestingLayout /></ProtectedRoute>}>
+          <Route path="/backtesting" element={<ProtectedRoute><BacktestingLayout /></ProtectedRoute>}>
             <Route index element={<BacktestingPage />} />
             <Route path="model-lab" element={<ModelLabPage />} />
             <Route path="model-lab/experiments/:id" element={<ModelLabExperimentDetailPage />} />
@@ -108,15 +108,15 @@ function App() {
             <Route index element={<AccountPage />} />
           </Route>
 
-          <Route path="/cockpit" element={<ProtectedRoute requiredRole="trader"><CockpitDashboard /></ProtectedRoute>} />
-          <Route path="/model-lab" element={<ProtectedRoute requiredRole="trader"><ModelLabPage /></ProtectedRoute>} />
-          <Route path="/model-lab/experiments/:id" element={<ProtectedRoute requiredRole="trader"><ModelLabExperimentDetailPage /></ProtectedRoute>} />
-          <Route path="/model-lab/runs/:runId" element={<ProtectedRoute requiredRole="trader"><ModelLabRunReportPage /></ProtectedRoute>} />
-          <Route path="/model-lab/compare" element={<ProtectedRoute requiredRole="trader"><ModelLabComparePage /></ProtectedRoute>} />
-          <Route path="/portfolio-lab" element={<ProtectedRoute requiredRole="trader"><PortfolioLabPage /></ProtectedRoute>} />
-          <Route path="/portfolio-lab/portfolios/:id" element={<ProtectedRoute requiredRole="trader"><PortfolioLabDetailPage /></ProtectedRoute>} />
-          <Route path="/portfolio-lab/runs/:runId" element={<ProtectedRoute requiredRole="trader"><PortfolioLabRunReportPage /></ProtectedRoute>} />
-          <Route path="/portfolio-lab/blends" element={<ProtectedRoute requiredRole="trader"><PortfolioLabBlendsPage /></ProtectedRoute>} />
+          <Route path="/cockpit" element={<ProtectedRoute><CockpitDashboard /></ProtectedRoute>} />
+          <Route path="/model-lab" element={<ProtectedRoute><ModelLabPage /></ProtectedRoute>} />
+          <Route path="/model-lab/experiments/:id" element={<ProtectedRoute><ModelLabExperimentDetailPage /></ProtectedRoute>} />
+          <Route path="/model-lab/runs/:runId" element={<ProtectedRoute><ModelLabRunReportPage /></ProtectedRoute>} />
+          <Route path="/model-lab/compare" element={<ProtectedRoute><ModelLabComparePage /></ProtectedRoute>} />
+          <Route path="/portfolio-lab" element={<ProtectedRoute><PortfolioLabPage /></ProtectedRoute>} />
+          <Route path="/portfolio-lab/portfolios/:id" element={<ProtectedRoute><PortfolioLabDetailPage /></ProtectedRoute>} />
+          <Route path="/portfolio-lab/runs/:runId" element={<ProtectedRoute><PortfolioLabRunReportPage /></ProtectedRoute>} />
+          <Route path="/portfolio-lab/blends" element={<ProtectedRoute><PortfolioLabBlendsPage /></ProtectedRoute>} />
 
           <Route path="/stocks" element={<Navigate to="/equity/stocks" replace />} />
           <Route path="/stocks/about" element={<Navigate to="/equity/stocks/about" replace />} />
