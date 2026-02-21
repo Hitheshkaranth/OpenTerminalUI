@@ -30,4 +30,10 @@ __all__ = [
     "health",
     "scripting",
     "auth",
+    "data_layer",
+    "risk",
+    "oms",
+    "audit",
+    "governance",
+    "ops",
 ]

@@ -108,6 +108,8 @@ class BacktestRun(Base):
     result_json: Mapped[str] = mapped_column(Text, default="")
     logs: Mapped[str] = mapped_column(Text, default="")
     error: Mapped[str] = mapped_column(Text, default="")
+    data_version_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("data_versions.id", ondelete="SET NULL"), nullable=True, index=True)
+    execution_profile_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())
     updated_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())
 
@@ -139,6 +141,9 @@ class ModelRun(Base):
     started_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat(), index=True)
     finished_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_version_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("data_versions.id", ondelete="SET NULL"), nullable=True, index=True)
+    code_hash: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    execution_profile_json: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
 class ModelRunMetrics(Base):
@@ -378,6 +383,152 @@ class ScanAlertRuleORM(Base):
     last_event_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     meta_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class DataVersionORM(Base):
+    __tablename__ = "data_versions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    name: Mapped[str] = mapped_column(String(128), index=True)
+    description: Mapped[str] = mapped_column(String(512), default="")
+    source: Mapped[str] = mapped_column(String(64), default="internal")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class CorpActionORM(Base):
+    __tablename__ = "corp_actions"
+    __table_args__ = (UniqueConstraint("symbol", "action_date", "action_type", name="uq_corp_action_symbol_date_type"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    action_date: Mapped[str] = mapped_column(String(16), index=True)
+    action_type: Mapped[str] = mapped_column(String(32), index=True)
+    factor: Mapped[float] = mapped_column(Float, default=1.0)
+    amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    notes: Mapped[str] = mapped_column(String(512), default="")
+    data_version_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("data_versions.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class PriceEodORM(Base):
+    __tablename__ = "prices_eod"
+    __table_args__ = (UniqueConstraint("symbol", "trade_date", "data_version_id", name="uq_prices_eod_symbol_date_version"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    trade_date: Mapped[str] = mapped_column(String(16), index=True)
+    open: Mapped[float] = mapped_column(Float)
+    high: Mapped[float] = mapped_column(Float)
+    low: Mapped[float] = mapped_column(Float)
+    close: Mapped[float] = mapped_column(Float)
+    volume: Mapped[float] = mapped_column(Float, default=0.0)
+    data_version_id: Mapped[str] = mapped_column(String(36), ForeignKey("data_versions.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class FundamentalsPitORM(Base):
+    __tablename__ = "fundamentals_pit"
+    __table_args__ = (UniqueConstraint("symbol", "metric", "as_of_date", "data_version_id", name="uq_fund_pit_symbol_metric_date_version"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    metric: Mapped[str] = mapped_column(String(64), index=True)
+    value: Mapped[float] = mapped_column(Float)
+    as_of_date: Mapped[str] = mapped_column(String(16), index=True)
+    effective_from: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
+    effective_to: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
+    data_version_id: Mapped[str] = mapped_column(String(36), ForeignKey("data_versions.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class UniverseMembershipORM(Base):
+    __tablename__ = "universe_membership"
+    __table_args__ = (UniqueConstraint("universe_id", "symbol", "start_date", "data_version_id", name="uq_universe_symbol_start_version"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    universe_id: Mapped[str] = mapped_column(String(64), index=True)
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    start_date: Mapped[str] = mapped_column(String(16), index=True)
+    end_date: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
+    data_version_id: Mapped[str] = mapped_column(String(36), ForeignKey("data_versions.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class OmsOrderORM(Base):
+    __tablename__ = "orders"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    side: Mapped[str] = mapped_column(String(8), index=True)
+    quantity: Mapped[float] = mapped_column(Float)
+    order_type: Mapped[str] = mapped_column(String(16), default="market")
+    limit_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="accepted", index=True)
+    rejection_reason: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    meta_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class OmsFillORM(Base):
+    __tablename__ = "fills"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    order_id: Mapped[str] = mapped_column(String(36), ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    quantity: Mapped[float] = mapped_column(Float)
+    fill_price: Mapped[float] = mapped_column(Float)
+    cost: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class RestrictedListORM(Base):
+    __tablename__ = "restricted_list"
+    __table_args__ = (UniqueConstraint("symbol", name="uq_restricted_symbol"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    reason: Mapped[str] = mapped_column(String(256), default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class AuditLogORM(Base):
+    __tablename__ = "audit_log"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    entity_type: Mapped[str] = mapped_column(String(64), index=True)
+    entity_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class ModelRegistryORM(Base):
+    __tablename__ = "model_registry"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    run_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("model_runs.id", ondelete="SET NULL"), nullable=True, index=True)
+    stage: Mapped[str] = mapped_column(String(16), default="staging", index=True)
+    promoted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class OpsKillSwitchORM(Base):
+    __tablename__ = "ops_kill_switches"
+    __table_args__ = (UniqueConstraint("scope", name="uq_kill_switch_scope"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    scope: Mapped[str] = mapped_column(String(64), index=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    reason: Mapped[str] = mapped_column(String(512), default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 

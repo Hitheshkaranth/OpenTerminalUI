@@ -8,6 +8,7 @@ from typing import List, Dict
 
 from fastapi import APIRouter, Query
 from backend.adapters.registry import get_adapter_registry
+from backend.api.deps import fetch_stock_snapshot_coalesced
 from backend.core.models import SearchResponse, SearchResult
 from backend.shared.market_classifier import market_classifier
 
@@ -125,9 +126,18 @@ async def search(q: str = Query(default=""), market: str = Query(default="NSE"))
             async with sem:
                 try:
                     cls = await market_classifier.classify(entry.ticker)
+                    resolved_name = entry.name
+                    if not resolved_name or resolved_name.strip().upper() == entry.ticker.strip().upper():
+                        try:
+                            snap = await fetch_stock_snapshot_coalesced(entry.ticker)
+                            company_name = str((snap or {}).get("company_name") or "").strip()
+                            if company_name:
+                                resolved_name = company_name
+                        except Exception:
+                            pass
                     return SearchResult(
                         ticker=entry.ticker,
-                        name=entry.name,
+                        name=resolved_name or entry.ticker,
                         exchange=cls.exchange,
                         country_code=cls.country_code,
                         flag_emoji=cls.flag_emoji,

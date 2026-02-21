@@ -108,7 +108,8 @@ async def run_screener_v1(
     try:
         fetcher = await get_unified_fetcher()
         runner = ScannerRunner(fetcher)
-        bundle = await runner.run(preset)
+        symbol_cap = max(40, min(240, payload.limit * 6))
+        bundle = await runner.run(preset, symbol_cap=symbol_cap, concurrency=8)
         all_rows = bundle.results
         persistence.save_results(db, run.id, all_rows)
         persistence.finalize_run(db, run.id, "completed", bundle.summary)

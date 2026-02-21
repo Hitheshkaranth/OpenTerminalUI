@@ -54,6 +54,14 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - **Portfolio Backtesting** - portfolio-level orchestration across many assets and blended strategy streams
 - **Institutional Analytics** - equity/drawdown, rolling metrics, contribution and turnover series, monthly heatmap, and correlation matrix
 
+### Risk, OMS & Governance Pack
+- **Risk Engine** - portfolio VaR/CVaR, backtest risk attribution, and configurable stress scenario analysis
+- **Execution Simulator** - transaction cost modeling with commission, slippage, spread, and market-impact parameters integrated into backtest runs
+- **OMS / Compliance** - order lifecycle management, fill tracking, restricted-list enforcement, and full audit log
+- **Model Governance** - run registration with code hash + data version binding, multi-run comparison, and model promotion workflow
+- **Ops Dashboard** - real-time data feed health monitoring and kill-switch controls
+- **Technical Screener** - pattern-based screener engine with breakout scanner and real-time scanner alert delivery
+
 ### Platform & APIs
 - **Realtime Streaming** - WebSocket quotes with REST/snapshot fallback
 - **V1 Endpoints** - equity analytics, shareholding pattern/trends, mutual fund search/performance/portfolio, delivery series, indicators, crypto, scripting
@@ -78,6 +86,14 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - **Theme system**: terminal theme CSS layer imported at app root with customizable accent colours exposed in settings.
 - **E2E mobile tests**: Playwright test suite covering swipe interactions, touch targets, and responsive breakpoint behaviour.
 - **New dependencies**: `openpyxl` and `reportlab` for server-side report generation.
+- **Technical Screener**: pattern-based screener rules engine and breakout scanner with real-time scanner alert delivery.
+- **Institutional data layer**: point-in-time data versions, corporate actions service, EOD price series, and PIT fundamentals with DB migration `0004`.
+- **Risk Engine**: portfolio-level VaR/CVaR, backtest risk attribution, and configurable stress scenarios via `/api/risk/`.
+- **Execution Simulator**: transaction cost model (commission, slippage, bid-ask spread, market impact) integrated into backtest runs via `execution_profile`.
+- **OMS / Compliance**: order management with fill tracking, restricted-list enforcement, and audit log via `/api/oms/` and `/api/audit`.
+- **Model Governance**: run registration with code hash + data version binding, multi-run comparison, and model promotion via `/api/governance/`.
+- **Ops Dashboard**: feed health status and kill-switch controls via `/api/ops/`; new Ops Dashboard UI page.
+
 ## Roadmap
 
 - [x] Equity terminal with charting, research panels, and operational workflows
@@ -95,7 +111,13 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 - [x] Export engine for PDF, Excel, and CSV report generation
 - [x] Portfolio analytics: benchmarks, correlation, dividends, risk metrics, tax lots
 - [x] PWA shell with service worker, offline support, and mobile-optimized layouts
-- [ ] Portfolio-level backtesting and strategy comparison views
+- [x] Technical Screener with breakout scanner engine and real-time scanner alerts
+- [x] Institutional data layer: data versions, corp actions, EOD prices, PIT fundamentals
+- [x] Risk Engine: portfolio/backtest VaR, CVaR, and configurable stress scenarios
+- [x] Execution Simulator: commission, slippage, spread, and market-impact cost modeling in backtests
+- [x] OMS / Compliance: order management, restricted list, fill tracking, and audit log
+- [x] Model Governance: run registration, multi-run comparison, and model promotion workflow
+- [x] Ops Dashboard: data feed health monitoring and kill-switch controls
 - [ ] Expanded model/template library and parameter presets
 - [ ] Additional performance optimization for large watchlists and long chart sessions
 

@@ -73,5 +73,5 @@ test("screener run and scanner alert flow renders", async ({ page }) => {
   await expect(page.getByText("Screener Presets")).toBeVisible();
   await page.getByRole("button", { name: "Run Preset" }).click();
   await expect(page.getByText("Today's Setups")).toBeVisible();
-  await expect(page.getByText("RELIANCE")).toBeVisible();
+  await expect(page.getByRole("cell", { name: "RELIANCE" }).first()).toBeVisible();
 });

@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from backend.api.routes import options
 from backend.equity.routes import admin, alerts, auth, backtest, backtests, chart, crypto, data, earnings, events, export, fundamentals, health, indicators, kite, mutual_funds, news, paper, peers, plugins, portfolio, quotes, reports, screener, scripting, search, shareholding, stocks, stream, valuation
+from backend.api.routes import audit, data_layer, governance, oms, ops, risk
 from backend.model_lab import router as model_lab_router
 from backend.portfolio_lab import router as portfolio_lab_router
 from backend.screener import router as screener_v1_router
@@ -37,6 +38,12 @@ equity_router.include_router(paper.router, prefix="/api", tags=["paper"])
 equity_router.include_router(scripting.router, prefix="/api", tags=["scripting"])
 equity_router.include_router(shareholding.router, prefix="/api", tags=["shareholding"])
 equity_router.include_router(options.router)
+equity_router.include_router(data_layer.router, prefix="/api", tags=["data-layer"])
+equity_router.include_router(risk.router, prefix="/api", tags=["risk"])
+equity_router.include_router(oms.router, prefix="/api", tags=["oms"])
+equity_router.include_router(audit.router, prefix="/api", tags=["audit"])
+equity_router.include_router(governance.router, prefix="/api", tags=["governance"])
+equity_router.include_router(ops.router, prefix="/api", tags=["ops"])
 equity_router.include_router(model_lab_router, prefix="/api", tags=["model-lab"])
 equity_router.include_router(portfolio_lab_router, prefix="/api", tags=["portfolio-lab"])
 equity_router.include_router(mutual_funds.router)

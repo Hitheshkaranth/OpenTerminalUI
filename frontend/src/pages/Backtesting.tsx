@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import type { Bar } from "oakscriptjs";
 
 import {
+  fetchActiveDataVersion,
   fetchBacktestJobResult,
   fetchBacktestJobStatus,
   searchSymbols,
@@ -336,10 +337,28 @@ export function BacktestingPage() {
   const [compareActiveStrategy, setCompareActiveStrategy] = useState<string | null>(null);
   const [walkForwardWindows, setWalkForwardWindows] = useState<WalkForwardWindow[]>([]);
   const [sensitivityRows, setSensitivityRows] = useState<SensitivityRow[]>([]);
+  const [dataVersionId, setDataVersionId] = useState<string>("");
+  const [adjustedSeries, setAdjustedSeries] = useState(true);
+  const [executionProfile, setExecutionProfile] = useState({
+    commission_bps: 5,
+    slippage_bps: 3,
+    spread_bps: 1,
+    market_impact_bps: 0,
+  });
   const proWorkspaceEnabled = import.meta.env.VITE_BACKTEST_PRO_WORKSPACE === "1";
 
   useEffect(() => { if (storeTicker) setAsset(storeTicker.toUpperCase()); }, [storeTicker]);
   useEffect(() => { if (selectedMarket) setMarket(selectedMarket); }, [selectedMarket]);
+  useEffect(() => {
+    void (async () => {
+      try {
+        const version = await fetchActiveDataVersion();
+        setDataVersionId(version.id);
+      } catch {
+        setDataVersionId("");
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     const q = asset.trim().toUpperCase();
@@ -414,7 +433,13 @@ export function BacktestingPage() {
       end,
       strategy,
       context,
-      config: { initial_cash: tradeCapital, position_fraction: modelAllocation },
+      config: {
+        initial_cash: tradeCapital,
+        position_fraction: modelAllocation,
+        data_version_id: dataVersionId || undefined,
+        adjusted: adjustedSeries,
+        execution_profile: executionProfile,
+      },
     });
     setRunId(res.run_id);
     setJobState("queued");
@@ -1074,7 +1099,13 @@ export function BacktestingPage() {
           end,
           strategy: `example:${key}`,
           context: strat?.default_context || {},
-          config: { initial_cash: tradeCapital, position_fraction: strat?.default_allocation ?? 1 },
+          config: {
+            initial_cash: tradeCapital,
+            position_fraction: strat?.default_allocation ?? 1,
+            data_version_id: dataVersionId || undefined,
+            adjusted: adjustedSeries,
+            execution_profile: executionProfile,
+          },
         });
         let done = false;
         while (!done) {
@@ -1363,6 +1394,35 @@ export function BacktestingPage() {
             <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">End</span><input type="date" className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
             <label className="md:col-span-2"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Model</span><select className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={strategyMode} onChange={(e) => setStrategyMode(e.target.value)}>{STRATEGY_CATALOG.map((opt) => <option key={opt.key} value={opt.key}>[{opt.category.toUpperCase()}] {opt.label}</option>)}<option value={CUSTOM_STRATEGY_VALUE}>Custom Python Script</option></select></label>
             <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Trade Capital</span><input type="number" min={1} step={100} className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={tradeCapital} onChange={(e) => setTradeCapital(Number(e.target.value))} /></label>
+          </div>
+          <div className="mt-2 grid grid-cols-1 gap-2 text-xs md:grid-cols-7">
+            <label className="md:col-span-2">
+              <span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Data Version ID</span>
+              <input className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={dataVersionId} onChange={(e) => setDataVersionId(e.target.value)} />
+            </label>
+            <label className="md:col-span-1">
+              <span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Series</span>
+              <select className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={adjustedSeries ? "adjusted" : "raw"} onChange={(e) => setAdjustedSeries(e.target.value === "adjusted")}>
+                <option value="adjusted">Adjusted</option>
+                <option value="raw">Unadjusted</option>
+              </select>
+            </label>
+            <label className="md:col-span-1">
+              <span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Comm bps</span>
+              <input type="number" className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={executionProfile.commission_bps} onChange={(e) => setExecutionProfile((s) => ({ ...s, commission_bps: Number(e.target.value) }))} />
+            </label>
+            <label className="md:col-span-1">
+              <span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Slip bps</span>
+              <input type="number" className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={executionProfile.slippage_bps} onChange={(e) => setExecutionProfile((s) => ({ ...s, slippage_bps: Number(e.target.value) }))} />
+            </label>
+            <label className="md:col-span-1">
+              <span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Spread bps</span>
+              <input type="number" className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={executionProfile.spread_bps} onChange={(e) => setExecutionProfile((s) => ({ ...s, spread_bps: Number(e.target.value) }))} />
+            </label>
+            <label className="md:col-span-1">
+              <span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Impact bps</span>
+              <input type="number" className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={executionProfile.market_impact_bps} onChange={(e) => setExecutionProfile((s) => ({ ...s, market_impact_bps: Number(e.target.value) }))} />
+            </label>
           </div>
           {strategyMode !== CUSTOM_STRATEGY_VALUE && activePreset && <div className="mt-2"><span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase" style={{ backgroundColor: `${CATEGORY_COLORS[activePreset.category] ?? terminalColors.accent}22`, color: CATEGORY_COLORS[activePreset.category] ?? terminalColors.accent, border: `1px solid ${CATEGORY_COLORS[activePreset.category] ?? terminalColors.accent}44` }}>{activePreset.category}</span></div>}
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px]"><div className="rounded border border-terminal-border/60 bg-terminal-bg px-2 py-1 text-terminal-muted">{strategyMode === CUSTOM_STRATEGY_VALUE ? "Custom script mode: define generate_signals(df, context)." : activePreset?.description}</div><div className="rounded border border-terminal-border/60 bg-terminal-bg px-2 py-1 text-terminal-muted">Model allocation: {(modelAllocation * 100).toFixed(0)}%</div><div className="flex items-center gap-2"><span className="text-terminal-muted">Run ID: {runId || "-"}</span><span className="text-terminal-muted">Status: {jobState.toUpperCase()}</span><button className="rounded border border-terminal-accent bg-terminal-accent/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-terminal-accent disabled:opacity-50" onClick={() => void submit()} disabled={!canSubmit}>{jobState === "queued" || jobState === "running" ? "Running..." : "Run"}</button></div></div>

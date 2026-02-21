@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -74,18 +75,22 @@ class ScannerRunner:
             return [x.strip().upper() for x in value.replace("CUSTOM:", "").split(",") if x.strip()]
         return nse_all[:200]
 
-    async def run(self, preset: ScanPresetBase) -> ScanRunBundle:
-        symbols = self.resolve_universe(preset.universe)
+    async def run(self, preset: ScanPresetBase, symbol_cap: int | None = None, concurrency: int = 8) -> ScanRunBundle:
+        all_symbols = self.resolve_universe(preset.universe)
+        symbols = all_symbols[: max(1, symbol_cap)] if symbol_cap else all_symbols
         matches: list[dict[str, Any]] = []
         scanned = 0
-        for symbol in symbols:
-            frame = await self._load_history(symbol=symbol, timeframe=preset.timeframe)
+        sem = asyncio.Semaphore(max(1, concurrency))
+
+        async def _scan_symbol(symbol: str) -> tuple[int, list[dict[str, Any]]]:
+            async with sem:
+                frame = await self._load_history(symbol=symbol, timeframe=preset.timeframe)
             if frame is None or frame.empty:
-                continue
+                return 0, []
             enriched = compute_indicator_pack(frame)
             if not self._pass_liquidity(enriched, preset):
-                continue
-            scanned += 1
+                return 0, []
+            symbol_matches: list[dict[str, Any]] = []
             for rule in preset.rules:
                 detector = DETECTOR_MAP.get(rule.type)
                 if detector is None:
@@ -105,7 +110,7 @@ class ScannerRunner:
                 features["breakout_strength"] = breakout_strength
                 features["atr_pct"] = float(enriched["atr_pct"].iloc[-1]) if not pd.isna(enriched["atr_pct"].iloc[-1]) else 0.0
                 payload["features"] = features
-                matches.append(
+                symbol_matches.append(
                     {
                         "symbol": symbol,
                         "setup_type": payload.get("setup_type") or rule.type,
@@ -122,10 +127,17 @@ class ScannerRunner:
                         "event_type": payload.get("event_type", "none"),
                     }
                 )
+            return 1, symbol_matches
+
+        scanned_rows = await asyncio.gather(*(_scan_symbol(symbol) for symbol in symbols))
+        for scanned_flag, symbol_matches in scanned_rows:
+            scanned += scanned_flag
+            matches.extend(symbol_matches)
 
         ranked = rank_results(matches)
         summary = {
-            "symbols_total": len(symbols),
+            "symbols_total": len(all_symbols),
+            "symbols_scanned_batch": len(symbols),
             "symbols_scanned": scanned,
             "matches": len(ranked),
             "setups": sorted({str(r.get("setup_type") or "") for r in ranked}),

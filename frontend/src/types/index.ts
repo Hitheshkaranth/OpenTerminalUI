@@ -463,6 +463,87 @@ export type PriceRange = {
   high?: number | null;
 };
 
+export type DataVersion = {
+  id: string;
+  name: string;
+  description: string;
+  source: string;
+  is_active: boolean;
+  created_at: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type PriceSeriesResponse = {
+  symbol: string;
+  adjusted: boolean;
+  data_version_id: string;
+  count: number;
+  items: Array<{
+    date: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+  }>;
+};
+
+export type PitFundamentalsResponse = {
+  symbol: string;
+  as_of: string;
+  data_version_id: string;
+  metrics: Record<string, number>;
+};
+
+export type UniverseMembersResponse = {
+  universe_id: string;
+  as_of?: string | null;
+  data_version_id: string;
+  count: number;
+  members: Array<{ symbol: string; start_date: string; end_date?: string | null }>;
+};
+
+export type RiskPortfolioResponse = {
+  symbols: string[];
+  portfolio_value: number;
+  confidence: number;
+  parametric: Record<string, number>;
+  historical: Record<string, number>;
+  rolling_covariance: Array<{ date: string; matrix: number[][]; symbols: string[] }>;
+  factor_exposures: Record<string, number>;
+  scenarios: Array<{ id: string; name: string; pnl: number; post_value: number }>;
+};
+
+export type OmsOrder = {
+  id: string;
+  symbol: string;
+  side: string;
+  quantity: number;
+  order_type: string;
+  limit_price?: number | null;
+  status: string;
+  rejection_reason?: string | null;
+  created_at: string;
+};
+
+export type AuditEvent = {
+  id: string;
+  user_id?: string | null;
+  event_type: string;
+  entity_type: string;
+  entity_id?: string | null;
+  payload: Record<string, unknown>;
+  created_at: string;
+};
+
+export type KillSwitch = {
+  id: string;
+  scope: string;
+  enabled: boolean;
+  reason: string;
+  updated_at: string;
+};
+
 export type EquityPerformanceSnapshot = {
   symbol: string;
   period_changes_pct: {

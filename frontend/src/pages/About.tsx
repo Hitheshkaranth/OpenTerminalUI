@@ -98,6 +98,23 @@ export function AboutPage() {
           <li>- Research Suites highlighting now indicates active backtesting/model-lab screen.</li>
           <li>- Backtesting includes standalone 3D analytics: terrain, regimes, orderbook liquidity, IV surface, volatility surface, and Monte Carlo simulation.</li>
           <li>- Auth recovery upgraded with dedicated Forgot Access flow and backend reset endpoint.</li>
+          <li>- Technical Screener upgraded with breakout scanner engine and real-time scanner alert delivery.</li>
+          <li>- Risk Engine added: portfolio VaR/CVaR, backtest risk attribution, and configurable stress scenarios.</li>
+          <li>- Execution Simulator: cost modeling (commission, slippage, spread, market impact) integrated into backtest runs.</li>
+          <li>- OMS / Compliance dashboard: order management, restricted list, fill tracking, and audit log.</li>
+          <li>- Model Governance page: run registration, multi-run comparison, and model promotion workflow.</li>
+          <li>- Ops Dashboard: data feed health status and kill-switch controls.</li>
+        </ul>
+      </TerminalPanel>
+
+      <TerminalPanel title="Risk, OMS &amp; Governance">
+        <ul className="space-y-1 text-xs text-terminal-text">
+          <li>- Risk Engine: portfolio VaR/CVaR, backtest risk attribution, and configurable stress scenario analysis.</li>
+          <li>- Execution Simulator: transaction cost modeling with commission, slippage, spread, and market-impact parameters.</li>
+          <li>- OMS / Compliance: order lifecycle management, fill tracking, restricted-list enforcement, and audit log.</li>
+          <li>- Model Governance: run registration with code hash + data version, multi-run comparison, and model promotion workflow.</li>
+          <li>- Ops Dashboard: real-time data feed health monitoring and kill-switch controls.</li>
+          <li>- Technical Screener: pattern-based screener engine with breakout scanner and real-time scanner alert delivery.</li>
         </ul>
       </TerminalPanel>
 

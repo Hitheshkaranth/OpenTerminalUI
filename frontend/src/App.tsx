@@ -40,6 +40,10 @@ import { PortfolioLabRunReportPage } from "./pages/PortfolioLabRunReport";
 import { PortfolioLabBlendsPage } from "./pages/PortfolioLabBlends";
 import { AccountPage } from "./pages/Account";
 import { AccountLayout } from "./pages/AccountLayout";
+import { RiskDashboardPage } from "./pages/RiskDashboard";
+import { OmsCompliancePage } from "./pages/OmsCompliance";
+import { OpsDashboardPage } from "./pages/OpsDashboard";
+import { ModelGovernancePage } from "./pages/ModelGovernance";
 
 function App() {
   return (
@@ -71,6 +75,9 @@ function App() {
             <Route path="news" element={<NewsPage />} />
             <Route path="alerts" element={<AlertsPage />} />
             <Route path="paper" element={<PaperTradingPage />} />
+            <Route path="risk" element={<RiskDashboardPage />} />
+            <Route path="oms" element={<OmsCompliancePage />} />
+            <Route path="ops" element={<OpsDashboardPage />} />
             <Route path="plugins" element={<PluginsPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
@@ -93,6 +100,7 @@ function App() {
             <Route path="model-lab/experiments/:id" element={<ModelLabExperimentDetailPage />} />
             <Route path="model-lab/runs/:runId" element={<ModelLabRunReportPage />} />
             <Route path="model-lab/compare" element={<ModelLabComparePage />} />
+            <Route path="model-governance" element={<ModelGovernancePage />} />
           </Route>
 
           <Route path="/account" element={<ProtectedRoute><AccountLayout /></ProtectedRoute>}>
@@ -118,6 +126,9 @@ function App() {
           <Route path="/news" element={<Navigate to="/equity/news" replace />} />
           <Route path="/alerts" element={<Navigate to="/equity/alerts" replace />} />
           <Route path="/paper" element={<Navigate to="/equity/paper" replace />} />
+          <Route path="/risk" element={<Navigate to="/equity/risk" replace />} />
+          <Route path="/oms" element={<Navigate to="/equity/oms" replace />} />
+          <Route path="/ops" element={<Navigate to="/equity/ops" replace />} />
           <Route path="/settings" element={<Navigate to="/equity/settings" replace />} />
           <Route path="/plugins" element={<Navigate to="/equity/plugins" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />

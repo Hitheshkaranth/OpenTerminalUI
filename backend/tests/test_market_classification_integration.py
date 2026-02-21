@@ -224,13 +224,18 @@ def test_search_fallback_includes_direct_us_ticker_query(monkeypatch) -> None:
     async def _fake_classify(symbol: str):
         return _us_classification(symbol)
 
+    async def _fake_snapshot(_: str):
+        return {"company_name": "Apple Inc."}
+
     monkeypatch.setattr(search, "_get_rows", _fake_rows)
     monkeypatch.setattr(search.market_classifier, "classify", _fake_classify)
+    monkeypatch.setattr(search, "fetch_stock_snapshot_coalesced", _fake_snapshot)
     monkeypatch.setattr(search, "get_adapter_registry", lambda: (_ for _ in ()).throw(RuntimeError("no adapter")))
 
     out = asyncio.run(search.search(q="AAPL"))
     assert len(out.results) == 1
     first = out.results[0]
     assert first.ticker == "AAPL"
+    assert first.name == "Apple Inc."
     assert first.exchange == "NASDAQ"
     assert first.country_code == "US"

@@ -18,6 +18,14 @@ import type {
   PortfolioCorrelationResponse,
   PortfolioDividendTracker,
   PortfolioBenchmarkOverlay,
+  DataVersion,
+  PriceSeriesResponse,
+  PitFundamentalsResponse,
+  UniverseMembersResponse,
+  RiskPortfolioResponse,
+  OmsOrder,
+  AuditEvent,
+  KillSwitch,
   TaxLotSummary,
   TaxLotRealizationResponse,
   PluginManifestItem,
@@ -181,7 +189,7 @@ export async function runScanner(payload: { preset_id?: string; inline_preset?: 
   rows: Array<Record<string, unknown>>;
   summary: Record<string, unknown>;
 }> {
-  const { data } = await api.post("/v1/screener/run", payload);
+  const { data } = await api.post("/v1/screener/run", payload, { timeout: 120000 });
   return data;
 }
 
@@ -207,6 +215,138 @@ export async function createScannerAlertRule(payload: {
   meta_json?: Record<string, unknown>;
 }): Promise<void> {
   await api.post("/v1/alerts/scanner-rules", payload);
+}
+
+export async function fetchActiveDataVersion(): Promise<DataVersion> {
+  const { data } = await api.get<DataVersion>("/data/version/active");
+  return data;
+}
+
+export async function createDataVersion(payload: {
+  name: string;
+  description?: string;
+  source?: string;
+  activate?: boolean;
+  metadata?: Record<string, unknown>;
+}): Promise<DataVersion> {
+  const { data } = await api.post<DataVersion>("/data/version", payload);
+  return data;
+}
+
+export async function fetchPriceSeries(
+  symbol: string,
+  opts?: { adjusted?: boolean; start?: string; end?: string; data_version_id?: string },
+): Promise<PriceSeriesResponse> {
+  const { data } = await api.get<PriceSeriesResponse>(`/prices/${encodeURIComponent(symbol)}`, { params: opts });
+  return data;
+}
+
+export async function fetchPitFundamentals(
+  symbol: string,
+  opts?: { as_of?: string; data_version_id?: string },
+): Promise<PitFundamentalsResponse> {
+  const { data } = await api.get<PitFundamentalsResponse>(`/fundamentals/${encodeURIComponent(symbol)}`, { params: opts });
+  return data;
+}
+
+export async function fetchUniverseMembers(
+  universeId: string,
+  opts?: { as_of?: string; data_version_id?: string },
+): Promise<UniverseMembersResponse> {
+  const { data } = await api.get<UniverseMembersResponse>(`/universe/${encodeURIComponent(universeId)}`, { params: opts });
+  return data;
+}
+
+export async function fetchPortfolioRisk(payload: {
+  symbols?: string[];
+  weights?: number[];
+  confidence?: number;
+  lookback_days?: number;
+  portfolio_value?: number;
+}): Promise<RiskPortfolioResponse> {
+  const { data } = await api.post<RiskPortfolioResponse>("/risk/portfolio", payload);
+  return data;
+}
+
+export async function fetchBacktestRisk(runId: string, confidence = 0.95): Promise<RiskPortfolioResponse> {
+  const { data } = await api.post<RiskPortfolioResponse>(`/risk/backtest/${encodeURIComponent(runId)}?confidence=${confidence}`, {});
+  return data;
+}
+
+export async function fetchRiskScenarios(): Promise<Array<Record<string, unknown>>> {
+  const { data } = await api.get<{ items: Array<Record<string, unknown>> }>("/risk/scenarios");
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function createOmsOrder(payload: {
+  symbol: string;
+  side: "buy" | "sell" | "long" | "short";
+  quantity: number;
+  order_type?: string;
+  limit_price?: number;
+  max_position_notional?: number;
+  max_adv_pct?: number;
+  simulate_fill?: boolean;
+}): Promise<{ order: OmsOrder; fill?: Record<string, unknown> | null }> {
+  const { data } = await api.post<{ order: OmsOrder; fill?: Record<string, unknown> | null }>("/oms/order", payload);
+  return data;
+}
+
+export async function fetchOmsOrders(status?: string): Promise<OmsOrder[]> {
+  const { data } = await api.get<{ items: OmsOrder[] }>("/oms/orders", { params: status ? { status } : undefined });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function setRestrictedSymbol(payload: { symbol: string; reason?: string; active?: boolean }): Promise<Record<string, unknown>> {
+  const { data } = await api.post<Record<string, unknown>>("/oms/restricted", payload);
+  return data;
+}
+
+export async function fetchAuditEvents(eventType?: string): Promise<AuditEvent[]> {
+  const { data } = await api.get<{ items: AuditEvent[] }>("/audit", { params: eventType ? { event_type: eventType } : undefined });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function registerGovernanceRun(payload: {
+  run_id: string;
+  data_version_id?: string;
+  code_hash?: string;
+  execution_profile?: Record<string, unknown>;
+}): Promise<Record<string, unknown>> {
+  const { data } = await api.post<Record<string, unknown>>("/governance/runs/register", payload);
+  return data;
+}
+
+export async function compareGovernanceRuns(runIds: string[]): Promise<Array<Record<string, unknown>>> {
+  const { data } = await api.get<{ items: Array<Record<string, unknown>> }>("/governance/runs/compare", {
+    params: { run_ids: runIds.join(",") },
+  });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function promoteGovernanceModel(payload: {
+  registry_name: string;
+  run_id: string;
+  stage?: "staging" | "prod";
+  metadata?: Record<string, unknown>;
+}): Promise<Record<string, unknown>> {
+  const { data } = await api.post<Record<string, unknown>>("/governance/model-registry/promote", payload);
+  return data;
+}
+
+export async function fetchFeedHealth(): Promise<Record<string, unknown>> {
+  const { data } = await api.get<Record<string, unknown>>("/ops/feed-health");
+  return data;
+}
+
+export async function fetchKillSwitches(): Promise<KillSwitch[]> {
+  const { data } = await api.get<{ items: KillSwitch[] }>("/ops/kill-switch");
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function setKillSwitch(payload: { scope?: string; enabled: boolean; reason?: string }): Promise<KillSwitch> {
+  const { data } = await api.post<KillSwitch>("/ops/kill-switch", payload);
+  return data;
 }
 
 export type SearchSymbolItem = {
