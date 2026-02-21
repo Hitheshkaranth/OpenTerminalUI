@@ -35,7 +35,7 @@ export function RiskDashboardPage() {
   return (
     <div className="space-y-3 p-4">
       <div className="flex justify-between items-center rounded border border-terminal-border bg-terminal-panel p-3">
-        <div className="text-sm font-semibold text-terminal-accent">Enterprise Risk Engine (Quant Pack)</div>
+        <div className="text-sm font-semibold text-terminal-accent">Portfolio Risk Dashboard</div>
         <button className="rounded border border-terminal-border px-3 py-1 text-xs hover:bg-terminal-border/30" onClick={() => void load()} disabled={loading}>
           {loading ? "Refreshing..." : "Refresh"}
         </button>
