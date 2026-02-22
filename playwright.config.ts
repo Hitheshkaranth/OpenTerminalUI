@@ -16,6 +16,10 @@ export default defineConfig({
       port: E2E_BACKEND_PORT,
       reuseExistingServer: true,
       timeout: 120_000,
+      env: {
+        ...process.env,
+        AUTH_MIDDLEWARE_ENABLED: "0",
+      },
     },
     {
       command: `npm run dev --prefix frontend -- --host 127.0.0.1 --port ${E2E_FRONTEND_PORT} --strictPort`,

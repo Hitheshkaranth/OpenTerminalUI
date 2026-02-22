@@ -321,6 +321,7 @@ export function BacktestingPage() {
   const [runId, setRunId] = useState<string | null>(null);
   const [jobState, setJobState] = useState<JobState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [submitInFlight, setSubmitInFlight] = useState(false);
   const [result, setResult] = useState<BacktestJobResult | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -415,34 +416,53 @@ export function BacktestingPage() {
   const canSubmit = useMemo(() => {
     if (!asset.trim()) return false;
     if (!Number.isFinite(tradeCapital) || tradeCapital <= 0) return false;
+    if (start && end && start > end) return false;
     if (strategyMode === CUSTOM_STRATEGY_VALUE && !script.trim()) return false;
-    return jobState !== "queued" && jobState !== "running";
-  }, [asset, jobState, script, strategyMode, tradeCapital]);
+    return !submitInFlight && jobState !== "queued" && jobState !== "running";
+  }, [asset, end, jobState, script, start, strategyMode, submitInFlight, tradeCapital]);
 
   const submit = async () => {
+    if (!canSubmit) return;
     setError(null);
     setResult(null);
     setAnalytics(null);
     const strategy = strategyMode === CUSTOM_STRATEGY_VALUE ? script : `example:${strategyMode}`;
     const context = strategyMode === CUSTOM_STRATEGY_VALUE ? {} : (activePreset?.default_context ?? {});
-    const res = await submitBacktestJob({
-      symbol,
-      asset: symbol,
-      market,
-      start,
-      end,
-      strategy,
-      context,
-      config: {
-        initial_cash: tradeCapital,
-        position_fraction: modelAllocation,
-        data_version_id: dataVersionId || undefined,
-        adjusted: adjustedSeries,
-        execution_profile: executionProfile,
-      },
-    });
-    setRunId(res.run_id);
-    setJobState("queued");
+    const sanitize = (value: unknown, fallback = 0): number => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : fallback;
+    };
+    setSubmitInFlight(true);
+    try {
+      const res = await submitBacktestJob({
+        symbol,
+        asset: symbol,
+        market,
+        start,
+        end,
+        strategy,
+        context,
+        config: {
+          initial_cash: sanitize(tradeCapital, 100000),
+          position_fraction: modelAllocation,
+          data_version_id: dataVersionId || undefined,
+          adjusted: adjustedSeries,
+          execution_profile: {
+            commission_bps: sanitize(executionProfile.commission_bps, 0),
+            slippage_bps: sanitize(executionProfile.slippage_bps, 0),
+            spread_bps: sanitize(executionProfile.spread_bps, 0),
+            market_impact_bps: sanitize(executionProfile.market_impact_bps, 0),
+          },
+        },
+      });
+      setRunId(res.run_id);
+      setJobState("queued");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to submit backtest");
+      setJobState("failed");
+    } finally {
+      setSubmitInFlight(false);
+    }
   };
 
   useEffect(() => {
@@ -1196,7 +1216,7 @@ export function BacktestingPage() {
     return computePremarketOrbLines(compareActiveBars, preset?.default_context ?? {});
   }, [compareActiveBars, compareActiveStrategy]);
 
-    const renderChartTab = () => (
+  const renderChartTab = () => (
     <ChartTabPanel
       timeframe={timeframe}
       setTimeframe={setTimeframe}
@@ -1393,7 +1413,7 @@ export function BacktestingPage() {
             <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Start</span><input type="date" className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={start} onChange={(e) => setStart(e.target.value)} /></label>
             <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">End</span><input type="date" className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
             <label className="md:col-span-2"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Model</span><select className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={strategyMode} onChange={(e) => setStrategyMode(e.target.value)}>{STRATEGY_CATALOG.map((opt) => <option key={opt.key} value={opt.key}>[{opt.category.toUpperCase()}] {opt.label}</option>)}<option value={CUSTOM_STRATEGY_VALUE}>Custom Python Script</option></select></label>
-            <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Trade Capital</span><input type="number" min={1} step={100} className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={tradeCapital} onChange={(e) => setTradeCapital(Number(e.target.value))} /></label>
+            <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Trade Capital</span><input type="number" min={1} step={100} className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={tradeCapital} onChange={(e) => setTradeCapital(Number.isFinite(e.target.valueAsNumber) ? e.target.valueAsNumber : 0)} /></label>
           </div>
           <div className="mt-2 grid grid-cols-1 gap-2 text-xs md:grid-cols-7">
             <label className="md:col-span-2">
@@ -1425,7 +1445,7 @@ export function BacktestingPage() {
             </label>
           </div>
           {strategyMode !== CUSTOM_STRATEGY_VALUE && activePreset && <div className="mt-2"><span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase" style={{ backgroundColor: `${CATEGORY_COLORS[activePreset.category] ?? terminalColors.accent}22`, color: CATEGORY_COLORS[activePreset.category] ?? terminalColors.accent, border: `1px solid ${CATEGORY_COLORS[activePreset.category] ?? terminalColors.accent}44` }}>{activePreset.category}</span></div>}
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px]"><div className="rounded border border-terminal-border/60 bg-terminal-bg px-2 py-1 text-terminal-muted">{strategyMode === CUSTOM_STRATEGY_VALUE ? "Custom script mode: define generate_signals(df, context)." : activePreset?.description}</div><div className="rounded border border-terminal-border/60 bg-terminal-bg px-2 py-1 text-terminal-muted">Model allocation: {(modelAllocation * 100).toFixed(0)}%</div><div className="flex items-center gap-2"><span className="text-terminal-muted">Run ID: {runId || "-"}</span><span className="text-terminal-muted">Status: {jobState.toUpperCase()}</span><button className="rounded border border-terminal-accent bg-terminal-accent/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-terminal-accent disabled:opacity-50" onClick={() => void submit()} disabled={!canSubmit}>{jobState === "queued" || jobState === "running" ? "Running..." : "Run"}</button></div></div>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px]"><div className="rounded border border-terminal-border/60 bg-terminal-bg px-2 py-1 text-terminal-muted">{strategyMode === CUSTOM_STRATEGY_VALUE ? "Custom script mode: define generate_signals(df, context)." : activePreset?.description}</div><div className="rounded border border-terminal-border/60 bg-terminal-bg px-2 py-1 text-terminal-muted">Model allocation: {(modelAllocation * 100).toFixed(0)}%</div><div className="flex items-center gap-2"><span className="text-terminal-muted">Run ID: {runId || "-"}</span><span className="text-terminal-muted">Status: {jobState.toUpperCase()}</span><button type="button" className="rounded border border-terminal-accent bg-terminal-accent/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-terminal-accent disabled:opacity-50" onClick={() => void submit()} disabled={!canSubmit}>{submitInFlight ? "Submitting..." : (jobState === "queued" || jobState === "running" ? "Running..." : "Run")}</button></div></div>
           {strategyMode === CUSTOM_STRATEGY_VALUE && <label className="mt-2 block"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Python Strategy Script</span><textarea className="h-36 w-full resize-none rounded border border-terminal-border bg-terminal-bg px-2 py-1 font-mono text-[11px] text-terminal-text" value={script} onChange={(e) => setScript(e.target.value)} /></label>}
           {error && <div className="mt-2 rounded border border-terminal-neg bg-terminal-neg/10 p-2 text-xs text-terminal-neg">{error}</div>}
         </TerminalPanel>
