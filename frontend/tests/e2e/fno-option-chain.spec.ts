@@ -52,8 +52,10 @@ test("fno option chain table renders with mocked backend data", async ({ page })
   }
   await expect(page.getByText("NSE F&O ANALYTICS")).toBeVisible();
 
-  // Wait for the option-chain table header to render (avoid ambiguous "Strike" matches).
-  await expect(page.getByRole("columnheader", { name: /^Strike$/ })).toBeVisible({ timeout: 10000 });
-  await expect(page.getByRole("cell", { name: /22850/ }).first()).toBeVisible();
+  // On mobile, the horizontally scrollable table can hide the Strike header off-screen.
+  // Use the table shell + known strike text as the render signal.
+  const chainTable = page.locator("table").first();
+  await expect(chainTable).toBeVisible({ timeout: 10000 });
+  await expect(chainTable.getByText(/22850/).first()).toBeVisible();
   await expect(page.getByText(/OI/i).first()).toBeVisible();
 });
