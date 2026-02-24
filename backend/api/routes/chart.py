@@ -218,7 +218,11 @@ async def get_chart(
     else:
         fetcher = await get_unified_fetcher()
         adapter_rows = []
-        if get_adapter_registry is not None:
+        # Pagination/backfill requests should use a stable source path across calls.
+        # The adapter registry may use loop-bound clients/caches that become brittle
+        # under direct `asyncio.run(...)` test invocations with repeated cursors.
+        use_adapter_registry = get_adapter_registry is not None and limit is None and cursor is None
+        if use_adapter_registry:
             try:
                 registry = get_adapter_registry()
                 end_d = date.today()
