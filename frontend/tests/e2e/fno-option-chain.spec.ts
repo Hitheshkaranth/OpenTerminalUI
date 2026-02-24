@@ -33,14 +33,15 @@ test("fno option chain table renders with mocked backend data", async ({ page })
   const fixturePath = path.resolve(process.cwd(), "tests/e2e/fixtures/fno-option-chain.json");
   const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf-8")) as FixtureShape;
 
-  await page.route("**/api/fno/chain/**/expiries**", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fixture.expiries) });
-  });
-  await page.route("**/api/fno/chain/**/summary**", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fixture.summary) });
-  });
   await page.route("**/api/fno/chain/**", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fixture.chain) });
+    const url = route.request().url();
+    if (url.includes("/expiries")) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fixture.expiries) });
+    } else if (url.includes("/summary")) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fixture.summary) });
+    } else {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fixture.chain) });
+    }
   });
 
   await page.goto("/fno");
@@ -50,7 +51,7 @@ test("fno option chain table renders with mocked backend data", async ({ page })
     await page.goto("/fno");
   }
   await expect(page.getByText("NSE F&O ANALYTICS")).toBeVisible();
-  await expect(page.getByRole("columnheader", { name: "Strike" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: /Strike/i })).toBeVisible();
   await expect(page.getByRole("cell", { name: /22850/ }).first()).toBeVisible();
-  await expect(page.getByRole("columnheader", { name: "OI" }).first()).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: /OI/i }).first()).toBeVisible();
 });

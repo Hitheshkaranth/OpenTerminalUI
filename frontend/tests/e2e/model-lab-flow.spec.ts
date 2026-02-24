@@ -33,12 +33,14 @@ test("model lab e2e: create -> run -> report -> compare", async ({ page }) => {
     const url = route.request().url();
     const method = route.request().method();
 
-    if (url.includes("/model-lab/experiments") && method === "GET" && !url.match(/\/experiments\//)) {
+    // List experiments: GET .../model-lab/experiments (no ID)
+    if (url.match(/\/model-lab\/experiments\/?(\?.*)?$/) && method === "GET") {
       await route.fulfill({ json: { items: experiments } });
       return;
     }
 
-    if (url.endsWith("/model-lab/experiments") && method === "POST") {
+    // Create experiment: POST .../model-lab/experiments
+    if (url.match(/\/model-lab\/experiments\/?$/) && method === "POST") {
       const body = route.request().postDataJSON() as Record<string, unknown>;
       const created = {
         id: `exp_${experiments.length + 1}`,
@@ -49,14 +51,15 @@ test("model lab e2e: create -> run -> report -> compare", async ({ page }) => {
         benchmark_symbol: String(body.benchmark_symbol || "NIFTY50"),
         start_date: String(body.start_date || "2025-01-01"),
         end_date: String(body.end_date || "2025-12-31"),
-        created_at: "2026-02-19T00:00:00",
+        created_at: new Date().toISOString(),
       };
       experiments.unshift(created);
       await route.fulfill({ json: created });
       return;
     }
 
-    if (url.includes("/model-lab/experiments/") && method === "GET" && !url.includes("/run") && !url.includes("/walk-forward") && !url.includes("/param-sweep")) {
+    // Detail: GET .../model-lab/experiments/{id}
+    if (url.match(/\/model-lab\/experiments\/[^/?]+(\?.*)?$/) && method === "GET") {
       const expId = url.split("/model-lab/experiments/")[1].split("?")[0];
       const exp = experiments.find((x) => x.id === expId) || experiments[0];
       await route.fulfill({

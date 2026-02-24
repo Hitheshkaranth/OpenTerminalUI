@@ -18,7 +18,7 @@ test("screener run and scanner alert flow renders", async ({ page }) => {
     localStorage.setItem("ot-refresh-token", "dummy");
   }, token);
 
-  await page.route("**/api/v1/screener/presets", async (route) => {
+  await page.route("**/api/screener/presets", async (route) => {
     if (route.request().method() === "GET") {
       return route.fulfill({
         status: 200,
@@ -28,11 +28,9 @@ test("screener run and scanner alert flow renders", async ({ page }) => {
             {
               id: "p1",
               name: "20D High Breakout + RVOL",
+              category: "technical",
+              query: "Market Capitalization > 500",
               universe: "NSE:NIFTY200",
-              timeframe: "1d",
-              liquidity_gate: { min_price: 50, min_avg_volume: 100000, min_avg_traded_value: 5000000 },
-              rules: [{ type: "breakout_n_day_high", params: { n: 20, buffer_pct: 0.001, rvol_threshold: 2, near_trigger_pct: 0.003 } }],
-              ranking: { mode: "default", params: {} },
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             },
@@ -43,26 +41,35 @@ test("screener run and scanner alert flow renders", async ({ page }) => {
     return route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
   });
 
-  await page.route("**/api/v1/screener/run", async (route) => {
+  await page.route("**/api/screener/run-revamped", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
         run_id: "r1",
         count: 1,
-        summary: { matches: 1 },
-        rows: [
+        results: [
           {
-            symbol: "RELIANCE",
-            setup_type: "20D_BREAKOUT",
-            score: 2.14,
-            breakout_level: 2450.5,
-            distance_to_trigger: 0.001,
-            explain: { steps: [{ rule: "rvol_threshold", passed: true, value: 2.4, expected: ">=2.0" }] },
+            ticker: "RELIANCE",
+            company: "RELIANCE INDUSTRIES",
+            sector: "Energy",
+            market_cap: 1500000,
+            pe: 25.4,
+            roe: 18.2,
+            roce: 16.5,
+            scores: { quality_score: { value: 85 } },
           },
         ],
       }),
     });
+  });
+
+  await page.route("**/api/screener/screens", async (route) => {
+    await route.fulfill({ status: 200, json: { items: [] } });
+  });
+
+  await page.route("**/api/screener/public", async (route) => {
+    await route.fulfill({ status: 200, json: { items: [] } });
   });
 
   await page.route("**/api/v1/alerts/scanner-rules", async (route) => {
@@ -70,8 +77,8 @@ test("screener run and scanner alert flow renders", async ({ page }) => {
   });
 
   await page.goto("/equity/screener");
-  await expect(page.getByText("Screener Presets")).toBeVisible();
-  await page.getByRole("button", { name: "Run Preset" }).click();
-  await expect(page.getByText("Today's Setups")).toBeVisible();
+  await expect(page.getByText("Screener Library")).toBeVisible();
+  await page.getByRole("button", { name: "20D High Breakout + RVOL" }).click();
+  await expect(page.getByText("Results")).toBeVisible();
   await expect(page.getByRole("cell", { name: "RELIANCE" }).first()).toBeVisible();
 });
