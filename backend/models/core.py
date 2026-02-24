@@ -386,6 +386,22 @@ class ScanAlertRuleORM(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 
+class UserScreenORM(Base):
+    __tablename__ = "user_screens"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    query: Mapped[str] = mapped_column(Text, default="")
+    columns_config: Mapped[list] = mapped_column(JSON, default=list)
+    viz_config: Mapped[dict] = mapped_column(JSON, default=dict)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    upvotes: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
 class DataVersionORM(Base):
     __tablename__ = "data_versions"
 

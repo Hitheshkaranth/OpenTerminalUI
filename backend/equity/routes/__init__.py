@@ -7,12 +7,13 @@ from backend.equity.routes import admin, alerts, auth, backtest, backtests, char
 from backend.api.routes import audit, data_layer, governance, oms, ops, risk
 from backend.model_lab import router as model_lab_router
 from backend.portfolio_lab import router as portfolio_lab_router
-from backend.screener import router as screener_v1_router
-
+from backend.screener import legacy_router as screener_v1_router
+from backend.screener.router import router as screener_revamped_router
 equity_router = APIRouter()
 equity_router.include_router(stocks.router, prefix="/api", tags=["stocks"])
 equity_router.include_router(chart.router, prefix="/api", tags=["chart"])
 equity_router.include_router(screener.router, prefix="/api", tags=["screener"])
+equity_router.include_router(screener_revamped_router, prefix="/api", tags=["screener-revamped"])
 equity_router.include_router(screener_v1_router, prefix="/api", tags=["screener-v1"])
 equity_router.include_router(valuation.router, prefix="/api", tags=["valuation"])
 equity_router.include_router(fundamentals.router, prefix="/api", tags=["fundamentals"])

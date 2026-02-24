@@ -1,29 +1,227 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap");
 
 :root {
-  --ot-black: #0a0a0a;
-  --ot-bg: #111111;
-  --ot-surface: #1a1a1a;
-  --ot-border: #2a2a2a;
-  --ot-border-hover: #333333;
-  --ot-amber: #ff9500;
-  --ot-amber-dim: #cc7700;
-  --ot-amber-glow: rgba(255, 149, 0, 0.12);
-  --ot-green: #00e676;
-  --ot-red: #ff3d3d;
-  --ot-cyan: #18ffff;
-  --ot-blue: #448aff;
-  --ot-white: #e0e0e0;
-  --ot-text: #cccccc;
-  --ot-muted: #666666;
-  --ot-dark: #333333;
+  /* Terminal Design System v2 - semantic tokens */
+  --ot-font-data: "JetBrains Mono", "IBM Plex Mono", "Courier New", monospace;
+  --ot-font-ui: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+
+  --ot-font-weight-regular: 400;
+  --ot-font-weight-medium: 500;
+  --ot-font-weight-semibold: 600;
+  --ot-font-weight-bold: 700;
+
+  /* Typography scale (dense-terminal friendly) */
+  --ot-type-size-2xs: 10px;
+  --ot-type-size-xs: 11px;
+  --ot-type-size-sm: 12px;
+  --ot-type-size-md: 13px;
+  --ot-type-size-lg: 14px;
+  --ot-type-size-xl: 16px;
+  --ot-type-size-2xl: 18px;
+  --ot-type-size-3xl: clamp(20px, 2vw, 24px);
+
+  --ot-line-height-tight: 1.1;
+  --ot-line-height-data: 1.25;
+  --ot-line-height-ui: 1.35;
+  --ot-line-height-copy: 1.5;
+
+  --ot-letter-spacing-tight: -0.01em;
+  --ot-letter-spacing-normal: 0.01em;
+  --ot-letter-spacing-wide: 0.08em;
+  --ot-letter-spacing-wider: 0.14em;
+
+  --ot-radius-xs: 2px;
+  --ot-radius-sm: 3px;
+  --ot-radius-md: 6px;
+
+  --ot-space-1: 4px;
+  --ot-space-2: 8px;
+  --ot-space-3: 12px;
+  --ot-space-4: 16px;
+
+  --ot-color-canvas: #0a0a0a;
+  --ot-color-canvas-elevated: #111111;
+  --ot-color-surface-1: #151515;
+  --ot-color-surface-2: #1a1a1a;
+  --ot-color-surface-3: #202020;
+  --ot-color-overlay: rgba(10, 10, 10, 0.78);
+
+  --ot-color-border-subtle: #242424;
+  --ot-color-border-default: #2a2a2a;
+  --ot-color-border-strong: #333333;
+
+  --ot-color-text-primary: #d0d0d0;
+  --ot-color-text-secondary: #a2a2a2;
+  --ot-color-text-muted: #666666;
+  --ot-color-text-inverse: #0a0a0a;
+  --ot-color-text-brand: #e0e0e0;
+
+  --ot-color-accent-primary: #ff9500;
+  --ot-color-accent-primary-hover: #ffb041;
+  --ot-color-accent-primary-dim: #cc7700;
+  --ot-color-accent-glow: rgba(255, 149, 0, 0.12);
+  --ot-color-accent-secondary: #18ffff;
+  --ot-color-accent-info: #448aff;
+
+  --ot-color-market-up: #00e676;
+  --ot-color-market-down: #ff3d3d;
+  --ot-color-market-neutral: #bdbdbd;
+  --ot-color-market-up-soft: rgba(0, 230, 118, 0.15);
+  --ot-color-market-down-soft: rgba(255, 61, 61, 0.15);
+
+  --ot-color-risk-low: #00e676;
+  --ot-color-risk-medium: #ffb74d;
+  --ot-color-risk-high: #ff3d3d;
+  --ot-color-risk-critical: #ff3d3d;
+
+  --ot-color-system-ok: #00e676;
+  --ot-color-system-stale: #ffb74d;
+  --ot-color-system-warning: #ffb74d;
+  --ot-color-system-critical: #ff3d3d;
+  --ot-color-system-offline: #9e9e9e;
+
+  --ot-color-action-safe: #00e676;
+  --ot-color-action-warning: #ffb74d;
+  --ot-color-action-danger: #ff3d3d;
+
+  --ot-density-row-compact: 24px;
+  --ot-density-row-default: 28px;
+  --ot-density-row-comfortable: 32px;
+
+  /* Compatibility aliases (existing UI uses these widely) */
+  --ot-black: var(--ot-color-canvas);
+  --ot-bg: var(--ot-color-canvas-elevated);
+  --ot-surface: var(--ot-color-surface-2);
+  --ot-border: var(--ot-color-border-default);
+  --ot-border-hover: var(--ot-color-border-strong);
+  --ot-amber: var(--ot-color-accent-primary);
+  --ot-amber-dim: var(--ot-color-accent-primary-dim);
+  --ot-amber-glow: var(--ot-color-accent-glow);
+  --ot-green: var(--ot-color-market-up);
+  --ot-red: var(--ot-color-market-down);
+  --ot-cyan: var(--ot-color-accent-secondary);
+  --ot-blue: var(--ot-color-accent-info);
+  --ot-white: var(--ot-color-text-brand);
+  --ot-text: var(--ot-color-text-primary);
+  --ot-muted: var(--ot-color-text-muted);
+  --ot-dark: var(--ot-color-border-strong);
 }
 
 .ot-app-shell {
   min-height: 100vh;
   color: var(--ot-text);
-  font-family: "JetBrains Mono", "IBM Plex Mono", "Courier New", monospace;
+  font-family: var(--ot-font-data);
   background: var(--ot-black);
+}
+
+/* Typography roles and utilities (Design System v2) */
+.ot-type-data {
+  font-family: var(--ot-font-data);
+  line-height: var(--ot-line-height-data);
+  letter-spacing: var(--ot-letter-spacing-normal);
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-feature-settings: "tnum" 1, "zero" 1;
+}
+
+.ot-type-ui {
+  font-family: var(--ot-font-ui);
+  line-height: var(--ot-line-height-ui);
+  letter-spacing: 0;
+}
+
+.ot-type-label {
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-2xs);
+  line-height: var(--ot-line-height-tight);
+  font-weight: var(--ot-font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--ot-letter-spacing-wide);
+}
+
+.ot-type-status {
+  font-family: var(--ot-font-data);
+  font-size: var(--ot-type-size-xs);
+  line-height: var(--ot-line-height-tight);
+  font-weight: var(--ot-font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--ot-letter-spacing-wide);
+  font-variant-numeric: tabular-nums;
+}
+
+.ot-type-badge {
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-2xs);
+  line-height: var(--ot-line-height-tight);
+  font-weight: var(--ot-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--ot-letter-spacing-wide);
+}
+
+.ot-type-panel-title {
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-xs);
+  line-height: var(--ot-line-height-tight);
+  font-weight: var(--ot-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--ot-letter-spacing-wide);
+}
+
+.ot-type-panel-subtitle {
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-2xs);
+  line-height: var(--ot-line-height-tight);
+  font-weight: var(--ot-font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--ot-letter-spacing-wide);
+}
+
+.ot-type-table-cell {
+  font-family: var(--ot-font-data);
+  font-size: var(--ot-type-size-xs);
+  line-height: var(--ot-line-height-data);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.ot-type-table-header {
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-2xs);
+  line-height: var(--ot-line-height-tight);
+  font-weight: var(--ot-font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--ot-letter-spacing-wide);
+}
+
+.ot-type-heading-lg {
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-2xl);
+  line-height: 1.2;
+  font-weight: var(--ot-font-weight-semibold);
+  letter-spacing: var(--ot-letter-spacing-tight);
+}
+
+.ot-type-heading-xl {
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-3xl);
+  line-height: 1.05;
+  font-weight: var(--ot-font-weight-bold);
+  letter-spacing: var(--ot-letter-spacing-tight);
+}
+
+.ot-type-body {
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-sm);
+  line-height: var(--ot-line-height-copy);
+}
+
+.ot-density-dense {
+  --ot-density-row-current: var(--ot-density-row-compact);
+  --ot-type-table-size-current: var(--ot-type-size-xs);
+}
+
+.ot-density-comfortable {
+  --ot-density-row-current: var(--ot-density-row-comfortable);
+  --ot-type-table-size-current: var(--ot-type-size-sm);
 }
 
 .ot-route-layer {

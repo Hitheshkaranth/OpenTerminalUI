@@ -7,6 +7,7 @@ from typing import Any, Generator
 from backend.core.ttl_policy import market_open_now, ttl_seconds
 from backend.core.unified_fetcher import UnifiedFetcher
 from backend.db.database import SessionLocal
+from backend.providers.chart_data import ChartDataProvider, get_chart_data_provider
 from backend.services.cache import cache as cache_instance
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,10 @@ async def shutdown_unified_fetcher() -> None:
         _fetcher_instance = None
 
     await cache_instance.close()
+
+
+async def get_chart_provider() -> ChartDataProvider:
+    return await get_chart_data_provider()
 
 async def fetch_stock_snapshot_coalesced(ticker: str) -> dict[str, Any]:
     """

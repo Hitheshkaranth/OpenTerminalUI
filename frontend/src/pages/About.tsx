@@ -62,20 +62,22 @@ export function AboutPage() {
       <div className="grid gap-3 lg:grid-cols-2">
         <TerminalPanel title="Equity Pack">
           <ul className="space-y-1 text-xs text-terminal-text">
-            <li>- Multi-timeframe chart workstation with indicators, delivery overlay, and automatic backfill.</li>
+            <li>- Multi-timeframe chart workstation with unified India/US OHLCV routing, indicator overlays, and automatic backfill.</li>
+            <li>- Live chart updates now support realtime tick-to-candle aggregation with continuous intrabar candle refresh.</li>
             <li>- Company intelligence stack: overview, scorecard, fundamentals, valuation, peers, reports.</li>
             <li>- Advanced panels: shareholding pattern + trend, capex tracker, and Python execution lab.</li>
-            <li>- Operational screens: screener, portfolio, watchlist, mutual funds, and news/sentiment monitor.</li>
-            <li>- US Market integration: NYSE/NASDAQ/AMEX support with US stock ticker search and routing.</li>
+            <li>- Operational screens: revamped screener (presets/saved/public screens + viz), portfolio, watchlist, mutual funds, and news/sentiment monitor.</li>
+            <li>- US market integration: NYSE/NASDAQ/AMEX support with market-aware symbol routing and normalized chart endpoint support.</li>
           </ul>
         </TerminalPanel>
 
         <TerminalPanel title="F&O Pack">
           <ul className="space-y-1 text-xs text-terminal-text">
             <li>- Option chain with Greeks + OI context for strike-level decision support.</li>
-            <li>- Futures terminal with shared chart/indicator engine and live quote sync.</li>
+            <li>- Futures terminal with shared chart/indicator engine, shared realtime quote stream, and synchronized ticker context.</li>
             <li>- Strategy builder, PCR analytics, heatmap, and expiry dashboards.</li>
-            <li>- Unified navigation and ticker context across Equity and F&O packs.</li>
+            <li>- Unified navigation and ticker context across Equity and F&O packs with cross-route symbol continuity.</li>
+            <li>- F&O screens inherit terminal shell/table primitives for denser, more consistent workflows.</li>
           </ul>
         </TerminalPanel>
       </div>
@@ -99,6 +101,8 @@ export function AboutPage() {
           <li>- Backtesting includes standalone 3D analytics: terrain, regimes, orderbook liquidity, IV surface, volatility surface, and Monte Carlo simulation.</li>
           <li>- Auth recovery upgraded with dedicated Forgot Access flow and backend reset endpoint.</li>
           <li>- Technical Screener upgraded with breakout scanner engine and real-time scanner alert delivery.</li>
+          <li>- Revamped Equity screener run flow hardened for multi-word filters and sparse-data fallback handling.</li>
+          <li>- Unified chart data path now auto-detects US vs India symbols when loading normalized chart history.</li>
           <li>- Risk Engine added: portfolio VaR/CVaR, backtest risk attribution, and configurable stress scenarios.</li>
           <li>- Execution Simulator: cost modeling (commission, slippage, spread, market impact) integrated into backtest runs.</li>
           <li>- OMS / Compliance dashboard: order management, restricted list, fill tracking, and audit log.</li>

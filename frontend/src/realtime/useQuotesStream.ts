@@ -15,22 +15,44 @@ export type QuoteTick = {
   ts: string;
 };
 
+export type QuoteCandle = {
+  token: string;
+  interval: string;
+  t: number; // ms epoch
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+  v: number;
+  status?: string;
+};
+
 type QuotesStore = {
   connectionState: QuotesConnectionState;
   ticksByToken: Record<string, QuoteTick>;
+  candlesByKey: Record<string, QuoteCandle>;
   setConnectionState: (state: QuotesConnectionState) => void;
   upsertTick: (tick: QuoteTick) => void;
+  upsertCandle: (candle: QuoteCandle) => void;
 };
 
 export const useQuotesStore = create<QuotesStore>((set) => ({
   connectionState: "disconnected",
   ticksByToken: {},
+  candlesByKey: {},
   setConnectionState: (connectionState) => set({ connectionState }),
   upsertTick: (tick) =>
     set((state) => ({
       ticksByToken: {
         ...state.ticksByToken,
         [tick.token]: tick,
+      },
+    })),
+  upsertCandle: (candle) =>
+    set((state) => ({
+      candlesByKey: {
+        ...state.candlesByKey,
+        [`${candle.token}|${candle.interval}`]: candle,
       },
     })),
 }));
@@ -130,7 +152,30 @@ class QuotesWsManager {
     ws.onmessage = (event) => {
       try {
         const payload = JSON.parse(String(event.data));
-        if (!payload || payload.type !== "tick" || typeof payload.symbol !== "string") return;
+        if (!payload || typeof payload.symbol !== "string") return;
+        if (payload.type === "candle") {
+          const interval = String(payload.interval || "").trim();
+          const t = Number(payload.t);
+          const o = Number(payload.o);
+          const h = Number(payload.h);
+          const l = Number(payload.l);
+          const c = Number(payload.c);
+          const v = Number(payload.v ?? 0);
+          if (!interval || ![t, o, h, l, c].every(Number.isFinite)) return;
+          useQuotesStore.getState().upsertCandle({
+            token: payload.symbol.toUpperCase(),
+            interval,
+            t,
+            o,
+            h,
+            l,
+            c,
+            v: Number.isFinite(v) ? v : 0,
+            status: typeof payload.status === "string" ? payload.status : undefined,
+          });
+          return;
+        }
+        if (payload.type !== "tick") return;
         const parsed = parseToken(payload.symbol);
         if (!parsed) return;
         const ltp = Number(payload.ltp);

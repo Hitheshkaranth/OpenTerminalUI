@@ -33,3 +33,4 @@ optuna
 statsmodels
 xgboost
 polygon-api-client
+websockets>=12.0

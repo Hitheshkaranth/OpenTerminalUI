@@ -150,6 +150,11 @@ export function NewsPanel({ symbol, market, limit = 14 }: Props) {
             rowKey={(row) => row.id}
             selectedIndex={selectedIndex}
             onRowSelect={setSelectedIndex}
+            onRowOpen={(idx) => {
+              const row = rows[idx];
+              if (row?.url) openNewsUrl(row.url);
+            }}
+            density="compact"
             emptyText="No news items"
             className="max-h-64"
             columns={[

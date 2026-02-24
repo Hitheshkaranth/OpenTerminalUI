@@ -23,17 +23,18 @@
 OpenTerminalUI is a terminal-style market analysis workspace organized around three connected operating areas:
 
 ### Equity & Fundamental Analysis Pack
-- **Chart Workstation** - multi-timeframe charts, indicator overlays, delivery overlay, and history backfill
+- **Chart Workstation** - multi-timeframe charts with unified India/US OHLCV routing, indicator overlays, delivery overlay, history backfill, and continuous live candle updates
 - **Company Analytics** - fundamentals, scorecards, trends, reports, valuation, peer comparison
 - **Advanced Research Widgets** - shareholding pattern panel (NSE + fallback), capex tracker, and in-app Python execution
-- **Operations Screens** - screener, portfolio, watchlist, mutual funds desk, settings, and news/sentiment flows
-- **US Market Integration** - NYSE/NASDAQ/AMEX market support with US stock ticker search and selection workflow
+- **Operations Screens** - revamped screener (presets/saved/public screens + viz), portfolio, watchlist, mutual funds desk, settings, and news/sentiment flows
+- **US Market Integration** - NYSE/NASDAQ/AMEX market support with market-aware symbol routing and normalized chart endpoint support
 
 ### Futures & Options (F&O) Analysis Pack
 - **Option Chain + Greeks + OI** - strike-level structure, Greeks, and open-interest context
 - **Strategy Builder** - multi-leg payoff analysis with preset templates
 - **PCR + Heatmap + Expiry Dashboards** - breadth, participation, and expiry-focused signals
-- **Futures Terminal** - shared chart/indicator stack with Equity for consistent workflow
+- **Futures Terminal** - shared chart/indicator stack + realtime quote stream with Equity for consistent workflow
+- **Unified Context** - cross-pack ticker/navigation continuity between Equity and F&O screens with common terminal shell primitives
 
 ### Backtesting Control Deck
 - **Asset + Capital Inputs** - user-defined asset and trade capital at run start
@@ -161,7 +162,11 @@ This screen shows the Momentum Rotation Backtest workflow: ticker universe input
 
 ![Stock Screen](assets/Stock_Screen.png)
 
-This view highlights the terminal-style stock analysis layout with charting, indicator context, and market data panels. It is intended to keep symbol search, analytics, and execution-relevant signals on one screen for faster decision flow.
+This view highlights the terminal-style Equity workspace with charting, indicator context, and market data panels. Recent upgrades include normalized India/US chart routing, realtime candle updates from the quote stream, and a hardened screener/chart data pipeline for more reliable symbol switching.
+
+### F&O Analysis Workspace
+
+The F&O screens share the same terminal shell and chart/quote context as Equity. Recent updates focus on tighter Equity↔F&O ticker continuity, denser table/panel primitives, and consistent realtime quote behavior across option chain and futures workflows.
 
 ## Repository structure
 

@@ -32,6 +32,71 @@ class ScreenerV2RunRequest(BaseModel):
     universe: str = "nse_eq"
     sector_neutral: bool = False
 
+
+async def _hydrate_missing_screener_rows(
+    tickers: list[str],
+    warnings: list[dict[str, str]],
+    refresh_cap: int = 30,
+) -> tuple[pd.DataFrame, int]:
+    df = load_screener_df(tickers)
+    if df.empty:
+        stored_tickers: set[str] = set()
+    else:
+        stored_tickers = set(df["ticker"].astype(str).str.upper())
+
+    missing = [t for t in tickers if t not in stored_tickers]
+    if not missing:
+        return df, 0
+
+    refresh_batch = missing[:refresh_cap]
+    if len(missing) > len(refresh_batch):
+        warnings.append(
+            {
+                "code": "screener_partial_refresh",
+                "message": f"Refreshing {len(refresh_batch)} of {len(missing)} missing symbols.",
+            }
+        )
+
+    sem = asyncio.Semaphore(16)
+
+    async def _fetch_row(sym: str) -> Optional[dict[str, Any]]:
+        async with sem:
+            try:
+                snap = await fetch_stock_snapshot_coalesced(sym)
+                if not snap:
+                    return None
+                return {
+                    "ticker": sym,
+                    "company_name": snap.get("company_name"),
+                    "sector": snap.get("sector"),
+                    "industry": snap.get("industry"),
+                    "current_price": snap.get("current_price"),
+                    "market_cap": snap.get("market_cap"),
+                    "pe": snap.get("pe"),
+                    "pb_calc": None,
+                    "ps_calc": None,
+                    "ev_ebitda": None,
+                    "roe_pct": None,
+                    "roa_pct": None,
+                    "op_margin_pct": None,
+                    "net_margin_pct": None,
+                    "rev_growth_pct": None,
+                    "eps_growth_pct": None,
+                    "beta": snap.get("beta"),
+                    "piotroski_f_score": None,
+                    "altman_z_score": None,
+                }
+            except Exception:
+                return None
+
+    fetched = await asyncio.gather(*(_fetch_row(t) for t in refresh_batch))
+    rows = [r for r in fetched if r is not None]
+    skipped = len(refresh_batch) - len(rows)
+    if rows:
+        upsert_screener_rows(rows)
+        df = load_screener_df(tickers)
+    return df, skipped
+
 def _load_universe(universe: str) -> List[str]:
     path = DATA_DIR / ("nse_equity_symbols_eq.txt" if universe == "nse_eq" else "sample_tickers.txt")
     if not path.exists():
@@ -60,55 +125,8 @@ async def run_screener(request: ScreenerRunRequest) -> ScreenerRunResponse:
 
     df = load_screener_df(tickers)
 
-    stored_tickers = set(df["ticker"].astype(str).str.upper()) if not df.empty else set()
-    missing = [t for t in tickers if t not in stored_tickers]
-
-    if missing:
-        refresh_batch = missing[:30]
-        if len(missing) > len(refresh_batch):
-             warnings.append({
-                "code": "screener_partial_refresh",
-                "message": f"Refreshing {len(refresh_batch)} of {len(missing)} missing symbols."
-            })
-
-        sem = asyncio.Semaphore(16)
-
-        async def _fetch_row(sym: str) -> Optional[dict]:
-            async with sem:
-                try:
-                    snap = await fetch_stock_snapshot_coalesced(sym)
-                    if not snap: return None
-                    return {
-                        "ticker": sym,
-                        "company_name": snap.get("company_name"),
-                        "sector": snap.get("sector"),
-                        "industry": snap.get("industry"),
-                        "current_price": snap.get("current_price"),
-                        "market_cap": snap.get("market_cap"),
-                        "pe": snap.get("pe"),
-                        "pb_calc": None,
-                        "ps_calc": None,
-                        "ev_ebitda": None, # Ideally fetch these
-                        "roe_pct": None,
-                        "roa_pct": None,
-                        "op_margin_pct": None,
-                        "net_margin_pct": None,
-                        "rev_growth_pct": None,
-                        "eps_growth_pct": None,
-                        "beta": snap.get("beta"),
-                        "piotroski_f_score": None,
-                        "altman_z_score": None,
-                    }
-                except Exception:
-                    return None
-
-        fetched = await asyncio.gather(*(_fetch_row(t) for t in refresh_batch))
-        rows = [r for r in fetched if r is not None]
-        skipped += len(refresh_batch) - len(rows)
-
-        if rows:
-            upsert_screener_rows(rows)
-            df = load_screener_df(tickers)
+    df, newly_skipped = await _hydrate_missing_screener_rows(tickers, warnings, refresh_cap=30)
+    skipped += newly_skipped
 
     if df.empty:
         return ScreenerRunResponse(count=0, rows=[], meta={"warnings": warnings + [{"code": "screener_empty", "message": "No data available."}]})
@@ -154,7 +172,7 @@ async def run_screener_v2(request: ScreenerV2RunRequest) -> dict[str, Any]:
             }
         )
 
-    df = load_screener_df(tickers)
+    df, _ = await _hydrate_missing_screener_rows(tickers, warnings, refresh_cap=40)
     if df.empty:
         return {"count": 0, "rows": [], "meta": {"warnings": warnings}}
 
@@ -205,3 +223,7 @@ async def run_screener_v2(request: ScreenerV2RunRequest) -> dict[str, Any]:
             "heatmap": heatmap,
         },
     }
+
+@router.get("/screener/run-v2")
+async def get_run_screener_v2() -> dict[str, Any]:
+    return await run_screener_v2(ScreenerV2RunRequest(rules=[], factors=[]))

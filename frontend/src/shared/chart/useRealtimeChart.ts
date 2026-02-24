@@ -34,6 +34,13 @@ function normalizeBars(input: Bar[]): Bar[] {
   return Array.from(byTime.values()).sort((a, b) => Number(a.time) - Number(b.time));
 }
 
+function wsCandleInterval(timeframe: ChartTimeframe): string | null {
+  if (timeframe === "1m") return "1m";
+  if (timeframe === "5m") return "5m";
+  if (timeframe === "15m") return "15m";
+  return null;
+}
+
 export function useRealtimeChart(
   market: string,
   symbol: string,
@@ -44,6 +51,8 @@ export function useRealtimeChart(
   const token = `${market.toUpperCase()}:${symbol.toUpperCase()}`;
   const { subscribe, unsubscribe } = useQuotesStream(market);
   const tick = useQuotesStore((s) => s.ticksByToken[token]);
+  const candleInterval = wsCandleInterval(timeframe);
+  const liveCandle = useQuotesStore((s) => (candleInterval ? s.candlesByKey[`${token}|${candleInterval}`] : undefined));
   const [bars, setBars] = useState<Bar[]>(normalizeBars(seedBars));
 
   useEffect(() => {
@@ -57,7 +66,40 @@ export function useRealtimeChart(
   }, [enabled, subscribe, symbol, unsubscribe]);
 
   useEffect(() => {
+    if (!enabled || !liveCandle || !candleInterval) return;
+    const t = Math.floor(Number(liveCandle.t) / 1000);
+    if (!Number.isFinite(t) || t <= 0) return;
+    const nextBar: Bar = {
+      time: t,
+      open: Number(liveCandle.o),
+      high: Number(liveCandle.h),
+      low: Number(liveCandle.l),
+      close: Number(liveCandle.c),
+      volume: Number.isFinite(Number(liveCandle.v)) ? Number(liveCandle.v) : 0,
+    };
+    if (![nextBar.open, nextBar.high, nextBar.low, nextBar.close].every(Number.isFinite)) return;
+    setBars((prev) => {
+      if (!prev.length) return [nextBar];
+      const next = [...prev];
+      const last = next[next.length - 1];
+      if (Number(last.time) === t) {
+        next[next.length - 1] = nextBar;
+        return next;
+      }
+      if (Number(last.time) > t) {
+        const idx = next.findIndex((b) => Number(b.time) === t);
+        if (idx >= 0) {
+          next[idx] = nextBar;
+        }
+        return next;
+      }
+      return [...next, nextBar];
+    });
+  }, [candleInterval, enabled, liveCandle]);
+
+  useEffect(() => {
     if (!enabled || !tick || !Number.isFinite(Number(tick.ltp))) return;
+    if (candleInterval) return; // Prefer server-built candles for supported intraday intervals.
     const ts = Math.floor(new Date(tick.ts).getTime() / 1000);
     if (!Number.isFinite(ts) || ts <= 0) return;
     const t = candleBoundary(ts, timeframe);
@@ -107,7 +149,7 @@ export function useRealtimeChart(
         },
       ];
     });
-  }, [enabled, tick, timeframe]);
+  }, [candleInterval, enabled, tick, timeframe]);
 
   const liveTick = useMemo(
     () =>

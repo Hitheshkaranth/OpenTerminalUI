@@ -1,4 +1,5 @@
 import axios from "axios";
+import { fetchChartData } from "../services/chartDataService";
 
 import type {
   ChartResponse,
@@ -41,7 +42,11 @@ import type {
   ScannerResult,
   ScannerRun,
   ShareholdingPatternResponse,
+  ScreenerPresetV3,
+  ScreenerRunRequestV3,
+  ScreenerRunResponseV3,
   StockSnapshot,
+  UserScreenV3,
   WatchlistItem,
   AlertRule,
   AlertTriggerEvent,
@@ -90,6 +95,33 @@ export async function getHistory(
   limit?: number,
   cursor?: number,
 ): Promise<ChartResponse> {
+  // Use unified OHLCV endpoint for normal chart loads/timeframe switches.
+  // Keep legacy route for backfill pagination (`limit`/`cursor`).
+  if (!limit && !cursor) {
+    try {
+      const unified = await fetchChartData(symbol, {
+        market,
+        interval,
+        period: range,
+      });
+      return {
+        ticker: symbol.toUpperCase(),
+        interval,
+        currency: market.toUpperCase() === "NSE" || market.toUpperCase() === "BSE" ? "INR" : "USD",
+        data: (Array.isArray(unified.data) ? unified.data : []).map((row) => ({
+          t: Math.floor(Number(row.t) / 1000),
+          o: Number(row.o),
+          h: Number(row.h),
+          l: Number(row.l),
+          c: Number(row.c),
+          v: Number(row.v ?? 0),
+        })),
+        meta: { warnings: [] },
+      } as ChartResponse;
+    } catch {
+      // Fall back to legacy endpoint below.
+    }
+  }
   const { data } = await api.get<ChartResponse>(`/chart/${symbol}`, { params: { market, interval, range, limit, cursor } });
   return data;
 }
@@ -215,6 +247,90 @@ export async function createScannerAlertRule(payload: {
   meta_json?: Record<string, unknown>;
 }): Promise<void> {
   await api.post("/v1/alerts/scanner-rules", payload);
+}
+
+export async function fetchScreenerPresetsV3(): Promise<ScreenerPresetV3[]> {
+  const { data } = await api.get<{ items: ScreenerPresetV3[] }>("/screener/presets");
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchScreenerPresetV3(id: string): Promise<ScreenerPresetV3> {
+  const { data } = await api.get<ScreenerPresetV3>(`/screener/presets/${encodeURIComponent(id)}`);
+  return data;
+}
+
+export async function runScreenerV3(payload: ScreenerRunRequestV3): Promise<ScreenerRunResponseV3> {
+  const { data } = await api.post<ScreenerRunResponseV3>("/screener/run-revamped", payload, { timeout: 120000 });
+  return data;
+}
+
+export async function fetchScreenerFieldsV3(): Promise<Array<Record<string, string>>> {
+  const { data } = await api.get<{ items: Array<Record<string, string>> }>("/screener/fields");
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchScreenerUniversesV3(): Promise<Array<{ id: string; name: string }>> {
+  const { data } = await api.get<{ items: Array<{ id: string; name: string }> }>("/screener/universes");
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchSavedScreensV3(): Promise<UserScreenV3[]> {
+  const { data } = await api.get<{ items: UserScreenV3[] }>("/screener/screens");
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function createSavedScreenV3(payload: {
+  name: string;
+  description?: string;
+  query: string;
+  columns_config?: string[];
+  viz_config?: Record<string, unknown>;
+  is_public?: boolean;
+}): Promise<UserScreenV3> {
+  const { data } = await api.post<UserScreenV3>("/screener/screens", payload);
+  return data;
+}
+
+export async function updateSavedScreenV3(
+  id: string,
+  payload: {
+    name: string;
+    description?: string;
+    query: string;
+    columns_config?: string[];
+    viz_config?: Record<string, unknown>;
+    is_public?: boolean;
+  },
+): Promise<UserScreenV3> {
+  const { data } = await api.put<UserScreenV3>(`/screener/screens/${encodeURIComponent(id)}`, payload);
+  return data;
+}
+
+export async function deleteSavedScreenV3(id: string): Promise<void> {
+  await api.delete(`/screener/screens/${encodeURIComponent(id)}`);
+}
+
+export async function fetchPublicScreensV3(limit = 50, offset = 0): Promise<UserScreenV3[]> {
+  const { data } = await api.get<{ items: UserScreenV3[] }>("/screener/public", { params: { limit, offset } });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function publishScreenV3(id: string): Promise<UserScreenV3> {
+  const { data } = await api.post<UserScreenV3>(`/screener/screens/${encodeURIComponent(id)}/publish`);
+  return data;
+}
+
+export async function forkPublicScreenV3(id: string): Promise<UserScreenV3> {
+  const { data } = await api.post<UserScreenV3>(`/screener/screens/${encodeURIComponent(id)}/fork`);
+  return data;
+}
+
+export async function exportScreenerV3(
+  format: "csv" | "xlsx" | "pdf",
+  payload: { rows: Array<Record<string, unknown>>; columns?: string[]; title?: string },
+): Promise<Blob> {
+  const { data } = await api.post(`/screener/export/${format}`, payload, { responseType: "blob" });
+  return data as Blob;
 }
 
 export async function fetchActiveDataVersion(): Promise<DataVersion> {

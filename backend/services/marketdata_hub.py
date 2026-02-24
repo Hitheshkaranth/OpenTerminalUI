@@ -10,10 +10,12 @@ from typing import Any
 from fastapi import WebSocket
 
 from backend.api.deps import get_unified_fetcher
-from backend.services.instrument_map import get_instrument_map_service
-from backend.services.kite_stream import KiteStreamAdapter
 from backend.core.ttl_policy import market_open_now
 from backend.fno.services.option_chain_fetcher import get_option_chain_fetcher
+from backend.services.candle_aggregator import CandleAggregator
+from backend.services.finnhub_ws import FinnhubWebSocket
+from backend.services.instrument_map import get_instrument_map_service
+from backend.services.kite_stream import KiteStreamAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,29 @@ NFO_FUT_RE = re.compile(r"^([A-Z]+)\d{2}[A-Z]{3}FUT$")
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _parse_tick_ts(value: Any) -> datetime:
+    if isinstance(value, str):
+        text = value.strip()
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        try:
+            parsed = datetime.fromisoformat(text)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc)
+        except Exception:
+            pass
+    if isinstance(value, (int, float)):
+        ts = float(value)
+        if ts > 1e12:
+            ts /= 1000.0
+        try:
+            return datetime.fromtimestamp(ts, tz=timezone.utc)
+        except Exception:
+            pass
+    return datetime.now(timezone.utc)
 
 
 def _to_float(value: Any) -> float | None:
@@ -63,6 +88,9 @@ class MarketDataHub:
         self._nfo_quote_cache: dict[str, dict[str, Any]] = {}
         self._tick_listeners: list = []
         self._alert_connections: set[WebSocket] = set()
+        self._candle_aggregator = CandleAggregator()
+        self._finnhub_ws = FinnhubWebSocket(self._on_finnhub_trade)
+        self.register_tick_listener(self._on_tick_for_candles)
 
     async def start(self) -> None:
         async with self._lock:
@@ -77,6 +105,7 @@ class MarketDataHub:
 
         self._kite_stream = KiteStreamAdapter(fetcher.kite, self._on_kite_tick)
         await self._kite_stream.start()
+        await self._finnhub_ws.start()
         await self._sync_stream_subscriptions()
         logger.info("MarketDataHub started")
 
@@ -93,6 +122,7 @@ class MarketDataHub:
             self._stream_token_to_symbol.clear()
             self._nfo_chain_last_fetch.clear()
             self._nfo_quote_cache.clear()
+            finnhub_ws = self._finnhub_ws
 
         if task:
             task.cancel()
@@ -104,6 +134,8 @@ class MarketDataHub:
         if self._kite_stream:
             await self._kite_stream.stop()
             self._kite_stream = None
+        if finnhub_ws:
+            await finnhub_ws.stop()
 
         for ws in sockets:
             try:
@@ -186,6 +218,18 @@ class MarketDataHub:
             logger.debug("Dropped %s stale WS clients", len(stale))
             await self._sync_stream_subscriptions()
 
+    async def _broadcast_candle(self, symbol: str, interval: str, candle: dict[str, Any], status: str = "closed") -> None:
+        await self.broadcast(
+            symbol,
+            {
+                "type": "candle",
+                "symbol": symbol,
+                "interval": interval,
+                "status": status,
+                **candle,
+            },
+        )
+
     async def register_alert_socket(self, websocket: WebSocket) -> None:
         await self.start()
         async with self._lock:
@@ -249,6 +293,13 @@ class MarketDataHub:
 
     async def _sync_stream_subscriptions(self) -> None:
         if not self._kite_stream or not self._kite_stream.enabled:
+            subscriptions = await self._union_subscriptions()
+            us_symbols = {
+                token.split(":", 1)[1]
+                for token in subscriptions
+                if ":" in token and token.split(":", 1)[0] in US_MARKETS
+            }
+            await self._finnhub_ws.set_symbols(us_symbols)
             return
         async with self._stream_sync_lock:
             subscriptions = await self._union_subscriptions()
@@ -259,6 +310,12 @@ class MarketDataHub:
             async with self._lock:
                 self._stream_symbols_to_token = {k: int(v) for k, v in mapping.items()}
                 self._stream_token_to_symbol = {int(v): k for k, v in mapping.items()}
+            us_symbols = {
+                token.split(":", 1)[1]
+                for token in subscriptions
+                if ":" in token and token.split(":", 1)[0] in US_MARKETS
+            }
+            await self._finnhub_ws.set_symbols(us_symbols)
 
     async def _poll_loop(self) -> None:
         try:
@@ -270,6 +327,8 @@ class MarketDataHub:
                     if stream_connected:
                         async with self._lock:
                             stream_symbols = set(self._stream_symbols_to_token.keys())
+                    if self._finnhub_ws.connected:
+                        stream_symbols.update({t for t in tokens if t.split(":", 1)[0] in US_MARKETS})
                     poll_tokens = sorted(tokens - stream_symbols)
                     if poll_tokens:
                         ticks = await self._fetch_ticks(poll_tokens)
@@ -312,6 +371,44 @@ class MarketDataHub:
         }
         await self.broadcast(symbol, payload)
         await self._emit_tick(payload)
+
+    async def _on_finnhub_trade(self, raw_symbol: str, price: float, volume: float, ts_ms: int) -> None:
+        symbol_candidates: set[str] = set()
+        suffix = f":{raw_symbol.strip().upper()}"
+        async with self._lock:
+            for subs in self._connections.values():
+                for token in subs:
+                    if token.endswith(suffix) and token.split(":", 1)[0] in US_MARKETS:
+                        symbol_candidates.add(token)
+        if not symbol_candidates:
+            symbol_candidates.add(f"NASDAQ:{raw_symbol.strip().upper()}")
+        ts_iso = datetime.fromtimestamp(ts_ms / 1000.0, tz=timezone.utc).isoformat()
+        for symbol_token in sorted(symbol_candidates):
+            payload = {
+                "type": "tick",
+                "symbol": symbol_token,
+                "ltp": float(price),
+                "change": 0.0,
+                "change_pct": 0.0,
+                "oi": None,
+                "volume": float(volume),
+                "ts": ts_iso,
+            }
+            await self.broadcast(symbol_token, payload)
+            await self._emit_tick(payload)
+
+    async def _on_tick_for_candles(self, payload: dict[str, Any]) -> None:
+        symbol = str(payload.get("symbol") or "").strip().upper()
+        ltp = _to_float(payload.get("ltp"))
+        if not symbol or ltp is None:
+            return
+        volume = _to_float(payload.get("volume")) or 0.0
+        ts = _parse_tick_ts(payload.get("ts"))
+        completed = self._candle_aggregator.on_tick(symbol, ltp, volume, ts)
+        for sym, interval, candle in completed:
+            await self._broadcast_candle(sym, interval, candle, status="closed")
+        for sym, interval, candle in self._candle_aggregator.current_candles(symbol):
+            await self._broadcast_candle(sym, interval, candle, status="partial")
 
     async def _fetch_ticks(self, tokens: list[str]) -> dict[str, dict[str, Any]]:
         fetcher = await get_unified_fetcher()

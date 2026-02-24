@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { PanelBody, PanelFooter, PanelFrame, PanelHeader } from "../layout/PanelChrome";
 
 type Props = {
   title?: string;
@@ -7,21 +8,25 @@ type Props = {
   children: ReactNode;
   className?: string;
   bodyClassName?: string;
+  footer?: ReactNode;
+  footerClassName?: string;
 };
 
-export function TerminalPanel({ title, subtitle, actions, children, className = "", bodyClassName = "" }: Props) {
+export function TerminalPanel({
+  title,
+  subtitle,
+  actions,
+  children,
+  className = "",
+  bodyClassName = "",
+  footer,
+  footerClassName = "",
+}: Props) {
   return (
-    <section className={`rounded-sm border border-terminal-border bg-terminal-panel ${className}`.trim()}>
-      {(title || subtitle || actions) && (
-        <header className="flex items-center justify-between border-b border-terminal-border px-2 py-1">
-          <div className="min-w-0">
-            {title && <div className="text-[11px] font-semibold uppercase tracking-wide text-terminal-accent">{title}</div>}
-            {subtitle && <div className="truncate text-[10px] uppercase tracking-wide text-terminal-muted">{subtitle}</div>}
-          </div>
-          {actions && <div className="ml-2 shrink-0">{actions}</div>}
-        </header>
-      )}
-      <div className={`p-2 ${bodyClassName}`.trim()}>{children}</div>
-    </section>
+    <PanelFrame className={className}>
+      <PanelHeader title={title} subtitle={subtitle} actions={actions} />
+      <PanelBody className={bodyClassName}>{children}</PanelBody>
+      {footer ? <PanelFooter className={footerClassName}>{footer}</PanelFooter> : null}
+    </PanelFrame>
   );
 }

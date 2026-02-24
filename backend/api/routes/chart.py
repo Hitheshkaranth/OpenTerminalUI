@@ -3,14 +3,14 @@ from __future__ import annotations
 import math
 import random
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from backend.api.deps import cache_instance, get_unified_fetcher
+from backend.api.deps import cache_instance, get_chart_provider, get_unified_fetcher
 from backend.api.deps import get_db
 from backend.auth.deps import get_current_user
 from backend.core.models import ChartResponse, IndicatorPoint, IndicatorResponse, OhlcvPoint
@@ -137,15 +137,80 @@ def _parse_yahoo_chart(data: Dict[str, Any]) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-@router.get("/chart/{ticker}", response_model=ChartResponse)
+@router.get("/chart/{ticker}")
 async def get_chart(
     ticker: str,
-    market: str = Query(default="NSE"),
+    market: str | None = Query(default=None),
     interval: str = Query(default="1d"),
     range: str = Query(default="1y"),
+    period: Optional[str] = Query(default=None),
+    start: Optional[str] = Query(default=None),
+    end: Optional[str] = Query(default=None),
+    normalized: bool = Query(default=False),
     limit: int | None = Query(default=None, ge=1, le=5000),
     cursor: int | None = Query(default=None),
-) -> ChartResponse:
+) -> Any:
+    # Direct function calls in unit tests bypass FastAPI dependency parsing and can leave
+    # `Query(...)` sentinel objects in parameters.
+    if not isinstance(market, str):
+        market = None
+    if not isinstance(interval, str):
+        interval = "1d"
+    if not isinstance(range, str):
+        range = "1y"
+    if not isinstance(period, str):
+        period = None
+    if not isinstance(start, str):
+        start = None
+    if not isinstance(end, str):
+        end = None
+    if not isinstance(normalized, bool):
+        normalized = False
+
+    # Unified OHLCV branch for the new chart workstation endpoint contract.
+    # Keep the legacy ChartResponse branch below intact for pagination/backfill consumers.
+    if normalized or period is not None or start is not None or end is not None:
+        provider = await get_chart_provider()
+        start_dt = None
+        end_dt = None
+        try:
+            if start:
+                s = start[:-1] + "+00:00" if start.endswith("Z") else start
+                start_dt = datetime.fromisoformat(s)
+            if end:
+                e = end[:-1] + "+00:00" if end.endswith("Z") else end
+                end_dt = datetime.fromisoformat(e)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid ISO date: {exc}") from exc
+
+        bars = await provider.get_ohlcv(
+            ticker,
+            interval=interval,
+            period=period or range or "6mo",
+            start=start_dt,
+            end=end_dt,
+            market_hint=market,
+        )
+        return {
+            "symbol": ticker.upper(),
+            "interval": interval,
+            "count": len(bars),
+            "market_hint": (market or "").upper(),
+            "data": [
+                {
+                    "t": int((b.timestamp if b.timestamp.tzinfo else b.timestamp.replace(tzinfo=timezone.utc)).timestamp() * 1000),
+                    "o": float(b.open),
+                    "h": float(b.high),
+                    "l": float(b.low),
+                    "c": float(b.close),
+                    "v": float(b.volume),
+                }
+                for b in bars
+            ],
+        }
+
+    if not market:
+        market = "NSE"
     key = cache_instance.build_key("chart", ticker.upper(), {"i": interval, "r": range})
     cached = await cache_instance.get(key)
     if cached:

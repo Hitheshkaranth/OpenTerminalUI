@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import time
 from typing import Any, Dict, Optional
 from urllib.parse import urlencode
+from datetime import datetime
 
 import httpx
 
@@ -27,6 +29,7 @@ class KiteClient:
         self.access_token = access_token or os.getenv("KITE_ACCESS_TOKEN", "")
         self.timeout = timeout
         self.client: Optional[httpx.AsyncClient] = None
+        self._last_auth_error_log_at = 0.0
 
     async def initialize(self) -> None:
         if self.client:
@@ -82,6 +85,16 @@ class KiteClient:
             )
             response.raise_for_status()
             return response.json()
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            if status in {401, 403}:
+                now = time.time()
+                if (now - self._last_auth_error_log_at) >= 60:
+                    logger.warning("Kite auth/permission failure for %s (HTTP %s): %s", endpoint, status, exc)
+                    self._last_auth_error_log_at = now
+                return {}
+            logger.error("Kite GET failed for %s: %s", endpoint, exc)
+            return {}
         except Exception as exc:
             logger.error("Kite GET failed for %s: %s", endpoint, exc)
             return {}
@@ -126,3 +139,23 @@ class KiteClient:
             return {}
         params = [("i", ins.strip()) for ins in instruments if ins.strip()]
         return await self._get("/quote", access_token, params=params)
+
+    async def get_historical_data(
+        self,
+        access_token: str,
+        instrument_token: int,
+        start: datetime,
+        end: datetime,
+        interval: str,
+    ) -> Dict[str, Any]:
+        params = {
+            "from": start.isoformat(),
+            "to": end.isoformat(),
+            "continuous": 0,
+            "oi": 1,
+        }
+        return await self._get(
+            f"/instruments/historical/{int(instrument_token)}/{interval}",
+            access_token,
+            params=params,
+        )

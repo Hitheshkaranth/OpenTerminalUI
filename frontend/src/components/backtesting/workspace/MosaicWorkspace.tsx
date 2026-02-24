@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { CommandBar } from "./CommandBar";
 import { loadLayout, saveLayout } from "./layoutStore";
 import { PANEL_LABELS, renderPanel, type PanelId, type PanelRendererMap } from "./PanelRegistry";
+import { SplitPane } from "../../layout/SplitPane";
 
 type MosaicWorkspaceProps = {
   renderers: PanelRendererMap;
@@ -30,6 +31,8 @@ export function MosaicWorkspace({ renderers, onCommand }: MosaicWorkspaceProps) 
   const [catalogOpen, setCatalogOpen] = useState(false);
 
   const visiblePanels = layout.slice(0, 4);
+  const leftPanels = visiblePanels.slice(0, 2);
+  const rightPanels = visiblePanels.slice(2, 4);
   const addPanel = (panel: PanelId) => {
     if (layout.includes(panel)) return;
     const next = [...layout, panel];
@@ -83,9 +86,9 @@ export function MosaicWorkspace({ renderers, onCommand }: MosaicWorkspaceProps) 
         </div>
       )}
       <div className="h-[72vh] min-h-[520px] rounded border border-terminal-border/40 bg-terminal-bg/50 p-1">
-        <div className="grid h-full grid-cols-1 gap-2 md:grid-cols-2">
+        <div className="grid h-full grid-cols-1 gap-2 md:hidden">
           {visiblePanels.map((id) => (
-            <div key={`tile-${id}`} className="relative min-h-0 overflow-hidden rounded border border-terminal-border/40">
+            <div key={`tile-mobile-${id}`} className="relative min-h-0 overflow-hidden rounded border border-terminal-border/40">
               <button
                 className="absolute right-2 top-2 z-10 rounded border border-terminal-border bg-terminal-bg px-1 py-0.5 text-[10px] text-terminal-muted hover:text-terminal-neg"
                 onClick={() => removePanel(id)}
@@ -95,6 +98,51 @@ export function MosaicWorkspace({ renderers, onCommand }: MosaicWorkspaceProps) 
               {renderPanel(id, renderers)}
             </div>
           ))}
+        </div>
+        <div className="hidden h-full md:block">
+          <SplitPane
+            orientation="vertical"
+            initialRatio={50}
+            minPrimaryPct={30}
+            minSecondaryPct={30}
+            storageKey="backtesting:mosaic:split:vertical"
+            primary={
+              <div className="grid h-full grid-rows-2 gap-2 pr-1">
+                {leftPanels.map((id) => (
+                  <div key={`left-${id}`} className="relative min-h-0 overflow-hidden rounded border border-terminal-border/40">
+                    <button
+                      className="absolute right-2 top-2 z-10 rounded border border-terminal-border bg-terminal-bg px-1 py-0.5 text-[10px] text-terminal-muted hover:text-terminal-neg"
+                      onClick={() => removePanel(id)}
+                    >
+                      x
+                    </button>
+                    {renderPanel(id, renderers)}
+                  </div>
+                ))}
+              </div>
+            }
+            secondary={
+              <div className="grid h-full grid-rows-2 gap-2 pl-1">
+                {rightPanels.length ? (
+                  rightPanels.map((id) => (
+                    <div key={`right-${id}`} className="relative min-h-0 overflow-hidden rounded border border-terminal-border/40">
+                      <button
+                        className="absolute right-2 top-2 z-10 rounded border border-terminal-border bg-terminal-bg px-1 py-0.5 text-[10px] text-terminal-muted hover:text-terminal-neg"
+                        onClick={() => removePanel(id)}
+                      >
+                        x
+                      </button>
+                      {renderPanel(id, renderers)}
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded border border-dashed border-terminal-border/60 p-3 ot-type-ui text-xs text-terminal-muted">
+                    Add more panels from Panel Catalog to populate the second column.
+                  </div>
+                )}
+              </div>
+            }
+          />
         </div>
       </div>
     </div>

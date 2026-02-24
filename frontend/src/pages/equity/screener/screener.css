@@ -1,0 +1,63 @@
+.screener-page {
+  --bg-primary: #0a0e14;
+  --bg-secondary: #111620;
+  --bg-tertiary: #1a1f2e;
+  --border: #2a2f3e;
+  --text-primary: #e0e0e0;
+  --text-secondary: #8892a4;
+  --accent-green: #00e676;
+  --accent-red: #ff5252;
+  --accent-blue: #448aff;
+  --accent-amber: #ffd740;
+  --accent-cyan: #18ffff;
+  color: var(--text-primary);
+}
+
+.screener-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.screener-row:hover {
+  background: var(--bg-tertiary);
+}
+
+.screener-row:nth-child(even) {
+  background: rgba(26, 31, 46, 0.3);
+}
+
+.badge-high {
+  background: rgba(0, 230, 118, 0.15);
+  color: var(--accent-green);
+}
+
+.badge-mid {
+  background: rgba(255, 215, 64, 0.15);
+  color: var(--accent-amber);
+}
+
+.badge-low {
+  background: rgba(255, 82, 82, 0.15);
+  color: var(--accent-red);
+}
+
+.query-input {
+  width: 100%;
+  min-height: 88px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #0f1320;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  padding: 8px;
+}
+
+.chip {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}

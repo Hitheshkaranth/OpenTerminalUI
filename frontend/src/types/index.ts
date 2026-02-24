@@ -848,5 +848,52 @@ export type EarningsAnalysis = {
   avg_eps_surprise_pct: number;
 };
 
+export type ScreenerPresetV3 = {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  query: string;
+  default_sort?: string;
+  columns: string[];
+  model_scores: string[];
+  viz_config: Record<string, unknown>;
+};
+
+export type ScreenerRunRequestV3 = {
+  query?: string;
+  preset_id?: string;
+  universe: string;
+  sort_by?: string;
+  sort_order?: "asc" | "desc";
+  limit: number;
+  offset: number;
+  columns?: string[];
+  include_sparklines?: boolean;
+  include_scores?: string[];
+};
+
+export type ScreenerRunResponseV3 = {
+  total_results: number;
+  query_parsed: string;
+  execution_time_ms: number;
+  results: Array<Record<string, unknown>>;
+  viz_data: Record<string, unknown>;
+};
+
+export type UserScreenV3 = {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string;
+  query: string;
+  columns_config: string[];
+  viz_config: Record<string, unknown>;
+  is_public: boolean;
+  upvotes: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export * from "./markets";
 export * from "./financialReports";
