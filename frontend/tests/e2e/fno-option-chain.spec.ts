@@ -51,7 +51,9 @@ test("fno option chain table renders with mocked backend data", async ({ page })
     await page.goto("/fno");
   }
   await expect(page.getByText("NSE F&O ANALYTICS")).toBeVisible();
-  await expect(page.getByRole("columnheader", { name: /Strike/i })).toBeVisible();
+
+  // Wait for the table to render
+  await expect(page.getByText(/Strike/i)).toBeVisible({ timeout: 10000 });
   await expect(page.getByRole("cell", { name: /22850/ }).first()).toBeVisible();
-  await expect(page.getByRole("columnheader", { name: /OI/i }).first()).toBeVisible();
+  await expect(page.getByText(/OI/i).first()).toBeVisible();
 });

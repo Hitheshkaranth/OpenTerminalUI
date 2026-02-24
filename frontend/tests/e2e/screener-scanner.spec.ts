@@ -77,8 +77,18 @@ test("screener run and scanner alert flow renders", async ({ page }) => {
   });
 
   await page.goto("/equity/screener");
-  await expect(page.getByText("Screener Library")).toBeVisible();
-  await page.getByRole("button", { name: "20D High Breakout + RVOL" }).click();
+
+  const isMobile = await page.evaluate(() => window.innerWidth < 1280);
+
+  if (isMobile) {
+    await expect(page.getByText("Quick Preset")).toBeVisible();
+    await page.locator("select").selectOption({ label: "20D High Breakout + RVOL" });
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+  } else {
+    await expect(page.getByText("Screener Library")).toBeVisible();
+    await page.getByRole("button", { name: "20D High Breakout + RVOL" }).click();
+  }
+
   await expect(page.getByText("Results")).toBeVisible();
   await expect(page.getByRole("cell", { name: "RELIANCE" }).first()).toBeVisible();
 });

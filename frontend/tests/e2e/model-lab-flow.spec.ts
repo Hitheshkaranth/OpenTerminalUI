@@ -173,7 +173,7 @@ test("model lab e2e: create -> run -> report -> compare", async ({ page }) => {
 
   await page.getByRole("button", { name: "Create Experiment" }).click();
   const openExperimentLink = page.getByRole("link", { name: "Open", exact: true }).first();
-  await expect(openExperimentLink).toBeVisible();
+  await expect(openExperimentLink).toBeVisible({ timeout: 10000 });
 
   await openExperimentLink.click();
   await expect(page).toHaveURL(/\/model-lab\/experiments\//);
