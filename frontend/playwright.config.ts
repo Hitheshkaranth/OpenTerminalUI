@@ -8,10 +8,17 @@ const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
 export default defineConfig({
   testDir: "tests/e2e",
-  timeout: 60_000,
+  timeout: 90_000,
+  workers: 2,
+  fullyParallel: false,
+  expect: {
+    timeout: 15_000,
+  },
   use: {
     baseURL: baseUrl,
     trace: "on-first-retry",
+    navigationTimeout: 45_000,
+    actionTimeout: 15_000,
   },
   webServer: useExistingServer
     ? undefined

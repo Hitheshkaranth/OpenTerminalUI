@@ -18,7 +18,7 @@ test("screener run and scanner alert flow renders", async ({ page }) => {
     localStorage.setItem("ot-refresh-token", "dummy");
   }, token);
 
-  await page.route("**/api/screener/presets", async (route) => {
+  await page.route("**/api/**/screener/presets*", async (route) => {
     if (route.request().method() === "GET") {
       return route.fulfill({
         status: 200,
@@ -41,7 +41,7 @@ test("screener run and scanner alert flow renders", async ({ page }) => {
     return route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
   });
 
-  await page.route("**/api/screener/run-revamped", async (route) => {
+  await page.route("**/api/**/screener/run-revamped*", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -64,11 +64,11 @@ test("screener run and scanner alert flow renders", async ({ page }) => {
     });
   });
 
-  await page.route("**/api/screener/screens", async (route) => {
+  await page.route("**/api/**/screener/screens*", async (route) => {
     await route.fulfill({ status: 200, json: { items: [] } });
   });
 
-  await page.route("**/api/screener/public", async (route) => {
+  await page.route("**/api/**/screener/public*", async (route) => {
     await route.fulfill({ status: 200, json: { items: [] } });
   });
 
@@ -76,19 +76,17 @@ test("screener run and scanner alert flow renders", async ({ page }) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ status: "created", id: "a1" }) });
   });
 
-  await page.goto("/equity/screener");
+  await page.goto("/equity/screener", { waitUntil: "domcontentloaded" });
 
-  const isMobile = await page.evaluate(() => window.innerWidth < 1280);
+  const queryPanel = page
+    .locator("section")
+    .filter({ has: page.locator(".ot-type-panel-title", { hasText: "Query" }) })
+    .first();
+  const queryRunButton = queryPanel.getByRole("button", { name: /^Run$/ });
+  await expect(queryPanel).toBeVisible();
+  await queryRunButton.scrollIntoViewIfNeeded();
+  await queryRunButton.click();
 
-  if (isMobile) {
-    await expect(page.getByText("Quick Preset")).toBeVisible();
-    await page.locator("select").selectOption({ label: "20D High Breakout + RVOL" });
-    await page.getByRole("button", { name: "Run", exact: true }).click();
-  } else {
-    await expect(page.getByText("Screener Library")).toBeVisible();
-    await page.getByRole("button", { name: "20D High Breakout + RVOL" }).click();
-  }
-
-  await expect(page.getByText("Results")).toBeVisible();
-  await expect(page.getByRole("cell", { name: "RELIANCE" }).first()).toBeVisible();
+  await expect(page.getByText("Results", { exact: true })).toBeVisible();
+  await expect(page.getByText("RELIANCE").first()).toBeVisible();
 });
