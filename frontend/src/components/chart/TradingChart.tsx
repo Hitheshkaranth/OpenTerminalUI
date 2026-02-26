@@ -17,7 +17,16 @@ import {
 import type { ChartPoint, IndicatorResponse } from "../../types";
 import type { DrawMode } from "./DrawingTools";
 import { terminalChartTheme } from "../../shared/chart/chartTheme";
+import { useIndicators } from "../../shared/chart/useIndicators";
+import type { IndicatorConfig } from "../../shared/chart/types";
 import { terminalColors, terminalOverlayPalette } from "../../theme/terminal";
+import type { Bar } from "oakscriptjs";
+
+import type {
+  ExtendedHoursConfig,
+  PreMarketLevelConfig,
+} from "../../store/chartWorkstationStore";
+import { calculatePreMarketLevels, drawPreMarketLevels } from "./PreMarketLevels";
 
 type ChartMode = "candles" | "line" | "area";
 type TrendPoint = { time: number; price: number };
@@ -25,7 +34,37 @@ type ChartDrawing =
   | { id: string; type: "trendline"; p1: TrendPoint; p2: TrendPoint }
   | { id: string; type: "hline"; price: number };
 
-type CandlePoint = { time: number; open: number; high: number; low: number; close: number };
+type CandlePoint = {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  session?: string;
+  isExtended?: boolean;
+};
+
+function sessionShadeColor(session: string | undefined, eth?: ExtendedHoursConfig): string {
+  const normalized = String(session || "rth");
+  if (normalized === "pre" || normalized === "pre_open") {
+    if (eth && !eth.showPreMarket) return "transparent";
+    return "rgba(59, 143, 249, 0.16)";
+  }
+  if (normalized === "post" || normalized === "closing") {
+    if (eth && !eth.showAfterHours) return "transparent";
+    return "rgba(155, 89, 182, 0.16)";
+  }
+  return "rgba(148, 163, 184, 0.045)";
+}
+
+function hasVisibleSessionShading(data: CandlePoint[], eth?: ExtendedHoursConfig): boolean {
+  if (!data.length) return false;
+  const hasTaggedSessions = data.some((d) => d.session && d.session !== "rth");
+  if (!hasTaggedSessions) return false;
+  if (!eth?.enabled) return true;
+  return Boolean(eth.showPreMarket || eth.showAfterHours);
+}
 
 function sanitizeDrawings(input: unknown): ChartDrawing[] {
   if (!Array.isArray(input)) return [];
@@ -72,12 +111,16 @@ type Props = {
   data: ChartPoint[];
   mode: ChartMode;
   overlays?: Record<string, IndicatorResponse | undefined>;
+  indicatorConfigs?: IndicatorConfig[];
   showVolume?: boolean;
   showHighLow?: boolean;
   logarithmic?: boolean;
   drawMode?: DrawMode;
   clearDrawingsSignal?: number;
   onPendingTrendPointChange?: (pending: boolean) => void;
+  extendedHours?: ExtendedHoursConfig;
+  preMarketLevels?: PreMarketLevelConfig;
+  market?: "US" | "IN";
 };
 
 export function TradingChart({
@@ -85,12 +128,16 @@ export function TradingChart({
   data,
   mode,
   overlays = {},
+  indicatorConfigs = [],
   showVolume = true,
   showHighLow = true,
   logarithmic = false,
   drawMode = "none",
   clearDrawingsSignal = 0,
   onPendingTrendPointChange,
+  extendedHours,
+  preMarketLevels,
+  market = "IN",
 }: Props) {
   const chartRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<IChartApi | null>(null);
@@ -98,9 +145,11 @@ export function TradingChart({
   const lineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const areaRef = useRef<ISeriesApi<"Area"> | null>(null);
   const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const sessionShadingRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const overlaySeriesRef = useRef<Array<ISeriesApi<"Line">>>([]);
   const highLineRef = useRef<IPriceLine | null>(null);
   const lowLineRef = useRef<IPriceLine | null>(null);
+  const pmLevelLinesRef = useRef<Array<IPriceLine>>([]);
   const drawingLineSeriesRef = useRef<Array<ISeriesApi<"Line">>>([]);
   const drawingPriceLinesRef = useRef<Array<IPriceLine>>([]);
   const pendingTrendPointRef = useRef<TrendPoint | null>(null);
@@ -108,9 +157,10 @@ export function TradingChart({
   const modeRef = useRef<ChartMode>("candles");
   const parsedByTimeRef = useRef<Map<number, CandlePoint>>(new Map());
   const pendingTrendCbRef = useRef<((pending: boolean) => void) | undefined>(undefined);
-  const selectedRef = useRef<{ time: number; open: number; high: number; low: number; close: number } | null>(null);
+  const selectedRef = useRef<CandlePoint | null>(null);
   const [drawings, setDrawings] = useState<ChartDrawing[]>([]);
-  const [selectedCandle, setSelectedCandle] = useState<{ time: number; open: number; high: number; low: number; close: number } | null>(null);
+  const [selectedCandle, setSelectedCandle] = useState<CandlePoint | null>(null);
+  const [indicatorChartApi, setIndicatorChartApi] = useState<IChartApi | null>(null);
   const storageKey = `lts:drawings:${ticker.toUpperCase()}`;
 
   const parsed = useMemo(
@@ -122,6 +172,8 @@ export function TradingChart({
         low: d.l,
         close: d.c,
         volume: d.v,
+        session: (d as any).s || "rth",
+        isExtended: !!(d as any).ext,
       }))
       .filter(
         (d) =>
@@ -143,10 +195,30 @@ export function TradingChart({
         high: p.high,
         low: p.low,
         close: p.close,
+        volume: p.volume,
+        session: p.session,
+        isExtended: p.isExtended,
       });
     }
     return m;
   }, [parsed]);
+  const indicatorBars = useMemo<Bar[]>(
+    () =>
+      parsed.map((p) => ({
+        time: Number(p.time),
+        open: p.open,
+        high: p.high,
+        low: p.low,
+        close: p.close,
+        volume: Number.isFinite(Number(p.volume)) ? Number(p.volume) : 0,
+      })),
+    [parsed],
+  );
+  useIndicators(indicatorChartApi, indicatorBars, indicatorConfigs, { nonOverlayPaneStartIndex: 1 });
+  const showSessionLegend = useMemo(
+    () => hasVisibleSessionShading(parsed, extendedHours),
+    [parsed, extendedHours],
+  );
 
   const toUnixTime = (t: Time | undefined): number | null => {
     if (!t) return null;
@@ -231,15 +303,23 @@ export function TradingChart({
       priceFormat: { type: "volume" },
       visible: showVolume,
     });
+    const sessionShading = chart.addSeries(HistogramSeries, {
+      priceScaleId: "",
+      visible: true,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
     chart.priceScale("").applyOptions({
-      scaleMargins: { top: 0.8, bottom: 0 },
+      scaleMargins: { top: 0, bottom: 0 },
     });
 
     apiRef.current = chart;
+    setIndicatorChartApi(chart);
     candleRef.current = candles;
     lineRef.current = line;
     areaRef.current = area;
     volumeRef.current = volume;
+    sessionShadingRef.current = sessionShading;
 
     const extractCandle = (param: MouseEventParams<Time>): CandlePoint | null => {
       const ts = toUnixTime(param.time);
@@ -262,6 +342,7 @@ export function TradingChart({
           high: candleData.high,
           low: candleData.low,
           close: candleData.close,
+          volume: 0,
         };
       }
       return null;
@@ -343,10 +424,12 @@ export function TradingChart({
       chart.unsubscribeClick(onClick);
       chart.remove();
       apiRef.current = null;
+      setIndicatorChartApi(null);
       candleRef.current = null;
       lineRef.current = null;
       areaRef.current = null;
       volumeRef.current = null;
+      sessionShadingRef.current = null;
       overlaySeriesRef.current = [];
       highLineRef.current = null;
       lowLineRef.current = null;
@@ -354,27 +437,152 @@ export function TradingChart({
     };
   }, []);
 
+  const lastParsedRef = useRef<CandlePoint[]>([]);
+
   useEffect(() => {
-    if (!candleRef.current || !volumeRef.current || !lineRef.current || !areaRef.current) {
+    if (!candleRef.current || !volumeRef.current || !lineRef.current || !areaRef.current || !sessionShadingRef.current) {
+      return;
+    }
+    if (!parsed.length) {
+      candleRef.current.setData([]);
+      lineRef.current.setData([]);
+      areaRef.current.setData([]);
+      volumeRef.current.setData([]);
+      sessionShadingRef.current.setData([]);
+      lastParsedRef.current = [];
       return;
     }
     candleRef.current.applyOptions({ visible: mode === "candles" });
     lineRef.current.applyOptions({ visible: mode === "line" });
     areaRef.current.applyOptions({ visible: mode === "area" });
 
-    candleRef.current.setData(parsed);
-    lineRef.current.setData(parsed.map((d) => ({ time: d.time, value: d.close })));
-    areaRef.current.setData(parsed.map((d) => ({ time: d.time, value: d.close })));
-    volumeRef.current.setData(
-      parsed.map((d) => ({
-        time: d.time,
-        value: Number.isFinite(Number(d.volume)) ? Number(d.volume) : 0,
-        color: d.close >= d.open ? terminalColors.candleUpAlpha88 : terminalColors.candleDownAlpha88,
-      }))
-    );
+    const isIncremental =
+      parsed.length > 0 &&
+      lastParsedRef.current.length > 0 &&
+      parsed.length === lastParsedRef.current.length &&
+      parsed[parsed.length - 2]?.time === lastParsedRef.current[lastParsedRef.current.length - 2]?.time;
+
+    const ethEnabled = extendedHours?.enabled;
+    const hasSessionMetadata = parsed.some((d) => d.session && d.session !== "rth");
+
+    // Handle session-aware candle coloring
+    if (ethEnabled && mode === "candles") {
+      const colorScheme = extendedHours.colorScheme || "dimmed";
+      const styledBars = parsed.map((d) => {
+        let color: string = d.close >= d.open ? terminalColors.candleUp : terminalColors.candleDown;
+        let wickColor: string = d.close >= d.open ? terminalColors.candleUp : terminalColors.candleDown;
+
+        if (d.isExtended) {
+          if (colorScheme === "dimmed") {
+            color = d.close >= d.open ? "rgba(38, 166, 91, 0.4)" : "rgba(232, 65, 66, 0.4)";
+            wickColor = d.close >= d.open ? "rgba(38, 166, 91, 0.2)" : "rgba(232, 65, 66, 0.2)";
+          } else if (colorScheme === "distinct") {
+             if (d.session === "pre" || d.session === "pre_open") color = "#5B8FF9";
+             else if (d.session === "post" || d.session === "closing") color = "#9B59B6";
+             wickColor = color;
+          }
+        }
+
+        return {
+          time: d.time as UTCTimestamp,
+          open: d.open,
+          high: d.high,
+          low: d.low,
+          close: d.close,
+          color,
+          wickColor,
+          borderColor: color,
+        };
+      });
+
+      if (isIncremental) {
+        candleRef.current.update(styledBars[styledBars.length - 1]);
+      } else {
+        candleRef.current.setData(styledBars);
+      }
+    } else {
+      const standardBars = parsed.map(d => ({
+        time: d.time as UTCTimestamp,
+        open: d.open,
+        high: d.high,
+        low: d.low,
+        close: d.close
+      }));
+      if (isIncremental) {
+        candleRef.current.update(standardBars[standardBars.length - 1]);
+      } else {
+        candleRef.current.setData(standardBars);
+      }
+    }
+
+    const lastPoint = parsed[parsed.length - 1];
+    const updatePoint = { time: lastPoint.time as UTCTimestamp, value: lastPoint.close };
+    const volUpdate = {
+      time: lastPoint.time as UTCTimestamp,
+      value: Number.isFinite(Number(lastPoint.volume)) ? Number(lastPoint.volume) : 0,
+      color: lastPoint.close >= lastPoint.open
+        ? (ethEnabled && lastPoint.isExtended ? "rgba(38, 166, 91, 0.2)" : terminalColors.candleUpAlpha88)
+        : (ethEnabled && lastPoint.isExtended ? "rgba(232, 65, 66, 0.2)" : terminalColors.candleDownAlpha88),
+    };
+
+    if (isIncremental) {
+      lineRef.current.update(updatePoint);
+      areaRef.current.update(updatePoint);
+      volumeRef.current.update(volUpdate);
+
+      if (ethEnabled || hasSessionMetadata) {
+        sessionShadingRef.current.update({
+          time: lastPoint.time as UTCTimestamp,
+          value: 1000000000,
+          color: sessionShadeColor(lastPoint.session, extendedHours),
+        });
+      } else {
+        sessionShadingRef.current.update({ time: lastPoint.time as UTCTimestamp, value: 0, color: "transparent" });
+      }
+    } else {
+      lineRef.current.setData(parsed.map((d) => ({ time: d.time as UTCTimestamp, value: d.close })));
+      areaRef.current.setData(parsed.map((d) => ({ time: d.time as UTCTimestamp, value: d.close })));
+      volumeRef.current.setData(
+        parsed.map((d) => {
+          let color: string = d.close >= d.open ? terminalColors.candleUpAlpha88 : terminalColors.candleDownAlpha88;
+          if (ethEnabled && d.isExtended) {
+               color = d.close >= d.open ? "rgba(38, 166, 91, 0.2)" : "rgba(232, 65, 66, 0.2)";
+          }
+          return {
+              time: d.time as UTCTimestamp,
+              value: Number.isFinite(Number(d.volume)) ? Number(d.volume) : 0,
+              color,
+          };
+        })
+      );
+      sessionShadingRef.current.setData(
+        parsed.map((d) => ({
+          time: d.time as UTCTimestamp,
+          value: 1000000000,
+          color: ethEnabled || hasSessionMetadata ? sessionShadeColor(d.session, extendedHours) : "transparent",
+        })),
+      );
+    }
+
+    lastParsedRef.current = parsed;
     volumeRef.current.applyOptions({ visible: showVolume });
+
+    // PM Levels
+    const candles = candleRef.current;
+    if (candles) {
+        for (const line of pmLevelLinesRef.current) {
+            candles.removePriceLine(line);
+        }
+        pmLevelLinesRef.current = [];
+
+        if (preMarketLevels && extendedHours?.enabled) {
+            const levels = calculatePreMarketLevels(parsed as any);
+            pmLevelLinesRef.current = drawPreMarketLevels(candles, levels, preMarketLevels);
+        }
+    }
+
     apiRef.current?.timeScale().fitContent();
-  }, [mode, parsed, showVolume]);
+  }, [mode, parsed, showVolume, extendedHours, preMarketLevels]);
 
   useEffect(() => {
     if (!apiRef.current) {
@@ -524,6 +732,22 @@ export function TradingChart({
   return (
     <div className="relative z-0 h-full w-full rounded border border-terminal-border">
       <div ref={chartRef} className="h-full w-full" />
+      {showSessionLegend && (
+        <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[10px] text-terminal-text">
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-sm" style={{ background: "rgba(59, 143, 249, 0.16)" }} />
+            PRE
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-sm" style={{ background: "rgba(148, 163, 184, 0.045)" }} />
+            RTH
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-sm" style={{ background: "rgba(155, 89, 182, 0.16)" }} />
+            POST
+          </span>
+        </div>
+      )}
       <div className="pointer-events-none absolute left-2 top-2 rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[11px] text-terminal-text">
         <div>Time: {selectedTime}</div>
         <div>O: {selectedCandle ? selectedCandle.open.toFixed(2) : "-"}</div>

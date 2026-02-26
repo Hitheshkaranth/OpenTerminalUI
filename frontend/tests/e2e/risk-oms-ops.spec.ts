@@ -18,24 +18,40 @@ test("risk/oms/ops pages render with mocked APIs", async ({ page }) => {
     localStorage.setItem("ot-refresh-token", "dummy");
   }, token);
 
-  await page.route("**/api/risk/portfolio", async (route) => {
+  await page.route("**/api/risk/summary**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        symbols: ["RELIANCE"],
-        portfolio_value: 1000000,
-        confidence: 0.95,
-        parametric: { var: 10000, es: 15000 },
-        historical: { var: 9000, es: 14000 },
-        rolling_covariance: [],
-        factor_exposures: { market_beta: 1, momentum: 0.1, low_vol: 0.2, sector_tilt: 0.05 },
-        scenarios: [{ id: "s1", name: "Equity -5%", pnl: -50000, post_value: 950000 }],
+        ewma_vol: 0.15,
+        beta: 1.02,
+        marginal_contribution: { RELIANCE: 0.12 },
       }),
     });
   });
-  await page.route("**/api/risk/scenarios", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) });
+  await page.route("**/api/risk/exposures**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        pca_factors: [{ factor: "PC1", variance_explained: 0.62 }],
+        loadings: { RELIANCE: [0.81] },
+      }),
+    });
+  });
+  await page.route("**/api/risk/correlation**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ assets: ["RELIANCE"], matrix: [[1]] }),
+    });
+  });
+  await page.route("**/api/risk/sector-concentration**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ sectors: { Energy: 100 }, industries: { Refining: 100 } }),
+    });
   });
   await page.route("**/api/oms/orders", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) });
@@ -56,11 +72,17 @@ test("risk/oms/ops pages render with mocked APIs", async ({ page }) => {
     }
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ id: "k1", scope: "orders", enabled: true, reason: "x", updated_at: new Date().toISOString() }) });
   });
+  await page.route("**/api/quotes**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ market: "NASDAQ", quotes: [] }) });
+  });
+  await page.route("**/api/search**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ results: [] }) });
+  });
 
   await page.goto("/equity/risk");
-  await expect(page.getByText("Portfolio Risk Dashboard")).toBeVisible();
+  await expect(page.getByText("RISK ENGINE CONTROL")).toBeVisible();
   await page.goto("/equity/oms");
   await expect(page.getByText("Order Ticket + Compliance")).toBeVisible();
   await page.goto("/equity/ops");
-  await expect(page.getByText("Ops Dashboard")).toBeVisible();
+  await expect(page.getByText("Operational Workspace Control")).toBeVisible();
 });

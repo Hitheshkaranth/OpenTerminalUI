@@ -28,7 +28,32 @@ type SeriesRef = {
   volume: ISeriesApi<"Histogram", Time> | null;
   oi: ISeriesApi<"Area", Time> | null;
   delivery: ISeriesApi<"Line", Time> | null;
+  sessionShading: ISeriesApi<"Histogram", Time> | null;
 };
+
+function sessionShadeColor(session: string | undefined, extendedHours?: { showPreMarket?: boolean; showAfterHours?: boolean }): string {
+  const normalized = String(session || "rth");
+  if (normalized === "pre" || normalized === "pre_open") {
+    if (extendedHours && extendedHours.showPreMarket === false) return "transparent";
+    return "rgba(59, 143, 249, 0.16)";
+  }
+  if (normalized === "post" || normalized === "closing") {
+    if (extendedHours && extendedHours.showAfterHours === false) return "transparent";
+    return "rgba(155, 89, 182, 0.16)";
+  }
+  return "rgba(148, 163, 184, 0.045)";
+}
+
+function showSessionLegendForBars(
+  bars: Bar[],
+  extendedHours?: { enabled?: boolean; showPreMarket?: boolean; showAfterHours?: boolean },
+): boolean {
+  if (!bars.length) return false;
+  const hasTaggedSessions = bars.some((b) => (b as any).s && (b as any).s !== "rth");
+  if (!hasTaggedSessions) return false;
+  if (!extendedHours?.enabled) return true;
+  return Boolean(extendedHours.showPreMarket || extendedHours.showAfterHours);
+}
 
 export function ChartEngine({
   symbol,
@@ -48,10 +73,14 @@ export function ChartEngine({
   showDeliveryOverlay = false,
   deliverySeries = [],
   panelId = "panel-default",
+  extendedHours,
 }: ChartEngineProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<SeriesRef>({ candles: null, line: null, area: null, baseline: null, volume: null, oi: null, delivery: null });
+  const seriesRef = useRef<SeriesRef>({
+    candles: null, line: null, area: null, baseline: null,
+    volume: null, oi: null, delivery: null, sessionShading: null
+  });
   const byTimeRef = useRef<Map<number, Bar>>(new Map());
   const crosshairCbRef = useRef<ChartEngineProps["onCrosshairOHLC"]>(onCrosshairOHLC);
   const backfillCbRef = useRef<ChartEngineProps["onRequestBackfill"]>(onRequestBackfill);
@@ -73,6 +102,10 @@ export function ChartEngine({
           Number.isFinite(Number(b.close)),
       ),
     [bars],
+  );
+  const showSessionLegend = useMemo(
+    () => showSessionLegendForBars(safeBars, extendedHours),
+    [safeBars, extendedHours],
   );
 
   const byTime = useMemo(() => {
@@ -165,6 +198,16 @@ export function ChartEngine({
       scaleMargins: { top: 0.7, bottom: 0.12 },
     });
 
+    const sessionShading = chart.addSeries(HistogramSeries, {
+      priceScaleId: "",
+      visible: true,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+    chart.priceScale("").applyOptions({
+      scaleMargins: { top: 0, bottom: 0 },
+    });
+
     // Keep price action dominant and volume compact.
     chart.panes()[0]?.setStretchFactor(950);
     chart.panes()[1]?.setStretchFactor(90);
@@ -188,7 +231,7 @@ export function ChartEngine({
       });
     }
 
-    seriesRef.current = { candles, line, area, baseline, volume, oi, delivery };
+    seriesRef.current = { candles, line, area, baseline, volume, oi, delivery, sessionShading };
     chartRef.current = chart;
     setChartApi(chart);
 
@@ -253,27 +296,101 @@ export function ChartEngine({
     s.baseline.applyOptions({ visible: chartType === "baseline" });
   }, [chartType]);
 
+  const lastBarsRef = useRef<Bar[]>([]);
+
   useEffect(() => {
     const s = seriesRef.current;
-    if (!s.candles || !s.line || !s.area || !s.baseline || !s.volume || !s.delivery) return;
-    const candles = safeBars.map((b) => ({
-      time: Number(b.time) as UTCTimestamp,
-      open: Number(b.open),
-      high: Number(b.high),
-      low: Number(b.low),
-      close: Number(b.close),
-    }));
-    const closeLine = safeBars.map((b) => ({ time: Number(b.time) as UTCTimestamp, value: Number(b.close) }));
-    const vol = safeBars.map((b) => ({
-      time: Number(b.time) as UTCTimestamp,
-      value: Number(b.volume ?? 0),
-      color: Number(b.close) >= Number(b.open) ? terminalColors.candleUpAlpha80 : terminalColors.candleDownAlpha80,
-    }));
-    s.candles.setData(candles);
-    s.line.setData(closeLine);
-    s.area.setData(closeLine);
-    s.baseline.setData(closeLine);
-    s.volume.setData(vol);
+    if (!s.candles || !s.line || !s.area || !s.baseline || !s.volume || !s.delivery || !s.sessionShading) return;
+
+    const isIncremental =
+      safeBars.length > 0 &&
+      lastBarsRef.current.length > 0 &&
+      safeBars.length === lastBarsRef.current.length &&
+      safeBars[safeBars.length - 2]?.time === lastBarsRef.current[lastBarsRef.current.length - 2]?.time;
+
+    const ethEnabled = extendedHours?.enabled;
+    const hasSessionMetadata = safeBars.some((b) => (b as any).s && (b as any).s !== "rth");
+
+    if (isIncremental) {
+      const last = safeBars[safeBars.length - 1];
+      const candleTime = Number(last.time) as UTCTimestamp;
+
+      let candleColor: any = Number(last.close) >= Number(last.open) ? terminalColors.candleUp : terminalColors.candleDown;
+      if (ethEnabled && (last as any).ext) {
+        candleColor = Number(last.close) >= Number(last.open) ? "rgba(38, 166, 91, 0.4)" : "rgba(232, 65, 66, 0.4)";
+      }
+
+      const candle = {
+        time: candleTime,
+        open: Number(last.open),
+        high: Number(last.high),
+        low: Number(last.low),
+        close: Number(last.close),
+        color: candleColor,
+        wickColor: candleColor,
+        borderColor: candleColor,
+      };
+      s.candles.update(candle as any);
+      s.line.update({ time: candle.time, value: candle.close });
+      s.area.update({ time: candle.time, value: candle.close });
+      s.baseline.update({ time: candle.time, value: candle.close });
+      s.volume.update({
+        time: candle.time,
+        value: Number(last.volume ?? 0),
+        color: Number(last.close) >= Number(last.open) ? terminalColors.candleUpAlpha80 : terminalColors.candleDownAlpha80,
+      });
+
+      if (ethEnabled || hasSessionMetadata) {
+        const session = (last as any).s;
+        s.sessionShading.update({
+          time: candleTime,
+          value: 1000000000, // Large constant
+          color: sessionShadeColor(session, extendedHours),
+        });
+      } else {
+        s.sessionShading.update({ time: candleTime, value: 0, color: "transparent" });
+      }
+    } else {
+      const candles = safeBars.map((b) => {
+        let color: any = Number(b.close) >= Number(b.open) ? terminalColors.candleUp : terminalColors.candleDown;
+        if (ethEnabled && (b as any).ext) {
+          color = Number(b.close) >= Number(b.open) ? "rgba(38, 166, 91, 0.4)" : "rgba(232, 65, 66, 0.4)";
+        }
+        return {
+          time: Number(b.time) as UTCTimestamp,
+          open: Number(b.open),
+          high: Number(b.high),
+          low: Number(b.low),
+          close: Number(b.close),
+          color,
+          wickColor: color,
+          borderColor: color,
+        };
+      });
+      const closeLine = safeBars.map((b) => ({ time: Number(b.time) as UTCTimestamp, value: Number(b.close) }));
+      const vol = safeBars.map((b) => ({
+        time: Number(b.time) as UTCTimestamp,
+        value: Number(b.volume ?? 0),
+        color: Number(b.close) >= Number(b.open) ? terminalColors.candleUpAlpha80 : terminalColors.candleDownAlpha80,
+      }));
+      const shadings = safeBars.map((b) => {
+        const color = ethEnabled || hasSessionMetadata ? sessionShadeColor((b as any).s, extendedHours) : "transparent";
+        return {
+          time: Number(b.time) as UTCTimestamp,
+          value: 1000000000,
+          color,
+        };
+      });
+
+      s.candles.setData(candles as any);
+      s.line.setData(closeLine);
+      s.area.setData(closeLine);
+      s.baseline.setData(closeLine);
+      s.volume.setData(vol);
+      s.sessionShading.setData(shadings);
+    }
+
+    lastBarsRef.current = safeBars;
     s.volume.applyOptions({ visible: showVolume });
     s.delivery.setData(
       deliverySeries.map((row) => ({
@@ -288,7 +405,7 @@ export function ChartEngine({
         value: Number(b.volume ?? 0),
       })),
     );
-  }, [safeBars, showVolume, deliverySeries, showDeliveryOverlay]);
+  }, [safeBars, showVolume, deliverySeries, showDeliveryOverlay, extendedHours]);
 
   useIndicators(chartApi, safeBars, activeIndicators);
 
@@ -305,6 +422,22 @@ export function ChartEngine({
   return (
     <div className="relative z-0 h-full w-full rounded border border-terminal-border">
       <div ref={hostRef} className="h-full w-full" />
+      {showSessionLegend && (
+        <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[10px] text-terminal-text">
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-sm" style={{ background: "rgba(59, 143, 249, 0.16)" }} />
+            PRE
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-sm" style={{ background: "rgba(148, 163, 184, 0.045)" }} />
+            RTH
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-sm" style={{ background: "rgba(155, 89, 182, 0.16)" }} />
+            POST
+          </span>
+        </div>
+      )}
     </div>
   );
 }

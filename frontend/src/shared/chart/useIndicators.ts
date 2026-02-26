@@ -29,9 +29,15 @@ function clearSeries(chart: IChartApi, map: SeriesMap): SeriesMap {
   return {};
 }
 
-export function useIndicators(chart: IChartApi | null, bars: Bar[], configs: IndicatorConfig[]): void {
+export function useIndicators(
+  chart: IChartApi | null,
+  bars: Bar[],
+  configs: IndicatorConfig[],
+  options?: { nonOverlayPaneStartIndex?: number },
+): void {
   const seriesMapRef = useRef<SeriesMap>({});
   const cacheRef = useRef<CacheMeta>({});
+  const nonOverlayPaneStartIndex = options?.nonOverlayPaneStartIndex ?? 2;
 
   useEffect(() => {
     if (!chart) return;
@@ -51,7 +57,7 @@ export function useIndicators(chart: IChartApi | null, bars: Bar[], configs: Ind
   useEffect(() => {
     if (!chart || !bars.length) return;
 
-    let paneIndex = 2;
+    let paneIndex = nonOverlayPaneStartIndex;
     for (const cfg of configs.filter((c) => c.visible)) {
       let result;
       try {
@@ -142,7 +148,7 @@ export function useIndicators(chart: IChartApi | null, bars: Bar[], configs: Ind
         delete seriesMapRef.current[id];
       }
     };
-  }, [chart, bars, configs]);
+  }, [chart, bars, configs, nonOverlayPaneStartIndex]);
 
   useEffect(() => {
     if (!chart) return;

@@ -5,6 +5,8 @@ export interface UnifiedOHLCVBar {
   l: number;
   c: number;
   v: number;
+  s?: string;   // session: "pre", "rth", "post", etc.
+  ext?: boolean; // isExtended
 }
 
 export interface UnifiedChartResponse {
@@ -27,6 +29,7 @@ export async function fetchChartData(
     period?: string;
     start?: string;
     end?: string;
+    extended?: boolean;
   },
 ): Promise<UnifiedChartResponse> {
   const params = new URLSearchParams();
@@ -36,6 +39,7 @@ export async function fetchChartData(
   if (opts?.market) params.set("market", opts.market);
   if (opts?.start) params.set("start", opts.start);
   if (opts?.end) params.set("end", opts.end);
+  if (opts?.extended) params.set("extended", "true");
   const res = await fetch(`${apiBase()}/chart/${encodeURIComponent(symbol)}?${params.toString()}`);
   if (!res.ok) {
     throw new Error(`Unified chart fetch failed (${res.status})`);

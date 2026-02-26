@@ -94,6 +94,7 @@ export async function getHistory(
   range = "1y",
   limit?: number,
   cursor?: number,
+  extended?: boolean,
 ): Promise<ChartResponse> {
   // Use unified OHLCV endpoint for normal chart loads/timeframe switches.
   // Keep legacy route for backfill pagination (`limit`/`cursor`).
@@ -103,6 +104,7 @@ export async function getHistory(
         market,
         interval,
         period: range,
+        extended,
       });
       return {
         ticker: symbol.toUpperCase(),
@@ -115,6 +117,8 @@ export async function getHistory(
           l: Number(row.l),
           c: Number(row.c),
           v: Number(row.v ?? 0),
+          s: row.s,
+          ext: row.ext,
         })),
         meta: { warnings: [] },
       } as ChartResponse;
@@ -122,7 +126,9 @@ export async function getHistory(
       // Fall back to legacy endpoint below.
     }
   }
-  const { data } = await api.get<ChartResponse>(`/chart/${symbol}`, { params: { market, interval, range, limit, cursor } });
+  const { data } = await api.get<ChartResponse>(`/chart/${symbol}`, {
+    params: { market, interval, range, limit, cursor, extended }
+  });
   return data;
 }
 
@@ -480,6 +486,56 @@ export async function searchSymbols(q: string, market: string): Promise<SearchSy
 
 export async function fetchChart(ticker: string, interval = "1d", range = "1y", market = "NSE"): Promise<ChartResponse> {
   return getHistory(ticker, market, interval, range);
+}
+
+export type ChartBatchSource = "batch" | "fallback";
+
+export async function fetchChartsBatchWithMeta(
+  items: Array<{ symbol: string; interval?: string; range?: string; market?: string; extended?: boolean }>,
+): Promise<{ data: Record<string, ChartResponse>; source: ChartBatchSource }> {
+  const normalized = items
+    .map((item) => ({
+      symbol: item.symbol.trim().toUpperCase(),
+      interval: item.interval ?? "1d",
+      range: item.range ?? "1y",
+      market: (item.market ?? "NSE").trim().toUpperCase(),
+      extended: !!item.extended,
+    }))
+    .filter((item) => Boolean(item.symbol));
+  if (!normalized.length) return { data: {}, source: "batch" };
+
+  try {
+    const { data } = await api.post<Record<string, ChartResponse>>("/charts/batch", {
+      tickers: normalized.map((item) => ({
+        symbol: item.symbol,
+        timeframe: item.interval,
+        market: item.market,
+        range: item.range,
+        extended: item.extended,
+      })),
+    });
+    if (data && typeof data === "object") {
+      return { data, source: "batch" };
+    }
+  } catch {
+    // Fallback to parallel legacy chart requests below.
+  }
+
+  const entries = await Promise.all(
+    normalized.map(async (item) => {
+      const res = await fetchChart(item.symbol, item.interval, item.range, item.market);
+      const key = `${item.market}:${item.symbol}|${item.interval}|${item.range}|ext=${item.extended}`;
+      return [key, res] as const;
+    }),
+  );
+  return { data: Object.fromEntries(entries), source: "fallback" };
+}
+
+export async function fetchChartsBatch(
+  items: Array<{ symbol: string; interval?: string; range?: string; market?: string }>,
+): Promise<Record<string, ChartResponse>> {
+  const result = await fetchChartsBatchWithMeta(items);
+  return result.data;
 }
 
 export async function fetchStock(ticker: string, market = "NSE"): Promise<StockSnapshot> {
@@ -906,16 +962,16 @@ export async function searchLatestNews(q: string, limit = 100): Promise<NewsLate
   return Array.isArray(data?.items) ? data.items : [];
 }
 
-export async function fetchNewsByTicker(ticker: string, limit = 100): Promise<NewsLatestApiItem[]> {
+export async function fetchNewsByTicker(ticker: string, limit = 100, market?: string): Promise<NewsLatestApiItem[]> {
   const symbol = ticker.trim().toUpperCase();
   if (!symbol) return [];
-  const { data } = await api.get<{ items: NewsLatestApiItem[] }>(`/news/by-ticker/${encodeURIComponent(symbol)}`, { params: { limit } });
+  const { data } = await api.get<{ items: NewsLatestApiItem[] }>(`/news/by-ticker/${encodeURIComponent(symbol)}`, { params: { limit, market } });
   return Array.isArray(data?.items) ? data.items : [];
 }
 
-export async function fetchNewsSentiment(ticker: string, days = 7): Promise<NewsSentimentSummary> {
+export async function fetchNewsSentiment(ticker: string, days = 7, market?: string): Promise<NewsSentimentSummary> {
   const symbol = ticker.trim().toUpperCase();
-  const { data } = await api.get<NewsSentimentSummary>(`/news/sentiment/${encodeURIComponent(symbol)}`, { params: { days } });
+  const { data } = await api.get<NewsSentimentSummary>(`/news/sentiment/${encodeURIComponent(symbol)}`, { params: { days, market } });
   return data;
 }
 

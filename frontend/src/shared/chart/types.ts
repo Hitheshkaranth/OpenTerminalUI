@@ -1,5 +1,6 @@
 import type { Bar, IndicatorResult } from "oakscriptjs";
 import type { ISeriesApi, Time } from "lightweight-charts";
+import type { ExtendedHoursConfig } from "../../store/chartWorkstationStore";
 
 export type ChartKind = "candle" | "line" | "area" | "baseline";
 
@@ -31,6 +32,7 @@ export type ChartEngineProps = {
   showDeliveryOverlay?: boolean;
   deliverySeries?: Array<{ time: number; value: number }>;
   panelId?: string;
+  extendedHours?: ExtendedHoursConfig;
 };
 
 export type IndicatorRegistryView = {

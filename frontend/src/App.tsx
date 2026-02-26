@@ -45,6 +45,7 @@ import { OmsCompliancePage } from "./pages/OmsCompliance";
 import { OpsDashboardPage } from "./pages/OpsDashboard";
 import { ModelGovernancePage } from "./pages/ModelGovernance";
 import CockpitDashboard from "./pages/Cockpit";
+import { ChartWorkstationPage } from "./pages/ChartWorkstationPage";
 
 function App() {
   return (
@@ -81,6 +82,7 @@ function App() {
             <Route path="ops" element={<OpsDashboardPage />} />
             <Route path="plugins" element={<PluginsPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="chart-workstation" element={<ChartWorkstationPage />} />
           </Route>
 
           <Route path="/fno" element={<ProtectedRoute><FnoLayout /></ProtectedRoute>}>

@@ -1,5 +1,6 @@
 export { TerminalBadge } from "./TerminalBadge";
 export { TerminalButton } from "./TerminalButton";
+export { TerminalCombobox } from "./TerminalCombobox";
 export { TerminalDropdown } from "./TerminalDropdown";
 export { TerminalInput } from "./TerminalInput";
 export { TerminalModal } from "./TerminalModal";

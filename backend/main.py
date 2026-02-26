@@ -84,6 +84,8 @@ from backend.experiments.routes import router as experiments_router
 from backend.instruments.routes import router as instruments_router
 from backend.data_quality.routes import router as data_quality_router
 from backend.tca.routes import router as tca_router
+from backend.routers.chart_workstation import router as chart_workstation_router
+from backend.routers.charts import router as charts_router
 
 app.include_router(equity_router)
 app.include_router(fno_router)
@@ -96,6 +98,8 @@ app.include_router(experiments_router, prefix="/api")
 app.include_router(instruments_router, prefix="/api")
 app.include_router(data_quality_router, prefix="/api")
 app.include_router(tca_router, prefix="/api")
+app.include_router(chart_workstation_router)
+app.include_router(charts_router)
 
 
 @app.on_event("startup")

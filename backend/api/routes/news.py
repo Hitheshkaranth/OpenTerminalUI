@@ -17,7 +17,7 @@ import httpx
 
 from backend.api.deps import cache_instance, get_unified_fetcher
 from backend.core.ttl_policy import market_open_now, ttl_seconds
-from backend.db.database import SessionLocal
+from backend.shared.db import SessionLocal
 from backend.db.models import NewsArticle
 from nlp.sentiment import score_financial_sentiment
 
@@ -125,6 +125,32 @@ def _to_day(value: str) -> str | None:
         return datetime.fromisoformat(str(value).replace("Z", "+00:00")).date().isoformat()
     except Exception:
         return None
+
+
+def _ticker_aliases(symbol: str, market: str | None = None) -> list[str]:
+    base = symbol.strip().upper()
+    if not base:
+        return []
+    aliases = {base}
+    mkt = (market or "").strip().upper()
+    if mkt in {"NSE", "IN"}:
+        aliases.add(f"{base}.NS")
+    if mkt in {"BSE"}:
+        aliases.add(f"{base}.BO")
+    if not mkt:
+        aliases.update({f"{base}.NS", f"{base}.BO"})
+    return sorted(aliases)
+
+
+def _ticker_fallback_terms(symbol: str, market: str | None = None) -> list[str]:
+    base = symbol.strip().upper()
+    mkt = (market or "").strip().upper()
+    terms = [f"{base} stock", base]
+    if mkt in {"NSE", "IN"}:
+        terms = [f"{base} NSE India stock", f"{base} NSE", *terms]
+    elif mkt == "BSE":
+        terms = [f"{base} BSE India stock", f"{base} BSE", *terms]
+    return list(dict.fromkeys([t for t in terms if t.strip()]))
 
 
 def _validate_market(market: str) -> str:
@@ -275,7 +301,9 @@ async def get_symbol_news(
     ticker = symbol.strip().upper()
 
     if market_code in IN_MARKETS:
-        return {"items": []}
+        # For Indian markets, use our news fallback mechanism (Yahoo search)
+        items = await _fetch_news_fallback(f"{ticker} NSE", limit=limit)
+        return {"items": items[:limit]}
 
     fetcher = await get_unified_fetcher()
     if not fetcher.finnhub.api_key:
@@ -294,7 +322,9 @@ async def get_market_news(
     market_code = _validate_market(market)
 
     if market_code in IN_MARKETS:
-        return {"items": []}
+        # Use fallback for Indian market news
+        items = await _fetch_news_fallback("NSE Nifty Indian Stock Market", limit=limit)
+        return {"items": items[:limit]}
 
     fetcher = await get_unified_fetcher()
     if not fetcher.finnhub.api_key:
@@ -377,29 +407,46 @@ async def search_news(
 
 
 @router.get("/news/by-ticker/{ticker}")
-async def get_news_by_ticker(ticker: str, limit: int = Query(default=50, ge=1, le=200)) -> dict[str, Any]:
+async def get_news_by_ticker(
+    ticker: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    market: str | None = Query(default=None, description="Optional market context e.g. NSE/BSE/NASDAQ"),
+) -> dict[str, Any]:
     symbol = ticker.strip().upper()
-    cache_key = cache_instance.build_key("news_latest", f"ticker:{symbol}", {"limit": limit})
+    if not isinstance(market, str):
+        market = None
+    market_code = (market or "").strip().upper() or None
+    cache_key = cache_instance.build_key("news_latest", f"ticker:{symbol}", {"limit": limit, "market": market_code or ""})
     cached = await cache_instance.get(cache_key)
     if cached:
         return cached
 
     db = SessionLocal()
     try:
-        like = f'%"{symbol}"%'
+        aliases = _ticker_aliases(symbol, market_code)
+        ticker_filters = [NewsArticle.tickers.like(f'%"{alias}"%') for alias in aliases]
         rows = (
             db.query(NewsArticle)
-            .filter(NewsArticle.tickers.like(like))
+            .filter(or_(*ticker_filters))
             .order_by(desc(NewsArticle.published_at))
             .limit(limit)
             .all()
         )
         items = [_row_to_item(row) for row in rows]
         if not items:
-            items = await _fetch_news_fallback(f"{symbol} stock", limit=limit)
+            items = []
+            for term in _ticker_fallback_terms(symbol, market_code):
+                items = await _fetch_news_fallback(term, limit=limit)
+                if items:
+                    break
         payload = {"items": items}
     except OperationalError:
-        payload = {"items": await _fetch_news_fallback(f"{symbol} stock", limit=limit)}
+        fallback_items: list[dict[str, Any]] = []
+        for term in _ticker_fallback_terms(symbol, market_code):
+            fallback_items = await _fetch_news_fallback(term, limit=limit)
+            if fallback_items:
+                break
+        payload = {"items": fallback_items}
     finally:
         db.close()
 
@@ -415,9 +462,13 @@ async def get_news_by_ticker(ticker: str, limit: int = Query(default=50, ge=1, l
 async def get_news_sentiment(
     ticker: str,
     days: int = Query(default=7, ge=1, le=30),
+    market: str | None = Query(default=None, description="Optional market context e.g. NSE/BSE/NASDAQ"),
 ) -> dict[str, Any]:
+    if not isinstance(market, str):
+        market = None
     symbol = ticker.strip().upper()
-    cache_key = cache_instance.build_key("news_latest", f"sentiment:{symbol}", {"days": days})
+    market_code = (market or "").strip().upper() or None
+    cache_key = cache_instance.build_key("news_latest", f"sentiment:{symbol}", {"days": days, "market": market_code or ""})
     cached = await cache_instance.get(cache_key)
     if cached:
         return cached
@@ -427,10 +478,11 @@ async def get_news_sentiment(
 
     db = SessionLocal()
     try:
-        like = f'%"{symbol}"%'
+        aliases = _ticker_aliases(symbol, market_code)
+        ticker_filters = [NewsArticle.tickers.like(f'%"{alias}"%') for alias in aliases]
         rows = (
             db.query(NewsArticle)
-            .filter(NewsArticle.tickers.like(like), NewsArticle.published_at >= cutoff_iso)
+            .filter(or_(*ticker_filters), NewsArticle.published_at >= cutoff_iso)
             .order_by(desc(NewsArticle.published_at))
             .all()
         )
@@ -464,7 +516,11 @@ async def get_news_sentiment(
                 day_buckets[day].append(score)
     else:
         # Fallback sentiment when DB has no ingested records.
-        fallback_items = await _fetch_news_fallback(f"{symbol} stock", limit=max(20, days * 8))
+        fallback_items: list[dict[str, Any]] = []
+        for term in _ticker_fallback_terms(symbol, market_code):
+            fallback_items = await _fetch_news_fallback(term, limit=max(20, days * 8))
+            if fallback_items:
+                break
         total = len(fallback_items)
         for item in fallback_items:
             sent = item.get("sentiment") if isinstance(item, dict) else {}

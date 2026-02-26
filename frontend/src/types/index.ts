@@ -5,6 +5,8 @@ export type ChartPoint = {
   l: number;
   c: number;
   v: number;
+  s?: string;   // session: "pre", "rth", "post", etc.
+  ext?: boolean; // isExtended
 };
 
 export type ChartResponse = {

@@ -10,6 +10,7 @@ export function Sidebar() {
   const nav = [
     { label: "Market", path: "/equity/stocks", key: "F1" },
     { label: "Screener", path: "/equity/screener", key: "F2" },
+    { label: "Workstation", path: "/equity/chart-workstation", key: "6", hint: "6 Charts" },
     { label: "Portfolio", path: "/equity/portfolio", key: "F3" },
     { label: "Paper", path: "/equity/paper", key: "P" },
     { label: "Watchlist", path: "/equity/watchlist", key: "F4" },
@@ -21,7 +22,6 @@ export function Sidebar() {
     { label: "Plugins", path: "/equity/plugins", key: "PL" },
     { label: "Settings", path: "/equity/settings", key: "F6" },
     { label: "About", path: "/equity/stocks/about", key: "F7" },
-    { label: "Heatmap", path: "/fno/heatmap", key: "F8" },
     { label: "Backtesting", path: "/backtesting", key: "F9" },
   ];
 
@@ -57,7 +57,10 @@ export function Sidebar() {
               }`
             }
           >
-            <span>{item.label}</span>
+            <div className="flex flex-col">
+              <span>{item.label}</span>
+              {(item as any).hint && <span className="text-[8px] text-terminal-accent/70 -mt-0.5 uppercase">{(item as any).hint}</span>}
+            </div>
             <span className="text-[10px]">
               {item.path === "/equity/alerts" && unreadCount > 0 ? `${unreadCount}` : item.key}
             </span>

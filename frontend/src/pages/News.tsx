@@ -127,8 +127,9 @@ function relevanceReason(item: UiNewsItem, ticker: string, aliases: string[]): s
   return "Market fallback";
 }
 
-async function loadTickerContextNews(ticker: string, companyName: string, limit = 200): Promise<NewsQueryResult> {
+async function loadTickerContextNews(ticker: string, companyName: string, market?: string, limit = 200): Promise<NewsQueryResult> {
   const symbol = ticker.trim().toUpperCase();
+  const marketCode = String(market || "").trim().toUpperCase();
   const errors: string[] = [];
   if (!symbol) {
     try {
@@ -141,7 +142,7 @@ async function loadTickerContextNews(ticker: string, companyName: string, limit 
   }
 
   try {
-    const byTicker = await fetchNewsByTicker(symbol, limit);
+    const byTicker = await fetchNewsByTicker(symbol, limit, marketCode || undefined);
     if (Array.isArray(byTicker) && byTicker.length > 0) {
       return { items: byTicker, sourceMode: "by_ticker", errors };
     }
@@ -152,6 +153,12 @@ async function loadTickerContextNews(ticker: string, companyName: string, limit 
   const searchTerms = Array.from(
     new Set([companyName, `${symbol} stock`, symbol].map((v) => v.trim()).filter((v) => v.length >= 2)),
   );
+  if (marketCode === "NSE" || marketCode === "BSE") {
+    searchTerms.unshift(
+      `${symbol} ${marketCode} India stock`,
+      `${companyName} ${marketCode}`.trim(),
+    );
+  }
 
   for (const term of searchTerms) {
     try {
@@ -210,7 +217,12 @@ export function NewsPage() {
     queryKey: ["news-page", currentTicker, selectedStock?.company_name || "", debouncedSearch, isTickerMode],
     queryFn: async () => {
       if (isTickerMode) {
-        return loadTickerContextNews(currentTicker, String(selectedStock?.company_name || ""), 200);
+        return loadTickerContextNews(
+          currentTicker,
+          String(selectedStock?.company_name || ""),
+          String(selectedStock?.exchange || ""),
+          200,
+        );
       }
       const items = debouncedSearch ? await searchLatestNews(debouncedSearch, 200) : await fetchLatestNews(200);
       return { items, sourceMode: debouncedSearch ? "search" : "latest", searchTerm: debouncedSearch || undefined, errors: [] };
@@ -229,7 +241,7 @@ export function NewsPage() {
 
   const sentimentQuery = useQuery({
     queryKey: ["news-sentiment", currentTicker, periodDays],
-    queryFn: () => fetchNewsSentiment(currentTicker, periodDays),
+    queryFn: () => fetchNewsSentiment(currentTicker, periodDays, String(selectedStock?.exchange || "")),
     enabled: isTickerMode && Boolean(currentTicker),
     staleTime: 60_000,
     refetchInterval: 60_000,
