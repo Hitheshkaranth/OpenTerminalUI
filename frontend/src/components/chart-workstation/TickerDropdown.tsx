@@ -7,7 +7,7 @@ import "./ChartWorkstation.css";
 interface Props {
   value: string | null;
   market: "IN" | "US";
-  onChange: (ticker: string, market: "IN" | "US") => void;
+  onChange: (ticker: string, market: "IN" | "US", companyName?: string | null) => void;
   className?: string;
 }
 
@@ -50,7 +50,7 @@ export function TickerDropdown({ value, market, onChange, className = "" }: Prop
 
   const pick = (item: SearchSymbolItem) => {
     const resolvedMarket: "IN" | "US" = item.country_code === "US" ? "US" : "IN";
-    onChange(item.ticker, resolvedMarket);
+    onChange(item.ticker, resolvedMarket, item.name ?? null);
     setQuery(item.ticker);
     setOpen(false);
     setResults([]);

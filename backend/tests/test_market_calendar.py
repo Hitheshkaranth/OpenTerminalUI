@@ -5,7 +5,6 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from backend.shared.market_calendar import (
-    SESSIONS,
     is_extended_hours,
     is_market_open,
     next_market_open,

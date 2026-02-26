@@ -8,10 +8,9 @@ from statistics import mean
 from typing import Any
 
 import httpx
-from sqlalchemy.orm import Session
 
 from backend.alerts.scanner_rules import process_scanner_tick
-from backend.db.database import SessionLocal
+from backend.shared.db import SessionLocal
 from backend.models import AlertConditionType, AlertORM, AlertStatus, AlertTriggerORM
 from backend.services.marketdata_hub import MarketDataHub, get_marketdata_hub
 

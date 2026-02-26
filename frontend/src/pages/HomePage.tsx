@@ -215,8 +215,28 @@ export function HomePage() {
 
     if (benchmarkRes.status === "fulfilled" && benchmarkRes.value?.equity_curve?.length > 0) {
       const curve = benchmarkRes.value.equity_curve;
-      const last30 = curve.slice(-30);
-      setPerformancePoints(last30.map((pt) => pt.portfolio));
+      const cutoffMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const by30d = curve.filter((pt) => {
+        const ms = Date.parse(`${pt.date}T00:00:00Z`);
+        return Number.isFinite(ms) && ms >= cutoffMs;
+      });
+      const windowCurve = (by30d.length >= 2 ? by30d : curve.slice(-30));
+
+      const currentPortfolioValue =
+        next.equityValue != null && Number.isFinite(next.equityValue)
+          ? next.equityValue
+          : null;
+      const lastNorm = Number(windowCurve[windowCurve.length - 1]?.portfolio ?? NaN);
+      const canScale = currentPortfolioValue != null && Number.isFinite(lastNorm) && lastNorm > 0;
+
+      const scaledPoints = windowCurve.map((pt) => {
+          const p = Number(pt.portfolio);
+          if (!Number.isFinite(p)) return 0;
+          return canScale ? (p / lastNorm) * currentPortfolioValue! : p;
+        }).filter((v) => Number.isFinite(v) && v > 0);
+      if (scaledPoints.length >= 2) {
+        setPerformancePoints(scaledPoints);
+      }
     }
 
     next.updatedAt = Date.now();

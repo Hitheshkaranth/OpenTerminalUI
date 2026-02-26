@@ -1,5 +1,4 @@
 import hashlib
-from typing import List
 from backend.data_quality.schemas import (
     DataQualityRunResponse,
     DataQualityDashboardResponse,

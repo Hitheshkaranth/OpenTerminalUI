@@ -29,6 +29,14 @@ const countryDefaults: Record<CountryCode, { market: MarketCode; currency: Displ
 const defaultCountry: CountryCode = "US";
 const defaultValues = countryDefaults[defaultCountry];
 
+function normalizePersistedMarket(value: unknown, country: CountryCode): MarketCode {
+  const raw = String(value ?? "").trim().toUpperCase();
+  if (raw === "IN") return "NSE";
+  if (raw === "US") return "NASDAQ";
+  if (raw === "NSE" || raw === "BSE" || raw === "NYSE" || raw === "NASDAQ") return raw as MarketCode;
+  return countryDefaults[country].market;
+}
+
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
@@ -55,6 +63,20 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: "ui-settings",
       storage: createJSONStorage(() => localStorage),
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState as Partial<SettingsState>) ?? {};
+        const current = currentState as SettingsState;
+        const selectedCountry: CountryCode =
+          persisted.selectedCountry === "IN" || persisted.selectedCountry === "US"
+            ? persisted.selectedCountry
+            : current.selectedCountry;
+        return {
+          ...current,
+          ...persisted,
+          selectedCountry,
+          selectedMarket: normalizePersistedMarket((persisted as any).selectedMarket, selectedCountry),
+        };
+      },
     },
   ),
 );

@@ -29,6 +29,9 @@ export default defineConfig({
           cwd: "..",
           reuseExistingServer: true,
           timeout: 120_000,
+          env: {
+            OPENTERMINALUI_SQLITE_URL: "sqlite:///./e2e_test.db",
+          },
         },
         {
           command: `${npmCommand} run dev -- --host 127.0.0.1 --port ${e2eFrontendPort} --strictPort`,

@@ -8,7 +8,7 @@ from starlette.responses import JSONResponse
 
 from backend.auth.deps import auth_exempt_path
 from backend.auth.jwt import decode_token
-from backend.db.database import SessionLocal
+from backend.shared.db import SessionLocal
 from backend.models.user import User
 
 

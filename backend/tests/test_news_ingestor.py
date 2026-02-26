@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from backend.services.news_ingestor import NewsIngestor, NormalizedNews, normalize_news_record
+from backend.bg_services.news_ingestor import NewsIngestor, NormalizedNews, normalize_news_record
 
 
 def test_normalize_news_record_finnhub() -> None:

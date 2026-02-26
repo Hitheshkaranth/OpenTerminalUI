@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from backend.db.database import Base
+from backend.shared.db import Base
 
 
 class UserRole(str, enum.Enum):

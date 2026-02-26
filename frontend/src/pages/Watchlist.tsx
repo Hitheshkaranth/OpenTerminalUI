@@ -1,7 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { addWatchlistItem, deleteWatchlistItem, fetchQuotesBatch, fetchWatchlist } from "../api/client";
+import { addWatchlistItem, deleteWatchlistItem, fetchQuotesBatch, fetchWatchlist, searchSymbols, type SearchSymbolItem } from "../api/client";
 import { CountryFlag } from "../components/common/CountryFlag";
+import { TerminalBadge } from "../components/terminal/TerminalBadge";
+import { TerminalButton } from "../components/terminal/TerminalButton";
+import { TerminalCombobox } from "../components/terminal/TerminalCombobox";
+import { TerminalInput } from "../components/terminal/TerminalInput";
 import { useDisplayCurrency } from "../hooks/useDisplayCurrency";
 import { useQuotesStore, useQuotesStream } from "../realtime/useQuotesStream";
 import { useSettingsStore } from "../store/settingsStore";
@@ -18,10 +22,15 @@ export function WatchlistPage() {
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [watchlistName, setWatchlistName] = useState("Core Picks");
   const [ticker, setTicker] = useState("INFY");
+  const [tickerResults, setTickerResults] = useState<SearchSymbolItem[]>([]);
+  const [tickerSearchOpen, setTickerSearchOpen] = useState(false);
+  const [tickerSelectedIdx, setTickerSelectedIdx] = useState(0);
+  const [tickerSearchLoading, setTickerSearchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [snapshotByTicker, setSnapshotByTicker] = useState<Record<string, SnapshotQuote>>({});
   const [pullStartY, setPullStartY] = useState<number | null>(null);
   const [pullHint, setPullHint] = useState("");
+  const tickerSearchMarket = useMemo(() => (selectedMarket === "NASDAQ" ? "NASDAQ" : "NSE"), [selectedMarket]);
 
   const load = async () => {
     try {
@@ -35,6 +44,36 @@ export function WatchlistPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const q = ticker.trim();
+    if (!q) {
+      setTickerResults([]);
+      setTickerSearchOpen(false);
+      setTickerSearchLoading(false);
+      return;
+    }
+    setTickerSearchLoading(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const rows = await searchSymbols(q, tickerSearchMarket);
+        if (!active) return;
+        setTickerResults(rows.slice(0, 8));
+        setTickerSelectedIdx(0);
+        setTickerSearchOpen(true);
+      } catch {
+        if (!active) return;
+        setTickerResults([]);
+      } finally {
+        if (active) setTickerSearchLoading(false);
+      }
+    }, 220);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [ticker, tickerSearchMarket]);
 
   useEffect(() => {
     const symbols = items.map((item) => item.ticker);
@@ -97,10 +136,61 @@ export function WatchlistPage() {
       <div className="rounded border border-terminal-border bg-terminal-panel p-3">
         <div className="mb-2 text-sm font-semibold">Add to Watchlist</div>
         <div className="grid grid-cols-1 gap-2 lg:grid-cols-3">
-          <input className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={watchlistName} onChange={(e) => setWatchlistName(e.target.value)} />
-          <input className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} />
-          <button
-            className="rounded bg-terminal-accent px-3 py-1 text-xs text-white"
+          <TerminalInput
+            tone="ui"
+            size="sm"
+            value={watchlistName}
+            onChange={(e) => setWatchlistName(e.target.value)}
+          />
+          <TerminalCombobox
+            value={ticker}
+            onChange={(v) => setTicker(v.toUpperCase())}
+            onFocus={() => tickerResults.length && setTickerSearchOpen(true)}
+            onKeyDown={(e) => {
+              if (!tickerSearchOpen) return;
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setTickerSelectedIdx((i) => Math.min(i + 1, tickerResults.length - 1));
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setTickerSelectedIdx((i) => Math.max(i - 1, 0));
+              } else if (e.key === "Enter" && tickerResults[tickerSelectedIdx]) {
+                e.preventDefault();
+                const picked = tickerResults[tickerSelectedIdx];
+                setTicker(picked.ticker.toUpperCase());
+                setTickerSearchOpen(false);
+              } else if (e.key === "Escape") {
+                setTickerSearchOpen(false);
+              }
+            }}
+            placeholder={`Search ${selectedMarket} symbol`}
+            open={tickerSearchOpen}
+            items={tickerResults}
+            selectedIndex={tickerSelectedIdx}
+            onSelect={(item) => {
+              setTicker(item.ticker.toUpperCase());
+              setTickerSearchOpen(false);
+            }}
+            getItemKey={(item) => item.ticker}
+            loading={tickerSearchLoading}
+            inputClassName={`min-h-8 px-2 py-1 text-xs ${tickerSearchLoading ? "cursor-wait" : ""}`}
+            listClassName="mt-1 max-h-56 overflow-auto rounded-sm border border-terminal-border bg-terminal-panel p-1 shadow-lg"
+            itemClassName=""
+            renderItem={(item, meta) => (
+              <div className={`flex items-center justify-between gap-2 rounded-sm px-2 py-1 text-xs ${meta.selected ? "bg-terminal-accent/15 text-terminal-accent" : "hover:bg-terminal-bg text-terminal-text"}`}>
+                <span className="inline-flex items-center gap-2">
+                  <span>{item.ticker}</span>
+                  <TerminalBadge size="sm" variant={item.country_code === "US" ? "info" : "neutral"}>
+                    {item.country_code === "US" ? "US" : "IN"}
+                  </TerminalBadge>
+                </span>
+                <span className="truncate text-terminal-muted">{(item.name || "").slice(0, 20)}</span>
+              </div>
+            )}
+          />
+          <TerminalButton
+            size="sm"
+            variant="accent"
             onClick={async () => {
               try {
                 await addWatchlistItem({ watchlist_name: watchlistName, ticker });
@@ -111,7 +201,7 @@ export function WatchlistPage() {
             }}
           >
             Add
-          </button>
+          </TerminalButton>
         </div>
       </div>
       {error && <div className="rounded border border-terminal-neg bg-terminal-neg/10 p-2 text-xs text-terminal-neg">{error}</div>}

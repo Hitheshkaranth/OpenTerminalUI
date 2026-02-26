@@ -12,7 +12,7 @@ from backend.api.deps import fetch_stock_snapshot_coalesced, get_db
 from backend.auth.deps import get_current_user
 from backend.models import User
 from backend.services.materialized_store import TABLE_NAME, load_screener_df, upsert_screener_rows
-from backend.db.database import engine
+from backend.shared.db import engine
 from sqlalchemy import text
 
 from .engine import RunConfig, ScreenerEngine, _load_universe_symbols

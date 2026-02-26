@@ -351,9 +351,14 @@ class ShareholdingService:
         client = await self.get_nse_session()
         try:
             resp = await client.get(endpoint, params={"symbol": symbol, "issuer": "company"})
-            resp.raise_for_status()
+            if resp.status_code != 200:
+                logger.warning(f"NSE shareholding pattern for {symbol} returned status {resp.status_code}")
+                return {}
             payload = resp.json()
             return payload if isinstance(payload, dict) else {}
+        except Exception as e:
+            logger.warning(f"NSE shareholding pattern for {symbol} fetch failed: {e}")
+            return {}
         finally:
             await client.aclose()
 

@@ -14,6 +14,7 @@
   display: grid;
   gap: 2px;
   padding: 2px;
+  height: 100%;
   background: var(--ot-color-border-default);
   transition: grid-template-columns 300ms ease,
               grid-template-rows 300ms ease;
@@ -27,7 +28,7 @@
   flex-direction: column;
   overflow: hidden;
   transition: border-color 200ms ease;
-  min-height: 120px;
+  min-height: 0;
 }
 
 .chart-panel.active {
@@ -88,7 +89,7 @@
   transition: opacity 200ms, border-color 200ms;
   color: var(--ot-color-text-muted);
   font-size: 11px;
-  min-height: 120px;
+  min-height: 0;
 }
 
 .add-chart-placeholder:hover {
@@ -173,4 +174,24 @@
 
 .layout-btn.active .layout-btn-cell {
   background: var(--ot-color-workstation-panel-active-border);
+}
+
+.chart-grid[data-slot-count="5"] .chart-panel-header,
+.chart-grid[data-slot-count="6"] .chart-panel-header {
+  padding: 2px 6px;
+  min-height: 24px;
+  gap: 4px;
+}
+
+.chart-grid[data-slot-count="5"] .chart-panel-footer,
+.chart-grid[data-slot-count="6"] .chart-panel-footer {
+  padding: 1px 6px;
+  gap: 8px;
+  font-size: 9px;
+}
+
+.chart-grid[data-slot-count="5"] .add-chart-placeholder,
+.chart-grid[data-slot-count="6"] .add-chart-placeholder {
+  gap: 4px;
+  font-size: 10px;
 }

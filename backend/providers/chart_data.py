@@ -105,14 +105,17 @@ class ChartDataProvider:
         start: datetime | None = None,
         end: datetime | None = None,
         market_hint: str | None = None,
+        prepost: bool = False,
     ) -> list[OHLCVBar]:
+        period = self._normalize_default_period_for_interval(interval, period, start, end)
         market, base_symbol, provider_ticker = await self.resolve_market(symbol, market_hint=market_hint)
         if not provider_ticker:
             return []
 
         start = _utc_dt(start) if start else None
         end = _utc_dt(end) if end else None
-        cache_key = (provider_ticker, interval, period)
+        cache_period_key = f"{period}|prepost={str(bool(prepost)).lower()}"
+        cache_key = (provider_ticker, interval, cache_period_key)
         now = time.time()
         if start is None and end is None:
             cached = self._mem_cache.get(cache_key)
@@ -120,7 +123,7 @@ class ChartDataProvider:
                 return list(cached[1])
 
         # SQLite cache lookup only for explicit ranges.
-        if start and end:
+        if start and end and not prepost:
             cached_rows = await self._cache.get_range(
                 provider_ticker,
                 interval,
@@ -145,7 +148,7 @@ class ChartDataProvider:
         if market == "IN":
             bars = await self._india_ohlcv(base_symbol, provider_ticker, interval, period, start, end)
         else:
-            bars = await self._us_ohlcv(base_symbol, provider_ticker, interval, period, start, end)
+            bars = await self._us_ohlcv(base_symbol, provider_ticker, interval, period, start, end, prepost=prepost)
 
         if bars:
             normalized = [
@@ -159,10 +162,32 @@ class ChartDataProvider:
                 }
                 for b in bars
             ]
-            await self._cache.put_bars(provider_ticker, interval, normalized)
+            if not prepost:
+                await self._cache.put_bars(provider_ticker, interval, normalized)
             if start is None and end is None:
                 self._mem_cache[cache_key] = (now, list(bars))
         return bars
+
+    def _normalize_default_period_for_interval(
+        self,
+        interval: str,
+        period: str,
+        start: datetime | None,
+        end: datetime | None,
+    ) -> str:
+        # yfinance rejects long lookbacks for intraday bars (especially 1m).
+        # Most callers rely on the function default period, so clamp only in that case.
+        if start or end:
+            return period
+        normalized_interval = (interval or "1d").strip().lower()
+        normalized_period = (period or "6mo").strip().lower()
+        if normalized_period != "6mo":
+            return period
+        if normalized_interval == "1m":
+            return "7d"
+        if normalized_interval in {"2m", "5m", "15m", "30m", "60m", "1h", "90m"}:
+            return "60d"
+        return period
 
     async def _india_ohlcv(
         self,
@@ -189,6 +214,7 @@ class ChartDataProvider:
         period: str,
         start: datetime | None,
         end: datetime | None,
+        prepost: bool = False,
     ) -> list[OHLCVBar]:
         if self.fmp_key:
             try:
@@ -204,7 +230,7 @@ class ChartDataProvider:
                     return bars
             except Exception as exc:
                 logger.warning("Finnhub candles failed for %s: %s", ticker, exc)
-        return await self._yfinance_ohlcv(base_symbol, ticker, interval, period, start, end, market="US")
+        return await self._yfinance_ohlcv(base_symbol, ticker, interval, period, start, end, market="US", prepost=prepost)
 
     async def _yfinance_ohlcv(
         self,
@@ -215,10 +241,15 @@ class ChartDataProvider:
         start: datetime | None,
         end: datetime | None,
         market: MarketType,
+        prepost: bool = False,
     ) -> list[OHLCVBar]:
         def _fetch():
             t = yf.Ticker(ticker)
             kwargs: dict[str, str] = {"interval": interval}
+            interval_lower = str(interval or "").strip().lower()
+            is_intraday = interval_lower.endswith("m") or interval_lower.endswith("h")
+            if market == "US" and prepost and is_intraday:
+                kwargs["prepost"] = True
             if start and end:
                 kwargs["start"] = start.strftime("%Y-%m-%d")
                 kwargs["end"] = end.strftime("%Y-%m-%d")

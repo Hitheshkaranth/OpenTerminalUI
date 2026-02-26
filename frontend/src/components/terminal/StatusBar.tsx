@@ -7,7 +7,9 @@ import { APP_VERSION } from "../../utils/constants";
 import { TerminalBadge } from "./TerminalBadge";
 
 function nowLabel(now: Date): string {
-  return now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return `${time} ${tz}`;
 }
 
 type Props = {

@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.api.deps import get_db, get_unified_fetcher
 from backend.auth.deps import get_current_user
-from backend.db.database import Base
+from backend.shared.db import Base
 from backend.screener.routes import router as screener_router
 
 

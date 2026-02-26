@@ -15,7 +15,7 @@ const CHART_TYPES: ChartSlotType[] = ["candle", "line", "area"];
 interface Props {
   slot: ChartSlot;
   isFullscreen: boolean;
-  onTickerChange: (ticker: string, market: SlotMarket) => void;
+  onTickerChange: (ticker: string, market: SlotMarket, companyName?: string | null) => void;
   onTimeframeChange: (tf: ChartSlotTimeframe) => void;
   onChartTypeChange: (type: ChartSlotType) => void;
   onETHChange: (eth: Partial<ExtendedHoursConfig>) => void;
@@ -69,6 +69,12 @@ export function ChartPanelHeader({
   return (
     <div className="chart-panel-header flex items-center gap-2 border-b border-terminal-border bg-terminal-panel px-2 py-1" data-testid={`cw-panel-header-${slot.id}`}>
       <TickerDropdown value={slot.ticker} market={slot.market} onChange={onTickerChange} />
+
+      {slot.companyName && (
+        <span className="max-w-40 truncate text-[10px] text-terminal-muted" title={slot.companyName}>
+          {slot.companyName}
+        </span>
+      )}
 
       <div className="h-4 w-px bg-terminal-border" />
 

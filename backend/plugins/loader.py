@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import importlib
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,7 +7,7 @@ from typing import Any
 
 import yaml
 
-from backend.db.database import SessionLocal
+from backend.shared.db import SessionLocal
 from backend.plugins.base import Plugin
 from backend.plugins.context import PluginContextImpl
 

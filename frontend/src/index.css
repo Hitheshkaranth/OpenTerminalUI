@@ -46,7 +46,18 @@ label {
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--ot-color-accent-primary, #ff9f1a) 20%, transparent);
+  background: var(--ot-color-feedback-info-soft, color-mix(in srgb, var(--ot-color-accent-primary, #ff9f1a) 20%, transparent));
+}
+
+:where(button, [role="button"], input, select, textarea):focus-visible {
+  outline: 1px solid var(--ot-color-interaction-selected-border, var(--ot-color-accent-primary, #ff9f1a));
+  outline-offset: 1px;
+  box-shadow: 0 0 0 2px var(--ot-color-interaction-focus-ring, rgba(255, 159, 26, 0.35));
+}
+
+:where(button, input, select, textarea):disabled {
+  color: var(--ot-color-interaction-disabled-text, inherit);
+  background-color: var(--ot-color-interaction-disabled-surface, transparent);
 }
 
 ::-webkit-scrollbar {

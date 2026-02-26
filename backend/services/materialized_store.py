@@ -6,7 +6,7 @@ from typing import Any
 import pandas as pd
 from sqlalchemy import text
 
-from backend.db.database import engine
+from backend.shared.db import engine
 
 
 TABLE_NAME = "screener_snapshot"

@@ -36,14 +36,19 @@ export function chartPointsToBars(points: ChartPoint[]): Bar[] {
     }
     const normalizedHigh = Math.max(open, high, low, close);
     const normalizedLow = Math.min(open, high, low, close);
-    byTime.set(time, {
+    const bar: Bar = {
       time,
       open,
       high: normalizedHigh,
       low: normalizedLow,
       close,
       volume: Number.isFinite(volume) ? volume : 0,
-    });
+    };
+    // Attach metadata if present
+    if ((d as any).s) (bar as any).s = (d as any).s;
+    if ((d as any).ext) (bar as any).ext = (d as any).ext;
+
+    byTime.set(time, bar);
   }
   return Array.from(byTime.values()).sort((a, b) => Number(a.time) - Number(b.time));
 }

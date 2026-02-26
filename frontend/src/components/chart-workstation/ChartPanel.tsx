@@ -29,7 +29,7 @@ interface Props {
   onActivate: () => void;
   onToggleFullscreen: () => void;
   onRemove: () => void;
-  onTickerChange: (ticker: string, market: SlotMarket) => void;
+  onTickerChange: (ticker: string, market: SlotMarket, companyName?: string | null) => void;
   onTimeframeChange: (tf: ChartSlotTimeframe) => void;
   onChartTypeChange: (type: ChartSlotType) => void;
   onETHChange: (eth: Partial<ExtendedHoursConfig>) => void;
@@ -161,6 +161,7 @@ export function ChartPanel({
             ticker={slot.ticker}
             data={renderChartData}
             mode={CHART_MODE_MAP[slot.chartType]}
+            timeframe={slot.timeframe}
             drawMode="none"
             extendedHours={slot.extendedHours}
             preMarketLevels={slot.preMarketLevels}

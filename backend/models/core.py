@@ -7,7 +7,7 @@ from uuid import uuid4
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from backend.db.database import Base
+from backend.shared.db import Base
 
 
 class Holding(Base):

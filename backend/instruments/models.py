@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, JSON
-from backend.db.database import Base
+from backend.shared.db import Base
 
 class InstrumentMaster(Base):
     __tablename__ = "instrument_master"

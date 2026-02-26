@@ -61,11 +61,18 @@ function intervalToTimeframe(interval: string): ChartTimeframe {
   return "1D";
 }
 
+function normalizeRealtimeMarketCode(value: string): "NSE" | "NASDAQ" {
+  const raw = String(value || "").trim().toUpperCase();
+  if (raw === "NSE" || raw === "BSE" || raw === "IN") return "NSE";
+  return "NASDAQ";
+}
+
 export function StockDetailPage() {
   const { ticker, interval, range, setInterval, setRange } = useStockStore();
   const { formatDisplayMoney } = useDisplayCurrency();
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
-  const { subscribe, unsubscribe, isConnected, connectionState } = useQuotesStream(selectedMarket);
+  const realtimeMarket = normalizeRealtimeMarketCode(selectedMarket);
+  const { subscribe, unsubscribe, isConnected, connectionState } = useQuotesStream(realtimeMarket);
   const ticksByToken = useQuotesStore((s) => s.ticksByToken);
 
   const [chartType, setChartType] = useState<ChartKind>("candle");
@@ -78,9 +85,10 @@ export function StockDetailPage() {
   const [financialPeriod, setFinancialPeriod] = useState<"annual" | "quarterly">("annual");
   const [showVolume, setShowVolume] = useState(true);
   const [showDeliveryOverlay, setShowDeliveryOverlay] = useState(false);
+  const [extended, setExtended] = useState(false);
   const [snapshotTick, setSnapshotTick] = useState<{ ltp: number; change: number; change_pct: number } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [chartPoints, setChartPoints] = useState<Array<{ t: number; o: number; h: number; l: number; c: number; v: number }>>([]);
+  const [chartPoints, setChartPoints] = useState<Array<{ t: number; o: number; h: number; l: number; c: number; v: number; s?: string; ext?: boolean }>>([]);
   const [isBackfilling, setIsBackfilling] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const chartFullscreenRef = useRef<HTMLDivElement | null>(null);
@@ -88,7 +96,7 @@ export function StockDetailPage() {
   const { data: stock } = useStock(ticker);
   const { data: returnsData } = useStockReturns(ticker);
   const { data: performanceData } = useEquityPerformance(ticker);
-  const { data: chart, isLoading: isChartLoading, error: chartError } = useStockHistory(ticker, range, interval);
+  const { data: chart, isLoading: isChartLoading, error: chartError } = useStockHistory(ticker, range, interval, extended);
   const { data: deliverySeriesData } = useDeliverySeries(ticker, interval, range);
   const { data: financials, isLoading: isFinancialsLoading } = useFinancials(ticker, financialPeriod);
   const { data: nextEarnings } = useNextEarnings(ticker);
@@ -98,14 +106,14 @@ export function StockDetailPage() {
     if (!ticker) return;
     subscribe([ticker]);
     return () => unsubscribe([ticker]);
-  }, [selectedMarket, subscribe, ticker, unsubscribe]);
+  }, [realtimeMarket, subscribe, ticker, unsubscribe]);
 
   useEffect(() => {
     let active = true;
     if (!ticker) return;
     void (async () => {
       try {
-        const payload = await fetchQuotesBatch([ticker], selectedMarket);
+        const payload = await fetchQuotesBatch([ticker], realtimeMarket);
         if (!active) return;
         const row = payload.quotes?.[0];
         if (!row) return;
@@ -123,7 +131,7 @@ export function StockDetailPage() {
     return () => {
       active = false;
     };
-  }, [selectedMarket, ticker]);
+  }, [realtimeMarket, ticker]);
 
   useEffect(() => {
     const storageKey = `chart:indicators:${ticker.toUpperCase()}`;
@@ -187,7 +195,7 @@ export function StockDetailPage() {
       : null;
   const derivedChangeFromSnapshot =
     latestPrice !== null && changePct !== null && changePct > -100 ? latestPrice - latestPrice / (1 + changePct / 100) : null;
-  const liveTick = ticker ? ticksByToken[`${selectedMarket}:${ticker.toUpperCase()}`] : undefined;
+  const liveTick = ticker ? ticksByToken[`${realtimeMarket}:${ticker.toUpperCase()}`] : undefined;
   const displayedLatestPrice = realtimeTick?.ltp ?? liveTick?.ltp ?? snapshotTick?.ltp ?? latestPrice;
   const displayedChange = liveTick?.change ?? snapshotTick?.change ?? derivedChangeFromSnapshot;
   const displayedChangePct = realtimeTick?.change_pct ?? liveTick?.change_pct ?? snapshotTick?.change_pct ?? changePct;
@@ -255,7 +263,7 @@ export function StockDetailPage() {
     if (!ticker || isBackfilling || !hasMoreHistory) return;
     setIsBackfilling(true);
     try {
-      const response = await getHistory(ticker, selectedMarket, interval, range, 300, oldestTime);
+      const response = await getHistory(ticker, realtimeMarket, interval, range, 300, oldestTime);
       const older = response.data ?? [];
       setChartPoints((prev) => mergePrependDedupe(prev, older));
       if (!older.length || response.meta?.pagination?.has_more === false) {
@@ -310,6 +318,8 @@ export function StockDetailPage() {
             onChartTypeChange={setChartType}
             showIndicators={showIndicators}
             onToggleIndicators={() => setShowIndicators((v) => !v)}
+            extended={extended}
+            onExtendedChange={setExtended}
           />
           <div
             ref={chartFullscreenRef}
@@ -322,7 +332,7 @@ export function StockDetailPage() {
                 symbol={ticker}
                 timeframe={timeframe}
                 historicalData={chartPointsToBars(chartPoints)}
-                market={selectedMarket}
+                market={realtimeMarket}
                 activeIndicators={selectedIndicators}
                 chartType={chartType}
                 showVolume={showVolume}
@@ -333,6 +343,13 @@ export function StockDetailPage() {
                 onRequestBackfill={(oldest) => backfillHistory(oldest)}
                 showDeliveryOverlay={showDeliveryOverlay}
                 deliverySeries={deliveryOverlaySeries}
+                extendedHours={{
+                  enabled: extended,
+                  showPreMarket: true,
+                  showAfterHours: true,
+                  visualMode: "merged",
+                  colorScheme: "dimmed"
+                }}
               />
             ) : (
               <div className="flex h-full items-center justify-center text-terminal-muted">

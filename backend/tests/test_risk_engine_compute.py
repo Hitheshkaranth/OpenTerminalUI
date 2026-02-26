@@ -1,4 +1,3 @@
-import pytest
 import numpy as np
 import pandas as pd
 from fastapi.testclient import TestClient
@@ -10,7 +9,6 @@ from backend.risk_engine.compute import (
     calculate_beta,
     build_correlation_matrix,
     calculate_pca_exposures,
-    marginal_risk_contribution,
 )
 
 client = TestClient(app)

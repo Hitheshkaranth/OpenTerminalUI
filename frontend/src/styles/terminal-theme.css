@@ -84,6 +84,39 @@
   --ot-color-action-warning: #ffb74d;
   --ot-color-action-danger: #ff3d3d;
 
+  /* Feedback / state semantics */
+  --ot-color-feedback-success: var(--ot-color-system-ok);
+  --ot-color-feedback-info: var(--ot-color-accent-info);
+  --ot-color-feedback-warning: var(--ot-color-system-warning);
+  --ot-color-feedback-error: var(--ot-color-system-critical);
+  --ot-color-feedback-success-soft: rgba(0, 230, 118, 0.12);
+  --ot-color-feedback-info-soft: rgba(68, 138, 255, 0.14);
+  --ot-color-feedback-warning-soft: rgba(255, 183, 77, 0.14);
+  --ot-color-feedback-error-soft: rgba(255, 61, 61, 0.14);
+
+  /* Ops/monitoring semantics */
+  --ot-color-ops-running: var(--ot-color-system-ok);
+  --ot-color-ops-degraded: var(--ot-color-system-warning);
+  --ot-color-ops-blocked: var(--ot-color-system-critical);
+  --ot-color-ops-maintenance: var(--ot-color-accent-info);
+  --ot-color-ops-queued: var(--ot-color-market-neutral);
+
+  /* Interaction semantics */
+  --ot-color-interaction-focus-ring: color-mix(in srgb, var(--ot-color-accent-primary) 45%, transparent);
+  --ot-color-interaction-hover-border: color-mix(in srgb, var(--ot-color-accent-primary) 35%, var(--ot-color-border-default));
+  --ot-color-interaction-selected-border: var(--ot-color-accent-primary);
+  --ot-color-interaction-disabled-surface: color-mix(in srgb, var(--ot-color-surface-2) 82%, black);
+  --ot-color-interaction-disabled-text: color-mix(in srgb, var(--ot-color-text-muted) 78%, black);
+
+  /* Workstation / chart panel semantics */
+  --ot-color-workstation-panel-active-border: var(--ot-color-accent-primary);
+  --ot-color-workstation-panel-active-glow: rgba(255, 149, 0, 0.18);
+  --ot-color-workstation-panel-drag-target-border: var(--ot-color-accent-info);
+  --ot-color-workstation-panel-drag-target-fill: rgba(68, 138, 255, 0.10);
+  --ot-color-workstation-panel-error-border: var(--ot-color-feedback-error);
+  --ot-color-workstation-panel-sync-indicator: var(--ot-color-accent-secondary);
+  --ot-color-workstation-panel-sync-muted: color-mix(in srgb, var(--ot-color-accent-secondary) 35%, var(--ot-color-text-muted));
+
   --ot-density-row-compact: 24px;
   --ot-density-row-default: 28px;
   --ot-density-row-comfortable: 32px;
@@ -105,6 +138,7 @@
   --ot-text: var(--ot-color-text-primary);
   --ot-muted: var(--ot-color-text-muted);
   --ot-dark: var(--ot-color-border-strong);
+  --ot-focus-ring: var(--ot-color-interaction-focus-ring);
 }
 
 .ot-app-shell {

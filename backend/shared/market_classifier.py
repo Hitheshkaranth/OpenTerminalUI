@@ -5,13 +5,13 @@ import csv
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from pydantic import BaseModel
 from zoneinfo import ZoneInfo
 
-from backend.db.database import SessionLocal
+from backend.shared.db import SessionLocal
 from backend.db.models import FutureContract
 
 

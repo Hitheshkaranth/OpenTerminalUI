@@ -38,6 +38,11 @@ class BatchChartRequest(BaseModel):
 
 
 
+def _batch_result_key(item: BatchTickerItem) -> str:
+    ext_flag = "true" if item.extended else "false"
+    return f"{item.market.upper()}:{item.symbol.upper()}|{item.timeframe}|{item.range or '1y'}|ext={ext_flag}"
+
+
 @router.post("/batch")
 async def batch_chart_data(request: BatchChartRequest) -> dict[str, Any]:
     """
@@ -62,7 +67,7 @@ async def batch_chart_data(request: BatchChartRequest) -> dict[str, Any]:
                 extended=item.extended,
             )
 
-            key = f"{item.market.upper()}:{item.symbol.upper()}|{item.timeframe}|{item.range or '1y'}|ext={item.extended}"
+            key = _batch_result_key(item)
             return key, {
                 "ticker": item.symbol.upper(),
                 "interval": item.timeframe,
@@ -88,7 +93,7 @@ async def batch_chart_data(request: BatchChartRequest) -> dict[str, Any]:
             }
         except Exception as exc:  # noqa: BLE001
             logger.exception("Batch fetch failed for %s", item.symbol)
-            key = f"{item.market.upper()}:{item.symbol.upper()}|{item.timeframe}|{item.range or '1y'}|ext={item.extended}"
+            key = _batch_result_key(item)
             return key, {
                 "ticker": item.symbol.upper(),
                 "interval": item.timeframe,

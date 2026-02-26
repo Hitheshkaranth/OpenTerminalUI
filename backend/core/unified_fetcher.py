@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from backend.core.finnhub_client import FinnhubClient
 from backend.core.fmp_client import FMPClient

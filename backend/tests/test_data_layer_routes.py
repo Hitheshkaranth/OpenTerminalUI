@@ -11,8 +11,8 @@ from sqlalchemy.pool import StaticPool
 from backend.api.deps import get_db, get_unified_fetcher
 from backend.api.routes.data_layer import router as data_layer_router
 from backend.auth.deps import get_current_user
-from backend.db.database import Base
-from backend.models import CorpActionORM, DataVersionORM
+from backend.shared.db import Base
+from backend.models import CorpActionORM
 
 
 def _chart_payload(days: int = 8) -> dict:

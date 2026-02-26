@@ -124,7 +124,56 @@ def _impact_for(event_type: EventType) -> str:
 
 
 class CorporateActionsService:
-    CACHE_TTL_SECONDS = 6 * 60 * 60
+    CACHE_TTL_SECONDS = 1 * 60 * 60  # Reduced to 1 hour
+
+    async def _fetch_yahoo_events(self, symbol: str) -> list[CorporateEvent]:
+        fetcher = await get_unified_fetcher()
+        # For Indian stocks, try with .NS suffix if not present
+        candidates = [symbol.upper()]
+        if "." not in symbol:
+            candidates.append(f"{symbol.upper()}.NS")
+            candidates.append(f"{symbol.upper()}.BO")
+
+        events: list[CorporateEvent] = []
+        for cand in candidates:
+            try:
+                summary = await fetcher.yahoo.get_quote_summary(cand, ["calendarEvents"])
+                cal = summary.get("calendarEvents", {})
+
+                # Earnings
+                earn = cal.get("earnings", {})
+                earn_date = _parse_date(earn.get("earningsDate", [None])[0])
+                if earn_date:
+                    events.append(
+                        CorporateEvent(
+                            symbol=symbol.upper(),
+                            event_type=EventType.EARNINGS,
+                            title="Earnings Date",
+                            description=f"Expected earnings date for {symbol.upper()}",
+                            event_date=earn_date,
+                            source="yahoo",
+                            impact="neutral",
+                        )
+                    )
+
+                # Dividends/Ex-Date from calendar
+                ex_date = _parse_date(cal.get("exDividendDate"))
+                if ex_date:
+                    events.append(
+                        CorporateEvent(
+                            symbol=symbol.upper(),
+                            event_type=EventType.DIVIDEND,
+                            title="Dividend Ex-Date",
+                            description="Dividend ex-date from Yahoo Calendar",
+                            event_date=ex_date,
+                            ex_date=ex_date,
+                            source="yahoo",
+                            impact="positive",
+                        )
+                    )
+            except Exception:
+                continue
+        return events
 
     async def _fetch_nse_events(self, symbol: str) -> list[CorporateEvent]:
         fetcher = await get_unified_fetcher()
@@ -360,6 +409,7 @@ class CorporateActionsService:
 
         gathered = await asyncio.gather(
             self._fetch_nse_events(clean),
+            self._fetch_yahoo_events(clean),
             self._fetch_fmp_dividends_splits(clean),
             self._fetch_fmp_ipo(clean),
             self._fetch_news_mentions(clean),

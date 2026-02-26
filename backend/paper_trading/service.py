@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from backend.api.deps import get_unified_fetcher
-from backend.db.database import SessionLocal
+from backend.shared.db import SessionLocal
 from backend.models import (
     VirtualOrder,
     VirtualOrderStatus,

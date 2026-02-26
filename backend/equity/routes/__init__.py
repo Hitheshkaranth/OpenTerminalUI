@@ -2,13 +2,20 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from backend.api.routes import options
-from backend.equity.routes import admin, alerts, auth, backtest, backtests, chart, crypto, data, earnings, events, export, fundamentals, health, indicators, kite, mutual_funds, news, paper, peers, plugins, portfolio, quotes, reports, screener, scripting, search, shareholding, stocks, stream, valuation
-from backend.api.routes import audit, data_layer, governance, oms, ops, risk
+from backend.api.routes import (
+    admin, alerts, backtest, backtests, chart, crypto, data,
+    export, fundamentals, health, indicators,
+    kite, news, paper, peers, plugins, portfolio, quotes,
+    reports, screener, scripting, search, shareholding, stocks,
+    stream, valuation, options, audit, data_layer, governance,
+    oms, ops, risk
+)
+from backend.equity.routes import earnings, events, mutual_funds, auth
 from backend.model_lab import router as model_lab_router
 from backend.portfolio_lab import router as portfolio_lab_router
 from backend.screener import legacy_router as screener_v1_router
 from backend.screener.router import router as screener_revamped_router
+
 equity_router = APIRouter()
 equity_router.include_router(stocks.router, prefix="/api", tags=["stocks"])
 equity_router.include_router(chart.router, prefix="/api", tags=["chart"])

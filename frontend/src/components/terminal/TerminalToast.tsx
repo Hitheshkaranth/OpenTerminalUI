@@ -11,20 +11,25 @@ type ToastProps = {
 };
 
 const variantClass: Record<Variant, string> = {
-  info: "border-terminal-border",
-  success: "border-terminal-pos",
-  warning: "border-terminal-warn",
-  danger: "border-terminal-neg",
+  info: "border-terminal-border bg-terminal-panel",
+  success: "border-terminal-pos bg-terminal-pos/10",
+  warning: "border-terminal-warn bg-terminal-warn/10",
+  danger: "border-terminal-neg bg-terminal-neg/10",
 };
 
 export function TerminalToast({ title, message, variant = "info", action, className = "" }: ToastProps) {
+  const liveMode = variant === "danger" ? "assertive" : "polite";
   return (
     <div
-      role="status"
-      aria-live="polite"
-      className={`rounded-sm border bg-terminal-panel px-3 py-2 shadow-lg ${variantClass[variant]} ${className}`.trim()}
+      role={variant === "danger" ? "alert" : "status"}
+      aria-live={liveMode}
+      className={`rounded-sm border px-3 py-2 shadow-lg ${variantClass[variant]} ${className}`.trim()}
     >
-      {title ? <div className="ot-type-panel-title mb-1 text-terminal-accent">{title}</div> : null}
+      {title ? (
+        <div className={`ot-type-panel-title mb-1 ${variant === "danger" ? "text-terminal-neg" : variant === "warning" ? "text-terminal-warn" : "text-terminal-accent"}`}>
+          {title}
+        </div>
+      ) : null}
       <div className="ot-type-ui text-xs text-terminal-text">{message}</div>
       {action ? <div className="mt-2">{action}</div> : null}
     </div>

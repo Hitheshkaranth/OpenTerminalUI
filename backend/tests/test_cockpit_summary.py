@@ -5,7 +5,6 @@ os.environ["AUTH_MIDDLEWARE_ENABLED"] = "0"
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from backend.main import app
-from backend.cockpit.schemas import CockpitSummary
 from backend.shared.cache import cache
 
 client = TestClient(app)

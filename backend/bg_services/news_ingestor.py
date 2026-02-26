@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from backend.api.deps import get_unified_fetcher
-from backend.db.database import SessionLocal
+from backend.shared.db import SessionLocal
 from backend.db.models import Holding, NewsArticle, WatchlistItem
 from nlp.sentiment import score_financial_sentiment
 
@@ -179,21 +179,60 @@ class NewsIngestor:
     async def ingest_once(self) -> int:
         fetcher = await get_unified_fetcher()
         items: list[NormalizedNews] = []
+
+        # Always try to fetch news for tracked tickers from Yahoo (works well for India)
+        yahoo_items = await self._fetch_yahoo(fetcher)
+        items.extend(yahoo_items)
+
         if fetcher.finnhub.api_key:
-            items = await self._fetch_finnhub(fetcher)
+            items.extend(await self._fetch_finnhub(fetcher))
         elif fetcher.fmp.api_key:
-            items = await self._fetch_fmp(fetcher)
-        else:
-            self._last_ingest_status = "skipped:no_provider_key"
-            logger.info("event=news_ingest_skipped reason=no_provider_key")
-            return 0
+            items.extend(await self._fetch_fmp(fetcher))
+
         if not items:
             self._last_ingest_status = "ok:0"
             logger.info("event=news_ingest_no_items")
             return 0
+
         inserted = await asyncio.to_thread(self._store_news, items)
         logger.info("event=news_ingest_store inserted=%s candidates=%s", inserted, len(items))
         return inserted
+
+    async def _fetch_yahoo(self, fetcher: Any) -> list[NormalizedNews]:
+        tickers = _db_tickers()
+        out: list[NormalizedNews] = []
+        for ticker in tickers:
+            try:
+                # Replicate Yahoo news search logic for background ingest
+                query = f"{ticker} stock news"
+                rows = await fetcher.yahoo.search_news(query, limit=10)
+                for row in rows:
+                    title = str(row.get("title") or "").strip()
+                    url = str(row.get("link") or row.get("url") or "").strip()
+                    if not title or not url:
+                        continue
+
+                    # Sentiment and normalization
+                    text = f"{title}. {str(row.get('summary') or '').strip()}".strip()
+                    sentiment = score_financial_sentiment(text)
+
+                    item = NormalizedNews(
+                        source=str(row.get("publisher") or "Yahoo Finance").strip() or "Yahoo Finance",
+                        title=title,
+                        url=url,
+                        summary=str(row.get("summary") or "").strip(),
+                        image_url="",
+                        published_at=_to_iso(row.get("providerPublishTime") or row.get("pubDate")),
+                        tickers=[ticker],
+                        sentiment_score=float(sentiment.get("score", 0.0)),
+                        sentiment_label=str(sentiment.get("label", "Neutral")),
+                        sentiment_confidence=float(sentiment.get("confidence", 0.0)),
+                    )
+                    out.append(item)
+            except Exception as e:
+                logger.warning("Yahoo ingest failed for %s: %s", ticker, e)
+                continue
+        return self._dedupe(out)
 
     async def _fetch_finnhub(self, fetcher: Any) -> list[NormalizedNews]:
         rows = await fetcher.finnhub.get_market_news(category="general", limit=120)

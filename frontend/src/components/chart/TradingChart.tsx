@@ -48,14 +48,14 @@ type CandlePoint = {
 function sessionShadeColor(session: string | undefined, eth?: ExtendedHoursConfig): string {
   const normalized = String(session || "rth");
   if (normalized === "pre" || normalized === "pre_open") {
-    if (eth && !eth.showPreMarket) return "transparent";
-    return "rgba(59, 143, 249, 0.16)";
+    if (eth?.enabled && !eth.showPreMarket) return "transparent";
+    return "rgba(59, 143, 249, 0.28)";
   }
   if (normalized === "post" || normalized === "closing") {
-    if (eth && !eth.showAfterHours) return "transparent";
-    return "rgba(155, 89, 182, 0.16)";
+    if (eth?.enabled && !eth.showAfterHours) return "transparent";
+    return "rgba(155, 89, 182, 0.28)";
   }
-  return "rgba(148, 163, 184, 0.045)";
+  return "rgba(148, 163, 184, 0.06)";
 }
 
 function hasVisibleSessionShading(data: CandlePoint[], eth?: ExtendedHoursConfig): boolean {
@@ -64,6 +64,25 @@ function hasVisibleSessionShading(data: CandlePoint[], eth?: ExtendedHoursConfig
   if (!hasTaggedSessions) return false;
   if (!eth?.enabled) return true;
   return Boolean(eth.showPreMarket || eth.showAfterHours);
+}
+
+function isPreSession(session: string | undefined): boolean {
+  return session === "pre" || session === "pre_open";
+}
+
+function isPostSession(session: string | undefined): boolean {
+  return session === "post" || session === "closing";
+}
+
+function buildSessionAreaMask(
+  data: CandlePoint[],
+  predicate: (session: string | undefined) => boolean,
+): Array<{ time: UTCTimestamp } | { time: UTCTimestamp; value: number }> {
+  return data.map((d) =>
+    predicate(d.session)
+      ? { time: d.time as UTCTimestamp, value: d.close }
+      : { time: d.time as UTCTimestamp },
+  );
 }
 
 function sanitizeDrawings(input: unknown): ChartDrawing[] {
@@ -110,6 +129,7 @@ type Props = {
   ticker: string;
   data: ChartPoint[];
   mode: ChartMode;
+  timeframe?: string;
   overlays?: Record<string, IndicatorResponse | undefined>;
   indicatorConfigs?: IndicatorConfig[];
   showVolume?: boolean;
@@ -127,6 +147,7 @@ export function TradingChart({
   ticker,
   data,
   mode,
+  timeframe,
   overlays = {},
   indicatorConfigs = [],
   showVolume = true,
@@ -144,6 +165,8 @@ export function TradingChart({
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const lineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const areaRef = useRef<ISeriesApi<"Area"> | null>(null);
+  const preSessionAreaRef = useRef<ISeriesApi<"Area"> | null>(null);
+  const postSessionAreaRef = useRef<ISeriesApi<"Area"> | null>(null);
   const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const sessionShadingRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const overlaySeriesRef = useRef<Array<ISeriesApi<"Line">>>([]);
@@ -297,6 +320,26 @@ export function TradingChart({
       bottomColor: terminalColors.accentAreaBottom,
       visible: mode === "area",
     });
+    const preSessionArea = chart.addSeries(AreaSeries, {
+      lineColor: "rgba(59, 143, 249, 0.55)",
+      topColor: "rgba(59, 143, 249, 0.30)",
+      bottomColor: "rgba(59, 143, 249, 0.10)",
+      lineWidth: 1,
+      lastValueVisible: false,
+      priceLineVisible: false,
+      crosshairMarkerVisible: false,
+      visible: false,
+    });
+    const postSessionArea = chart.addSeries(AreaSeries, {
+      lineColor: "rgba(155, 89, 182, 0.55)",
+      topColor: "rgba(155, 89, 182, 0.30)",
+      bottomColor: "rgba(155, 89, 182, 0.10)",
+      lineWidth: 1,
+      lastValueVisible: false,
+      priceLineVisible: false,
+      crosshairMarkerVisible: false,
+      visible: false,
+    });
     const volume = chart.addSeries(HistogramSeries, {
       priceScaleId: "",
       color: terminalColors.accent,
@@ -318,6 +361,8 @@ export function TradingChart({
     candleRef.current = candles;
     lineRef.current = line;
     areaRef.current = area;
+    preSessionAreaRef.current = preSessionArea;
+    postSessionAreaRef.current = postSessionArea;
     volumeRef.current = volume;
     sessionShadingRef.current = sessionShading;
 
@@ -428,6 +473,8 @@ export function TradingChart({
       candleRef.current = null;
       lineRef.current = null;
       areaRef.current = null;
+      preSessionAreaRef.current = null;
+      postSessionAreaRef.current = null;
       volumeRef.current = null;
       sessionShadingRef.current = null;
       overlaySeriesRef.current = [];
@@ -447,6 +494,8 @@ export function TradingChart({
       candleRef.current.setData([]);
       lineRef.current.setData([]);
       areaRef.current.setData([]);
+      preSessionAreaRef.current?.setData([]);
+      postSessionAreaRef.current?.setData([]);
       volumeRef.current.setData([]);
       sessionShadingRef.current.setData([]);
       lastParsedRef.current = [];
@@ -464,6 +513,11 @@ export function TradingChart({
 
     const ethEnabled = extendedHours?.enabled;
     const hasSessionMetadata = parsed.some((d) => d.session && d.session !== "rth");
+    const showSessionOverlays = ethEnabled || hasSessionMetadata;
+    const showAreaSessionHighlight = mode === "area" && showSessionOverlays;
+    preSessionAreaRef.current?.applyOptions({ visible: showAreaSessionHighlight });
+    postSessionAreaRef.current?.applyOptions({ visible: showAreaSessionHighlight });
+    sessionShadingRef.current.applyOptions({ visible: showSessionOverlays });
 
     // Handle session-aware candle coloring
     if (ethEnabled && mode === "candles") {
@@ -528,6 +582,21 @@ export function TradingChart({
     if (isIncremental) {
       lineRef.current.update(updatePoint);
       areaRef.current.update(updatePoint);
+      if (showAreaSessionHighlight) {
+        preSessionAreaRef.current?.update(
+          isPreSession(lastPoint.session)
+            ? { time: lastPoint.time as UTCTimestamp, value: lastPoint.close }
+            : ({ time: lastPoint.time as UTCTimestamp } as any),
+        );
+        postSessionAreaRef.current?.update(
+          isPostSession(lastPoint.session)
+            ? { time: lastPoint.time as UTCTimestamp, value: lastPoint.close }
+            : ({ time: lastPoint.time as UTCTimestamp } as any),
+        );
+      } else {
+        preSessionAreaRef.current?.update({ time: lastPoint.time as UTCTimestamp } as any);
+        postSessionAreaRef.current?.update({ time: lastPoint.time as UTCTimestamp } as any);
+      }
       volumeRef.current.update(volUpdate);
 
       if (ethEnabled || hasSessionMetadata) {
@@ -542,6 +611,8 @@ export function TradingChart({
     } else {
       lineRef.current.setData(parsed.map((d) => ({ time: d.time as UTCTimestamp, value: d.close })));
       areaRef.current.setData(parsed.map((d) => ({ time: d.time as UTCTimestamp, value: d.close })));
+      preSessionAreaRef.current?.setData(showAreaSessionHighlight ? buildSessionAreaMask(parsed, isPreSession) : []);
+      postSessionAreaRef.current?.setData(showAreaSessionHighlight ? buildSessionAreaMask(parsed, isPostSession) : []);
       volumeRef.current.setData(
         parsed.map((d) => {
           let color: string = d.close >= d.open ? terminalColors.candleUpAlpha88 : terminalColors.candleDownAlpha88;
@@ -559,7 +630,7 @@ export function TradingChart({
         parsed.map((d) => ({
           time: d.time as UTCTimestamp,
           value: 1000000000,
-          color: ethEnabled || hasSessionMetadata ? sessionShadeColor(d.session, extendedHours) : "transparent",
+          color: showSessionOverlays ? sessionShadeColor(d.session, extendedHours) : "transparent",
         })),
       );
     }
@@ -581,8 +652,28 @@ export function TradingChart({
         }
     }
 
-    apiRef.current?.timeScale().fitContent();
-  }, [mode, parsed, showVolume, extendedHours, preMarketLevels]);
+    const timeScale = apiRef.current?.timeScale();
+    if (timeScale) {
+      const intradayWindowBars =
+        timeframe === "1m"
+          ? 390
+          : timeframe === "5m"
+            ? 390
+            : timeframe === "15m"
+              ? 260
+              : timeframe === "1h"
+                ? 180
+                : null;
+      if (intradayWindowBars && parsed.length > intradayWindowBars) {
+        timeScale.setVisibleLogicalRange({
+          from: Math.max(0, parsed.length - intradayWindowBars - 1),
+          to: parsed.length + 2,
+        });
+      } else {
+        timeScale.fitContent();
+      }
+    }
+  }, [mode, parsed, showVolume, extendedHours, preMarketLevels, timeframe]);
 
   useEffect(() => {
     if (!apiRef.current) {

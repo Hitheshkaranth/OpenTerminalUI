@@ -95,16 +95,16 @@ function EquityRightRail() {
   });
 
   const riskSummaryQuery = useQuery({
-    queryKey: ["right-rail", "risk", "summary"],
-    queryFn: fetchRiskSummary,
+    queryKey: ["right-rail", "risk", "summary", ticker],
+    queryFn: () => fetchRiskSummary(ticker),
     enabled: isRiskRoute,
     staleTime: 20_000,
     refetchInterval: 45_000,
     refetchOnWindowFocus: false,
   });
   const riskExposuresQuery = useQuery({
-    queryKey: ["right-rail", "risk", "exposures"],
-    queryFn: fetchRiskExposures,
+    queryKey: ["right-rail", "risk", "exposures", ticker],
+    queryFn: () => fetchRiskExposures(ticker),
     enabled: isRiskRoute,
     staleTime: 20_000,
     refetchInterval: 45_000,

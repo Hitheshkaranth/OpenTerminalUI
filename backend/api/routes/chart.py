@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import random
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query

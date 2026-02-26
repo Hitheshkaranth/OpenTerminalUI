@@ -121,8 +121,8 @@ export function ChartWorkstationPage() {
 
   const handleTickerChange = useCallback(
     (slotId: string) =>
-      (ticker: string, market: SlotMarket) => {
-        updateSlotTicker(slotId, ticker, market);
+      (ticker: string, market: SlotMarket, companyName?: string | null) => {
+        updateSlotTicker(slotId, ticker, market, companyName);
       },
     [updateSlotTicker],
   );
@@ -266,14 +266,14 @@ export function ChartWorkstationPage() {
     <CrosshairSyncProvider>
       <div className="chart-workstation flex h-full flex-col bg-terminal-canvas text-terminal-text" data-testid="chart-workstation">
         {/* Toolbar */}
-        <div className="flex items-center gap-3 border-b border-terminal-border bg-terminal-panel px-3 py-1.5 text-[10px]">
+        <div className="flex flex-wrap items-center gap-2 border-b border-terminal-border bg-terminal-panel px-3 py-1.5 text-[10px]">
           <span className="ot-type-label text-terminal-accent font-bold uppercase tracking-widest">Workspace</span>
 
           <div className="h-4 w-px bg-terminal-border" />
 
           <LayoutSelector current={gridTemplate} onChange={handleLayoutChange} />
 
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
             <TerminalBadge
               variant={
                 quotesConnectionState === "connected"

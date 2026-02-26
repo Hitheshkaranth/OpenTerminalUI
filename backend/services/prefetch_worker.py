@@ -6,8 +6,8 @@ from datetime import datetime, timedelta, timezone
 from typing import List
 
 from backend.core.unified_fetcher import UnifiedFetcher
-from backend.services.cache import cache
-from backend.db.database import SessionLocal
+from backend.shared.cache import cache
+from backend.shared.db import SessionLocal
 from backend.db.models import Holding, WatchlistItem
 
 logger = logging.getLogger(__name__)

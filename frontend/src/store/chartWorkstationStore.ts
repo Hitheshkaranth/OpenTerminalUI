@@ -31,6 +31,7 @@ export interface PreMarketLevelConfig {
 export interface ChartSlot {
   id: string;
   ticker: string | null;
+  companyName?: string | null;
   market: SlotMarket;
   timeframe: ChartSlotTimeframe;
   chartType: ChartSlotType;
@@ -54,7 +55,7 @@ interface ChartWorkstationState {
   syncTimeframe: boolean;
   addSlot: () => void;
   removeSlot: (id: string) => void;
-  updateSlotTicker: (id: string, ticker: string, market: SlotMarket) => void;
+  updateSlotTicker: (id: string, ticker: string, market: SlotMarket, companyName?: string | null) => void;
   updateSlotTimeframe: (id: string, tf: ChartSlotTimeframe) => void;
   updateSlotType: (id: string, type: ChartSlotType) => void;
   updateSlotETH: (id: string, eth: Partial<ExtendedHoursConfig>) => void;
@@ -87,6 +88,7 @@ function makeSlot(): ChartSlot {
   return {
     id: makeId(),
     ticker: null,
+    companyName: null,
     market: "IN",
     timeframe: "1D",
     chartType: "candle",
@@ -126,6 +128,9 @@ function normalizeSlot(slot: Partial<ChartSlot> | undefined): ChartSlot {
     ...(slot ?? {}),
     id: typeof slot?.id === "string" && slot.id ? slot.id : base.id,
     ticker: typeof slot?.ticker === "string" && slot.ticker ? slot.ticker : null,
+    companyName: typeof (slot as any)?.companyName === "string" && (slot as any).companyName.trim()
+      ? (slot as any).companyName.trim()
+      : null,
     market: slot?.market === "US" ? "US" : "IN",
     timeframe: (slot?.timeframe as ChartSlotTimeframe) ?? "1D",
     chartType: (slot?.chartType as ChartSlotType) ?? "candle",
@@ -160,10 +165,18 @@ export const useChartWorkstationStore = create<ChartWorkstationState>()(
           return { slots, activeSlotId };
         }),
 
-      updateSlotTicker: (id, ticker, market) =>
+      updateSlotTicker: (id, ticker, market, companyName) =>
         set((s) => ({
           slots: s.slots.map((sl) =>
-            sl.id === id ? { ...sl, ticker, market, extendedHours: { ...sl.extendedHours, enabled: market === "US" } } : sl,
+            sl.id === id
+              ? {
+                  ...sl,
+                  ticker,
+                  companyName: typeof companyName === "string" ? (companyName.trim() || null) : (ticker ? sl.companyName ?? null : null),
+                  market,
+                  extendedHours: { ...sl.extendedHours, enabled: market === "US" },
+                }
+              : sl,
           ),
         })),
 

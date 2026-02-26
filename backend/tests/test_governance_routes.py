@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 from backend.api.deps import get_db
 from backend.api.routes.governance import router as governance_router
 from backend.auth.deps import get_current_user
-from backend.db.database import Base
+from backend.shared.db import Base
 from backend.models import DataVersionORM, ModelExperiment, ModelRun
 
 

@@ -3,9 +3,8 @@ from __future__ import annotations
 import os
 import smtplib
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from email.message import EmailMessage
-from typing import Callable
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger

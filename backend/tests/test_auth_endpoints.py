@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
@@ -10,9 +9,9 @@ from sqlalchemy.pool import StaticPool
 
 from backend.api.deps import get_db
 from backend.auth.deps import get_current_user, require_role
-from backend.auth.jwt import create_access_token, create_refresh_token
+from backend.auth.jwt import create_access_token
 from backend.auth.middleware import AuthMiddleware
-from backend.db.database import Base
+from backend.shared.db import Base
 from backend.equity.routes.auth import router as auth_router
 from backend.models.user import RefreshToken, User, UserRole
 

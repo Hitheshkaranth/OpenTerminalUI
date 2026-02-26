@@ -152,17 +152,53 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 
 ## Screenshots
 
+### Login Page
+
+![Login Page](assets/Login_Page.png)
+
+The login screen provides the entry point to the terminal-style web app experience, with a focused authentication flow before entering the dashboard and analysis workspaces.
+
+### Enhanced Home Screen and Screener
+
+![Enhanced Home Screen](assets/Enhanced_Home_Screen.png)
+
+This view showcases the enhanced terminal-style home screen and screener entry experience, with a denser dashboard layout, improved visual hierarchy, and faster access to screening, trading, analytics, and monitoring workflows.
+
 ### Backtesting Control Deck
 
 ![Backtesting Screen](assets/Back_testing.png)
 
 This screen shows the Momentum Rotation Backtest workflow: ticker universe input, lookback and top-N controls, strategy vs benchmark curve, and rebalance history. It is designed for quick parameter iteration with immediate visual feedback on returns, drawdown, and trade rotations.
 
+### Backtesting Models and Simulations
+
+![Backtesting Models and Simulations](assets/Backtesting_Models_Simulations.png)
+
+This expanded backtesting view highlights additional models and simulation tooling, including richer scenario controls and deeper analytics for comparing strategy behavior under multiple assumptions.
+
 ### Stock Analysis Workspace
 
 ![Stock Screen](assets/Stock_Screen.png)
 
 This view highlights the terminal-style Equity workspace with charting, indicator context, and market data panels. Recent upgrades include normalized India/US chart routing, realtime candle updates from the quote stream, and a hardened screener/chart data pipeline for more reliable symbol switching.
+
+### Enhanced Fundamental Analysis
+
+![Enhanced Fundamental Analysis](assets/Enhanced_Fundamental_Analysis.png)
+
+This enhanced fundamental analysis view expands the research workflow with deeper company metrics, valuation context, and comparison-ready panels while preserving the terminal-style layout and fast navigation between analysis modules.
+
+### Advanced Workstation (6 Parallel Charts)
+
+![Advanced Workstation 6 Parallel Charts](assets/Advanced_Workstation_6_Charts.png)
+
+This advanced workstation layout is designed for multi-symbol monitoring and comparative analysis, displaying 6 parallel charts at once for faster scanning of setups, correlations, and timeframe behavior.
+
+### Advanced Portfolio Monitoring
+
+![Advanced Portfolio Monitoring](assets/Advanced_Portfolio_Monitoring.png)
+
+This portfolio monitoring view is optimized for active oversight, combining portfolio state, performance context, and actionable signals in a dense terminal-style layout for faster decision support.
 
 ### F&O Analysis Workspace
 

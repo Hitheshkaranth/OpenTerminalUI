@@ -152,7 +152,14 @@ class ExtendedHoursService:
 
         # Fallback to standard provider (which uses yfinance)
         provider = await self.provider_factory()
-        bars = await provider.get_ohlcv(symbol, interval=timeframe, start=start_dt, end=end_dt, market_hint="US")
+        bars = await provider.get_ohlcv(
+            symbol,
+            interval=timeframe,
+            start=start_dt,
+            end=end_dt,
+            market_hint="US",
+            prepost=extended,
+        )
         return [self._to_dict(b) for b in bars]
 
     async def _fetch_fmp_extended(self, symbol, timeframe, extended, start_dt, end_dt):

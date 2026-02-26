@@ -7,7 +7,7 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from backend.db.base import get_database_url
-from backend.db.database import Base
+from backend.shared.db import Base
 from backend import models as _models  # noqa: F401
 
 config = context.config

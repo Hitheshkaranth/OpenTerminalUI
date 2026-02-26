@@ -90,13 +90,13 @@ export function useStock(ticker: string) {
   });
 }
 
-export function useStockHistory(ticker: string, range = "1y", interval = "1d") {
+export function useStockHistory(ticker: string, range = "1y", interval = "1d", extended = false) {
   const normalizedTicker = normalizeTicker(ticker);
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
   const isCrypto = /-USD$/i.test(normalizedTicker || "");
   return useQuery<ChartResponse>({
-    queryKey: ["history", selectedMarket, normalizedTicker, range, interval, isCrypto ? "crypto" : "equity"],
-    queryFn: () => (isCrypto ? fetchCryptoCandles(normalizedTicker, interval, range) : getHistory(normalizedTicker, selectedMarket, interval, range)),
+    queryKey: ["history", selectedMarket, normalizedTicker, range, interval, extended, isCrypto ? "crypto" : "equity"],
+    queryFn: () => (isCrypto ? fetchCryptoCandles(normalizedTicker, interval, range) : getHistory(normalizedTicker, selectedMarket, interval, range, undefined, undefined, extended)),
     enabled: Boolean(normalizedTicker),
     staleTime: 5 * 60 * 1000,
     refetchInterval: 60 * 1000, // 1 minute realtime update interval

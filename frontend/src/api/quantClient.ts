@@ -42,18 +42,23 @@ export async function fetchPortfolioBacktestResult(jobId: string) {
 }
 
 // Risk Engine
-export async function fetchRiskSummary() {
-  const { data } = await api.get("/risk/summary");
+export async function fetchRiskSummary(ticker?: string) {
+  const { data } = await api.get("/risk/summary", { params: { ticker } });
   return data;
 }
 
-export async function fetchRiskExposures() {
-  const { data } = await api.get("/risk/exposures");
+export async function fetchRiskExposures(ticker?: string) {
+  const { data } = await api.get("/risk/exposures", { params: { ticker } });
   return data;
 }
 
-export async function fetchRiskCorrelation() {
-  const { data } = await api.get("/risk/correlation");
+export async function fetchRiskCorrelation(ticker?: string) {
+  const { data } = await api.get("/risk/correlation", { params: { ticker } });
+  return data;
+}
+
+export async function fetchSectorConcentration(ticker?: string) {
+  const { data } = await api.get("/risk/sector-concentration", { params: { ticker } });
   return data;
 }
 

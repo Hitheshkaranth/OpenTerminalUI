@@ -1,6 +1,5 @@
 from typing import List
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
 from backend.instruments.models import InstrumentMaster
 from backend.instruments.schemas import InstrumentSearchResult
 

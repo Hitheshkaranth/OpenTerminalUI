@@ -4,9 +4,10 @@ type Props = {
   content: ReactNode;
   children: ReactNode;
   className?: string;
+  side?: "top" | "bottom";
 };
 
-export function TerminalTooltip({ content, children, className = "" }: Props) {
+export function TerminalTooltip({ content, children, className = "", side = "top" }: Props) {
   const [open, setOpen] = useState(false);
   const id = useId();
 
@@ -24,7 +25,9 @@ export function TerminalTooltip({ content, children, className = "" }: Props) {
         <span
           id={id}
           role="tooltip"
-          className="pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 z-40 w-max max-w-60 -translate-x-1/2 rounded-sm border border-terminal-border bg-terminal-panel px-2 py-1 ot-type-ui text-[11px] text-terminal-text shadow-lg"
+          className={`pointer-events-none absolute left-1/2 z-40 w-max max-w-60 -translate-x-1/2 rounded-sm border border-terminal-border bg-terminal-panel px-2 py-1 ot-type-ui text-[11px] text-terminal-text shadow-lg ${
+            side === "top" ? "bottom-[calc(100%+6px)]" : "top-[calc(100%+6px)]"
+          }`}
         >
           {content}
         </span>

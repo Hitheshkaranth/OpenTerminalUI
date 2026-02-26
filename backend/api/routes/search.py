@@ -142,6 +142,13 @@ async def search(q: str = Query(default=""), market: str = Query(default="NSE"))
                 try:
                     cls = await market_classifier.classify(entry.ticker)
                     resolved_name = entry.name
+
+                    # If name is missing or just the ticker, try using display_name from classifier
+                    if not resolved_name or resolved_name.strip().upper() == entry.ticker.strip().upper():
+                        if cls.display_name and cls.display_name.strip().upper() != entry.ticker.strip().upper():
+                            resolved_name = cls.display_name
+
+                    # Fallback to snapshot if still just ticker
                     if not resolved_name or resolved_name.strip().upper() == entry.ticker.strip().upper():
                         try:
                             snap = await fetch_stock_snapshot_coalesced(entry.ticker)
@@ -150,10 +157,11 @@ async def search(q: str = Query(default=""), market: str = Query(default="NSE"))
                                 resolved_name = company_name
                         except Exception:
                             pass
+
                     return SearchResult(
                         ticker=entry.ticker,
                         name=resolved_name or entry.ticker,
-                        exchange=cls.exchange,
+                        exchange=cls.exchange or entry.exchange,
                         country_code=cls.country_code,
                         flag_emoji=cls.flag_emoji,
                     )

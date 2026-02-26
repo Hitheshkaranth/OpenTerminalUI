@@ -1519,15 +1519,15 @@ export function BacktestingPage() {
             {renderMonteCarloTab()}
           </TerminalPanel>
         </div>
-        <div className="grid grid-cols-1 gap-3 min-h-[520px] max-h-[70vh]">
-          <TerminalPanel title="Trade Blotter" subtitle="Execution ledger" className="h-full" bodyClassName="flex h-full min-h-0 flex-col">
+        <div className="grid grid-cols-1 gap-3 h-[44vh] min-h-[300px] sticky top-3">
+          <TerminalPanel title="Trade Blotter" subtitle="Execution ledger" className="h-1/2" bodyClassName="flex h-full min-h-0 flex-col overflow-hidden">
             <div className="mb-2 grid grid-cols-2 gap-2 rounded border border-terminal-border/40 bg-terminal-bg px-2 py-1 text-[11px] md:grid-cols-2">
               <div className="text-terminal-muted">Executed trades: <span className="text-terminal-text">{trades.length}</span></div>
               <div className="text-terminal-muted text-right">Total quantity: <span className="text-terminal-text">{totalTradeQty.toFixed(2)}</span></div>
             </div>
             <div className="min-h-0 flex-1 overflow-auto"><table className="min-w-full text-[11px]"><thead className="text-terminal-muted"><tr className="border-b border-terminal-border"><th className="px-1 py-1 text-left">Date</th><th className="px-1 py-1 text-left">Asset</th><th className="px-1 py-1 text-left">Side</th><th className="px-1 py-1 text-right">Quantity</th><th className="px-1 py-1 text-right">Price</th></tr></thead><tbody>{trades.map((trade, idx) => { const isBuy = trade.action.toUpperCase() === "BUY"; return <tr key={`${trade.date}-${idx}`} className={`border-t border-terminal-border/40 ${isBuy ? "text-terminal-pos" : "text-terminal-neg"}`}><td className="px-1 py-1 text-terminal-text">{trade.date}</td><td className="px-1 py-1 text-terminal-text">{tradedAsset}</td><td className={`px-1 py-1 font-semibold ${isBuy ? "text-terminal-pos" : "text-terminal-neg"}`}>{trade.action.toUpperCase()}</td><td className="px-1 py-1 text-right">{trade.quantity.toFixed(2)}</td><td className="px-1 py-1 text-right">{fmtMoney(trade.price)}</td></tr>; })}</tbody></table></div>
           </TerminalPanel>
-          <TerminalPanel title="Execution Logs" subtitle="Strategy stdout/stderr" className="h-full" bodyClassName="flex h-full min-h-0 flex-col"><pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap bg-terminal-bg p-2 font-mono text-[11px] text-terminal-muted">{result?.logs || "No logs"}</pre></TerminalPanel>
+          <TerminalPanel title="Execution Logs" subtitle="Strategy stdout/stderr" className="h-1/2" bodyClassName="flex h-full min-h-0 flex-col overflow-hidden"><pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap bg-terminal-bg p-2 font-mono text-[11px] text-terminal-muted">{result?.logs || "No logs"}</pre></TerminalPanel>
         </div>
       </div>
     </div>

@@ -44,6 +44,39 @@ export const terminalThemeTokens = {
     critical: "#ff4d4f",
     offline: "#8e98a8",
   },
+  feedback: {
+    success: "#00c176",
+    info: "#4ea1ff",
+    warning: "#ffb74d",
+    error: "#ff4d4f",
+    successSoft: "#00c1761f",
+    infoSoft: "#4ea1ff24",
+    warningSoft: "#ffb74d24",
+    errorSoft: "#ff4d4f24",
+  },
+  ops: {
+    running: "#00c176",
+    degraded: "#ffb74d",
+    blocked: "#ff4d4f",
+    maintenance: "#4ea1ff",
+    queued: "#8e98a8",
+  },
+  interaction: {
+    focusRing: "#ff9f1a73",
+    hoverBorder: "#5d4a2d",
+    selectedBorder: "#ff9f1a",
+    disabledSurface: "#090b10",
+    disabledText: "#677080",
+  },
+  workstation: {
+    panelActiveBorder: "#ff9f1a",
+    panelActiveGlow: "#ff9f1a2e",
+    panelDropTargetBorder: "#4ea1ff",
+    panelDropTargetFill: "#4ea1ff1a",
+    panelErrorBorder: "#ff4d4f",
+    panelSyncIndicator: "#4dd0e1",
+    panelSyncMuted: "#76a8b0",
+  },
   chart: {
     drawingTrend: "#ffd166",
     drawingHLine: "#4dd0e1",
@@ -65,10 +98,27 @@ export const terminalThemeTokens = {
 } as const;
 
 export const terminalSemanticColorRoles = {
+  surface: {
+    canvas: terminalThemeTokens.surface.canvas,
+    shell: terminalThemeTokens.surface.canvasAlt,
+    panel: terminalThemeTokens.surface.panel,
+    panelElevated: terminalThemeTokens.surface.panelAlt,
+    overlay: terminalThemeTokens.surface.overlay,
+  },
   shell: {
     background: terminalThemeTokens.surface.canvasAlt,
     panel: terminalThemeTokens.surface.panel,
     border: terminalThemeTokens.border.default,
+  },
+  feedback: {
+    success: terminalThemeTokens.feedback.success,
+    info: terminalThemeTokens.feedback.info,
+    warning: terminalThemeTokens.feedback.warning,
+    error: terminalThemeTokens.feedback.error,
+    successSoft: terminalThemeTokens.feedback.successSoft,
+    infoSoft: terminalThemeTokens.feedback.infoSoft,
+    warningSoft: terminalThemeTokens.feedback.warningSoft,
+    errorSoft: terminalThemeTokens.feedback.errorSoft,
   },
   status: {
     ok: terminalThemeTokens.system.ok,
@@ -88,6 +138,68 @@ export const terminalSemanticColorRoles = {
     high: terminalThemeTokens.risk.high,
     critical: terminalThemeTokens.risk.critical,
   },
+  ops: {
+    running: terminalThemeTokens.ops.running,
+    degraded: terminalThemeTokens.ops.degraded,
+    blocked: terminalThemeTokens.ops.blocked,
+    maintenance: terminalThemeTokens.ops.maintenance,
+    queued: terminalThemeTokens.ops.queued,
+  },
+  interaction: {
+    focusRing: terminalThemeTokens.interaction.focusRing,
+    hoverBorder: terminalThemeTokens.interaction.hoverBorder,
+    selectedBorder: terminalThemeTokens.interaction.selectedBorder,
+    disabledSurface: terminalThemeTokens.interaction.disabledSurface,
+    disabledText: terminalThemeTokens.interaction.disabledText,
+  },
+  workstation: {
+    panelActiveBorder: terminalThemeTokens.workstation.panelActiveBorder,
+    panelActiveGlow: terminalThemeTokens.workstation.panelActiveGlow,
+    panelDropTargetBorder: terminalThemeTokens.workstation.panelDropTargetBorder,
+    panelDropTargetFill: terminalThemeTokens.workstation.panelDropTargetFill,
+    panelErrorBorder: terminalThemeTokens.workstation.panelErrorBorder,
+    panelSyncIndicator: terminalThemeTokens.workstation.panelSyncIndicator,
+    panelSyncMuted: terminalThemeTokens.workstation.panelSyncMuted,
+  },
+} as const;
+
+export type TerminalThemeTokens = typeof terminalThemeTokens;
+export type TerminalSemanticColorRoles = typeof terminalSemanticColorRoles;
+
+export const terminalSemanticCssVars = {
+  feedback: {
+    success: "--ot-color-feedback-success",
+    info: "--ot-color-feedback-info",
+    warning: "--ot-color-feedback-warning",
+    error: "--ot-color-feedback-error",
+    successSoft: "--ot-color-feedback-success-soft",
+    infoSoft: "--ot-color-feedback-info-soft",
+    warningSoft: "--ot-color-feedback-warning-soft",
+    errorSoft: "--ot-color-feedback-error-soft",
+  },
+  ops: {
+    running: "--ot-color-ops-running",
+    degraded: "--ot-color-ops-degraded",
+    blocked: "--ot-color-ops-blocked",
+    maintenance: "--ot-color-ops-maintenance",
+    queued: "--ot-color-ops-queued",
+  },
+  interaction: {
+    focusRing: "--ot-color-interaction-focus-ring",
+    hoverBorder: "--ot-color-interaction-hover-border",
+    selectedBorder: "--ot-color-interaction-selected-border",
+    disabledSurface: "--ot-color-interaction-disabled-surface",
+    disabledText: "--ot-color-interaction-disabled-text",
+  },
+  workstation: {
+    panelActiveBorder: "--ot-color-workstation-panel-active-border",
+    panelActiveGlow: "--ot-color-workstation-panel-active-glow",
+    panelDropTargetBorder: "--ot-color-workstation-panel-drag-target-border",
+    panelDropTargetFill: "--ot-color-workstation-panel-drag-target-fill",
+    panelErrorBorder: "--ot-color-workstation-panel-error-border",
+    panelSyncIndicator: "--ot-color-workstation-panel-sync-indicator",
+    panelSyncMuted: "--ot-color-workstation-panel-sync-muted",
+  },
 } as const;
 
 // Compatibility export for existing chart/table components.
@@ -104,8 +216,20 @@ export const terminalColors = {
   negative: terminalThemeTokens.market.down,
   warning: terminalThemeTokens.accent.warning,
   info: terminalThemeTokens.accent.info,
+  feedbackInfoSoft: terminalThemeTokens.feedback.infoSoft,
+  feedbackWarnSoft: terminalThemeTokens.feedback.warningSoft,
+  feedbackErrorSoft: terminalThemeTokens.feedback.errorSoft,
   candleUp: terminalThemeTokens.market.candleUp,
   candleDown: terminalThemeTokens.market.candleDown,
+  focusRing: terminalThemeTokens.interaction.focusRing,
+  hoverBorder: terminalThemeTokens.interaction.hoverBorder,
+  selectedBorder: terminalThemeTokens.interaction.selectedBorder,
+  wsPanelActiveBorder: terminalThemeTokens.workstation.panelActiveBorder,
+  wsPanelActiveGlow: terminalThemeTokens.workstation.panelActiveGlow,
+  wsPanelDropTargetBorder: terminalThemeTokens.workstation.panelDropTargetBorder,
+  wsPanelDropTargetFill: terminalThemeTokens.workstation.panelDropTargetFill,
+  wsPanelErrorBorder: terminalThemeTokens.workstation.panelErrorBorder,
+  wsPanelSyncIndicator: terminalThemeTokens.workstation.panelSyncIndicator,
   drawingTrend: terminalThemeTokens.chart.drawingTrend,
   drawingHLine: terminalThemeTokens.chart.drawingHLine,
   indicatorOverlay: terminalThemeTokens.chart.indicatorOverlay,

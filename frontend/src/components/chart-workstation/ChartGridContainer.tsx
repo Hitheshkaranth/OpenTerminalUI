@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { GridTemplate } from "../../store/chartWorkstationStore";
 import "./ChartWorkstation.css";
 
@@ -42,10 +42,39 @@ function computeGridCSS(count: number, template: GridTemplate): CSSProperties {
 }
 
 export function ChartGridContainer({ slotCount, template, children }: Props) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      setSize({ width, height });
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const effectiveTemplate = useMemo(() => {
+    if (template.arrangement === "custom") return template;
+    const isSixPaneMatrix = template.cols * template.rows === 6 && slotCount >= 5;
+    if (!isSixPaneMatrix || size.width <= 0 || size.height <= 0) return template;
+    return size.width >= size.height ? { ...template, cols: 3, rows: 2 } : { ...template, cols: 2, rows: 3 };
+  }, [size.height, size.width, slotCount, template]);
+
+  const gridCss = useMemo(() => computeGridCSS(slotCount, effectiveTemplate), [effectiveTemplate, slotCount]);
+
   return (
     <div
+      ref={containerRef}
       className="chart-grid"
-      style={computeGridCSS(slotCount, template)}
+      style={gridCss}
+      data-slot-count={slotCount}
+      data-grid-cols={effectiveTemplate.cols}
+      data-grid-rows={effectiveTemplate.rows}
       data-testid="chart-grid"
     >
       {children}

@@ -88,6 +88,7 @@ export function ChartEngine({
   const barsRef = useRef<Bar[]>(historicalData);
   const backfillInFlightRef = useRef(false);
   const lastBackfillOldestRef = useRef<number | null>(null);
+  const lastAutoViewportKeyRef = useRef<string | null>(null);
   const [chartApi, setChartApi] = useState<IChartApi | null>(null);
   const { event: syncEvent, publish } = useChartSync();
   const { bars, liveTick } = useRealtimeChart(market, symbol, timeframe, historicalData, enableRealtime);
@@ -390,6 +391,7 @@ export function ChartEngine({
       s.sessionShading.setData(shadings);
     }
 
+    const previousBarsLength = lastBarsRef.current.length;
     lastBarsRef.current = safeBars;
     s.volume.applyOptions({ visible: showVolume });
     s.delivery.setData(
@@ -405,7 +407,38 @@ export function ChartEngine({
         value: Number(b.volume ?? 0),
       })),
     );
-  }, [safeBars, showVolume, deliverySeries, showDeliveryOverlay, extendedHours]);
+
+    const ts = chartRef.current?.timeScale();
+    if (ts) {
+      const viewportKey = `${market}:${symbol}|${timeframe}`;
+      const shouldAutoViewport =
+        (lastAutoViewportKeyRef.current !== viewportKey) ||
+        (previousBarsLength === 0 && safeBars.length > 0);
+      const intradayWindowBars =
+        timeframe === "1m"
+          ? 390
+          : timeframe === "5m"
+            ? 390
+            : timeframe === "15m"
+              ? 260
+              : timeframe === "1h"
+                ? 180
+                : timeframe === "4h"
+                  ? 120
+                  : null;
+      if (shouldAutoViewport) {
+        if (intradayWindowBars && safeBars.length > intradayWindowBars) {
+          ts.setVisibleLogicalRange({
+            from: Math.max(0, safeBars.length - intradayWindowBars - 1),
+            to: safeBars.length + 2,
+          });
+        } else {
+          ts.fitContent();
+        }
+        lastAutoViewportKeyRef.current = viewportKey;
+      }
+    }
+  }, [safeBars, showVolume, deliverySeries, showDeliveryOverlay, extendedHours, timeframe]);
 
   useIndicators(chartApi, safeBars, activeIndicators);
 

@@ -9,14 +9,13 @@ Data sources:
 from __future__ import annotations
 
 import asyncio
-import json
 import math
 import time
 from datetime import date, datetime, timedelta
 from typing import Any, Optional
 
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from backend.shared.cache import cache
 
