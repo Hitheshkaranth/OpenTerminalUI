@@ -4,24 +4,27 @@ import {
   RefreshCw, Zap, Database
 } from "lucide-react";
 
-import { fetchFeedHealth, fetchKillSwitches, setKillSwitch } from "../api/client";
+import { fetchFeedHealth, fetchKillSwitches, fetchOpsDataQuality, setKillSwitch, type OpsDataQualityReport } from "../api/client";
 import type { KillSwitch } from "../types";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { TerminalTabs } from "../components/terminal/TerminalTabs";
 import { TerminalBadge } from "../components/terminal/TerminalBadge";
+import { DataQualityPanel } from "../components/ops/DataQualityPanel";
 
 export function OpsDashboardPage() {
   const [feed, setFeed] = useState<Record<string, unknown>>({});
   const [switches, setSwitches] = useState<KillSwitch[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [dataQuality, setDataQuality] = useState<OpsDataQualityReport | null>(null);
 
   async function load() {
     setLoading(true);
     try {
-      const [health, kill] = await Promise.all([fetchFeedHealth(), fetchKillSwitches()]);
+      const [health, kill, dq] = await Promise.all([fetchFeedHealth(), fetchKillSwitches(), fetchOpsDataQuality()]);
       setFeed(health);
       setSwitches(kill);
+      setDataQuality(dq);
     } finally {
       setLoading(false);
     }
@@ -214,6 +217,8 @@ export function OpsDashboardPage() {
                   {message || "No new system alerts."}
                 </div>
               </TerminalPanel>
+
+              <DataQualityPanel report={dataQuality} loading={loading} />
             </div>
 
             <TerminalPanel title="KILL SWITCHES">

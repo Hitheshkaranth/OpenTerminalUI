@@ -1,15 +1,29 @@
 from __future__ import annotations
 
+import sqlite3
+
+from sqlalchemy import event
 from sqlalchemy import create_engine
 from sqlalchemy import text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from backend.config.settings import get_settings
+from backend.shared.sqlite_utils import configure_sqlite_connection
 
 settings = get_settings()
-engine = create_engine(settings.sqlite_url, connect_args={"check_same_thread": False})
+engine = create_engine(
+    settings.sqlite_url,
+    connect_args={"check_same_thread": False, "timeout": 15},
+    pool_pre_ping=True,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+
+@event.listens_for(engine, "connect")
+def _set_sqlite_pragmas(dbapi_connection: object, connection_record: object) -> None:
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        configure_sqlite_connection(dbapi_connection)
 
 
 def init_db() -> None:

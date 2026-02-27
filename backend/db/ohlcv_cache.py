@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.config.settings import get_settings
+from backend.shared.sqlite_utils import configure_sqlite_connection
 
 CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS ohlcv_cache (
@@ -51,7 +52,9 @@ class OHLCVCache:
             self._ready = True
 
     def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(str(self.sqlite_path), check_same_thread=False)
+        conn = sqlite3.connect(str(self.sqlite_path), check_same_thread=False, timeout=15)
+        configure_sqlite_connection(conn)
+        return conn
 
     def _initialize_sync(self) -> None:
         with self._connect() as conn:

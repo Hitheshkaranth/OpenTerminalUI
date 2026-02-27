@@ -45,6 +45,16 @@ export function AlertsPage() {
         const payload = JSON.parse(String(event.data));
         if (payload?.type !== "alert_triggered") return;
         incrementUnread();
+        window.dispatchEvent(
+          new CustomEvent("ot:alert-toast", {
+            detail: {
+              title: `Alert: ${String(payload.symbol || "").toUpperCase() || "SYMBOL"}`,
+              message: `${String(payload.condition || "Condition met")} @ ${payload.triggered_value ?? "NA"}`,
+              variant: "warning",
+              ttlMs: 5000,
+            },
+          }),
+        );
         setHistory((prev) => [
           {
             id: String(payload.alert_id) + ":" + String(payload.timestamp),

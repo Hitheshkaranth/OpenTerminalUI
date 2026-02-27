@@ -35,6 +35,35 @@ function focusLayoutSelector() {
   btn?.focus();
 }
 
+function applyMultiTimeframePreset() {
+  const state = useChartWorkstationStore.getState();
+  const active = state.slots.find((s) => s.id === state.activeSlotId) || state.slots[0];
+  const symbol = active?.ticker || "AAPL";
+  const market = active?.market || "US";
+  const nextSlots = [...state.slots];
+  while (nextSlots.length < 4) {
+    const id = Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
+    nextSlots.push({
+      id,
+      ticker: symbol,
+      companyName: active?.companyName ?? null,
+      market,
+      timeframe: "1D",
+      chartType: "candle",
+      indicators: [],
+      extendedHours: { ...active?.extendedHours, enabled: market === "US", showPreMarket: true, showAfterHours: true, visualMode: "merged", colorScheme: "dimmed" },
+      preMarketLevels: { ...active?.preMarketLevels, showPMHigh: true, showPMLow: true, showPMOpen: false, showPMVWAP: false, extendIntoRTH: true, daysToShow: 1 },
+    });
+  }
+  const tfs: ChartSlotTimeframe[] = ["1D", "1h", "15m", "5m"];
+  const patched = nextSlots.map((slot, idx) => (idx < 4 ? { ...slot, ticker: symbol, market, timeframe: tfs[idx] } : slot));
+  useChartWorkstationStore.setState({
+    slots: patched,
+    activeSlotId: patched[0]?.id ?? null,
+    gridTemplate: { cols: 2, rows: 2, arrangement: "grid" },
+  });
+}
+
 function getLayoutCapacity(cols: number, rows: number) {
   return Math.max(1, Math.min(6, cols * rows));
 }
@@ -56,6 +85,7 @@ export function ChartWorkstationPage() {
     updateSlotIndicators,
     setActiveSlot,
     setGridTemplate,
+    syncCrosshair,
   } = useChartWorkstationStore();
 
   const visibleCapacity = getLayoutCapacity(gridTemplate.cols || 1, gridTemplate.rows || 1);
@@ -263,7 +293,7 @@ export function ChartWorkstationPage() {
 
 
   return (
-    <CrosshairSyncProvider>
+    <CrosshairSyncProvider enabled={syncCrosshair}>
       <div className="chart-workstation flex h-full flex-col bg-terminal-canvas text-terminal-text" data-testid="chart-workstation">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2 border-b border-terminal-border bg-terminal-panel px-3 py-1.5 text-[10px]">
@@ -340,6 +370,15 @@ export function ChartWorkstationPage() {
                 + ADD PANE
               </TerminalButton>
             )}
+            <TerminalButton
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="px-2 font-bold uppercase"
+              onClick={applyMultiTimeframePreset}
+            >
+              4-TF PRESET
+            </TerminalButton>
           </div>
         </div>
 

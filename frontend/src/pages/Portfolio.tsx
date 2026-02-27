@@ -25,6 +25,7 @@ import { BacktestResults } from "../components/portfolio/BacktestResults";
 import { BenchmarkOverlayChart } from "../components/portfolio/BenchmarkOverlayChart";
 import { CorrelationHeatmap } from "../components/portfolio/CorrelationHeatmap";
 import { DividendTracker } from "../components/portfolio/DividendTracker";
+import { PortfolioManager } from "../components/portfolio/PortfolioManager";
 import { RiskMetricsPanel } from "../components/portfolio/RiskMetricsPanel";
 import { TaxLotManager } from "../components/portfolio/TaxLotManager";
 import { EarningsCalendar } from "../components/EarningsCalendar";
@@ -188,6 +189,9 @@ function daysSince(dateString: string): number | null {
 
 export function PortfolioPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [portfolioView, setPortfolioView] = useState<"legacy" | "manager">(
+    () => (searchParams.get("view") === "manager" ? "manager" : "legacy"),
+  );
   const [portfolioMode, setPortfolioMode] = useState<"equity" | "mutual_funds">(
     () => (searchParams.get("mode") === "mutual_funds" ? "mutual_funds" : "equity"),
   );
@@ -243,6 +247,7 @@ export function PortfolioPage() {
   useEffect(() => {
     const mode = searchParams.get("mode") === "mutual_funds" ? "mutual_funds" : "equity";
     setPortfolioMode(mode);
+    setPortfolioView(searchParams.get("view") === "manager" ? "manager" : "legacy");
   }, [searchParams]);
 
   const switchPortfolioMode = useCallback((mode: "equity" | "mutual_funds") => {
@@ -251,6 +256,16 @@ export function PortfolioPage() {
       const next = new URLSearchParams(prev);
       if (mode === "mutual_funds") next.set("mode", "mutual_funds");
       else next.delete("mode");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const switchPortfolioView = useCallback((view: "legacy" | "manager") => {
+    setPortfolioView(view);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (view === "manager") next.set("view", "manager");
+      else next.delete("view");
       return next;
     }, { replace: true });
   }, [setSearchParams]);
@@ -629,6 +644,28 @@ export function PortfolioPage() {
           {mfMessage && <div className="mt-2 text-xs text-terminal-pos">{mfMessage}</div>}
         </div>
         <MutualFundPortfolioSection refreshToken={mfRefreshToken} />
+      </div>
+    );
+  }
+
+  if (portfolioView === "manager") {
+    return (
+      <div className="space-y-3 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <TerminalButton variant="default" onClick={() => switchPortfolioMode("equity")}>
+            Equity
+          </TerminalButton>
+          <TerminalButton variant="default" onClick={() => switchPortfolioMode("mutual_funds")}>
+            Mutual Funds
+          </TerminalButton>
+          <TerminalButton variant="accent" onClick={() => switchPortfolioView("manager")}>
+            Portfolio Manager
+          </TerminalButton>
+          <TerminalButton variant="default" onClick={() => switchPortfolioView("legacy")}>
+            Legacy View
+          </TerminalButton>
+        </div>
+        <PortfolioManager />
       </div>
     );
   }

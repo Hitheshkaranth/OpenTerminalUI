@@ -174,6 +174,7 @@ function EquityRightRail() {
 
   const quickLinks = [
     { to: "/equity/stocks", label: "Chart" },
+    { to: "/equity/compare", label: "Compare" },
     { to: "/equity/screener", label: "Screener" },
     { to: "/equity/portfolio", label: "Portfolio" },
     { to: "/equity/paper", label: "Paper" },

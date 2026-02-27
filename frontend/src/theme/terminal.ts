@@ -1,25 +1,25 @@
 export const terminalThemeTokens = {
   surface: {
-    canvas: "#05070b",
-    canvasAlt: "#06080c",
-    panel: "#0c0f14",
-    panelAlt: "#121722",
-    overlay: "#0b0f15",
+    canvas: "#0D1117",
+    canvasAlt: "#0F141B",
+    panel: "#161B22",
+    panelAlt: "#1A212B",
+    overlay: "#0F141B",
   },
   border: {
-    subtle: "#232937",
-    default: "#2a2f3a",
-    strong: "#3a4250",
+    subtle: "#212A36",
+    default: "#2D3745",
+    strong: "#3A4658",
   },
   text: {
-    primary: "#d8dde7",
-    secondary: "#aeb8c8",
-    muted: "#8e98a8",
-    inverse: "#05070b",
+    primary: "#d7dde7",
+    secondary: "#adb7c6",
+    muted: "#7f8b9d",
+    inverse: "#0D1117",
   },
   accent: {
-    primary: "#ff9f1a",
-    primaryAlt: "#f57c20",
+    primary: "#FF6B00",
+    primaryAlt: "#FF8B3D",
     warning: "#ffb74d",
     info: "#4ea1ff",
     cyan: "#4dd0e1",
@@ -167,6 +167,24 @@ export type TerminalThemeTokens = typeof terminalThemeTokens;
 export type TerminalSemanticColorRoles = typeof terminalSemanticColorRoles;
 
 export const terminalSemanticCssVars = {
+  market: {
+    up: "--ot-color-market-up",
+    down: "--ot-color-market-down",
+    neutral: "--ot-color-market-neutral",
+  },
+  risk: {
+    low: "--ot-color-risk-low",
+    medium: "--ot-color-risk-medium",
+    high: "--ot-color-risk-high",
+    critical: "--ot-color-risk-critical",
+  },
+  system: {
+    ok: "--ot-color-system-ok",
+    stale: "--ot-color-system-stale",
+    warning: "--ot-color-system-warning",
+    critical: "--ot-color-system-critical",
+    offline: "--ot-color-system-offline",
+  },
   feedback: {
     success: "--ot-color-feedback-success",
     info: "--ot-color-feedback-info",
@@ -201,6 +219,36 @@ export const terminalSemanticCssVars = {
     panelSyncMuted: "--ot-color-workstation-panel-sync-muted",
   },
 } as const;
+
+interface NestedStringRecord {
+  [key: string]: string | NestedStringRecord;
+}
+
+function flattenThemeRoles(
+  root: NestedStringRecord,
+  path: string[] = [],
+  out: Record<string, string> = {},
+) {
+  Object.entries(root).forEach(([key, value]) => {
+    const nextPath = [...path, key];
+    if (typeof value === "string") {
+      out[nextPath.join(".")] = value;
+      return;
+    }
+    flattenThemeRoles(value, nextPath, out);
+  });
+  return out;
+}
+
+export const terminalSemanticRoleMap = flattenThemeRoles(
+  terminalSemanticColorRoles as unknown as NestedStringRecord,
+);
+
+export type TerminalSemanticRole = keyof typeof terminalSemanticRoleMap;
+
+export function getTerminalRoleColor(role: TerminalSemanticRole): string {
+  return terminalSemanticRoleMap[role];
+}
 
 // Compatibility export for existing chart/table components.
 export const terminalColors = {

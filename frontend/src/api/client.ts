@@ -175,6 +175,50 @@ export async function fetchFundamentalScores(ticker: string): Promise<Fundamenta
   return data;
 }
 
+export type SecurityHubOwnershipResponse = {
+  ticker: string;
+  shareholding?: Record<string, unknown>;
+  institutional_holders?: Array<Record<string, unknown>>;
+  insider_transactions?: Array<Record<string, unknown>>;
+  source?: Record<string, unknown>;
+};
+
+export async function fetchSecurityHubOwnership(ticker: string, limit = 25): Promise<SecurityHubOwnershipResponse> {
+  const { data } = await api.get<SecurityHubOwnershipResponse>(`/stocks/${encodeURIComponent(ticker)}/ownership`, {
+    params: { limit },
+  });
+  return data;
+}
+
+export type SecurityHubEstimatesResponse = {
+  ticker: string;
+  analyst_estimates?: Array<Record<string, unknown>>;
+  recommendation_trends?: Array<Record<string, unknown>>;
+  price_target?: Record<string, unknown>;
+  consensus?: unknown;
+};
+
+export async function fetchSecurityHubEstimates(ticker: string, limit = 24): Promise<SecurityHubEstimatesResponse> {
+  const { data } = await api.get<SecurityHubEstimatesResponse>(`/stocks/${encodeURIComponent(ticker)}/estimates`, {
+    params: { limit },
+  });
+  return data;
+}
+
+export type SecurityHubEsgResponse = {
+  ticker: string;
+  latest?: Record<string, unknown>;
+  history?: Array<Record<string, unknown>>;
+  source?: string;
+};
+
+export async function fetchSecurityHubEsg(ticker: string, limit = 10): Promise<SecurityHubEsgResponse> {
+  const { data } = await api.get<SecurityHubEsgResponse>(`/stocks/${encodeURIComponent(ticker)}/esg`, {
+    params: { limit },
+  });
+  return data;
+}
+
 export async function runScreener(rules: ScreenerRule[], limit = 50): Promise<ScreenerResponse> {
   const { data } = await api.post<ScreenerResponse>("/screener/run", {
     rules,
@@ -471,6 +515,138 @@ export async function setKillSwitch(payload: { scope?: string; enabled: boolean;
   return data;
 }
 
+export type MultiPortfolio = {
+  id: string;
+  name: string;
+  description?: string;
+  benchmark_symbol?: string | null;
+  currency?: string;
+  total_value?: number;
+  created_at?: string;
+};
+
+export type MultiPortfolioHolding = {
+  id: string;
+  symbol: string;
+  shares: number;
+  cost_basis_per_share: number;
+  purchase_date: string;
+  notes?: string;
+  lot_id?: string;
+  current_price?: number;
+};
+
+export type MultiPortfolioAnalytics = {
+  portfolio_id: string;
+  total_value: number;
+  total_cost: number;
+  unrealized_pnl: number;
+  unrealized_pnl_pct: number;
+  realized_pnl: number;
+  day_change: number;
+  day_change_pct: number;
+  allocation_by_sector: Array<{ name: string; value: number }>;
+  allocation_by_market: Array<{ name: string; value: number }>;
+  top_gainers: Array<Record<string, unknown>>;
+  top_losers: Array<Record<string, unknown>>;
+  dividend_income_ytd: number;
+  annualized_return: number;
+  sharpe_ratio: number;
+  max_drawdown: number;
+};
+
+export async function fetchPortfolios(): Promise<MultiPortfolio[]> {
+  const { data } = await api.get<{ items: MultiPortfolio[] }>("/portfolios");
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function createPortfolio(payload: { name: string; description?: string; benchmark_symbol?: string; currency?: string; starting_cash?: number }): Promise<{ id: string; name: string }> {
+  const { data } = await api.post<{ id: string; name: string }>("/portfolios", payload);
+  return data;
+}
+
+export async function fetchPortfolioById(portfolioId: string): Promise<MultiPortfolio> {
+  const { data } = await api.get<MultiPortfolio>(`/portfolios/${encodeURIComponent(portfolioId)}`);
+  return data;
+}
+
+export async function updatePortfolioById(portfolioId: string, payload: { name?: string; description?: string; benchmark_symbol?: string; currency?: string }): Promise<void> {
+  await api.patch(`/portfolios/${encodeURIComponent(portfolioId)}`, payload);
+}
+
+export async function deletePortfolioById(portfolioId: string): Promise<void> {
+  await api.delete(`/portfolios/${encodeURIComponent(portfolioId)}`);
+}
+
+export async function fetchPortfolioHoldings(portfolioId: string): Promise<MultiPortfolioHolding[]> {
+  const { data } = await api.get<{ items: MultiPortfolioHolding[] }>(`/portfolios/${encodeURIComponent(portfolioId)}/holdings`);
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function addPortfolioHolding(portfolioId: string, payload: { symbol: string; shares: number; cost_basis_per_share: number; purchase_date: string; notes?: string; lot_id?: string }): Promise<{ id: string; symbol: string }> {
+  const { data } = await api.post<{ id: string; symbol: string }>(`/portfolios/${encodeURIComponent(portfolioId)}/holdings`, payload);
+  return data;
+}
+
+export async function addPortfolioTransaction(portfolioId: string, payload: { symbol: string; type: "buy" | "sell" | "dividend"; shares?: number; price?: number; date: string; fees?: number; lot_id?: string; notes?: string }): Promise<{ id: string; status: string }> {
+  const { data } = await api.post<{ id: string; status: string }>(`/portfolios/${encodeURIComponent(portfolioId)}/transactions`, payload);
+  return data;
+}
+
+export async function fetchPortfolioTransactions(portfolioId: string): Promise<Array<Record<string, unknown>>> {
+  const { data } = await api.get<{ items: Array<Record<string, unknown>> }>(`/portfolios/${encodeURIComponent(portfolioId)}/transactions`);
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchPortfolioAnalyticsV2(portfolioId: string): Promise<MultiPortfolioAnalytics> {
+  const { data } = await api.get<MultiPortfolioAnalytics>(`/portfolios/${encodeURIComponent(portfolioId)}/analytics`);
+  return data;
+}
+
+export type ScreenerScanFilter = { field: string; op: string; value: unknown };
+export type ScreenerScanRequest = {
+  markets: string[];
+  filters: ScreenerScanFilter[];
+  sort: { field: string; order: "asc" | "desc" };
+  limit: number;
+  formula?: string;
+};
+export type ScreenerScanResponse = {
+  count: number;
+  rows: Array<Record<string, unknown>>;
+  meta?: Record<string, unknown>;
+};
+
+export async function runScreenerScan(payload: ScreenerScanRequest): Promise<ScreenerScanResponse> {
+  const { data } = await api.post<ScreenerScanResponse>("/screener/scan", payload, { timeout: 120000 });
+  return data;
+}
+
+export type OpsDataQualitySymbolRow = {
+  symbol: string;
+  last_tick_time: string | null;
+  ticks_per_minute: number;
+  tick_rate_history?: number[];
+  bars_received_today: number;
+  bars_expected_today: number;
+  average_latency_ms: number;
+  provider_source: string;
+  health_status: "healthy" | "degraded" | "stale" | "disconnected" | string;
+};
+
+export type OpsDataQualityReport = {
+  timestamp: string;
+  symbols: OpsDataQualitySymbolRow[];
+  provider_health?: Record<string, Record<string, unknown>>;
+  gaps?: Array<Record<string, unknown>>;
+  us_stream?: Record<string, unknown>;
+};
+
+export async function fetchOpsDataQuality(): Promise<OpsDataQualityReport> {
+  const { data } = await api.get<OpsDataQualityReport>("/ops/data-quality");
+  return data;
+}
+
 export type SearchSymbolItem = {
   ticker: string;
   name: string;
@@ -486,6 +662,71 @@ export async function searchSymbols(q: string, market: string): Promise<SearchSy
 
 export async function fetchChart(ticker: string, interval = "1d", range = "1y", market = "NSE"): Promise<ChartResponse> {
   return getHistory(ticker, market, interval, range);
+}
+
+export type ChartDrawingRecord = {
+  id: string;
+  symbol: string;
+  tool_type: string;
+  coordinates: Record<string, unknown>;
+  style: Record<string, unknown>;
+  created_at?: string;
+};
+
+export async function listChartDrawings(symbol: string): Promise<ChartDrawingRecord[]> {
+  const { data } = await api.get<{ items: ChartDrawingRecord[] }>(`/chart-drawings/${encodeURIComponent(symbol)}`);
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function createChartDrawing(symbol: string, payload: { tool_type: string; coordinates: Record<string, unknown>; style?: Record<string, unknown> }): Promise<{ id: string }> {
+  const { data } = await api.post<{ id: string }>(`/chart-drawings/${encodeURIComponent(symbol)}`, payload);
+  return data;
+}
+
+export async function updateChartDrawing(symbol: string, drawingId: string, payload: { coordinates?: Record<string, unknown>; style?: Record<string, unknown> }): Promise<void> {
+  await api.put(`/chart-drawings/${encodeURIComponent(symbol)}/${encodeURIComponent(drawingId)}`, payload);
+}
+
+export async function deleteChartDrawing(symbol: string, drawingId: string): Promise<void> {
+  await api.delete(`/chart-drawings/${encodeURIComponent(symbol)}/${encodeURIComponent(drawingId)}`);
+}
+
+export async function listChartTemplates(): Promise<Array<{ id: string; name: string; layout_config: Record<string, unknown> }>> {
+  const { data } = await api.get<{ items: Array<{ id: string; name: string; layout_config: Record<string, unknown> }> }>("/chart-templates");
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function createChartTemplate(payload: { name: string; layout_config: Record<string, unknown> }): Promise<{ id: string; name: string }> {
+  const { data } = await api.post<{ id: string; name: string }>("/chart-templates", payload);
+  return data;
+}
+
+export type VolumeProfileBin = {
+  price_low: number;
+  price_high: number;
+  volume: number;
+  buy_volume: number;
+  sell_volume: number;
+};
+
+export type VolumeProfileResponse = {
+  symbol: string;
+  period: string;
+  bins: VolumeProfileBin[];
+  poc_price: number | null;
+  value_area_high: number | null;
+  value_area_low: number | null;
+};
+
+export async function fetchVolumeProfile(symbol: string, opts?: { period?: string; bins?: number; market?: string }): Promise<VolumeProfileResponse> {
+  const { data } = await api.get<VolumeProfileResponse>(`/charts/volume-profile/${encodeURIComponent(symbol)}`, {
+    params: {
+      period: opts?.period ?? "20d",
+      bins: opts?.bins ?? 50,
+      market: opts?.market ?? "NSE",
+    },
+  });
+  return data;
 }
 
 export type ChartBatchSource = "batch" | "fallback";
@@ -942,6 +1183,19 @@ export type NewsSentimentSummary = {
   daily_sentiment: Array<{ date: string; avg_score: number; count: number }>;
 };
 
+export type MarketSentimentSummary = {
+  period_days: number;
+  market: string;
+  sectors: Array<{
+    sector: string;
+    articles_count: number;
+    avg_sentiment: number;
+    bullish_count: number;
+    bearish_count: number;
+    neutral_count: number;
+  }>;
+};
+
 export async function fetchSymbolNews(market: string, symbol: string, limit = 30): Promise<NewsApiItem[]> {
   const { data } = await api.get<{ items: NewsApiItem[] }>("/news/symbol", { params: { market, symbol, limit } });
   return Array.isArray(data?.items) ? data.items : [];
@@ -972,6 +1226,11 @@ export async function fetchNewsByTicker(ticker: string, limit = 100, market?: st
 export async function fetchNewsSentiment(ticker: string, days = 7, market?: string): Promise<NewsSentimentSummary> {
   const symbol = ticker.trim().toUpperCase();
   const { data } = await api.get<NewsSentimentSummary>(`/news/sentiment/${encodeURIComponent(symbol)}`, { params: { days, market } });
+  return data;
+}
+
+export async function fetchMarketSentiment(days = 7, market?: string): Promise<MarketSentimentSummary> {
+  const { data } = await api.get<MarketSentimentSummary>("/news/sentiment/market", { params: { days, market } });
   return data;
 }
 

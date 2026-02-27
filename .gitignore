@@ -21,11 +21,16 @@ frontend/.env.development
 
 # Databases, caches, and runtime artifacts
 *.db
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
 .yf_cache/
 reports/*.xlsx
 reports/*.csv
+.coverage
+coverage.xml
+pytest-report.xml
 
 # Frontend artifacts
 frontend/node_modules/

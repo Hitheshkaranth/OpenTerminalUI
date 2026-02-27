@@ -13,6 +13,11 @@ import {
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
+import {
+  createChartDrawing,
+  deleteChartDrawing,
+  listChartDrawings,
+} from "../../api/client";
 
 import type { ChartPoint, IndicatorResponse } from "../../types";
 import type { DrawMode } from "./DrawingTools";
@@ -27,12 +32,13 @@ import type {
   PreMarketLevelConfig,
 } from "../../store/chartWorkstationStore";
 import { calculatePreMarketLevels, drawPreMarketLevels } from "./PreMarketLevels";
+import { useCrosshairSync } from "../../contexts/CrosshairSyncContext";
 
 type ChartMode = "candles" | "line" | "area";
 type TrendPoint = { time: number; price: number };
 type ChartDrawing =
-  | { id: string; type: "trendline"; p1: TrendPoint; p2: TrendPoint }
-  | { id: string; type: "hline"; price: number };
+  | { id: string; type: "trendline"; p1: TrendPoint; p2: TrendPoint; remoteId?: string }
+  | { id: string; type: "hline"; price: number; remoteId?: string };
 
 type CandlePoint = {
   time: number;
@@ -141,6 +147,10 @@ type Props = {
   extendedHours?: ExtendedHoursConfig;
   preMarketLevels?: PreMarketLevelConfig;
   market?: "US" | "IN";
+  panelId?: string;
+  crosshairSyncGroupId?: string | null;
+  comparisonSeries?: Array<{ symbol: string; data: ChartPoint[]; color?: string }>;
+  onAddToPortfolio?: (symbol: string, priceHint?: number) => void;
 };
 
 export function TradingChart({
@@ -159,6 +169,10 @@ export function TradingChart({
   extendedHours,
   preMarketLevels,
   market = "IN",
+  panelId,
+  crosshairSyncGroupId = "chart-workstation",
+  comparisonSeries = [],
+  onAddToPortfolio,
 }: Props) {
   const chartRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<IChartApi | null>(null);
@@ -170,6 +184,7 @@ export function TradingChart({
   const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const sessionShadingRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const overlaySeriesRef = useRef<Array<ISeriesApi<"Line">>>([]);
+  const comparisonSeriesRef = useRef<Array<ISeriesApi<"Line">>>([]);
   const highLineRef = useRef<IPriceLine | null>(null);
   const lowLineRef = useRef<IPriceLine | null>(null);
   const pmLevelLinesRef = useRef<Array<IPriceLine>>([]);
@@ -181,10 +196,18 @@ export function TradingChart({
   const parsedByTimeRef = useRef<Map<number, CandlePoint>>(new Map());
   const pendingTrendCbRef = useRef<((pending: boolean) => void) | undefined>(undefined);
   const selectedRef = useRef<CandlePoint | null>(null);
+  const hoveredRef = useRef<CandlePoint | null>(null);
   const [drawings, setDrawings] = useState<ChartDrawing[]>([]);
   const [selectedCandle, setSelectedCandle] = useState<CandlePoint | null>(null);
+  const [syncedCandle, setSyncedCandle] = useState<CandlePoint | null>(null);
+  const [syncedCrosshairX, setSyncedCrosshairX] = useState<number | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [indicatorChartApi, setIndicatorChartApi] = useState<IChartApi | null>(null);
   const storageKey = `lts:drawings:${ticker.toUpperCase()}`;
+  const remoteSyncEnabledRef = useRef(true);
+  const initializedDrawingsRef = useRef(false);
+  const syncTimerRef = useRef<number | null>(null);
+  const { pos: syncedPos, broadcast, syncEnabled } = useCrosshairSync();
 
   const parsed = useMemo(
     () =>
@@ -268,20 +291,67 @@ export function TradingChart({
   }, [onPendingTrendPointChange]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) {
-        setDrawings([]);
-        pendingTrendPointRef.current = null;
-          pendingTrendCbRef.current?.(false);
-          return;
+    let cancelled = false;
+    const loadRemoteOrLocal = async () => {
+      if (remoteSyncEnabledRef.current) {
+        try {
+          const items = await listChartDrawings(ticker.toUpperCase());
+          if (!cancelled && Array.isArray(items) && items.length > 0) {
+            const mapped: ChartDrawing[] = items
+              .map((row) => {
+                if (row.tool_type === "hline") {
+                  const price = Number((row.coordinates || {}).price);
+                  if (!Number.isFinite(price)) return null;
+                  return { id: `remote-${row.id}`, remoteId: row.id, type: "hline", price } as ChartDrawing;
+                }
+                if (row.tool_type === "trendline") {
+                  const p1 = (row.coordinates || {}).p1 as Record<string, unknown>;
+                  const p2 = (row.coordinates || {}).p2 as Record<string, unknown>;
+                  if (!p1 || !p2) return null;
+                  const p1t = Number(p1.time);
+                  const p2t = Number(p2.time);
+                  const p1p = Number(p1.price);
+                  const p2p = Number(p2.price);
+                  if (![p1t, p2t, p1p, p2p].every(Number.isFinite)) return null;
+                  return {
+                    id: `remote-${row.id}`,
+                    remoteId: row.id,
+                    type: "trendline",
+                    p1: { time: p1t, price: p1p },
+                    p2: { time: p2t, price: p2p },
+                  } as ChartDrawing;
+                }
+                return null;
+              })
+              .filter((x): x is ChartDrawing => x != null);
+            setDrawings(mapped);
+            initializedDrawingsRef.current = true;
+            return;
+          }
+        } catch {
+          remoteSyncEnabledRef.current = false;
+        }
       }
-      setDrawings(sanitizeDrawings(JSON.parse(raw)));
-    } catch {
-      setDrawings([]);
-    }
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) {
+          setDrawings([]);
+          initializedDrawingsRef.current = true;
+          return;
+        }
+        setDrawings(sanitizeDrawings(JSON.parse(raw)));
+      } catch {
+        setDrawings([]);
+      } finally {
+        initializedDrawingsRef.current = true;
+      }
+    };
+    void loadRemoteOrLocal();
     pendingTrendPointRef.current = null;
     pendingTrendCbRef.current?.(false);
+    return () => {
+      cancelled = true;
+    };
   }, [storageKey]);
 
   useEffect(() => {
@@ -291,6 +361,42 @@ export function TradingChart({
       // ignore storage errors
     }
   }, [drawings, storageKey]);
+
+  useEffect(() => {
+    if (!initializedDrawingsRef.current) return;
+    if (!remoteSyncEnabledRef.current) return;
+    if (syncTimerRef.current !== null) window.clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = window.setTimeout(async () => {
+      const symbol = ticker.toUpperCase();
+      try {
+        const existing = await listChartDrawings(symbol);
+        await Promise.all(existing.map((row) => deleteChartDrawing(symbol, row.id)));
+        for (const d of drawings) {
+          if (d.type === "hline") {
+            await createChartDrawing(symbol, {
+              tool_type: "hline",
+              coordinates: { price: d.price },
+              style: {},
+            });
+          } else {
+            await createChartDrawing(symbol, {
+              tool_type: "trendline",
+              coordinates: { p1: d.p1, p2: d.p2 },
+              style: {},
+            });
+          }
+        }
+      } catch {
+        remoteSyncEnabledRef.current = false;
+      }
+    }, 550);
+    return () => {
+      if (syncTimerRef.current !== null) {
+        window.clearTimeout(syncTimerRef.current);
+        syncTimerRef.current = null;
+      }
+    };
+  }, [drawings, ticker]);
 
   useEffect(() => {
     if (!chartRef.current || apiRef.current) {
@@ -412,7 +518,12 @@ export function TradingChart({
         return;
       }
       const next = extractCandle(param);
+      hoveredRef.current = next;
       setSelectedCandle(next);
+      if (syncEnabled && panelId) {
+        const ts = next ? next.time : null;
+        broadcast(panelId, ts, crosshairSyncGroupId);
+      }
     };
 
     const onClick = (param: MouseEventParams<Time>) => {
@@ -478,9 +589,14 @@ export function TradingChart({
       volumeRef.current = null;
       sessionShadingRef.current = null;
       overlaySeriesRef.current = [];
+      for (const series of comparisonSeriesRef.current) {
+        chart.removeSeries(series);
+      }
+      comparisonSeriesRef.current = [];
       highLineRef.current = null;
       lowLineRef.current = null;
       selectedRef.current = null;
+      hoveredRef.current = null;
     };
   }, []);
 
@@ -727,6 +843,37 @@ export function TradingChart({
 
   useEffect(() => {
     const chart = apiRef.current;
+    if (!chart) return;
+    for (const s of comparisonSeriesRef.current) {
+      chart.removeSeries(s);
+    }
+    comparisonSeriesRef.current = [];
+    if (!comparisonSeries.length) return;
+
+    const palette = ["#4EA1FF", "#A0E75A", "#FFB86B", "#D58CFF"];
+    comparisonSeries.forEach((row, idx) => {
+      const sorted = (row.data || [])
+        .filter((p) => Number.isFinite(Number(p.t)) && Number.isFinite(Number(p.c)))
+        .sort((a, b) => Number(a.t) - Number(b.t));
+      if (!sorted.length) return;
+      const base = Number(sorted[0].c) || 1;
+      const line = chart.addSeries(LineSeries, {
+        color: row.color || palette[idx % palette.length],
+        lineWidth: 2,
+        priceLineVisible: false,
+      });
+      line.setData(
+        sorted.map((p) => ({
+          time: p.t as UTCTimestamp,
+          value: ((Number(p.c) - base) / base) * 100,
+        })),
+      );
+      comparisonSeriesRef.current.push(line);
+    });
+  }, [comparisonSeries]);
+
+  useEffect(() => {
+    const chart = apiRef.current;
     const candles = candleRef.current;
     if (!chart || !candles) {
       return;
@@ -814,15 +961,82 @@ export function TradingChart({
     });
   }, [selectedCandle, showHighLow]);
 
-  const selectedTime = selectedCandle ? new Date(selectedCandle.time * 1000).toLocaleString() : "-";
+  useEffect(() => {
+    const chart = apiRef.current;
+    if (!chart || !syncEnabled || !panelId) {
+      setSyncedCrosshairX(null);
+      setSyncedCandle(null);
+      return;
+    }
+    if (!syncedPos.time || syncedPos.sourceSlotId === panelId) {
+      setSyncedCrosshairX(null);
+      setSyncedCandle(null);
+      return;
+    }
+    if ((syncedPos.groupId ?? null) !== (crosshairSyncGroupId ?? null)) {
+      setSyncedCrosshairX(null);
+      setSyncedCandle(null);
+      return;
+    }
+    const candle = parsedByTimeRef.current.get(syncedPos.time) ?? null;
+    setSyncedCandle(candle);
+    const x = chart.timeScale().timeToCoordinate(syncedPos.time as UTCTimestamp);
+    setSyncedCrosshairX(typeof x === "number" && Number.isFinite(x) ? x : null);
+  }, [syncedPos, syncEnabled, panelId, crosshairSyncGroupId]);
+
+  useEffect(() => {
+    const chart = apiRef.current;
+    if (!chart || !syncEnabled || !panelId) return;
+    const recalc = () => {
+      if (!syncedPos.time || syncedPos.sourceSlotId === panelId) {
+        setSyncedCrosshairX(null);
+        return;
+      }
+      if ((syncedPos.groupId ?? null) !== (crosshairSyncGroupId ?? null)) {
+        setSyncedCrosshairX(null);
+        return;
+      }
+      const x = chart.timeScale().timeToCoordinate(syncedPos.time as UTCTimestamp);
+      setSyncedCrosshairX(typeof x === "number" && Number.isFinite(x) ? x : null);
+    };
+    chart.timeScale().subscribeVisibleTimeRangeChange(recalc as never);
+    return () => {
+      chart.timeScale().unsubscribeVisibleTimeRangeChange(recalc as never);
+    };
+  }, [syncedPos.time, syncedPos.sourceSlotId, syncedPos.groupId, syncEnabled, panelId, crosshairSyncGroupId]);
+
+  const displayCandle = selectedCandle ?? hoveredRef.current ?? syncedCandle;
+  const selectedTime = displayCandle ? new Date(displayCandle.time * 1000).toLocaleString() : "-";
+  const latestClose = parsed.length ? Number(parsed[parsed.length - 1].close) : undefined;
   const selectedChangePct =
-    selectedCandle && selectedCandle.open
-      ? ((selectedCandle.close - selectedCandle.open) / selectedCandle.open) * 100
+    displayCandle && displayCandle.open
+      ? ((displayCandle.close - displayCandle.open) / displayCandle.open) * 100
       : null;
 
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [contextMenu]);
+
   return (
-    <div className="relative z-0 h-full w-full rounded border border-terminal-border">
+    <div
+      className="relative z-0 h-full w-full rounded border border-terminal-border"
+      onContextMenu={(e) => {
+        if (!onAddToPortfolio) return;
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY });
+      }}
+    >
       <div ref={chartRef} className="h-full w-full" />
+      {syncedCrosshairX !== null && (
+        <div
+          className="pointer-events-none absolute inset-y-0 z-[5] border-l border-dashed border-terminal-accent/90"
+          style={{ left: `${Math.round(syncedCrosshairX)}px` }}
+          aria-hidden
+        />
+      )}
       {showSessionLegend && (
         <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[10px] text-terminal-text">
           <span className="inline-flex items-center gap-1">
@@ -841,15 +1055,33 @@ export function TradingChart({
       )}
       <div className="pointer-events-none absolute left-2 top-2 rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[11px] text-terminal-text">
         <div>Time: {selectedTime}</div>
-        <div>O: {selectedCandle ? selectedCandle.open.toFixed(2) : "-"}</div>
-        <div>C: {selectedCandle ? selectedCandle.close.toFixed(2) : "-"}</div>
+        <div>O: {displayCandle ? displayCandle.open.toFixed(2) : "-"}</div>
+        <div>C: {displayCandle ? displayCandle.close.toFixed(2) : "-"}</div>
         <div>
           Chg:{" "}
           {selectedChangePct === null ? "-" : `${selectedChangePct >= 0 ? "+" : ""}${selectedChangePct.toFixed(2)}%`}
         </div>
-        <div>H: {selectedCandle ? selectedCandle.high.toFixed(2) : "-"}</div>
-        <div>L: {selectedCandle ? selectedCandle.low.toFixed(2) : "-"}</div>
+        <div>H: {displayCandle ? displayCandle.high.toFixed(2) : "-"}</div>
+        <div>L: {displayCandle ? displayCandle.low.toFixed(2) : "-"}</div>
+        <div>V: {displayCandle ? Math.round(displayCandle.volume).toLocaleString() : "-"}</div>
       </div>
+      {contextMenu ? (
+        <div
+          className="fixed z-[120] w-44 rounded-sm border border-terminal-border bg-[#0F141B] p-1 shadow-2xl"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            type="button"
+            className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-terminal-panel"
+            onClick={() => {
+              onAddToPortfolio?.(ticker, displayCandle?.close ?? latestClose);
+              setContextMenu(null);
+            }}
+          >
+            Add to Portfolio
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

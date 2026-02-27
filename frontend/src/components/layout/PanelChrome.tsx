@@ -17,7 +17,7 @@ export function PanelFrame({ as = "section", children, className = "", ...rest }
   );
 }
 
-type PanelHeaderProps = HTMLAttributes<HTMLElement> & {
+type PanelHeaderProps = Omit<HTMLAttributes<HTMLElement>, "title"> & {
   title?: ReactNode;
   subtitle?: ReactNode;
   actions?: ReactNode;

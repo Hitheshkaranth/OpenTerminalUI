@@ -33,7 +33,9 @@ export function FuturesPanel() {
   const [error, setError] = useState<string | null>(null);
 
   const { data: chart } = useStockHistory(selectedUnderlying, "3mo", "1d");
-  const chartPoints = chart?.data ?? [];
+  // Must be memoized: inline chartPointsToBars() creates a new array reference every
+  // render, which feeds an unstable seedBars into useRealtimeChart → setBars loop.
+  const historicalData = useMemo(() => (chart?.data ? chartPointsToBars(chart.data) : []), [chart?.data]);
 
   useEffect(() => {
     const term = query.trim().toUpperCase();
@@ -164,12 +166,12 @@ export function FuturesPanel() {
         {error && <div className="text-xs text-terminal-neg">{error}</div>}
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          {selectedUnderlying && chartPoints.length > 0 && (
+          {selectedUnderlying && historicalData.length > 0 && (
             <div className="h-72 w-full max-h-72 rounded border border-terminal-border">
               <ChartEngine
                 symbol={selectedUnderlying}
                 timeframe="1D"
-                historicalData={chartPointsToBars(chartPoints)}
+                historicalData={historicalData}
                 market="NSE"
                 activeIndicators={[]}
                 chartType="candle"

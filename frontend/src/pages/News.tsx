@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-import { fetchLatestNews, fetchNewsByTicker, fetchNewsSentiment, searchLatestNews, type NewsLatestApiItem } from "../api/client";
+import { fetchLatestNews, fetchMarketSentiment, fetchNewsByTicker, fetchNewsSentiment, searchLatestNews, type NewsLatestApiItem } from "../api/client";
+import { SentimentBadge } from "../components/terminal/SentimentBadge";
 import { useStock } from "../hooks/useStocks";
 import { useStockStore } from "../store/stockStore";
 import { terminalColors } from "../theme/terminal";
@@ -189,6 +190,9 @@ export function NewsPage() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [nowMs, setNowMs] = useState(Date.now());
   const [isTickerMode, setIsTickerMode] = useState(true);
+  const [sortMode, setSortMode] = useState<"time" | "sentiment">("time");
+  const [keywordInput, setKeywordInput] = useState(localStorage.getItem("news:keyword-alerts") || "");
+  const [keywordHits, setKeywordHits] = useState<Array<{ keyword: string; title: string; source: string; publishedAt: string }>>([]);
   const [lastRefreshMs, setLastRefreshMs] = useState<number>(Date.now());
   const relevanceAliases = useMemo(
     () => Array.from(new Set(toUpperWords(String(selectedStock?.company_name || "")).slice(0, 6))),
@@ -239,10 +243,21 @@ export function NewsPage() {
     }
   }, [newsQuery.dataUpdatedAt]);
 
+  useEffect(() => {
+    localStorage.setItem("news:keyword-alerts", keywordInput);
+  }, [keywordInput]);
+
   const sentimentQuery = useQuery({
     queryKey: ["news-sentiment", currentTicker, periodDays],
     queryFn: () => fetchNewsSentiment(currentTicker, periodDays, String(selectedStock?.exchange || "")),
     enabled: isTickerMode && Boolean(currentTicker),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+  const marketSentimentQuery = useQuery({
+    queryKey: ["news-sentiment-market", periodDays, String(selectedStock?.exchange || "")],
+    queryFn: () => fetchMarketSentiment(periodDays, String(selectedStock?.exchange || "")),
     staleTime: 60_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
@@ -262,6 +277,29 @@ export function NewsPage() {
     if (newsQuery.data?.sourceMode === "by_ticker") return mapped;
     return mapped.slice(0, 40);
   }, [currentTicker, isTickerMode, newsQuery.data?.items, newsQuery.data?.sourceMode, relevanceAliases]);
+
+  useEffect(() => {
+    const keywords = keywordInput
+      .split(",")
+      .map((k) => k.trim().toLowerCase())
+      .filter(Boolean);
+    if (!keywords.length || !normalizedItems.length) {
+      setKeywordHits([]);
+      return;
+    }
+    const hits: Array<{ keyword: string; title: string; source: string; publishedAt: string }> = [];
+    for (const item of normalizedItems.slice(0, 80)) {
+      const text = `${item.title} ${item.summary}`.toLowerCase();
+      for (const keyword of keywords) {
+        if (text.includes(keyword)) {
+          hits.push({ keyword, title: item.title, source: item.source, publishedAt: item.publishedAt });
+          break;
+        }
+      }
+      if (hits.length >= 8) break;
+    }
+    setKeywordHits(hits);
+  }, [keywordInput, normalizedItems]);
 
   const cutoffMs = nowMs - periodDays * 24 * 60 * 60 * 1000;
   const periodItems = useMemo(
@@ -329,7 +367,16 @@ export function NewsPage() {
         ...fallbackSummary,
       };
 
-  const visibleItems = periodItems.slice(0, visibleCount);
+  const sortedItems = useMemo(() => {
+    const next = [...periodItems];
+    if (sortMode === "sentiment") {
+      next.sort((a, b) => b.sentiment.score - a.sentiment.score);
+      return next;
+    }
+    next.sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
+    return next;
+  }, [periodItems, sortMode]);
+  const visibleItems = sortedItems.slice(0, visibleCount);
 
   return (
     <div className="space-y-3 p-4">
@@ -345,6 +392,14 @@ export function NewsPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <select
+              className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs"
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value as "time" | "sentiment")}
+            >
+              <option value="time">Sort: Time</option>
+              <option value="sentiment">Sort: Sentiment</option>
+            </select>
             <select
               className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs"
               value={String(periodDays)}
@@ -413,6 +468,45 @@ export function NewsPage() {
             </LineChart>
           </ResponsiveContainer>
         </div>
+        {marketSentimentQuery.data?.sectors?.length ? (
+          <div className="mt-3 grid grid-cols-2 gap-1 text-[11px] md:grid-cols-4">
+            {marketSentimentQuery.data.sectors.slice(0, 8).map((row) => (
+              <div
+                key={row.sector}
+                className="rounded border border-terminal-border px-1.5 py-1"
+                style={{
+                  background:
+                    row.avg_sentiment > 0
+                      ? `rgba(34,197,94,${Math.min(0.55, Math.abs(row.avg_sentiment) + 0.1)})`
+                      : row.avg_sentiment < 0
+                      ? `rgba(244,63,94,${Math.min(0.55, Math.abs(row.avg_sentiment) + 0.1)})`
+                      : "#0D1117",
+                }}
+              >
+                <div className="truncate text-terminal-muted">{row.sector}</div>
+                <div className="font-semibold">{row.avg_sentiment >= 0 ? "+" : ""}{row.avg_sentiment.toFixed(2)}</div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <div className="mt-3 rounded border border-terminal-border bg-terminal-bg p-2">
+          <div className="mb-1 text-[11px] text-terminal-muted">Keyword Alerts (comma separated)</div>
+          <input
+            value={keywordInput}
+            onChange={(e) => setKeywordInput(e.target.value)}
+            placeholder="FDA approval, CEO resign, acquisition"
+            className="w-full rounded border border-terminal-border bg-terminal-panel px-2 py-1 text-xs outline-none focus:border-terminal-accent"
+          />
+          {keywordHits.length ? (
+            <div className="mt-2 space-y-1">
+              {keywordHits.map((hit, idx) => (
+                <div key={`${hit.keyword}-${idx}`} className="rounded border border-terminal-border bg-terminal-panel px-2 py-1 text-[11px]">
+                  <span className="text-terminal-accent">{hit.keyword}</span> | {hit.title}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </section>
 
       {(newsQuery.isLoading || (isTickerMode && sentimentQuery.isLoading)) && (
@@ -435,10 +529,7 @@ export function NewsPage() {
         {visibleItems.map((item) => (
           <article key={item.id} className="rounded border border-terminal-border bg-terminal-panel p-3">
             <div className="flex items-center justify-between gap-2">
-              <div className="text-xs">
-                {sentimentDot(item.sentiment.label)} {item.sentiment.score >= 0 ? "+" : ""}
-                {item.sentiment.score.toFixed(2)}
-              </div>
+              <SentimentBadge label={item.sentiment.label} score={item.sentiment.score} confidence={item.sentiment.confidence} />
               <div className="flex items-center gap-2">
                 {isTickerMode && (
                   <span className="rounded border border-terminal-border px-1.5 py-0.5 text-[10px] text-terminal-muted">

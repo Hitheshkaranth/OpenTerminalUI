@@ -4,8 +4,10 @@ import type { ChartTimeframe } from "./types";
 
 const TF_SECONDS: Record<ChartTimeframe, number> = {
   "1m": 60,
+  "2m": 120,
   "5m": 300,
   "15m": 900,
+  "30m": 1800,
   "1h": 3600,
   "4h": 14_400,
   "1D": 86_400,

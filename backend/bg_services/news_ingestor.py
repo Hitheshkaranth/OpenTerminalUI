@@ -10,7 +10,7 @@ from typing import Any
 from backend.api.deps import get_unified_fetcher
 from backend.shared.db import SessionLocal
 from backend.db.models import Holding, NewsArticle, WatchlistItem
-from nlp.sentiment import score_financial_sentiment
+from backend.services.sentiment_engine import score_article_sentiment
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +113,7 @@ def normalize_news_record(row: dict[str, Any], provider: str) -> NormalizedNews 
 
 def _attach_sentiment(item: NormalizedNews) -> None:
     text = f"{item.title}. {item.summary}".strip()
-    sentiment = score_financial_sentiment(text)
+    sentiment = score_article_sentiment(text)
     item.sentiment_score = float(sentiment.get("score", 0.0))
     item.sentiment_label = str(sentiment.get("label", "Neutral"))
     item.sentiment_confidence = float(sentiment.get("confidence", 0.0))
@@ -214,7 +214,7 @@ class NewsIngestor:
 
                     # Sentiment and normalization
                     text = f"{title}. {str(row.get('summary') or '').strip()}".strip()
-                    sentiment = score_financial_sentiment(text)
+                    sentiment = score_article_sentiment(text)
 
                     item = NormalizedNews(
                         source=str(row.get("publisher") or "Yahoo Finance").strip() or "Yahoo Finance",

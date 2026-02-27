@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { fetchVolumeProfile, type VolumeProfileResponse } from "../../api/client";
 import type { ChartPoint, ChartResponse } from "../../types";
 import type {
   ChartSlot,
@@ -9,11 +10,13 @@ import type {
   PreMarketLevelConfig,
 } from "../../store/chartWorkstationStore";
 import { TradingChart } from "../chart/TradingChart";
+import { VolumeProfile } from "../chart/VolumeProfile";
 import { IndicatorPanel } from "../../shared/chart/IndicatorPanel";
 import type { IndicatorConfig } from "../../shared/chart/types";
 import { ChartPanelHeader } from "./ChartPanelHeader";
 import { ChartPanelFooter } from "./ChartPanelFooter";
 import type { QuoteTick } from "../../realtime/useQuotesStream";
+import { quickAddToFirstPortfolio } from "../../shared/portfolioQuickAdd";
 import "./ChartWorkstation.css";
 
 const CHART_MODE_MAP: Record<ChartSlotType, "candles" | "line" | "area"> = {
@@ -60,6 +63,11 @@ export function ChartPanel({
   liveQuote = null,
 }: Props) {
   const [showIndicators, setShowIndicators] = useState(false);
+  const [showVolumeProfile, setShowVolumeProfile] = useState(false);
+  const [vpPeriod, setVpPeriod] = useState("20d");
+  const [vpBins, setVpBins] = useState(50);
+  const [volumeProfile, setVolumeProfile] = useState<VolumeProfileResponse | null>(null);
+  const [vpLoading, setVpLoading] = useState(false);
   const chartData: ChartPoint[] = chartResponse?.data ?? [];
   const loading = chartLoading && Boolean(slot.ticker);
   const error = chartError;
@@ -100,6 +108,35 @@ export function ChartPanel({
     [slot.indicators],
   );
 
+  useEffect(() => {
+    if (!showVolumeProfile || !slot.ticker) return;
+    const symbol = String(slot.ticker);
+    let cancelled = false;
+    const load = async () => {
+      setVpLoading(true);
+      try {
+        const payload = await fetchVolumeProfile(symbol, {
+          period: vpPeriod,
+          bins: vpBins,
+          market: slot.market,
+        });
+        if (!cancelled) setVolumeProfile(payload);
+      } catch {
+        if (!cancelled) setVolumeProfile(null);
+      } finally {
+        if (!cancelled) setVpLoading(false);
+      }
+    };
+    void load();
+    const timer = setInterval(() => {
+      void load();
+    }, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [showVolumeProfile, slot.ticker, slot.market, vpPeriod, vpBins]);
+
   return (
     <div
       className={`chart-panel${isActive ? " active" : ""}${isFullscreen ? " fullscreen" : ""}`}
@@ -124,6 +161,21 @@ export function ChartPanel({
       <div className="chart-panel-body">
         {slot.ticker && (
           <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
+            <button
+              type="button"
+              className={`rounded border px-2 py-0.5 text-[10px] ${
+                showVolumeProfile
+                  ? "border-terminal-accent bg-terminal-accent/10 text-terminal-accent"
+                  : "border-terminal-border bg-terminal-panel/90 text-terminal-muted"
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowVolumeProfile((v) => !v);
+              }}
+              aria-label={showVolumeProfile ? "Hide volume profile" : "Show volume profile"}
+            >
+              VP
+            </button>
             <button
               type="button"
               className={`rounded border px-2 py-0.5 text-[10px] ${
@@ -157,18 +209,51 @@ export function ChartPanel({
           </div>
         )}
         {slot.ticker && !loading && !error && renderChartData.length > 0 && (
-          <TradingChart
-            ticker={slot.ticker}
-            data={renderChartData}
-            mode={CHART_MODE_MAP[slot.chartType]}
-            timeframe={slot.timeframe}
-            drawMode="none"
-            extendedHours={slot.extendedHours}
-            preMarketLevels={slot.preMarketLevels}
-            market={slot.market}
-            indicatorConfigs={indicatorConfigs}
-          />
+          <>
+            <TradingChart
+              ticker={slot.ticker}
+              data={renderChartData}
+              mode={CHART_MODE_MAP[slot.chartType]}
+              timeframe={slot.timeframe}
+              drawMode="none"
+              extendedHours={slot.extendedHours}
+              preMarketLevels={slot.preMarketLevels}
+              market={slot.market}
+              indicatorConfigs={indicatorConfigs}
+              panelId={slot.id}
+              crosshairSyncGroupId="chart-workstation-linked"
+              onAddToPortfolio={(symbol, priceHint) => {
+                void quickAddToFirstPortfolio(symbol, priceHint, "Added from Chart Workstation");
+              }}
+            />
+            {showVolumeProfile ? <VolumeProfile profile={volumeProfile} /> : null}
+          </>
         )}
+        {showVolumeProfile && slot.ticker ? (
+          <div className="absolute right-2 top-10 z-10 flex items-center gap-1 rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[10px] text-terminal-muted">
+            <span>VP</span>
+            <select
+              className="rounded border border-terminal-border bg-terminal-bg px-1 py-0.5 text-[10px]"
+              value={vpPeriod}
+              onChange={(e) => setVpPeriod(e.target.value)}
+            >
+              <option value="5d">5d</option>
+              <option value="10d">10d</option>
+              <option value="20d">20d</option>
+              <option value="30d">30d</option>
+            </select>
+            <select
+              className="rounded border border-terminal-border bg-terminal-bg px-1 py-0.5 text-[10px]"
+              value={vpBins}
+              onChange={(e) => setVpBins(Number(e.target.value))}
+            >
+              <option value={30}>30</option>
+              <option value={50}>50</option>
+              <option value={80}>80</option>
+            </select>
+            {vpLoading ? <span className="text-terminal-accent">...</span> : null}
+          </div>
+        ) : null}
         {slot.ticker && showIndicators && (
           <div
             className="absolute inset-y-2 right-2 z-20 w-[320px] max-w-[calc(100%-1rem)] overflow-hidden rounded border border-terminal-border bg-terminal-panel shadow-xl"

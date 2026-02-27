@@ -23,9 +23,10 @@ const COUNTRY_DEFAULT_MARKET: Record<CountryCode, MarketCode> = {
 
 type TopBarProps = {
   hideTickerLoader?: boolean;
+  hideMarketMarquee?: boolean;
 };
 
-export function TopBar({ hideTickerLoader = false }: TopBarProps) {
+export function TopBar({ hideTickerLoader = false, hideMarketMarquee = false }: TopBarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const setTicker = useStockStore((s) => s.setTicker);
@@ -219,62 +220,89 @@ export function TopBar({ hideTickerLoader = false }: TopBarProps) {
     gold: "GOLDBEES",
     silver: "SILVERBEES",
   };
+
   const marketTickerItems = (
     <>
-      <span className="text-terminal-accent">NIFTY 50</span>
-      <span>{formatIndex(nifty50)}</span>
-      <span className={pctClass(nifty50Pct)}>{formatPct(nifty50Pct)}</span>
-      <span className={hasIndexData ? "text-terminal-pos" : "text-terminal-neg"}>
-        {feedStateLabel}
-      </span>
-      <span className="text-terminal-accent">SENSEX</span>
-      <span>{formatIndex(sensex)}</span>
-      <span className={pctClass(sensexPct)}>{formatPct(sensexPct)}</span>
-      <span className="text-terminal-accent">USD/INR</span>
-      <span>{formatFx(usdInr ?? (inrUsd ? 1 / inrUsd : null))}</span>
-      <span className={pctClass(usdInrPct)}>{formatPct(usdInrPct)}</span>
-      <span className="text-terminal-accent">S&P500</span>
-      <span>{formatGlobalIndex(sp500)}</span>
-      <span className={pctClass(sp500Pct)}>{formatPct(sp500Pct)}</span>
-      <span className="text-terminal-accent">NIKKEI225</span>
-      <span>{formatGlobalIndex(nikkei225)}</span>
-      <span className={pctClass(nikkei225Pct)}>{formatPct(nikkei225Pct)}</span>
-      <span className="text-terminal-accent">HANGSENG</span>
-      <span>{formatGlobalIndex(hangseng)}</span>
-      <span className={pctClass(hangsengPct)}>{formatPct(hangsengPct)}</span>
-      {topIndicators.map((item) => (
-        <button
-          key={item.key}
-          className="inline-flex items-center gap-1 rounded border border-terminal-border px-1.5 py-0.5 text-[10px] uppercase hover:border-terminal-accent hover:text-terminal-accent"
-          onClick={() => {
-            const proxy = chartProxyTickerByKey[item.key] || safeTicker;
-            setTicker(proxy);
-            void load();
-            navigate("/equity/stocks");
-          }}
-          title={`Open chart pane (${(chartProxyTickerByKey[item.key] || safeTicker).toUpperCase()})`}
-        >
-          <span className="text-terminal-accent">{item.label}</span>
-          <span>{item.price == null ? "NA" : Number(item.price).toFixed(2)}</span>
-          <span className={pctClass(item.change_pct ?? null)}>{formatPct(item.change_pct ?? null)}</span>
-        </button>
-      ))}
+      {nifty50 !== null ? (
+        <>
+          <span className="text-terminal-accent">NIFTY 50</span>
+          <span>{formatIndex(nifty50)}</span>
+          <span className={pctClass(nifty50Pct)}>{formatPct(nifty50Pct)}</span>
+        </>
+      ) : null}
+      {sensex !== null ? (
+        <>
+          <span className="text-terminal-accent">SENSEX</span>
+          <span>{formatIndex(sensex)}</span>
+          <span className={pctClass(sensexPct)}>{formatPct(sensexPct)}</span>
+        </>
+      ) : null}
+      {(usdInr !== null || inrUsd !== null) ? (
+        <>
+          <span className="text-terminal-accent">USD/INR</span>
+          <span>{formatFx(usdInr ?? (inrUsd ? 1 / inrUsd : null))}</span>
+          <span className={pctClass(usdInrPct)}>{formatPct(usdInrPct)}</span>
+        </>
+      ) : null}
+      {sp500 !== null ? (
+        <>
+          <span className="text-terminal-accent">S&P500</span>
+          <span>{formatGlobalIndex(sp500)}</span>
+          <span className={pctClass(sp500Pct)}>{formatPct(sp500Pct)}</span>
+        </>
+      ) : null}
+      {nikkei225 !== null ? (
+        <>
+          <span className="text-terminal-accent">NIKKEI225</span>
+          <span>{formatGlobalIndex(nikkei225)}</span>
+          <span className={pctClass(nikkei225Pct)}>{formatPct(nikkei225Pct)}</span>
+        </>
+      ) : null}
+      {hangseng !== null ? (
+        <>
+          <span className="text-terminal-accent">HANGSENG</span>
+          <span>{formatGlobalIndex(hangseng)}</span>
+          <span className={pctClass(hangsengPct)}>{formatPct(hangsengPct)}</span>
+        </>
+      ) : null}
+      {topIndicators
+        .filter((item) => Number.isFinite(Number(item.price)))
+        .map((item) => (
+          <button
+            key={item.key}
+            className="inline-flex items-center gap-1 rounded border border-terminal-border px-1.5 py-0.5 text-[10px] uppercase hover:border-terminal-accent hover:text-terminal-accent"
+            onClick={() => {
+              const proxy = chartProxyTickerByKey[item.key] || safeTicker;
+              setTicker(proxy);
+              void load();
+              navigate("/equity/stocks");
+            }}
+            title={`Open chart pane (${(chartProxyTickerByKey[item.key] || safeTicker).toUpperCase()})`}
+          >
+            <span className="text-terminal-accent">{item.label}</span>
+            <span>{Number(item.price).toFixed(2)}</span>
+            <span className={pctClass(item.change_pct ?? null)}>{formatPct(item.change_pct ?? null)}</span>
+          </button>
+        ))}
+      <span className={hasIndexData ? "text-terminal-pos" : "text-terminal-neg"}>{feedStateLabel}</span>
       <span className="text-terminal-muted">{isFallback ? "fallback enabled" : backendHealthLabel}</span>
-      {marketError && !hasIndexData && <span className="text-terminal-neg">feed error</span>}
+      {marketError && !hasIndexData ? <span className="text-terminal-neg">feed error</span> : null}
     </>
   );
 
   return (
     <div className="relative z-20 border-b border-terminal-border bg-terminal-panel">
-      <div className="flex items-center justify-between border-b border-terminal-border px-3 py-1 text-[11px] uppercase text-terminal-muted">
-        <div className="min-w-0 flex-1 overflow-hidden">
-          <div className="topbar-marquee-track">
-            <div className="topbar-marquee-segment">{marketTickerItems}</div>
-            <div className="topbar-marquee-segment" aria-hidden="true">{marketTickerItems}</div>
+      {!hideMarketMarquee ? (
+        <div className="flex items-center justify-between border-b border-terminal-border px-3 py-1 text-[11px] uppercase text-terminal-muted">
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <div className="topbar-marquee-track">
+              <div className="topbar-marquee-segment">{marketTickerItems}</div>
+              <div className="topbar-marquee-segment" aria-hidden="true">{marketTickerItems}</div>
+            </div>
           </div>
+          <div className="ml-3 shrink-0">CTRL+G GO BAR | / SEARCH</div>
         </div>
-        <div className="ml-3 shrink-0">CTRL+K COMMAND | / SEARCH</div>
-      </div>
+      ) : null}
       <style>{`
         .topbar-marquee-track {
           display: flex;
@@ -305,6 +333,9 @@ export function TopBar({ hideTickerLoader = false }: TopBarProps) {
         </Link>
         <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/equity/screener">
           SCREENER
+        </Link>
+        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/equity/compare">
+          COMPARE
         </Link>
         <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno/heatmap?symbol=${encodeURIComponent(safeTicker)}`}>
           HEATMAP

@@ -5,6 +5,7 @@ import type { CountryCode, MarketCode } from "../types/markets";
 
 type DisplayCurrency = "INR" | "USD";
 type RealtimeMode = "polling" | "ws";
+export type ThemeVariant = "terminal-noir" | "classic-bloomberg" | "light-desk" | "custom";
 
 type SettingsState = {
   selectedCountry: CountryCode;
@@ -13,12 +14,18 @@ type SettingsState = {
   realtimeMode: RealtimeMode;
   newsAutoRefresh: boolean;
   newsRefreshSec: number;
+  themeVariant: ThemeVariant;
+  customAccentColor: string;
+  hudOverlayEnabled: boolean;
   setSelectedCountry: (country: CountryCode) => void;
   setSelectedMarket: (market: MarketCode) => void;
   setDisplayCurrency: (currency: DisplayCurrency) => void;
   setRealtimeMode: (mode: RealtimeMode) => void;
   setNewsAutoRefresh: (enabled: boolean) => void;
   setNewsRefreshSec: (seconds: number) => void;
+  setThemeVariant: (theme: ThemeVariant) => void;
+  setCustomAccentColor: (value: string) => void;
+  setHudOverlayEnabled: (enabled: boolean) => void;
 };
 
 const countryDefaults: Record<CountryCode, { market: MarketCode; currency: DisplayCurrency }> = {
@@ -46,6 +53,9 @@ export const useSettingsStore = create<SettingsState>()(
       realtimeMode: "polling",
       newsAutoRefresh: true,
       newsRefreshSec: 60,
+      themeVariant: "terminal-noir",
+      customAccentColor: "#FF6B00",
+      hudOverlayEnabled: false,
       setSelectedCountry: (country) => {
         const defaults = countryDefaults[country];
         set({
@@ -59,6 +69,12 @@ export const useSettingsStore = create<SettingsState>()(
       setRealtimeMode: (mode) => set({ realtimeMode: mode }),
       setNewsAutoRefresh: (enabled) => set({ newsAutoRefresh: enabled }),
       setNewsRefreshSec: (seconds) => set({ newsRefreshSec: seconds }),
+      setThemeVariant: (theme) => set({ themeVariant: theme }),
+      setCustomAccentColor: (value) =>
+        set({
+          customAccentColor: /^#[0-9A-Fa-f]{6}$/.test(value) ? value.toUpperCase() : "#FF6B00",
+        }),
+      setHudOverlayEnabled: (enabled) => set({ hudOverlayEnabled: enabled }),
     }),
     {
       name: "ui-settings",
@@ -75,6 +91,21 @@ export const useSettingsStore = create<SettingsState>()(
           ...persisted,
           selectedCountry,
           selectedMarket: normalizePersistedMarket((persisted as any).selectedMarket, selectedCountry),
+          themeVariant:
+            persisted.themeVariant === "terminal-noir" ||
+            persisted.themeVariant === "classic-bloomberg" ||
+            persisted.themeVariant === "light-desk" ||
+            persisted.themeVariant === "custom"
+              ? persisted.themeVariant
+              : current.themeVariant,
+          customAccentColor:
+            typeof persisted.customAccentColor === "string" && /^#[0-9A-Fa-f]{6}$/.test(persisted.customAccentColor)
+              ? persisted.customAccentColor.toUpperCase()
+              : current.customAccentColor,
+          hudOverlayEnabled:
+            typeof persisted.hudOverlayEnabled === "boolean"
+              ? persisted.hudOverlayEnabled
+              : current.hudOverlayEnabled,
         };
       },
     },

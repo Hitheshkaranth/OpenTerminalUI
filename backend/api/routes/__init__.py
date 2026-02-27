@@ -19,6 +19,7 @@ __all__ = [
     "search",
     "news",
     "paper",
+    "portfolios",
     "crypto",
     "options",
     "quotes",
@@ -36,4 +37,5 @@ __all__ = [
     "audit",
     "governance",
     "ops",
+    "user_layouts",
 ]

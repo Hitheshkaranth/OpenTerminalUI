@@ -12,6 +12,7 @@ from backend.auth.deps import get_current_user
 from backend.models import OpsKillSwitchORM, User
 from backend.oms.service import log_audit
 from backend.services.marketdata_hub import get_marketdata_hub
+from backend.services.us_tick_stream import get_us_tick_stream_service
 
 router = APIRouter()
 
@@ -25,6 +26,7 @@ class KillSwitchRequest(BaseModel):
 @router.get("/ops/feed-health")
 async def feed_health(_: User = Depends(get_current_user)) -> dict[str, Any]:
     hub = get_marketdata_hub()
+    us_stream = get_us_tick_stream_service()
     snap = await hub.metrics_snapshot()
     ws_clients = int(snap.get("ws_connected_clients", 0))
     ws_subs = int(snap.get("ws_subscriptions", 0))
@@ -34,8 +36,16 @@ async def feed_health(_: User = Depends(get_current_user)) -> dict[str, Any]:
         "ws_connected_clients": ws_clients,
         "ws_subscriptions": ws_subs,
         "kite_stream_status": hub.kite_stream_status(),
+        "us_provider_health": us_stream.provider_health_snapshot(),
+        "us_primary_provider": us_stream.primary_provider_name(),
         "timestamp": datetime.utcnow().isoformat(),
     }
+
+
+@router.get("/ops/data-quality")
+async def ops_data_quality(_: User = Depends(get_current_user)) -> dict[str, Any]:
+    us_stream = get_us_tick_stream_service()
+    return await us_stream.data_quality_report()
 
 
 @router.get("/ops/kill-switch")

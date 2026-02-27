@@ -8,6 +8,7 @@ from backend.api.routes import (
     kite, news, paper, peers, plugins, portfolio, quotes,
     reports, screener, scripting, search, shareholding, stocks,
     stream, valuation, options, audit, data_layer, governance,
+    user_layouts, portfolios,
     oms, ops, risk
 )
 from backend.equity.routes import earnings, events, mutual_funds, auth
@@ -43,6 +44,7 @@ equity_router.include_router(stream.router, prefix="/api", tags=["stream"])
 equity_router.include_router(indicators.router, prefix="/api", tags=["indicators"])
 equity_router.include_router(crypto.router, prefix="/api", tags=["crypto"])
 equity_router.include_router(paper.router, prefix="/api", tags=["paper"])
+equity_router.include_router(portfolios.router, prefix="/api", tags=["portfolios"])
 equity_router.include_router(scripting.router, prefix="/api", tags=["scripting"])
 equity_router.include_router(shareholding.router, prefix="/api", tags=["shareholding"])
 equity_router.include_router(options.router)
@@ -51,6 +53,7 @@ equity_router.include_router(risk.router, prefix="/api", tags=["risk"])
 equity_router.include_router(oms.router, prefix="/api", tags=["oms"])
 equity_router.include_router(audit.router, prefix="/api", tags=["audit"])
 equity_router.include_router(governance.router, prefix="/api", tags=["governance"])
+equity_router.include_router(user_layouts.router, prefix="/api", tags=["user-layouts"])
 equity_router.include_router(ops.router, prefix="/api", tags=["ops"])
 equity_router.include_router(model_lab_router, prefix="/api", tags=["model-lab"])
 equity_router.include_router(portfolio_lab_router, prefix="/api", tags=["portfolio-lab"])

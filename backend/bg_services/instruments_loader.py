@@ -10,6 +10,7 @@ from typing import Any
 
 from backend.api.deps import get_unified_fetcher
 from backend.config.settings import get_settings
+from backend.shared.sqlite_utils import configure_sqlite_connection
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +168,9 @@ class InstrumentsLoader:
 
     def _connect(self) -> sqlite3.Connection:
         self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
-        return sqlite3.connect(str(self.sqlite_path), check_same_thread=False)
+        conn = sqlite3.connect(str(self.sqlite_path), check_same_thread=False, timeout=15)
+        configure_sqlite_connection(conn)
+        return conn
 
     def _upsert_rows(self, rows: list[FutureContractRow]) -> None:
         with self._connect() as conn:

@@ -4,7 +4,7 @@ import type { ExtendedHoursConfig } from "../../store/chartWorkstationStore";
 
 export type ChartKind = "candle" | "line" | "area" | "baseline";
 
-export type ChartTimeframe = "1m" | "5m" | "15m" | "1h" | "4h" | "1D" | "1W" | "1M";
+export type ChartTimeframe = "1m" | "2m" | "5m" | "15m" | "30m" | "1h" | "4h" | "1D" | "1W" | "1M";
 
 export type IndicatorConfig = {
   id: string;
@@ -27,12 +27,19 @@ export type ChartEngineProps = {
   symbolIsFnO?: boolean;
   onCrosshairOHLC?: (payload: { open: number; high: number; low: number; close: number; time: number } | null) => void;
   onTick?: (payload: { ltp: number; change_pct: number } | null) => void;
+  onRealtimeMeta?: (payload: {
+    status: "live" | "delayed" | "disconnected";
+    lastTickTs?: number | null;
+    currentBar?: { open: number; high: number; low: number; close: number; volume: number; time: number } | null;
+  }) => void;
   canRequestBackfill?: boolean;
   onRequestBackfill?: (oldestTime: number) => Promise<void> | void;
   showDeliveryOverlay?: boolean;
   deliverySeries?: Array<{ time: number; value: number }>;
   panelId?: string;
   extendedHours?: ExtendedHoursConfig;
+  showSessionShading?: boolean;
+  onAddToPortfolio?: (symbol: string, priceHint?: number) => void;
 };
 
 export type IndicatorRegistryView = {

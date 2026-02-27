@@ -1,9 +1,9 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500;600;700&display=swap");
 
 :root {
   /* Terminal Design System v2 - semantic tokens */
-  --ot-font-data: "JetBrains Mono", "IBM Plex Mono", "Courier New", monospace;
-  --ot-font-ui: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --ot-font-data: "Fira Code", "JetBrains Mono", "IBM Plex Mono", "Courier New", monospace;
+  --ot-font-ui: "Inter", "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
 
   --ot-font-weight-regular: 400;
   --ot-font-weight-medium: 500;
@@ -39,27 +39,27 @@
   --ot-space-3: 12px;
   --ot-space-4: 16px;
 
-  --ot-color-canvas: #0a0a0a;
-  --ot-color-canvas-elevated: #111111;
-  --ot-color-surface-1: #151515;
-  --ot-color-surface-2: #1a1a1a;
-  --ot-color-surface-3: #202020;
-  --ot-color-overlay: rgba(10, 10, 10, 0.78);
+  --ot-color-canvas: #0d1117;
+  --ot-color-canvas-elevated: #0f141b;
+  --ot-color-surface-1: #161b22;
+  --ot-color-surface-2: #1a212b;
+  --ot-color-surface-3: #222b36;
+  --ot-color-overlay: rgba(13, 17, 23, 0.82);
 
-  --ot-color-border-subtle: #242424;
-  --ot-color-border-default: #2a2a2a;
-  --ot-color-border-strong: #333333;
+  --ot-color-border-subtle: #212a36;
+  --ot-color-border-default: #2d3745;
+  --ot-color-border-strong: #3a4658;
 
-  --ot-color-text-primary: #d0d0d0;
-  --ot-color-text-secondary: #a2a2a2;
-  --ot-color-text-muted: #666666;
-  --ot-color-text-inverse: #0a0a0a;
+  --ot-color-text-primary: #d7dde7;
+  --ot-color-text-secondary: #adb7c6;
+  --ot-color-text-muted: #7f8b9d;
+  --ot-color-text-inverse: #0d1117;
   --ot-color-text-brand: #e0e0e0;
 
-  --ot-color-accent-primary: #ff9500;
-  --ot-color-accent-primary-hover: #ffb041;
-  --ot-color-accent-primary-dim: #cc7700;
-  --ot-color-accent-glow: rgba(255, 149, 0, 0.12);
+  --ot-color-accent-primary: #ff6b00;
+  --ot-color-accent-primary-hover: #ff8b3d;
+  --ot-color-accent-primary-dim: #c85100;
+  --ot-color-accent-glow: rgba(255, 107, 0, 0.14);
   --ot-color-accent-secondary: #18ffff;
   --ot-color-accent-info: #448aff;
 
@@ -139,6 +139,45 @@
   --ot-muted: var(--ot-color-text-muted);
   --ot-dark: var(--ot-color-border-strong);
   --ot-focus-ring: var(--ot-color-interaction-focus-ring);
+}
+
+:root[data-ot-theme="classic-bloomberg"] {
+  --ot-color-canvas: #000000;
+  --ot-color-canvas-elevated: #050505;
+  --ot-color-surface-1: #101010;
+  --ot-color-surface-2: #151515;
+  --ot-color-border-default: #2b2b2b;
+  --ot-color-accent-primary: #ff7a00;
+  --ot-color-accent-primary-hover: #ffa144;
+  --ot-color-text-primary: #f4f1e8;
+  --ot-color-text-muted: #9a978f;
+}
+
+:root[data-ot-theme="light-desk"] {
+  --ot-color-canvas: #eef2f7;
+  --ot-color-canvas-elevated: #f7f9fc;
+  --ot-color-surface-1: #ffffff;
+  --ot-color-surface-2: #f1f5fb;
+  --ot-color-surface-3: #e7edf6;
+  --ot-color-overlay: rgba(236, 241, 248, 0.9);
+  --ot-color-border-subtle: #c9d4e4;
+  --ot-color-border-default: #b8c6db;
+  --ot-color-border-strong: #90a4bf;
+  --ot-color-text-primary: #111a26;
+  --ot-color-text-secondary: #314055;
+  --ot-color-text-muted: #5f7088;
+  --ot-color-accent-primary: #d95f00;
+  --ot-color-accent-primary-hover: #ee812c;
+  --ot-color-market-up: #087f5b;
+  --ot-color-market-down: #d63a3a;
+}
+
+:root[data-ot-theme="custom"] {
+  --ot-color-accent-primary: var(--ot-custom-accent, #ff6b00);
+  --ot-color-accent-primary-hover: color-mix(in srgb, var(--ot-color-accent-primary) 78%, white);
+  --ot-color-accent-glow: color-mix(in srgb, var(--ot-color-accent-primary) 20%, transparent);
+  --ot-color-interaction-selected-border: var(--ot-color-accent-primary);
+  --ot-color-workstation-panel-active-border: var(--ot-color-accent-primary);
 }
 
 .ot-app-shell {

@@ -648,3 +648,59 @@ class ChartTemplate(Base):
     name: Mapped[str] = mapped_column(String(128), index=True)
     layout_config: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class PortfolioORM(Base):
+    __tablename__ = "portfolios"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(128), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    benchmark_symbol: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    currency: Mapped[str] = mapped_column(String(8), default="USD")
+    starting_cash: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class PortfolioHoldingORM(Base):
+    __tablename__ = "portfolio_holdings"
+    __table_args__ = (
+        UniqueConstraint("portfolio_id", "symbol", "lot_id", name="uq_portfolio_holding_portfolio_symbol_lot"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    portfolio_id: Mapped[str] = mapped_column(String(36), ForeignKey("portfolios.id", ondelete="CASCADE"), index=True)
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    shares: Mapped[float] = mapped_column(Float, default=0.0)
+    cost_basis_per_share: Mapped[float] = mapped_column(Float, default=0.0)
+    purchase_date: Mapped[str] = mapped_column(String(16), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    lot_id: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class PortfolioTransactionORM(Base):
+    __tablename__ = "portfolio_transactions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    portfolio_id: Mapped[str] = mapped_column(String(36), ForeignKey("portfolios.id", ondelete="CASCADE"), index=True)
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    type: Mapped[str] = mapped_column(String(16), index=True)  # buy|sell|dividend
+    shares: Mapped[float] = mapped_column(Float, default=0.0)
+    price: Mapped[float] = mapped_column(Float, default=0.0)
+    date: Mapped[str] = mapped_column(String(16), index=True)
+    fees: Mapped[float] = mapped_column(Float, default=0.0)
+    lot_id: Mapped[str] = mapped_column(String(64), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class UserLayoutORM(Base):
+    __tablename__ = "user_layouts"
+    __table_args__ = (UniqueConstraint("user_key", name="uq_user_layouts_user_key"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_key: Mapped[str] = mapped_column(String(64), index=True)
+    layouts_json: Mapped[list] = mapped_column(JSON, default=list)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

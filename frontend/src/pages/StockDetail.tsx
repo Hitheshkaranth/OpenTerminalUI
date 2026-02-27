@@ -34,6 +34,7 @@ import { SharedChartToolbar } from "../shared/chart/ChartToolbar";
 import { IndicatorPanel } from "../shared/chart/IndicatorPanel";
 import { chartPointsToBars } from "../shared/chart/chartUtils";
 import type { ChartKind, ChartTimeframe, IndicatorConfig } from "../shared/chart/types";
+import { quickAddToFirstPortfolio } from "../shared/portfolioQuickAdd";
 import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
 
@@ -41,8 +42,10 @@ type TabId = "overview" | "financials" | "analysis" | "peers" | "valuation" | "s
 
 const TIMEFRAME_TO_INTERVAL: Record<ChartTimeframe, { interval: string; range: string }> = {
   "1m": { interval: "1m", range: "5d" },
+  "2m": { interval: "1m", range: "5d" },
   "5m": { interval: "5m", range: "1mo" },
   "15m": { interval: "15m", range: "1mo" },
+  "30m": { interval: "1m", range: "1mo" },
   "1h": { interval: "1h", range: "3mo" },
   "4h": { interval: "1h", range: "6mo" },
   "1D": { interval: "1d", range: "1y" },
@@ -53,8 +56,10 @@ const TIMEFRAME_TO_INTERVAL: Record<ChartTimeframe, { interval: string; range: s
 function intervalToTimeframe(interval: string): ChartTimeframe {
   const value = interval.toLowerCase();
   if (value === "1m") return "1m";
+  if (value === "2m") return "2m";
   if (value === "5m") return "5m";
   if (value === "15m") return "15m";
+  if (value === "30m") return "30m";
   if (value === "1h") return "1h";
   if (value === "1wk") return "1W";
   if (value === "1mo") return "1M";
@@ -80,15 +85,22 @@ export function StockDetailPage() {
   const [selectedIndicators, setSelectedIndicators] = useState<IndicatorConfig[]>([]);
   const [crosshair, setCrosshair] = useState<{ open: number; high: number; low: number; close: number; time: number } | null>(null);
   const [realtimeTick, setRealtimeTick] = useState<{ ltp: number; change_pct: number } | null>(null);
+  const [chartRealtimeMeta, setChartRealtimeMeta] = useState<{
+    status: "live" | "delayed" | "disconnected";
+    lastTickTs?: number | null;
+    currentBar?: { open: number; high: number; low: number; close: number; volume: number; time: number } | null;
+  }>({ status: "disconnected", currentBar: null });
   const [tab, setTab] = useState<TabId>("overview");
   const [shareholdingTabLoaded, setShareholdingTabLoaded] = useState(false);
   const [financialPeriod, setFinancialPeriod] = useState<"annual" | "quarterly">("annual");
   const [showVolume, setShowVolume] = useState(true);
   const [showDeliveryOverlay, setShowDeliveryOverlay] = useState(false);
+  const [showSessionShading, setShowSessionShading] = useState(true);
   const [extended, setExtended] = useState(false);
   const [snapshotTick, setSnapshotTick] = useState<{ ltp: number; change: number; change_pct: number } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [chartPoints, setChartPoints] = useState<Array<{ t: number; o: number; h: number; l: number; c: number; v: number; s?: string; ext?: boolean }>>([]);
+  const [selectedChartTimeframe, setSelectedChartTimeframe] = useState<ChartTimeframe>(intervalToTimeframe(interval));
   const [isBackfilling, setIsBackfilling] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const chartFullscreenRef = useRef<HTMLDivElement | null>(null);
@@ -155,9 +167,30 @@ export function StockDetailPage() {
   }, [selectedIndicators, ticker]);
 
   useEffect(() => {
-    setChartPoints(chart?.data ?? []);
+    const next = chart?.data ?? [];
+    setChartPoints((prev) => {
+      if (prev === next) return prev;
+      if (
+        prev.length === next.length &&
+        prev.length > 0 &&
+        prev[0]?.t === next[0]?.t &&
+        prev[prev.length - 1]?.t === next[next.length - 1]?.t
+      ) {
+        return prev;
+      }
+      if (prev.length === 0 && next.length === 0) return prev;
+      return next;
+    });
+  }, [chart?.data]);
+
+  useEffect(() => {
     setHasMoreHistory(true);
-  }, [chart?.data, ticker, interval, range]);
+  }, [ticker, interval, range]);
+
+  useEffect(() => {
+    const inferred = intervalToTimeframe(interval);
+    setSelectedChartTimeframe((prev) => ((prev === "2m" || prev === "30m") && inferred === "1m") ? prev : inferred);
+  }, [interval]);
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -211,16 +244,40 @@ export function StockDetailPage() {
       : `${displayedChange >= 0 ? "+" : ""}${displayedChange.toFixed(2)}`;
   const changePctText =
     displayedChangePct === null ? "-" : `${displayedChangePct >= 0 ? "+" : ""}${displayedChangePct.toFixed(2)}%`;
-  const timeframe = intervalToTimeframe(interval);
+  const timeframe = selectedChartTimeframe;
   const stockClassification = stockForOverview?.classification;
   const ohlcForToolbar =
     crosshair ??
+    (chartRealtimeMeta.currentBar
+      ? {
+          open: chartRealtimeMeta.currentBar.open,
+          high: chartRealtimeMeta.currentBar.high,
+          low: chartRealtimeMeta.currentBar.low,
+          close: chartRealtimeMeta.currentBar.close,
+          time: chartRealtimeMeta.currentBar.time,
+        }
+      : null) ??
     (chartPoints.length
       ? (() => {
           const last = chartPoints[chartPoints.length - 1];
           return { open: last.o, high: last.h, low: last.l, close: last.c, time: last.t };
         })()
       : null);
+  const ohlcvForToolbar = chartRealtimeMeta.currentBar
+    ? {
+        open: chartRealtimeMeta.currentBar.open,
+        high: chartRealtimeMeta.currentBar.high,
+        low: chartRealtimeMeta.currentBar.low,
+        close: chartRealtimeMeta.currentBar.close,
+        volume: chartRealtimeMeta.currentBar.volume,
+      }
+    : chartPoints.length
+    ? (() => {
+        const last = chartPoints[chartPoints.length - 1];
+        return { open: last.o, high: last.h, low: last.l, close: last.c, volume: last.v };
+      })()
+    : null;
+  const effectiveChartLiveStatus = chartRealtimeMeta.status;
   const deliveryOverlaySeries = useMemo(
     () =>
       (deliverySeriesData?.points ?? [])
@@ -230,6 +287,18 @@ export function StockDetailPage() {
         }))
         .filter((row) => Number.isFinite(row.time) && Number.isFinite(row.value)),
     [deliverySeriesData?.points],
+  );
+
+  // Must be memoized: inline chartPointsToBars() creates a new array reference every render,
+  // which causes useRealtimeChart's seedBars effect to fire → setBars → realtimeMeta new
+  // object → setChartRealtimeMeta → StockDetail re-render → repeat (React error #185).
+  const historicalData = useMemo(() => chartPointsToBars(chartPoints), [chartPoints]);
+
+  // Must be memoized: inline object literals create a new reference every render and are used
+  // as a useEffect dependency inside ChartEngine, causing unnecessary chart redraws.
+  const extendedHoursConfig = useMemo(
+    () => ({ enabled: extended, showPreMarket: true, showAfterHours: true, visualMode: "merged" as const, colorScheme: "dimmed" as const }),
+    [extended],
   );
 
   if (!ticker) return <div className="p-8 text-center text-terminal-muted">Select a stock to view details.</div>;
@@ -308,8 +377,10 @@ export function StockDetailPage() {
             ltp={displayedLatestPrice}
             changePct={displayedChangePct}
             ohlc={ohlcForToolbar}
+            ohlcv={ohlcvForToolbar}
             timeframe={timeframe}
             onTimeframeChange={(tf) => {
+              setSelectedChartTimeframe(tf);
               const next = TIMEFRAME_TO_INTERVAL[tf];
               setInterval(next.interval);
               setRange(next.range);
@@ -320,6 +391,7 @@ export function StockDetailPage() {
             onToggleIndicators={() => setShowIndicators((v) => !v)}
             extended={extended}
             onExtendedChange={setExtended}
+            liveStatus={effectiveChartLiveStatus}
           />
           <div
             ref={chartFullscreenRef}
@@ -331,7 +403,7 @@ export function StockDetailPage() {
               <ChartEngine
                 symbol={ticker}
                 timeframe={timeframe}
-                historicalData={chartPointsToBars(chartPoints)}
+                historicalData={historicalData}
                 market={realtimeMarket}
                 activeIndicators={selectedIndicators}
                 chartType={chartType}
@@ -339,16 +411,15 @@ export function StockDetailPage() {
                 enableRealtime={true}
                 onCrosshairOHLC={setCrosshair}
                 onTick={setRealtimeTick}
+                onRealtimeMeta={setChartRealtimeMeta}
                 canRequestBackfill={hasMoreHistory && !isBackfilling}
                 onRequestBackfill={(oldest) => backfillHistory(oldest)}
                 showDeliveryOverlay={showDeliveryOverlay}
                 deliverySeries={deliveryOverlaySeries}
-                extendedHours={{
-                  enabled: extended,
-                  showPreMarket: true,
-                  showAfterHours: true,
-                  visualMode: "merged",
-                  colorScheme: "dimmed"
+                showSessionShading={showSessionShading}
+                extendedHours={extendedHoursConfig}
+                onAddToPortfolio={(symbol, priceHint) => {
+                  void quickAddToFirstPortfolio(symbol, priceHint, "Added from Stock Detail chart");
                 }}
               />
             ) : (
@@ -398,8 +469,16 @@ export function StockDetailPage() {
             <div className={`mt-1 text-sm font-semibold tabular-nums ${moveClass}`}>{changeText}</div>
             <div className={`mt-1 text-sm font-semibold tabular-nums ${moveClass}`}>{changePctText}</div>
             <div className="mt-2 flex items-center gap-2">
-              <span className={`rounded border px-2 py-0.5 text-[11px] ${isConnected ? "border-terminal-pos text-terminal-pos" : "border-terminal-border text-terminal-muted"}`}>
-                LIVE
+              <span
+                className={`rounded border px-2 py-0.5 text-[11px] ${
+                  effectiveChartLiveStatus === "live"
+                    ? "border-terminal-pos text-terminal-pos"
+                    : effectiveChartLiveStatus === "delayed"
+                    ? "border-terminal-warn text-terminal-warn"
+                    : "border-terminal-neg text-terminal-neg"
+                }`}
+              >
+                {effectiveChartLiveStatus.toUpperCase()}
               </span>
               <TerminalBadge variant={isConnected ? "live" : "mock"}>{connectionState.toUpperCase()}</TerminalBadge>
               <button
@@ -413,6 +492,12 @@ export function StockDetailPage() {
                 onClick={() => setShowDeliveryOverlay((v) => !v)}
               >
                 DELIVERY %
+              </button>
+              <button
+                className={`rounded border px-2 py-0.5 text-[11px] ${showSessionShading ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted"}`}
+                onClick={() => setShowSessionShading((v) => !v)}
+              >
+                SESSIONS
               </button>
               <button
                 className={`rounded border px-2 py-0.5 text-[11px] ${isFullscreen ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted"} ${fullscreenSupported ? "" : "cursor-not-allowed opacity-60"}`}

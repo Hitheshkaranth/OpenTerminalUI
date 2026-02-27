@@ -7,8 +7,10 @@ import { TerminalTooltip } from "../../components/terminal/TerminalTooltip";
 
 const TIMEFRAMES: Array<{ label: string; value: ChartTimeframe }> = [
   { label: "1m", value: "1m" },
+  { label: "2m", value: "2m" },
   { label: "5m", value: "5m" },
   { label: "15m", value: "15m" },
+  { label: "30m", value: "30m" },
   { label: "1H", value: "1h" },
   { label: "4H", value: "4h" },
   { label: "1D", value: "1D" },
@@ -21,6 +23,7 @@ type Props = {
   ltp: number | null;
   changePct: number | null;
   ohlc: { open: number; high: number; low: number; close: number } | null;
+  ohlcv?: { open: number; high: number; low: number; close: number; volume?: number | null } | null;
   timeframe: ChartTimeframe;
   onTimeframeChange: (tf: ChartTimeframe) => void;
   chartType: ChartKind;
@@ -29,6 +32,7 @@ type Props = {
   onToggleIndicators: () => void;
   extended?: boolean;
   onExtendedChange?: (v: boolean) => void;
+  liveStatus?: "live" | "delayed" | "disconnected";
 };
 
 export function SharedChartToolbar({
@@ -36,6 +40,7 @@ export function SharedChartToolbar({
   ltp,
   changePct,
   ohlc,
+  ohlcv,
   timeframe,
   onTimeframeChange,
   chartType,
@@ -44,12 +49,19 @@ export function SharedChartToolbar({
   onToggleIndicators,
   extended = false,
   onExtendedChange,
+  liveStatus,
 }: Props) {
   const { formatDisplayMoney } = useDisplayCurrency();
   const pctBadgeVariant: "neutral" | "success" | "danger" =
     changePct === null ? "neutral" : changePct >= 0 ? "success" : "danger";
 
   const isDailyPlus = ["1D", "1W", "1M"].includes(timeframe);
+  const liveStatusClass =
+    liveStatus === "live"
+      ? "text-terminal-pos border-terminal-pos"
+      : liveStatus === "delayed"
+      ? "text-terminal-warn border-terminal-warn"
+      : "text-terminal-neg border-terminal-neg";
 
   return (
     <div className="rounded border border-terminal-border bg-terminal-panel px-3 py-1.5 text-xs">
@@ -67,12 +79,19 @@ export function SharedChartToolbar({
           <TerminalBadge variant={pctBadgeVariant} size="sm" className="tabular-nums font-bold">
             {changePct === null ? "-" : `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%`}
           </TerminalBadge>
+          {liveStatus && (
+            <span className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] ${liveStatusClass}`}>
+              <span className={`inline-block h-1.5 w-1.5 rounded-full ${liveStatus === "live" ? "animate-pulse bg-current" : "bg-current"}`} />
+              {liveStatus.toUpperCase()}
+            </span>
+          )}
 
           <div className="hidden tabular-nums text-terminal-muted xl:block">
-            <span className="mr-2">O:{ohlc?.open?.toFixed(2) ?? "-"}</span>
-            <span className="mr-2">H:{ohlc?.high?.toFixed(2) ?? "-"}</span>
-            <span className="mr-2">L:{ohlc?.low?.toFixed(2) ?? "-"}</span>
-            <span>C:{ohlc?.close?.toFixed(2) ?? "-"}</span>
+            <span className="mr-2">O:{(ohlcv ?? ohlc)?.open?.toFixed(2) ?? "-"}</span>
+            <span className="mr-2">H:{(ohlcv ?? ohlc)?.high?.toFixed(2) ?? "-"}</span>
+            <span className="mr-2">L:{(ohlcv ?? ohlc)?.low?.toFixed(2) ?? "-"}</span>
+            <span className="mr-2">C:{(ohlcv ?? ohlc)?.close?.toFixed(2) ?? "-"}</span>
+            <span>V:{Number.isFinite(Number(ohlcv?.volume)) ? Number(ohlcv?.volume).toLocaleString() : "-"}</span>
           </div>
         </div>
 

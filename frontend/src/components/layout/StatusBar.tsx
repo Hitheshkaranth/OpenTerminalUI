@@ -1,1 +1,1 @@
-export { StatusBar } from "../terminal/StatusBar";
+export { MarketStatusBar as StatusBar } from "./MarketStatusBar";

@@ -68,12 +68,15 @@ export function ChartEngine({
   symbolIsFnO = false,
   onCrosshairOHLC,
   onTick,
+  onRealtimeMeta,
   canRequestBackfill = false,
   onRequestBackfill,
   showDeliveryOverlay = false,
   deliverySeries = [],
   panelId = "panel-default",
   extendedHours,
+  showSessionShading = true,
+  onAddToPortfolio,
 }: ChartEngineProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -90,8 +93,9 @@ export function ChartEngine({
   const lastBackfillOldestRef = useRef<number | null>(null);
   const lastAutoViewportKeyRef = useRef<string | null>(null);
   const [chartApi, setChartApi] = useState<IChartApi | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const { event: syncEvent, publish } = useChartSync();
-  const { bars, liveTick } = useRealtimeChart(market, symbol, timeframe, historicalData, enableRealtime);
+  const { bars, liveTick, realtimeMeta } = useRealtimeChart(market, symbol, timeframe, historicalData, enableRealtime);
   const safeBars = useMemo(
     () =>
       bars.filter(
@@ -105,8 +109,8 @@ export function ChartEngine({
     [bars],
   );
   const showSessionLegend = useMemo(
-    () => showSessionLegendForBars(safeBars, extendedHours),
-    [safeBars, extendedHours],
+    () => showSessionShading && showSessionLegendForBars(safeBars, extendedHours),
+    [safeBars, extendedHours, showSessionShading],
   );
 
   const byTime = useMemo(() => {
@@ -135,6 +139,10 @@ export function ChartEngine({
   useEffect(() => {
     onTick?.(liveTick);
   }, [liveTick, onTick]);
+
+  useEffect(() => {
+    onRealtimeMeta?.(realtimeMeta);
+  }, [onRealtimeMeta, realtimeMeta]);
 
   useEffect(() => {
     if (!hostRef.current || chartRef.current) return;
@@ -311,6 +319,7 @@ export function ChartEngine({
 
     const ethEnabled = extendedHours?.enabled;
     const hasSessionMetadata = safeBars.some((b) => (b as any).s && (b as any).s !== "rth");
+    const renderSessionShading = showSessionShading && (ethEnabled || hasSessionMetadata);
 
     if (isIncremental) {
       const last = safeBars[safeBars.length - 1];
@@ -341,7 +350,7 @@ export function ChartEngine({
         color: Number(last.close) >= Number(last.open) ? terminalColors.candleUpAlpha80 : terminalColors.candleDownAlpha80,
       });
 
-      if (ethEnabled || hasSessionMetadata) {
+      if (renderSessionShading) {
         const session = (last as any).s;
         s.sessionShading.update({
           time: candleTime,
@@ -375,7 +384,7 @@ export function ChartEngine({
         color: Number(b.close) >= Number(b.open) ? terminalColors.candleUpAlpha80 : terminalColors.candleDownAlpha80,
       }));
       const shadings = safeBars.map((b) => {
-        const color = ethEnabled || hasSessionMetadata ? sessionShadeColor((b as any).s, extendedHours) : "transparent";
+        const color = renderSessionShading ? sessionShadeColor((b as any).s, extendedHours) : "transparent";
         return {
           time: Number(b.time) as UTCTimestamp,
           value: 1000000000,
@@ -417,11 +426,15 @@ export function ChartEngine({
       const intradayWindowBars =
         timeframe === "1m"
           ? 390
+          : timeframe === "2m"
+            ? 390
           : timeframe === "5m"
             ? 390
-            : timeframe === "15m"
-              ? 260
-              : timeframe === "1h"
+          : timeframe === "15m"
+            ? 260
+            : timeframe === "30m"
+              ? 200
+            : timeframe === "1h"
                 ? 180
                 : timeframe === "4h"
                   ? 120
@@ -438,7 +451,7 @@ export function ChartEngine({
         lastAutoViewportKeyRef.current = viewportKey;
       }
     }
-  }, [safeBars, showVolume, deliverySeries, showDeliveryOverlay, extendedHours, timeframe]);
+  }, [safeBars, showVolume, deliverySeries, showDeliveryOverlay, extendedHours, timeframe, showSessionShading]);
 
   useIndicators(chartApi, safeBars, activeIndicators);
 
@@ -452,8 +465,24 @@ export function ChartEngine({
     });
   }, [chartApi, panelId, syncEvent]);
 
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [contextMenu]);
+
+  const latestClose = safeBars.length ? Number(safeBars[safeBars.length - 1].close) : undefined;
+
   return (
-    <div className="relative z-0 h-full w-full rounded border border-terminal-border">
+    <div
+      className="relative z-0 h-full w-full rounded border border-terminal-border"
+      onContextMenu={(e) => {
+        if (!onAddToPortfolio) return;
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY });
+      }}
+    >
       <div ref={hostRef} className="h-full w-full" />
       {showSessionLegend && (
         <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[10px] text-terminal-text">
@@ -471,6 +500,23 @@ export function ChartEngine({
           </span>
         </div>
       )}
+      {contextMenu ? (
+        <div
+          className="fixed z-[120] w-44 rounded-sm border border-terminal-border bg-[#0F141B] p-1 shadow-2xl"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            type="button"
+            className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-terminal-panel"
+            onClick={() => {
+              onAddToPortfolio?.(symbol, latestClose);
+              setContextMenu(null);
+            }}
+          >
+            Add to Portfolio
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

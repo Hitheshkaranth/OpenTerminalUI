@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+import re
 from typing import Any, List, Optional
 
 import pandas as pd
@@ -31,6 +32,139 @@ class ScreenerV2RunRequest(BaseModel):
     limit: int = 50
     universe: str = "nse_eq"
     sector_neutral: bool = False
+
+
+class ScreenerScanFilter(BaseModel):
+    field: str
+    op: str
+    value: Any
+
+
+class ScreenerScanSort(BaseModel):
+    field: str
+    order: str = "desc"
+
+
+class ScreenerScanRequest(BaseModel):
+    markets: list[str] = Field(default_factory=lambda: ["NSE", "NYSE", "NASDAQ"])
+    filters: list[ScreenerScanFilter] = Field(default_factory=list)
+    sort: ScreenerScanSort = Field(default_factory=lambda: ScreenerScanSort(field="market_cap", order="desc"))
+    limit: int = Field(default=100, ge=1, le=500)
+    formula: str | None = None
+
+
+SCAN_FIELD_MAP: dict[str, list[str]] = {
+    "symbol": ["symbol", "ticker"],
+    "market_cap": ["market_cap", "mcap"],
+    "pe_ratio": ["pe_ratio", "pe"],
+    "pb_ratio": ["pb_ratio", "pb_calc", "pb"],
+    "ps_ratio": ["ps_ratio", "ps_calc", "ps"],
+    "dividend_yield": ["dividend_yield"],
+    "revenue_growth_yoy": ["revenue_growth_yoy", "rev_growth_pct"],
+    "earnings_growth_yoy": ["earnings_growth_yoy", "eps_growth_pct"],
+    "roe": ["roe", "roe_pct"],
+    "roa": ["roa", "roa_pct"],
+    "debt_to_equity": ["debt_to_equity"],
+    "current_ratio": ["current_ratio"],
+    "beta": ["beta"],
+    "avg_volume_10d": ["avg_volume_10d", "avg_volume"],
+    "price_change_1d": ["price_change_1d", "change_pct"],
+    "price_change_1w": ["price_change_1w"],
+    "price_change_1m": ["price_change_1m"],
+    "price_change_3m": ["price_change_3m", "returns_3m"],
+    "price_change_6m": ["price_change_6m"],
+    "price_change_1y": ["price_change_1y", "returns_1y"],
+    "sector": ["sector"],
+    "industry": ["industry"],
+    "country": ["country", "country_code"],
+    "exchange": ["exchange", "market"],
+}
+
+
+def _normalize_scan_value(row: dict[str, Any], field: str) -> Any:
+    keys = SCAN_FIELD_MAP.get(field, [field])
+    for key in keys:
+        if key in row and row[key] is not None:
+            return row[key]
+    return None
+
+
+def _to_num(value: Any) -> float | None:
+    try:
+        num = float(value)
+        if num != num:  # NaN
+            return None
+        return num
+    except Exception:
+        return None
+
+
+def _passes_filter(row: dict[str, Any], filt: ScreenerScanFilter) -> bool:
+    left = _normalize_scan_value(row, filt.field)
+    op = filt.op.lower().strip()
+    right = filt.value
+    left_num = _to_num(left)
+    right_num = _to_num(right)
+
+    if op in {"gte", "gt", "lte", "lt", "eq", "neq"}:
+        if left_num is not None and right_num is not None:
+            if op == "gte":
+                return left_num >= right_num
+            if op == "gt":
+                return left_num > right_num
+            if op == "lte":
+                return left_num <= right_num
+            if op == "lt":
+                return left_num < right_num
+            if op == "eq":
+                return left_num == right_num
+            return left_num != right_num
+        ltxt = str(left or "").strip().upper()
+        rtxt = str(right or "").strip().upper()
+        if op == "eq":
+            return ltxt == rtxt
+        if op == "neq":
+            return ltxt != rtxt
+        return False
+
+    if op == "in":
+        if isinstance(right, list):
+            universe = {str(v).strip().upper() for v in right}
+            return str(left or "").strip().upper() in universe
+        return False
+
+    if op == "contains":
+        return str(right or "").strip().upper() in str(left or "").strip().upper()
+
+    return True
+
+
+_TOKEN_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
+
+
+def _passes_formula(row: dict[str, Any], formula: str | None) -> bool:
+    expr = (formula or "").strip()
+    if not expr:
+        return True
+    safe = expr.replace("AND", " and ").replace("OR", " or ").replace("NOT", " not ")
+    safe = safe.replace("=", "==").replace(">==", ">=").replace("<==", "<=").replace("!==", "!=")
+    safe = safe.replace("<>", "!=")
+    safe = safe.replace("===", "==")
+    if "__" in safe:
+        return False
+
+    vars_map: dict[str, Any] = {}
+    for token in set(_TOKEN_RE.findall(expr)):
+        upper = token.upper()
+        if upper in {"AND", "OR", "NOT", "IN"}:
+            continue
+        vars_map[token] = _normalize_scan_value(row, token.lower())
+        vars_map[upper] = _normalize_scan_value(row, token.lower())
+
+    try:
+        return bool(eval(safe, {"__builtins__": {}}, vars_map))
+    except Exception:
+        return False
 
 
 async def _hydrate_missing_screener_rows(
@@ -155,6 +289,82 @@ async def run_screener(request: ScreenerRunRequest) -> ScreenerRunResponse:
     except Exception as e:
         warnings.append({"code": "screener_error", "message": str(e)})
         return ScreenerRunResponse(count=0, rows=[], meta={"warnings": warnings})
+
+
+@router.post("/screener/scan")
+async def run_multimarket_scan(request: ScreenerScanRequest) -> dict[str, Any]:
+    markets = [m.strip().upper() for m in request.markets if str(m).strip()]
+    if not markets:
+        markets = ["NSE", "NYSE", "NASDAQ"]
+
+    rows: list[dict[str, Any]] = []
+    warnings: list[dict[str, str]] = []
+
+    if "NSE" in markets:
+        symbols = _load_universe("nse_eq")[:350]
+        nse_df, skipped = await _hydrate_missing_screener_rows(symbols, warnings, refresh_cap=60)
+        if skipped:
+            warnings.append({"code": "nse_partial", "message": f"Skipped {skipped} NSE symbols during refresh"})
+        if not nse_df.empty:
+            for rec in nse_df.where(pd.notnull(nse_df), None).to_dict(orient="records"):
+                rec["exchange"] = "NSE"
+                rec["market"] = "NSE"
+                rec["country"] = rec.get("country") or "IN"
+                rec["symbol"] = rec.get("ticker")
+                rows.append(rec)
+
+    us_seed = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "AVGO", "JPM", "XOM", "LLY", "AMD", "NFLX", "INTC", "QCOM"]
+    if "NYSE" in markets or "NASDAQ" in markets:
+        sem = asyncio.Semaphore(8)
+
+        async def _fetch_us(sym: str) -> dict[str, Any] | None:
+            async with sem:
+                snap = await fetch_stock_snapshot_coalesced(sym)
+                if not snap:
+                    return None
+                ex = str(snap.get("exchange") or snap.get("market") or "NASDAQ").upper()
+                if ex not in {"NYSE", "NASDAQ"}:
+                    ex = "NASDAQ"
+                row = dict(snap)
+                row["exchange"] = ex
+                row["market"] = ex
+                row["country"] = row.get("country") or row.get("country_code") or "US"
+                row["symbol"] = row.get("ticker") or sym
+                row["pe_ratio"] = row.get("pe_ratio") or row.get("pe")
+                row["roe"] = row.get("roe") or row.get("roe_pct")
+                row["roa"] = row.get("roa") or row.get("roa_pct")
+                row["revenue_growth_yoy"] = row.get("revenue_growth_yoy") or row.get("rev_growth_pct")
+                row["earnings_growth_yoy"] = row.get("earnings_growth_yoy") or row.get("eps_growth_pct")
+                return row
+
+        fetched = await asyncio.gather(*[_fetch_us(sym) for sym in us_seed])
+        for row in fetched:
+            if row is None:
+                continue
+            if row.get("exchange") in markets:
+                rows.append(row)
+
+    filtered: list[dict[str, Any]] = []
+    for row in rows:
+        if request.filters and not all(_passes_filter(row, f) for f in request.filters):
+            continue
+        if not _passes_formula(row, request.formula):
+            continue
+        filtered.append(row)
+
+    sort_field = request.sort.field
+    reverse = request.sort.order.lower() != "asc"
+    filtered.sort(key=lambda row: _to_num(_normalize_scan_value(row, sort_field)) or float("-inf"), reverse=reverse)
+
+    out = filtered[: request.limit]
+    return {
+        "count": len(out),
+        "rows": out,
+        "meta": {
+            "markets": markets,
+            "warnings": warnings,
+        },
+    }
 
 
 @router.post("/screener/run-v2")

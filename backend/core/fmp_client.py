@@ -98,3 +98,35 @@ class FMPClient:
     async def get_profile(self, symbol: str) -> Dict[str, Any]:
         data = await self._get(f"/profile/{self._symbol(symbol)}")
         return data[0] if data and isinstance(data, list) else {}
+
+    async def _get_symbol_list(self, endpoint_prefix: str, symbol: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        raw = symbol.strip().upper()
+        candidates = [raw]
+        ns = self._symbol(raw)
+        if ns not in candidates:
+            candidates.append(ns)
+        for candidate in candidates:
+            data = await self._get(f"{endpoint_prefix}/{candidate}", params)
+            if isinstance(data, list) and data:
+                return data
+        return []
+
+    async def get_institutional_holders(self, symbol: str, limit: int = 50) -> List[Dict[str, Any]]:
+        rows = await self._get_symbol_list("/institutional-holder", symbol)
+        return rows[:limit] if isinstance(rows, list) else []
+
+    async def get_analyst_estimates(self, symbol: str, limit: int = 20) -> List[Dict[str, Any]]:
+        rows = await self._get_symbol_list("/analyst-estimates", symbol, {"limit": limit})
+        return rows if isinstance(rows, list) else []
+
+    async def get_esg_data(self, symbol: str, limit: int = 20) -> List[Dict[str, Any]]:
+        raw = symbol.strip().upper()
+        candidates = [raw]
+        ns = self._symbol(raw)
+        if ns not in candidates:
+            candidates.append(ns)
+        for candidate in candidates:
+            data = await self._get("/esg-environmental-social-governance-data", {"symbol": candidate, "limit": limit})
+            if isinstance(data, list) and data:
+                return data
+        return []

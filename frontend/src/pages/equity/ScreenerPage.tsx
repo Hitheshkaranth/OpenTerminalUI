@@ -19,6 +19,7 @@ import { ScreenLibrarySidebar } from "./screener/ScreenLibrarySidebar";
 import { ScreenerProvider, useScreenerContext } from "./screener/ScreenerContext";
 import { StatusBar } from "./screener/StatusBar";
 import { ViewToggle } from "./screener/ViewToggle";
+import { MultiMarketScanPanel } from "./screener/MultiMarketScanPanel";
 import { ScreenVizLoader } from "./screener/viz/ScreenVizLoader";
 
 function ScreenerWorkspace() {
@@ -91,6 +92,7 @@ function ScreenerWorkspace() {
         </TerminalPanel>
 
         <QueryBar />
+        <MultiMarketScanPanel />
         <FilterChips />
         <ViewToggle />
 

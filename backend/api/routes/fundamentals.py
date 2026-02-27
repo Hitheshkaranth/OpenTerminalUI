@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 
 from backend.api.deps import fetch_stock_snapshot_coalesced, get_unified_fetcher
+from backend.equity.services.shareholding import ShareholdingService
 from backend.core.fundamental_scores import (
     altman_z_score,
     cagr,
@@ -20,6 +21,7 @@ from backend.core.fundamental_scores import (
 )
 
 router = APIRouter()
+_shareholding_service = ShareholdingService()
 
 
 @router.get("/stocks/{ticker}/snapshot-v2")
@@ -64,6 +66,130 @@ async def corporate_actions(ticker: str) -> dict:
 async def analyst_consensus(ticker: str) -> dict:
     fetcher = await get_unified_fetcher()
     return await fetcher.fetch_analyst_consensus(ticker.strip().upper())
+
+
+def _normalize_symbol(symbol: str) -> str:
+    return symbol.strip().upper()
+
+
+async def _finnhub_insiders_with_fallback(fetcher: Any, symbol: str, limit: int = 20) -> list[dict[str, Any]]:
+    raw = _normalize_symbol(symbol)
+    rows: Any = {}
+    try:
+        rows = await fetcher.finnhub._get("/stock/insider-transactions", {"symbol": raw, "limit": limit})
+    except Exception:
+        rows = {}
+    if not rows:
+        try:
+            rows = await fetcher.finnhub.get_insider_transactions(raw, limit=limit)
+        except Exception:
+            rows = {}
+    if isinstance(rows, dict):
+        data = rows.get("data")
+        return [r for r in data if isinstance(r, dict)] if isinstance(data, list) else []
+    if isinstance(rows, list):
+        return [r for r in rows if isinstance(r, dict)]
+    return []
+
+
+@router.get("/stocks/{ticker}/ownership")
+async def ownership_adapter(ticker: str, limit: int = 25) -> dict[str, Any]:
+    symbol = _normalize_symbol(ticker)
+    if not symbol:
+        raise HTTPException(status_code=400, detail="Ticker is required")
+    fetcher = await get_unified_fetcher()
+
+    shareholding = {}
+    try:
+        pattern = await _shareholding_service.get_shareholding(symbol)
+        shareholding = pattern.model_dump() if hasattr(pattern, "model_dump") else pattern.dict()
+    except Exception as exc:
+        shareholding = {"symbol": symbol, "warning": f"Shareholding adapter unavailable: {exc}"}
+
+    institutional_holders: list[dict[str, Any]] = []
+    if isinstance(shareholding, dict):
+        institutional_holders = [
+            row for row in (shareholding.get("institutional_holders") or []) if isinstance(row, dict)
+        ][:limit]
+    if not institutional_holders:
+        try:
+            institutional_holders = (await fetcher.fmp.get_institutional_holders(symbol, limit=limit))[:limit]
+        except Exception:
+            institutional_holders = []
+
+    insider_transactions = await _finnhub_insiders_with_fallback(fetcher, symbol, limit=limit)
+
+    return {
+        "ticker": symbol,
+        "shareholding": shareholding,
+        "institutional_holders": institutional_holders,
+        "insider_transactions": insider_transactions[:limit],
+        "source": {
+            "shareholding": (shareholding or {}).get("source") if isinstance(shareholding, dict) else None,
+            "institutional_holders": "fmp",
+            "insider_transactions": "finnhub",
+        },
+    }
+
+
+@router.get("/stocks/{ticker}/estimates")
+async def estimates_adapter(ticker: str, limit: int = 24) -> dict[str, Any]:
+    symbol = _normalize_symbol(ticker)
+    if not symbol:
+        raise HTTPException(status_code=400, detail="Ticker is required")
+    fetcher = await get_unified_fetcher()
+
+    analyst_estimates: list[dict[str, Any]] = []
+    recommendation_trends: list[dict[str, Any]] = []
+    price_target: dict[str, Any] = {}
+    consensus: Any = {}
+
+    try:
+        analyst_estimates = await fetcher.fmp.get_analyst_estimates(symbol, limit=limit)
+    except Exception:
+        analyst_estimates = []
+    try:
+        recommendation_trends = await fetcher.finnhub.get_recommendation_trends(symbol)
+    except Exception:
+        recommendation_trends = []
+    try:
+        price_target = await fetcher.finnhub.get_price_target(symbol)
+    except Exception:
+        price_target = {}
+    try:
+        consensus = await fetcher.fetch_analyst_consensus(symbol)
+    except Exception:
+        consensus = {}
+
+    return {
+        "ticker": symbol,
+        "analyst_estimates": analyst_estimates,
+        "recommendation_trends": recommendation_trends,
+        "price_target": price_target if isinstance(price_target, dict) else {},
+        "consensus": consensus,
+    }
+
+
+@router.get("/stocks/{ticker}/esg")
+async def esg_adapter(ticker: str, limit: int = 10) -> dict[str, Any]:
+    symbol = _normalize_symbol(ticker)
+    if not symbol:
+        raise HTTPException(status_code=400, detail="Ticker is required")
+    fetcher = await get_unified_fetcher()
+
+    rows: list[dict[str, Any]] = []
+    try:
+        rows = await fetcher.fmp.get_esg_data(symbol, limit=limit)
+    except Exception:
+        rows = []
+    latest = rows[0] if rows else {}
+
+    return {
+        "ticker": symbol,
+        "latest": latest if isinstance(latest, dict) else {},
+        "history": rows if isinstance(rows, list) else [],
+        "source": "fmp",
+    }
 
 
 def _to_float(value: Any) -> float | None:

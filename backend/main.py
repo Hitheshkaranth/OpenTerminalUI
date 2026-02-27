@@ -24,9 +24,11 @@ from backend.auth.middleware import AuthMiddleware
 from backend.bg_services.instruments_loader import get_instruments_loader
 from backend.bg_services.news_ingestor import get_news_ingestor
 from backend.bg_services.pcr_snapshot import get_pcr_snapshot_service
+from backend.bg_services.scanner_alert_scheduler import get_scanner_alert_scheduler_service
 from backend.equity.routes import equity_router
 from backend.fno.routes import fno_router
 from backend.services.prefetch_worker import get_prefetch_worker
+from backend.services.us_tick_stream import get_us_tick_stream_service
 from backend.paper_trading import get_paper_engine
 from backend.config.settings import get_settings
 from backend.shared.cache import cache as cache_instance
@@ -43,6 +45,7 @@ _prefetch_worker = None
 _instruments_loader = None
 _news_ingestor = None
 _pcr_snapshot_service = None
+_scanner_alert_scheduler = None
 _prefetch_enabled = (
     os.getenv("OPENTERMINALUI_PREFETCH_ENABLED")
     or os.getenv("OPENSCREENS_PREFETCH_ENABLED")
@@ -107,13 +110,14 @@ async def on_startup() -> None:
     _install_windows_loop_exception_filter()
     init_db()
 
-    global _prefetch_worker, _instruments_loader, _news_ingestor, _pcr_snapshot_service
+    global _prefetch_worker, _instruments_loader, _news_ingestor, _pcr_snapshot_service, _scanner_alert_scheduler
     from backend.api.deps import get_unified_fetcher
     fetcher = await get_unified_fetcher()
     _prefetch_worker = get_prefetch_worker(fetcher)
     _instruments_loader = get_instruments_loader()
     _news_ingestor = get_news_ingestor()
     _pcr_snapshot_service = get_pcr_snapshot_service()
+    _scanner_alert_scheduler = get_scanner_alert_scheduler_service()
 
     if _prefetch_enabled:
         await _prefetch_worker.start()
@@ -127,13 +131,18 @@ async def on_startup() -> None:
     await get_marketdata_hub().start()
     get_alert_evaluator_service().start(get_marketdata_hub())
     get_paper_engine().start(get_marketdata_hub())
+    if _scanner_alert_scheduler:
+        await _scanner_alert_scheduler.start(get_marketdata_hub(), interval_seconds=900)
 
 
 @app.on_event("shutdown")
 async def on_shutdown() -> None:
+    await get_us_tick_stream_service().shutdown()
     await get_marketdata_hub().shutdown()
     await get_alert_evaluator_service().shutdown()
     await get_paper_engine().shutdown()
+    if _scanner_alert_scheduler:
+        await _scanner_alert_scheduler.stop()
     if _pcr_snapshot_service:
         await _pcr_snapshot_service.stop()
     if _news_ingestor:
@@ -193,6 +202,12 @@ async def metrics_lite() -> dict[str, object]:
         "last_pcr_snapshot_date": None,
         "last_pcr_snapshot_status": "not_initialized",
     }
+    scanner_status = _scanner_alert_scheduler.status_snapshot() if _scanner_alert_scheduler else {
+        "last_run_at": None,
+        "last_status": "not_initialized",
+        "last_scanned_symbols": 0,
+        "running": False,
+    }
     return {
         "ws_connected_clients": ws_metrics.get("ws_connected_clients", 0),
         "ws_subscriptions": ws_metrics.get("ws_subscriptions", 0),
@@ -200,6 +215,9 @@ async def metrics_lite() -> dict[str, object]:
         "last_news_ingest_status": news_status.get("last_news_ingest_status"),
         "last_pcr_snapshot_date": pcr_status.get("last_pcr_snapshot_date"),
         "last_pcr_snapshot_status": pcr_status.get("last_pcr_snapshot_status"),
+        "scanner_alert_last_run_at": scanner_status.get("last_run_at"),
+        "scanner_alert_last_status": scanner_status.get("last_status"),
+        "scanner_alert_scanned_symbols": scanner_status.get("last_scanned_symbols"),
         "last_kite_stream_status": hub.kite_stream_status(),
     }
 

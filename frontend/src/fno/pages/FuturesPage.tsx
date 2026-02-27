@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { FuturesPanel } from "../../components/market/FuturesPanel";
@@ -16,8 +16,10 @@ import { fetchChainSummary } from "../api/fnoApi";
 
 const TF_TO_INTERVAL_RANGE: Record<ChartTimeframe, { interval: string; range: string }> = {
   "1m": { interval: "1m", range: "5d" },
+  "2m": { interval: "1m", range: "5d" },
   "5m": { interval: "5m", range: "1mo" },
   "15m": { interval: "15m", range: "1mo" },
+  "30m": { interval: "1m", range: "1mo" },
   "1h": { interval: "1h", range: "3mo" },
   "4h": { interval: "1h", range: "6mo" },
   "1D": { interval: "1d", range: "1y" },
@@ -38,7 +40,9 @@ export function FuturesPage() {
   const [tick, setTick] = useState<{ ltp: number; change_pct: number } | null>(null);
   const tfConfig = TF_TO_INTERVAL_RANGE[timeframe];
   const { data: chart, isLoading } = useStockHistory(symbol, tfConfig.range, tfConfig.interval);
-  const chartBars = chart?.data?.length ? chartPointsToBars(chart.data) : [];
+  // Must be memoized: inline chartPointsToBars() creates a new array reference every render,
+  // which feeds an unstable seedBars into useRealtimeChart → infinite setBars loop.
+  const chartBars = useMemo(() => (chart?.data?.length ? chartPointsToBars(chart.data) : []), [chart?.data]);
   const summaryQuery = useQuery({
     queryKey: ["fno-summary-futures", symbol, expiry],
     queryFn: () => fetchChainSummary(symbol, expiry || undefined),

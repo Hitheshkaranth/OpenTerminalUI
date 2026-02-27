@@ -1,4 +1,4 @@
-import { useEffect, useId, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { TerminalButton } from "./TerminalButton";
 
 type Props = {
@@ -30,20 +30,47 @@ export function TerminalModal({
 }: Props) {
   const titleId = useId();
   const subtitleId = useId();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !busy) onClose();
+      if (event.key !== "Tab") return;
+      const root = dialogRef.current;
+      if (!root) return;
+      const focusable = root.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex=\"-1\"])',
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const raf = window.requestAnimationFrame(() => {
+      const root = dialogRef.current;
+      if (!root) return;
+      const firstFocusable = root.querySelector<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex=\"-1\"])',
+      );
+      (firstFocusable ?? root).focus();
+    });
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
+      window.cancelAnimationFrame(raf);
     };
-  }, [open, onClose]);
+  }, [open, onClose, busy]);
 
   if (!open) return null;
 
@@ -56,11 +83,13 @@ export function TerminalModal({
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         aria-describedby={subtitle ? subtitleId : undefined}
         aria-busy={busy || undefined}
+        tabIndex={-1}
         className={`w-full ${
           size === "sm" ? "max-w-md" : size === "lg" ? "max-w-3xl" : "max-w-xl"
         } rounded-sm border border-terminal-border bg-terminal-panel shadow-2xl ${className}`.trim()}

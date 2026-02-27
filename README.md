@@ -22,6 +22,27 @@
 
 OpenTerminalUI is a terminal-style market analysis workspace organized around three connected operating areas:
 
+## Terminal Noir UI Status
+
+The Bloomberg-inspired **Terminal Noir** overhaul is now integrated into the main shell:
+
+- `CommandBar` (GO bar) with command parsing, shortcuts, and autocomplete
+- top `TickerTape` and bottom `MarketStatusBar`
+- `Launchpad` multi-panel workspace with panel linking and presets
+- `SecurityHub` (DES-style) with dense tabbed security views
+- `DenseTable` reusable high-density table component across screener/portfolio flows
+- chart/workstation context actions, including quick **Add to Portfolio**
+
+Primary routes to validate quickly:
+
+- `/equity/stocks`
+- `/equity/security/:ticker`
+- `/equity/launchpad`
+- `/equity/chart-workstation`
+- `/equity/compare`
+- `/equity/screener`
+- `/equity/portfolio?view=manager`
+
 ### Equity & Fundamental Analysis Pack
 - **Chart Workstation** - multi-timeframe charts with unified India/US OHLCV routing, indicator overlays, delivery overlay, history backfill, and continuous live candle updates
 - **Company Analytics** - fundamentals, scorecards, trends, reports, valuation, peer comparison
@@ -217,6 +238,18 @@ The F&O screens share the same terminal shell and chart/quote context as Equity.
 
 - Docker Desktop (Compose v2) for containerized install
 - Python 3.11+ and Node.js 22+ only for non-Docker local development
+
+## CI Gate (must pass before push)
+
+The repository CI workflow runs the following checks:
+
+1. `python -m compileall backend`
+2. `PYTHONPATH=. pytest backend/tests -q --cov=backend --cov-fail-under=45 --cov-report=xml --junitxml=pytest-report.xml`
+3. `npm ci --prefix frontend`
+4. `npm run build --prefix frontend`
+5. `npm run test --prefix frontend`
+6. `npx playwright install --with-deps chromium --prefix frontend`
+7. `npm run test:e2e --prefix frontend`
 
 ## One-command Docker setup (new machine)
 

@@ -68,11 +68,11 @@ export function AboutPage({ terminalType = "market" }: AboutProps) {
       <div className="grid gap-3 lg:grid-cols-2">
         <TerminalPanel title="Equity Pack">
           <ul className="space-y-1 text-xs text-terminal-text">
-            <li>- Multi-timeframe chart workstation with unified India/US OHLCV routing.</li>
-            <li>- Realtime tick-to-candle aggregation with continuous refresh.</li>
-            <li>- Company intelligence stack: overview, scorecard, fundamentals, valuation.</li>
-            <li>- Advanced panels: shareholding pattern, capex tracker, and Python lab.</li>
-            <li>- US market integration: NYSE/NASDAQ/AMEX support.</li>
+            <li>- Terminal Noir shell with GO command bar, ticker tape, and market status bar.</li>
+            <li>- Multi-timeframe chart workstation with realtime tick-to-candle updates.</li>
+            <li>- Security Hub (DES-style): overview, financials, chart, news, ownership, estimates, peers, ESG.</li>
+            <li>- Dense data workflows: screener, watchlist, and portfolio manager built on shared primitives.</li>
+            <li>- US + India market support with unified symbol routing and metadata badges.</li>
           </ul>
         </TerminalPanel>
 
@@ -93,6 +93,7 @@ export function AboutPage({ terminalType = "market" }: AboutProps) {
             <li>- Risk Compute: EWMA volatility, beta, and PCA factor decomposition.</li>
             <li>- Model Governance: run registration and model promotion workflow.</li>
             <li>- Portfolio Backtest Jobs: async job-based testing with results.</li>
+            <li>- Scanner alerts + scheduler-backed runtime evaluation.</li>
           </ul>
         </TerminalPanel>
 
@@ -100,6 +101,8 @@ export function AboutPage({ terminalType = "market" }: AboutProps) {
           <div className="space-y-2 text-xs text-terminal-muted">
             <div className="grid grid-cols-2 gap-2">
               <Link className="rounded border border-terminal-border px-2 py-1 text-center hover:bg-terminal-accent/10" to="/equity/stocks">Market Home</Link>
+              <Link className="rounded border border-terminal-border px-2 py-1 text-center hover:bg-terminal-accent/10" to="/equity/security">Security Hub</Link>
+              <Link className="rounded border border-terminal-border px-2 py-1 text-center hover:bg-terminal-accent/10" to="/equity/launchpad">Launchpad</Link>
               <Link className="rounded border border-terminal-border px-2 py-1 text-center hover:bg-terminal-accent/10" to="/fno">F&O Home</Link>
               <Link className="rounded border border-terminal-border px-2 py-1 text-center hover:bg-terminal-accent/10" to="/backtesting">Backtesting</Link>
               <Link className="rounded border border-terminal-border px-2 py-1 text-center hover:bg-terminal-accent/10" to="/equity/chart-workstation">Workstation</Link>

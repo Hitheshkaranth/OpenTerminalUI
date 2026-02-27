@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-import { addWatchlistItem, deleteWatchlistItem, fetchQuotesBatch, fetchWatchlist, searchSymbols, type SearchSymbolItem } from "../api/client";
+import { addPortfolioHolding, addWatchlistItem, deleteWatchlistItem, fetchPortfolios, fetchQuotesBatch, fetchWatchlist, searchSymbols, type SearchSymbolItem } from "../api/client";
 import { CountryFlag } from "../components/common/CountryFlag";
 import { TerminalBadge } from "../components/terminal/TerminalBadge";
 import { TerminalButton } from "../components/terminal/TerminalButton";
@@ -15,6 +16,7 @@ import { InstrumentBadges } from "../components/common/InstrumentBadges";
 type SnapshotQuote = { ltp: number; change: number; change_pct: number };
 
 export function WatchlistPage() {
+  const navigate = useNavigate();
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
   const { formatDisplayMoney } = useDisplayCurrency();
   const { subscribe, unsubscribe, isConnected } = useQuotesStream(selectedMarket);
@@ -30,6 +32,7 @@ export function WatchlistPage() {
   const [snapshotByTicker, setSnapshotByTicker] = useState<Record<string, SnapshotQuote>>({});
   const [pullStartY, setPullStartY] = useState<number | null>(null);
   const [pullHint, setPullHint] = useState("");
+  const [rowMenu, setRowMenu] = useState<{ id: string; ticker: string; x: number; y: number } | null>(null);
   const tickerSearchMarket = useMemo(() => (selectedMarket === "NASDAQ" ? "NASDAQ" : "NSE"), [selectedMarket]);
 
   const load = async () => {
@@ -111,6 +114,28 @@ export function WatchlistPage() {
       unsubscribe(symbols);
     };
   }, [items, selectedMarket, subscribe, unsubscribe]);
+
+  useEffect(() => {
+    if (!rowMenu) return;
+    const close = () => setRowMenu(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [rowMenu]);
+
+  const addToPortfolio = async (symbol: string) => {
+    const portfolios = await fetchPortfolios();
+    const target = portfolios[0];
+    if (!target) return;
+    const snap = snapshotByTicker[symbol.toUpperCase()];
+    const px = Number(snap?.ltp ?? 1);
+    await addPortfolioHolding(target.id, {
+      symbol,
+      shares: 1,
+      cost_basis_per_share: Number.isFinite(px) && px > 0 ? px : 1,
+      purchase_date: new Date().toISOString().slice(0, 10),
+      notes: "Added from Watchlist context menu",
+    });
+  };
 
   return (
     <div
@@ -265,7 +290,14 @@ export function WatchlistPage() {
                 const moveClass =
                   changePct === null ? "text-terminal-muted" : changePct >= 0 ? "text-terminal-pos" : "text-terminal-neg";
                 return (
-                  <tr key={item.id} className="border-b border-terminal-border/50">
+                  <tr
+                    key={item.id}
+                    className="border-b border-terminal-border/50"
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setRowMenu({ id: String(item.id), ticker: item.ticker.toUpperCase(), x: e.clientX, y: e.clientY });
+                    }}
+                  >
                     <td className="px-2 py-1">{item.watchlist_name}</td>
                     <td className="px-2 py-1">
                       <span className="inline-flex items-center gap-1.5">
@@ -307,6 +339,33 @@ export function WatchlistPage() {
           </table>
         </div>
       </div>
+      {rowMenu ? (
+        <div
+          className="fixed z-[120] w-48 rounded-sm border border-terminal-border bg-[#0F141B] p-1 shadow-2xl"
+          style={{ left: rowMenu.x, top: rowMenu.y }}
+        >
+          <button
+            type="button"
+            className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-terminal-panel"
+            onClick={() => {
+              navigate(`/equity/stocks?ticker=${encodeURIComponent(rowMenu.ticker)}`);
+              setRowMenu(null);
+            }}
+          >
+            Load in Chart
+          </button>
+          <button
+            type="button"
+            className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-terminal-panel"
+            onClick={() => {
+              void addToPortfolio(rowMenu.ticker);
+              setRowMenu(null);
+            }}
+          >
+            Add to Portfolio
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from backend.services.marketdata_hub import get_marketdata_hub
+from backend.services.us_tick_stream import get_us_tick_stream_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -19,6 +20,17 @@ def _symbols_from_payload(payload: dict[str, Any]) -> list[str]:
     for item in symbols:
         if isinstance(item, str):
             out.append(item.strip().upper())
+    return out
+
+
+def _channels_from_payload(payload: dict[str, Any]) -> list[str]:
+    channels = payload.get("channels")
+    if not isinstance(channels, list):
+        return []
+    out: list[str] = []
+    for item in channels:
+        if isinstance(item, str):
+            out.append(item.strip().lower())
     return out
 
 
@@ -84,3 +96,42 @@ async def ws_alerts(websocket: WebSocket) -> None:
         logger.exception("WS alerts error: %s", exc)
     finally:
         await hub.unregister_alert_socket(websocket)
+
+
+@router.websocket("/ws/us-quotes")
+async def ws_us_quotes(websocket: WebSocket) -> None:
+    us_service = get_us_tick_stream_service()
+    await websocket.accept()
+    await us_service.register(websocket)
+    try:
+        await websocket.send_json({"type": "ready", "channels": ["trades", "bars"]})
+        while True:
+            payload = await websocket.receive_json()
+            if not isinstance(payload, dict):
+                await websocket.send_json({"type": "error", "message": "Invalid message payload"})
+                continue
+            op = str(payload.get("op") or "").strip().lower()
+            if op == "ping":
+                await websocket.send_json({"type": "pong"})
+                continue
+            symbols = _symbols_from_payload(payload)
+            channels = _channels_from_payload(payload)
+            if op == "subscribe":
+                result = await us_service.subscribe(websocket, symbols, channels)
+                await websocket.send_json({"type": "subscribed", **result})
+                continue
+            if op == "unsubscribe":
+                result = await us_service.unsubscribe(websocket, symbols, channels)
+                await websocket.send_json({"type": "unsubscribed", **result})
+                continue
+            await websocket.send_json({"type": "error", "message": f"Unsupported op: {op or 'unknown'}"})
+    except WebSocketDisconnect:
+        logger.debug("WS us-quotes client disconnected")
+    except Exception as exc:
+        logger.exception("WS us-quotes error: %s", exc)
+        try:
+            await websocket.send_json({"type": "error", "message": "Internal server error"})
+        except Exception:
+            pass
+    finally:
+        await us_service.unregister(websocket)

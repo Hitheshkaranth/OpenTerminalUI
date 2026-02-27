@@ -46,10 +46,16 @@ import { OpsDashboardPage } from "./pages/OpsDashboard";
 import { ModelGovernancePage } from "./pages/ModelGovernance";
 import CockpitDashboard from "./pages/Cockpit";
 import { ChartWorkstationPage } from "./pages/ChartWorkstationPage";
+import { LaunchpadPage } from "./pages/Launchpad";
+import { SecurityHubPage } from "./pages/SecurityHub";
+import { SplitComparisonPage } from "./pages/SplitComparison";
+import { ThemeRuntime } from "./components/layout/ThemeRuntime";
+import { LaunchpadPopoutPage } from "./pages/LaunchpadPopout";
 
 function App() {
   return (
     <div className="ot-app-shell">
+      <ThemeRuntime />
       <TerminalBackground />
       <div className="ot-vignette-overlay" />
       <div className="ot-scanline-overlay" />
@@ -64,6 +70,8 @@ function App() {
           <Route path="/equity" element={<ProtectedRoute><EquityLayout /></ProtectedRoute>}>
             <Route index element={<Navigate to="/equity/stocks" replace />} />
             <Route path="stocks" element={<StockDetailPage />} />
+            <Route path="security" element={<SecurityHubPage />} />
+            <Route path="security/:ticker" element={<SecurityHubPage />} />
             <Route path="stocks/about" element={<AboutPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="screener" element={<ScreenerPage />} />
@@ -83,6 +91,9 @@ function App() {
             <Route path="plugins" element={<PluginsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="chart-workstation" element={<ChartWorkstationPage />} />
+            <Route path="launchpad" element={<LaunchpadPage />} />
+            <Route path="launchpad/popout" element={<LaunchpadPopoutPage />} />
+            <Route path="compare" element={<SplitComparisonPage />} />
           </Route>
 
           <Route path="/fno" element={<ProtectedRoute><FnoLayout /></ProtectedRoute>}>
@@ -121,9 +132,11 @@ function App() {
           <Route path="/portfolio-lab/blends" element={<ProtectedRoute><PortfolioLabBlendsPage /></ProtectedRoute>} />
 
           <Route path="/stocks" element={<Navigate to="/equity/stocks" replace />} />
+          <Route path="/security" element={<Navigate to="/equity/security" replace />} />
           <Route path="/stocks/about" element={<Navigate to="/equity/stocks/about" replace />} />
           <Route path="/dashboard" element={<Navigate to="/equity/dashboard" replace />} />
           <Route path="/screener" element={<Navigate to="/equity/screener" replace />} />
+          <Route path="/compare" element={<Navigate to="/equity/compare" replace />} />
           <Route path="/portfolio" element={<Navigate to="/equity/portfolio" replace />} />
           <Route path="/mutual-funds" element={<Navigate to="/equity/portfolio?mode=mutual_funds" replace />} />
           <Route path="/watchlist" element={<Navigate to="/equity/watchlist" replace />} />

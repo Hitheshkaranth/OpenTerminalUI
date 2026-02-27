@@ -4,6 +4,7 @@ import hashlib
 import html
 import json
 import re
+import asyncio
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
@@ -15,11 +16,11 @@ from sqlalchemy import desc, or_
 from sqlalchemy.exc import OperationalError
 import httpx
 
-from backend.api.deps import cache_instance, get_unified_fetcher
+from backend.api.deps import cache_instance, fetch_stock_snapshot_coalesced, get_unified_fetcher
 from backend.core.ttl_policy import market_open_now, ttl_seconds
+from backend.services.sentiment_engine import score_article_sentiment
 from backend.shared.db import SessionLocal
 from backend.db.models import NewsArticle
-from nlp.sentiment import score_financial_sentiment
 
 router = APIRouter()
 
@@ -109,7 +110,7 @@ def _row_sentiment(row: NewsArticle) -> dict[str, Any]:
             "label": str(row.sentiment_label),
             "confidence": float(row.sentiment_confidence),
         }
-    return score_financial_sentiment(_compose_news_text(row.title, row.summary))
+    return score_article_sentiment(_compose_news_text(row.title, row.summary))
 
 
 def _label_from_score(score: float) -> str:
@@ -179,7 +180,7 @@ def _to_iso_from_rss_date(raw: str | None) -> str:
 
 
 def _sentiment_payload(title: str, summary: str) -> dict[str, Any]:
-    return score_financial_sentiment(_compose_news_text(title, summary))
+    return score_article_sentiment(_compose_news_text(title, summary))
 
 
 def _rss_item_to_payload(item: ET.Element) -> dict[str, Any] | None:
@@ -450,6 +451,122 @@ async def get_news_by_ticker(
     finally:
         db.close()
 
+    await cache_instance.set(
+        cache_key,
+        payload,
+        ttl=ttl_seconds("news_latest", market_open_now()),
+    )
+    return payload
+
+
+@router.get("/news/sentiment/market")
+async def get_market_sentiment(
+    days: int = Query(default=7, ge=1, le=30),
+    market: str | None = Query(default=None, description="Optional market context e.g. NSE/BSE/NASDAQ"),
+) -> dict[str, Any]:
+    market_code = (market or "").strip().upper()
+    cache_key = cache_instance.build_key("news_latest", "sentiment:market", {"days": days, "market": market_code})
+    cached = await cache_instance.get(cache_key)
+    if cached:
+        return cached
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff_iso = cutoff.isoformat()
+
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(NewsArticle)
+            .filter(NewsArticle.published_at >= cutoff_iso)
+            .order_by(desc(NewsArticle.published_at))
+            .limit(800)
+            .all()
+        )
+    except OperationalError:
+        rows = []
+    finally:
+        db.close()
+
+    ticker_set: set[str] = set()
+    row_tickers: list[list[str]] = []
+    for row in rows:
+        tickers: list[str] = []
+        try:
+            parsed = json.loads(row.tickers or "[]")
+            if isinstance(parsed, list):
+                tickers = [str(v).split(".")[0].strip().upper() for v in parsed if str(v).strip()]
+        except Exception:
+            tickers = []
+        row_tickers.append(tickers)
+        ticker_set.update(tickers[:4])
+
+    ticker_to_sector: dict[str, str] = {}
+    if ticker_set:
+        sem = asyncio.Semaphore(12)
+
+        async def _fetch_sector(sym: str) -> tuple[str, str]:
+            async with sem:
+                snap = await fetch_stock_snapshot_coalesced(sym)
+                sector = str((snap or {}).get("sector") or "Unknown").strip() or "Unknown"
+                return sym, sector
+
+        resolved = await asyncio.gather(*[_fetch_sector(sym) for sym in list(ticker_set)[:200]])
+        ticker_to_sector = {sym: sector for sym, sector in resolved}
+
+    agg: dict[str, dict[str, Any]] = {}
+    for idx, row in enumerate(rows):
+        sentiment = _row_sentiment(row)
+        score = float(sentiment.get("score", 0.0))
+        label = str(sentiment.get("label") or _label_from_score(score))
+        tickers = row_tickers[idx]
+        sector = "Unknown"
+        for t in tickers:
+            s = ticker_to_sector.get(t)
+            if s:
+                sector = s
+                break
+        node = agg.setdefault(
+            sector,
+            {
+                "sector": sector,
+                "articles_count": 0,
+                "avg_sentiment": 0.0,
+                "bullish_count": 0,
+                "bearish_count": 0,
+                "neutral_count": 0,
+                "sum_score": 0.0,
+            },
+        )
+        node["articles_count"] += 1
+        node["sum_score"] += score
+        if label == "Bullish":
+            node["bullish_count"] += 1
+        elif label == "Bearish":
+            node["bearish_count"] += 1
+        else:
+            node["neutral_count"] += 1
+
+    sectors = []
+    for row in agg.values():
+        count = int(row["articles_count"]) or 1
+        avg = float(row["sum_score"]) / count
+        sectors.append(
+            {
+                "sector": row["sector"],
+                "articles_count": int(row["articles_count"]),
+                "avg_sentiment": round(avg, 4),
+                "bullish_count": int(row["bullish_count"]),
+                "bearish_count": int(row["bearish_count"]),
+                "neutral_count": int(row["neutral_count"]),
+            }
+        )
+    sectors.sort(key=lambda x: x["articles_count"], reverse=True)
+
+    payload = {
+        "period_days": days,
+        "market": market_code or "ALL",
+        "sectors": sectors,
+    }
     await cache_instance.set(
         cache_key,
         payload,

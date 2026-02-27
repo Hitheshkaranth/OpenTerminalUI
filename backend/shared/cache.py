@@ -8,6 +8,7 @@ import logging
 import os
 import pickle
 import sqlite3
+import threading
 import time
 from typing import Any, Optional, Tuple
 
@@ -23,6 +24,7 @@ class MultiTierCache:
         self._l1_cache: dict[str, Tuple[float, Any]] = {}
         self._redis: Optional[aioredis.Redis] = None
         self._db_conn: Optional[sqlite3.Connection] = None
+        self._db_lock = threading.Lock()
         key = os.getenv("CACHE_SIGNING_KEY", "openterminalui-dev-cache-key")
         self._signing_key = key.encode("utf-8")
 
@@ -37,7 +39,10 @@ class MultiTierCache:
                 self._redis = None
 
         try:
-            self._db_conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            self._db_conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=15)
+            self._db_conn.execute("PRAGMA journal_mode=WAL;")
+            self._db_conn.execute("PRAGMA synchronous=NORMAL;")
+            self._db_conn.execute("PRAGMA busy_timeout=5000;")
             self._db_conn.execute(
                 "CREATE TABLE IF NOT EXISTS cache (key TEXT PRIMARY KEY, value BLOB, expiry REAL)"
             )
@@ -90,14 +95,15 @@ class MultiTierCache:
             return None
 
         def _read():
-            cursor = self._db_conn.execute("SELECT value, expiry FROM cache WHERE key = ?", (key,))
-            row = cursor.fetchone()
-            if row:
-                blob, expiry = row
-                if time.time() < expiry:
-                    return self._decode_blob(blob)
-                self._db_conn.execute("DELETE FROM cache WHERE key = ?", (key,))
-                self._db_conn.commit()
+            with self._db_lock:
+                cursor = self._db_conn.execute("SELECT value, expiry FROM cache WHERE key = ?", (key,))
+                row = cursor.fetchone()
+                if row:
+                    blob, expiry = row
+                    if time.time() < expiry:
+                        return self._decode_blob(blob)
+                    self._db_conn.execute("DELETE FROM cache WHERE key = ?", (key,))
+                    self._db_conn.commit()
             return None
 
         return await asyncio.to_thread(_read)
@@ -109,11 +115,12 @@ class MultiTierCache:
         def _write():
             expiry = time.time() + ttl
             blob = self._encode_blob(value)
-            self._db_conn.execute(
-                "INSERT OR REPLACE INTO cache (key, value, expiry) VALUES (?, ?, ?)",
-                (key, blob, expiry),
-            )
-            self._db_conn.commit()
+            with self._db_lock:
+                self._db_conn.execute(
+                    "INSERT OR REPLACE INTO cache (key, value, expiry) VALUES (?, ?, ?)",
+                    (key, blob, expiry),
+                )
+                self._db_conn.commit()
 
         await asyncio.to_thread(_write)
 
