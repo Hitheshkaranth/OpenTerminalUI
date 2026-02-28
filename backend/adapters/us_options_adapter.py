@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional
 import httpx
 import yfinance as yf
 from backend.config.settings import get_settings
-from backend.fno.services.greeks_engine import get_greeks_engine
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +17,12 @@ class USOptionsAdapter:
     def __init__(self):
         self.settings = get_settings()
         self.fmp_key = self.settings.fmp_api_key
-        self.greeks = get_greeks_engine()
         # US Risk-free rate is roughly 4.5% currently
         self.risk_free_rate = 4.5
+
+    def _get_greeks_engine(self):
+        from backend.fno.services.greeks_engine import get_greeks_engine
+        return get_greeks_engine()
 
     def _to_float(self, value: Any, default: float = 0.0) -> float:
         try:
@@ -98,6 +100,7 @@ class USOptionsAdapter:
     def _normalize_chain(self, symbol: str, spot: float, expiry: str, data: List[Dict[str, Any]], strike_range: int) -> Dict[str, Any]:
         grouped = {}
         dte = max((datetime.strptime(expiry, "%Y-%m-%d").date() - date.today()).days, 1)
+        greeks_engine = self._get_greeks_engine()
 
         for opt in data:
             strike = self._to_float(opt.get("strike"))
@@ -119,7 +122,7 @@ class USOptionsAdapter:
 
             # Recalculate IV if missing/low using mibian if possible
             if iv <= 0 and ltp > 0:
-                iv = self.greeks.compute_iv(spot, strike, dte, ltp, mibian_type)
+                iv = greeks_engine.compute_iv(spot, strike, dte, ltp, mibian_type)
 
             leg = {
                 "oi": int(opt.get("openInterest", 0)),
@@ -130,7 +133,7 @@ class USOptionsAdapter:
                 "bid": self._to_float(opt.get("bid")),
                 "ask": self._to_float(opt.get("ask")),
                 "price_change": self._to_float(opt.get("change")),
-                "greeks": self.greeks.compute_greeks(spot, strike, dte, iv, mibian_type)
+                "greeks": greeks_engine.compute_greeks(spot, strike, dte, iv, mibian_type)
             }
             grouped[strike][key] = leg
 

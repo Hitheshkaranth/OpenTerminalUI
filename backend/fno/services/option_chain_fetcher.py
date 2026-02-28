@@ -7,8 +7,6 @@ from typing import Any
 from backend.core.ttl_policy import market_open_now
 from backend.api.deps import get_unified_fetcher
 from backend.fno.services.greeks_engine import get_greeks_engine
-from backend.adapters.us_options_adapter import USOptionsAdapter
-from backend.shared.market_classifier import market_classifier
 from backend.shared.cache import cache as default_cache
 from backend.shared.nse_session import NSESession
 from backend.shared.symbol_resolver import SymbolResolver
@@ -29,7 +27,14 @@ class OptionChainFetcher:
         self._cache = cache or default_cache
         self._resolver = symbol_resolver or SymbolResolver()
         self._greeks = get_greeks_engine()
-        self._us_adapter = USOptionsAdapter()
+
+    def _get_us_adapter(self):
+        from backend.adapters.us_options_adapter import USOptionsAdapter
+        return USOptionsAdapter()
+
+    def _get_market_classifier(self):
+        from backend.shared.market_classifier import market_classifier
+        return market_classifier
 
     def _to_float(self, value: Any, default: float = 0.0) -> float:
         try:
@@ -265,6 +270,7 @@ class OptionChainFetcher:
                 "totals": {"ce_oi_total": 0, "pe_oi_total": 0, "ce_volume_total": 0, "pe_volume_total": 0, "pcr_oi": 0.0, "pcr_volume": 0.0},
             }
 
+        market_classifier = self._get_market_classifier()
         cls = await market_classifier.classify(symbol_u)
         is_us = cls.country_code == "US"
 
@@ -275,13 +281,14 @@ class OptionChainFetcher:
 
         if is_us:
             # US Logic
+            us_adapter = self._get_us_adapter()
             if not expiry:
-                expiries = await self._us_adapter.get_expiry_dates(symbol_u)
+                expiries = await us_adapter.get_expiry_dates(symbol_u)
                 expiry = self._pick_expiry(expiries, None)
 
-            chain = await self._us_adapter.get_option_chain(symbol_u, expiry, strike_range)
+            chain = await us_adapter.get_option_chain(symbol_u, expiry, strike_range)
             if not chain.get("available_expiries"):
-                chain["available_expiries"] = await self._us_adapter.get_expiry_dates(symbol_u)
+                chain["available_expiries"] = await us_adapter.get_expiry_dates(symbol_u)
             chain["market"] = "US"
         else:
             # NSE Logic (Existing)
@@ -327,9 +334,10 @@ class OptionChainFetcher:
 
     async def get_expiry_dates(self, symbol: str) -> list[str]:
         symbol_u = symbol.strip().upper()
+        market_classifier = self._get_market_classifier()
         cls = await market_classifier.classify(symbol_u)
         if cls.country_code == "US":
-            return await self._us_adapter.get_expiry_dates(symbol_u)
+            return await self._get_us_adapter().get_expiry_dates(symbol_u)
 
         chain = await self.get_option_chain(symbol_u, expiry=None, strike_range=40)
         expiries = chain.get("available_expiries")

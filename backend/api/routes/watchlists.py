@@ -5,7 +5,7 @@ from typing import Any, List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.orm import Session
 
 from backend.api.deps import get_db
@@ -34,8 +34,7 @@ class WatchlistResponse(WatchlistBase):
     symbols: List[str]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 @router.get("", response_model=List[WatchlistResponse])
