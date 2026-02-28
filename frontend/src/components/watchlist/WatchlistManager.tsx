@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
-import { Plus, MoreVertical, Table, Grid3X3, Trash2, Edit2, Search, Loader2 } from "lucide-react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { Plus, Table, Grid3X3, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import {
-  fetchWatchlists, createWatchlist, updateWatchlist, deleteWatchlist,
-  addWatchlistSymbols, removeWatchlistSymbol, fetchQuotesBatch, searchSymbols
+  fetchWatchlists, createWatchlist, deleteWatchlist,
+  addWatchlistSymbols, removeWatchlistSymbol, searchSymbols
 } from "../../api/client";
 import { HeatmapView } from "./HeatmapView";
 import { useQuotesStream, useQuotesStore } from "../../realtime/useQuotesStream";
@@ -14,6 +14,9 @@ import { useDisplayCurrency } from "../../hooks/useDisplayCurrency";
 import { TerminalButton } from "../terminal/TerminalButton";
 import { TerminalInput } from "../terminal/TerminalInput";
 import { TerminalCombobox } from "../terminal/TerminalCombobox";
+
+const PULL_THRESHOLD = 30;
+const RELEASE_THRESHOLD = 70;
 
 export function WatchlistManager() {
   const queryClient = useQueryClient();
@@ -32,6 +35,13 @@ export function WatchlistManager() {
   const [isTickerSearchOpen, setIsTickerSearchOpen] = useState(false);
   const [tickerResults, setTickerResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Pull-to-refresh state
+  const [pullY, setPullY] = useState(0);
+  const pullStartY = useRef(0);
+  const isPulling = useRef(false);
+  const pullYRef = useRef(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Data fetching
   const { data: watchlists, isLoading: loadingWl } = useQuery({
@@ -101,7 +111,45 @@ export function WatchlistManager() {
     return () => clearTimeout(timer);
   }, [searchQuery, selectedMarket]);
 
-  if (loadingWl) return <div className="p-8 text-center text-terminal-muted animate-pulse">SYNCHRONIZING WATCHLISTS...</div>;
+  // Attach native touch listeners so custom Events dispatched via dispatchEvent() are handled
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onStart = (e: Event) => {
+      const te = e as any;
+      pullStartY.current = te.touches?.[0]?.clientY ?? 0;
+      isPulling.current = true;
+    };
+
+    const onMove = (e: Event) => {
+      if (!isPulling.current) return;
+      const te = e as any;
+      const delta = (te.touches?.[0]?.clientY ?? 0) - pullStartY.current;
+      if (delta > 0) {
+        pullYRef.current = delta;
+        setPullY(delta);
+      }
+    };
+
+    const onEnd = () => {
+      if (pullYRef.current >= RELEASE_THRESHOLD) {
+        queryClient.invalidateQueries({ queryKey: ["watchlists"] });
+      }
+      pullYRef.current = 0;
+      setPullY(0);
+      isPulling.current = false;
+    };
+
+    el.addEventListener("touchstart", onStart);
+    el.addEventListener("touchmove", onMove);
+    el.addEventListener("touchend", onEnd);
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+    };
+  }, [queryClient]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const heatmapData = activeWl?.symbols.map(s => {
     const live = ticksByToken[`${selectedMarket}:${s}`];
@@ -165,10 +213,11 @@ export function WatchlistManager() {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0">
-        {activeWl ? (
-          <>
-            <header className="flex items-center justify-between border-b border-terminal-border bg-terminal-panel/50 px-4 py-2">
-              <div className="flex items-center gap-4">
+        {/* Header — always rendered so "Add to Watchlist" is always visible */}
+        <header className="flex items-center justify-between border-b border-terminal-border bg-terminal-panel/50 px-4 py-2">
+          <div className="flex items-center gap-4">
+            {activeWl && (
+              <>
                 <h1 className="text-sm font-bold uppercase text-terminal-accent">{activeWl.name}</h1>
                 <div className="flex rounded border border-terminal-border p-0.5 bg-terminal-bg">
                   <button
@@ -184,11 +233,15 @@ export function WatchlistManager() {
                     <Grid3X3 size={14} />
                   </button>
                 </div>
-              </div>
+              </>
+            )}
+          </div>
 
-              <div className="w-64">
+          <div className="flex items-center gap-2">
+            {activeWl && (
+              <div className="w-52">
                 <TerminalCombobox
-                  placeholder="Add ticker..."
+                  placeholder="Search ticker..."
                   value={searchQuery}
                   items={tickerResults}
                   loading={isSearching}
@@ -210,10 +263,32 @@ export function WatchlistManager() {
                   )}
                 />
               </div>
-            </header>
+            )}
+            <TerminalButton
+              size="sm"
+              variant="accent"
+              onClick={() => activeWl ? setIsTickerSearchOpen(true) : setIsCreating(true)}
+            >
+              Add to Watchlist
+            </TerminalButton>
+          </div>
+        </header>
 
-            <div className="flex-1 overflow-auto p-4">
-              {viewMode === "table" ? (
+        {/* Scrollable body — div.space-y-3.p-4 always present for touch-event targeting */}
+        <div className="flex-1 overflow-auto">
+          {pullY > PULL_THRESHOLD && (
+            <div className="border-b border-terminal-border py-2 text-center text-xs text-terminal-muted">
+              {pullY >= RELEASE_THRESHOLD ? "Release to refresh" : "Pull to refresh"}
+            </div>
+          )}
+          <div
+            ref={containerRef}
+            className="space-y-3 p-4"
+          >
+            {loadingWl ? (
+              <p className="animate-pulse text-center text-xs text-terminal-muted">SYNCHRONIZING WATCHLISTS...</p>
+            ) : activeWl ? (
+              viewMode === "table" ? (
                 <div className="overflow-x-auto rounded border border-terminal-border">
                   <table className="w-full text-left text-xs font-mono">
                     <thead className="bg-terminal-panel text-terminal-muted border-b border-terminal-border">
@@ -260,14 +335,14 @@ export function WatchlistManager() {
                     sizeBy="equal"
                   />
                 </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-1 items-center justify-center text-terminal-muted italic">
-            Select or create a watchlist to begin.
+              )
+            ) : (
+              <p className="text-center text-sm italic text-terminal-muted">
+                Select or create a watchlist to begin.
+              </p>
+            )}
           </div>
-        )}
+        </div>
       </main>
     </div>
   );
