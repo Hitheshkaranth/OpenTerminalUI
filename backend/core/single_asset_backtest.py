@@ -350,7 +350,7 @@ class BacktestEngine:
 
         # Intraday specific metrics
         avg_hold, win_rate_morning, win_rate_afternoon = _intraday_trade_stats(trades, date_index)
-        unique_days = len(np.unique(date_index.date)) if not date_index.empty else 1
+        unique_days = len(np.unique(date_index.dt.date)) if not date_index.empty else 1
         trades_per_day = float(len(trades) / unique_days) if unique_days > 0 else 0.0
 
         return BacktestResult(

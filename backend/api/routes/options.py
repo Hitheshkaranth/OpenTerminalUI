@@ -1,6 +1,7 @@
 """Option chain and options analytics endpoints."""
 from __future__ import annotations
 
+from dataclasses import asdict
 from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException, Query
@@ -15,9 +16,29 @@ router = APIRouter(prefix="/api/options", tags=["options"])
 async def get_option_chain(
     underlying: str,
     expiry: str | None = Query(None, description="ISO date, e.g. 2026-02-27"),
+    provider: str | None = Query(None, description="Provider override: mock, kite, etc."),
     range: int = Query(20, description="Number of strikes to show"),
 ):
     """Fetch option chain for underlying + expiry (auto-detects US/NSE)."""
+    if provider == "mock":
+        try:
+            registry = get_adapter_registry()
+            adapter = registry._instance("mock")  # noqa: SLF001
+            expiry_date = date.fromisoformat(expiry) if expiry else date.today() + timedelta(days=7)
+            chain = await adapter.get_option_chain(underlying.upper(), expiry_date)
+            return {
+                "underlying": chain.underlying,
+                "spot_price": chain.spot_price,
+                "expiry": chain.expiry,
+                "contracts": [asdict(c) for c in chain.contracts],
+                "pcr_oi": chain.pcr_oi,
+                "pcr_volume": chain.pcr_volume,
+                "max_pain": chain.max_pain,
+                "timestamp": chain.timestamp,
+            }
+        except Exception as e:
+            raise HTTPException(500, f"Error fetching mock option chain: {str(e)}")
+
     fetcher = get_option_chain_fetcher()
     try:
         result = await fetcher.get_option_chain(underlying.upper(), expiry=expiry, strike_range=range)

@@ -152,16 +152,14 @@ class MarketDataHub:
             if symbol:
                 # 1. Local Broadcast to connected WS clients
                 await self.broadcast(symbol, payload)
-                # 2. Emit to local tick listeners (e.g. alert engine)
+                # 2. Emit to local tick listeners (e.g. alert engine) and process candles
                 await self._emit_tick(payload)
-                # 3. If I am the aggregator, update my candle state and publish results
-                if self._is_aggregator:
-                    await self._on_tick_for_candles(payload)
 
         elif channel.startswith("bars:"):
-            # Completed bar arrived from the aggregator instance via Redis
+            # Completed bar from aggregator via Redis — broadcast to clients on other instances
             symbol = payload.get("symbol")
-            if symbol:
+            if symbol and not self._is_aggregator:
+                # Aggregator already broadcast locally in _on_tick_for_candles; skip duplicate
                 await self.broadcast(symbol, payload)
 
     async def shutdown(self) -> None:
@@ -367,8 +365,6 @@ class MarketDataHub:
         self._tick_listeners.append(callback)
 
     async def _emit_tick(self, payload: dict[str, Any]) -> None:
-        if not self._tick_listeners:
-            return
         for callback in list(self._tick_listeners):
             try:
                 result = callback(payload)
@@ -376,6 +372,7 @@ class MarketDataHub:
                     await result
             except Exception:
                 logger.exception("Tick listener failed")
+        await self._on_tick_for_candles(payload)
 
     async def _union_subscriptions(self) -> set[str]:
         async with self._lock:
@@ -519,26 +516,18 @@ class MarketDataHub:
 
         market = symbol.split(":", 1)[0]
         for sym, interval, candle in completed:
-            bar_payload = {
-                "type": "candle",
-                "symbol": sym,
-                "interval": interval,
-                "status": "closed",
-                **candle,
-            }
-            # Publish to Redis Bus so all instances can see the completed bar
-            await self._bus.publish_bar(market, interval, bar_payload)
-
-        # For partial candles, we still broadcast locally to our clients if they want it
-        # but we don't publish to Redis to avoid excessive traffic.
-        # Actually, the requirement says "Each backend instance subscribes to the relevant Redis channels"
-        # and "Only the aggregator processes raw ticks into bars".
-        # If Instance B wants to show a partial 1m candle, it needs to see all ticks.
-        # It DOES see all ticks via Redis. So Instance B can aggregate its own partials?
-        # No, the requirement says "Only the aggregator processes raw ticks into bars".
-        # So aggregator should probably publish partials too, or others should aggregate partials.
-        # Let's have everyone aggregate partials for their own local clients if they want,
-        # but the "Official" closed bars come from the aggregator.
+            # Broadcast closed candle to local WS clients immediately
+            await self._broadcast_candle(sym, interval, candle, status="closed")
+            # Only the aggregator publishes to Redis so other instances can pick it up
+            if self._is_aggregator:
+                bar_payload = {
+                    "type": "candle",
+                    "symbol": sym,
+                    "interval": interval,
+                    "status": "closed",
+                    **candle,
+                }
+                await self._bus.publish_bar(market, interval, bar_payload)
 
         for sym, interval, candle in self._candle_aggregator.current_candles(symbol):
             await self._broadcast_candle(sym, interval, candle, status="partial")
