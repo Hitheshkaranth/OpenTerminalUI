@@ -15,6 +15,11 @@ const PANEL_RENDERERS: Record<LaunchpadPanelType, ComponentType<{ panel: Launchp
   heatmap: lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadHeatmapPanel }))),
   "market-pulse": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadMarketPulsePanel }))),
   fundamentals: lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadFundamentalsPanel }))),
+  "yield-curve": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadYieldCurvePanel }))),
+  "ai-research": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadAIResearchPanel }))),
+  "option-chain": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadOptionChainPanel }))),
+  "watchlist-heatmap": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadWatchlistHeatmapPanel }))),
+  "sector-rotation": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadSectorRotationPanel }))),
 };
 
 function toPanelType(value: string | null): LaunchpadPanelType {

@@ -56,7 +56,9 @@ from backend.models.core import (
     VirtualTrade,
     WeightingMethod,
     BlendMethod,
+    WatchlistORM,
     WatchlistItem,
+    InsiderTrade,
 )
 from backend.portfolio_backtests.models import PortfolioBacktestJob
 from backend.experiments.models import Experiment, ExperimentArtifact
@@ -114,6 +116,8 @@ __all__ = [
     "VirtualPosition",
     "VirtualOrder",
     "VirtualTrade",
+    "WatchlistORM",
+    "InsiderTrade",
     "VirtualSide",
     "VirtualOrderType",
     "VirtualOrderStatus",

@@ -11,6 +11,15 @@
 - Multi-portfolio backend + manager UI
 - Multi-market screener + formula mode
 - News sentiment components and trend chart
+- **Economic Data Terminal** (Calendar + Macro Dashboard)
+- **AI Research Copilot** (Natural Language Query engine)
+- **US Stock Options Support** (Greeks + IV Rank/Percentile)
+- **Sector Rotation (RRG)** Map implementation
+- **Redis Quote Bus** for distributed quote broadcasting
+- **Multi-Watchlist System** with Treemap Heatmap mode
+- **Intraday Backtesting** with Vectorized NumPy Engine
+- **Keyboard Navigation System** (Bloomberg-style global hotkeys)
+- **Advanced Reporting Engine** (Bloomberg-quality PDF export)
 
 ## In Progress
 

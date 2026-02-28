@@ -9,7 +9,11 @@ export function Sidebar() {
   const unreadCount = useAlertsStore((s) => s.unreadCount);
   const nav = [
     { label: "Market", path: "/equity/stocks", key: "F1" },
+    { label: "Economics", path: "/equity/economics", key: "E", hint: "Macro" },
+    { label: "Yield Curve", path: "/equity/yield-curve", key: "YC", hint: "Fixed Income" },
+    { label: "Rotation", path: "/equity/sector-rotation", key: "ROT", hint: "Relative" },
     { label: "Screener", path: "/equity/screener", key: "F2" },
+    { label: "Launchpad", path: "/equity/launchpad", key: "LP", hint: "Workspace" },
     { label: "Workstation", path: "/equity/chart-workstation", key: "6", hint: "6 Charts" },
     { label: "Portfolio", path: "/equity/portfolio", key: "F3" },
     { label: "Paper", path: "/equity/paper", key: "P" },

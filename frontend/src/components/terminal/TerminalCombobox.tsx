@@ -5,6 +5,7 @@ type Props<T> = {
   value: string;
   onChange: (value: string) => void;
   onFocus?: () => void;
+  onBlur?: () => void;
   onKeyDown?: (event: React.KeyboardEvent) => void;
   placeholder?: string;
   open: boolean;
@@ -25,6 +26,7 @@ export function TerminalCombobox<T>({
   value,
   onChange,
   onFocus,
+  onBlur,
   onKeyDown,
   placeholder,
   open,
@@ -50,6 +52,7 @@ export function TerminalCombobox<T>({
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         onFocus={onFocus}
+        onBlur={onBlur}
         onKeyDown={onKeyDown}
         spellCheck={false}
         data-testid={dataTestId}

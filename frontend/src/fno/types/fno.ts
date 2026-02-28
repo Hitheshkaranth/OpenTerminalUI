@@ -26,11 +26,14 @@ export type StrikeData = {
 
 export type OptionChainResponse = {
   symbol: string;
+  market?: "US" | "NSE";
   spot_price: number;
   timestamp: string;
   expiry_date: string;
   available_expiries: string[];
   atm_strike: number;
+  iv_rank?: number;
+  iv_percentile?: number;
   strikes: StrikeData[];
   totals: {
     ce_oi_total: number;
@@ -62,10 +65,13 @@ export type OIAnalysis = {
 
 export type ChainSummary = {
   symbol: string;
+  market?: "US" | "NSE";
   expiry_date: string;
   spot_price: number;
   atm_strike: number;
   atm_iv: number;
+  iv_rank?: number;
+  iv_percentile?: number;
   pcr: { pcr_oi: number; pcr_volume: number; pcr_oi_change: number; signal: string };
   max_pain: number;
   support_resistance: { support: number[]; resistance: number[] };

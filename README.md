@@ -27,41 +27,54 @@ OpenTerminalUI is a terminal-style market analysis workspace organized around th
 The Bloomberg-inspired **Terminal Noir** overhaul is now integrated into the main shell:
 
 - `CommandBar` (GO bar) with command parsing, shortcuts, and autocomplete
-- top `TickerTape` and bottom `MarketStatusBar`
+- top `TickerTape` with seamless **infinite scroll** and real-time global indices (NASDAQ, DOW, FTSE, DAX, Nikkei)
 - `Launchpad` multi-panel workspace with panel linking and presets
-- `SecurityHub` (DES-style) with dense tabbed security views
+- `SecurityHub` (DES-style) with dense tabbed security views and **Multi-Symbol Chart Comparison** (Overlay Mode)
 - `DenseTable` reusable high-density table component across screener/portfolio flows
 - chart/workstation context actions, including quick **Add to Portfolio**
+- **Keyboard Navigation System** (Ctrl+G, Ctrl+W, Ctrl+N, Ctrl+P, Ctrl+B) for a keyboard-first professional workflow
 
 Primary routes to validate quickly:
 
 - `/equity/stocks`
 - `/equity/security/:ticker`
 - `/equity/launchpad`
+- `/equity/economics` (New: Calendar + Macro Dashboard)
+- `/equity/yield-curve` (New: US Treasury Yield Curve)
+- `/equity/sector-rotation` (New: RRG Map)
 - `/equity/chart-workstation`
 - `/equity/compare`
 - `/equity/screener`
 - `/equity/portfolio?view=manager`
 
 ### Equity & Fundamental Analysis Pack
-- **Chart Workstation** - multi-timeframe charts with unified India/US OHLCV routing, indicator overlays, delivery overlay, history backfill, and continuous live candle updates
+- **Chart Workstation** - multi-timeframe charts with unified India/US OHLCV routing, indicator overlays, delivery overlay, history backfill, and **Incremental Realtime Candle Updates**
+- **Economic Terminal** - Global economic calendar with impact-coding and a Macro Dashboard tracking US, India, EU, and China indicators (GDP, CPI, Rates)
+- **Sector Rotation (RRG)** - Visual relative rotation graph using JdK RS-Ratio and RS-Momentum to track sector leading/lagging cycles
+- **Fixed Income** - Live US Treasury Yield Curve dashboard with historical curve overlays and automatic inversion detection
+- **AI Research Copilot** - Natural Language Query engine in the GO bar; translates plain English to data queries, screener filters, and chart commands
+- **Insider Trading Monitor** - Tracks SEC Form 4 and NSE disclosures with cluster detection and chart event markers
 - **Company Analytics** - fundamentals, scorecards, trends, reports, valuation, peer comparison
-- **Advanced Research Widgets** - shareholding pattern panel (NSE + fallback), capex tracker, and in-app Python execution
-- **Operations Screens** - revamped screener (presets/saved/public screens + viz), portfolio, watchlist, mutual funds desk, settings, and news/sentiment flows
+- **Operations Screens** - revamped screener (presets/saved/public screens + viz), **Multi-Watchlist System** with Heatmap mode, portfolio, mutual funds desk, settings, and news/sentiment flows
 - **US Market Integration** - NYSE/NASDAQ/AMEX market support with market-aware symbol routing and normalized chart endpoint support
 
 ### Futures & Options (F&O) Analysis Pack
-- **Option Chain + Greeks + OI** - strike-level structure, Greeks, and open-interest context
+- **US Stock Options Support** - Fully extended F&O pack to support US tickers via FMP/Yahoo adapters with unified routing
+- **Option Chain + Greeks + OI** - strike-level structure, **Color-Coded Greeks** (Delta, Theta), and open-interest context
 - **Strategy Builder** - multi-leg payoff analysis with preset templates
+- **IV Analytics** - Real-time Implied Volatility Rank and Percentile tracking for all underlyings
 - **PCR + Heatmap + Expiry Dashboards** - breadth, participation, and expiry-focused signals
 - **Futures Terminal** - shared chart/indicator stack + realtime quote stream with Equity for consistent workflow
 - **Unified Context** - cross-pack ticker/navigation continuity between Equity and F&O screens with common terminal shell primitives
 
 ### Backtesting Control Deck
+- **Intraday Support** - Sub-daily backtesting (1m, 5m, 15m, 1h) with session-aware signal generation and execution
+- **Vectorized Engine** - Performance-optimized NumPy engine capable of processing 100k+ intraday bars in <1s
 - **Asset + Capital Inputs** - user-defined asset and trade capital at run start
 - **Model Presets + Custom Script** - built-in strategies or custom Python `generate_signals(df, context)`
 - **Capital-aware Execution** - model allocation determines share quantity against available capital
 - **Result Accounting** - initial capital, final equity, net P/L, and ending cash shown in performance block
+- **Execution model** - configurable fill delay and intraday spread-aware slippage modeling
 - **Trade Audit** - buy/sell markers, execution logs, and full trade blotter by asset
 
 ### Model Lab
@@ -95,12 +108,15 @@ Primary routes to validate quickly:
 - **TCA (Transaction Cost Analysis)** - paper trading execution cost breakdown: fills, gross P&L, commission, slippage, and net P&L per lot
 
 ### Platform & APIs
-- **Realtime Streaming** - WebSocket quotes with REST/snapshot fallback
+- **Redis Quote Bus** - High-performance Pub/Sub quote distribution enabling horizontal scaling of backend instances
+- **Distributed Bar Aggregation** - Redis-locked aggregator role for consistent 1-min bar construction across nodes
+- **Realtime Streaming** - WebSocket quotes with 5-second market-status broadcasts and REST fallback
+- **Advanced Export** - Bloomberg-quality PDF research reports, Excel, and CSV generation for stocks, portfolios, and backtest results
 - **V1 Endpoints** - equity analytics, shareholding pattern/trends, mutual fund search/performance/portfolio, delivery series, indicators, crypto, scripting
 - **UI Reliability** - hardened chart/indicator pipelines for first-load and timeframe-switch stability
 - **Market Classification** - country/exchange badges, currency metadata, and instrument capability tags (F/O)
 - **Background Services** - instruments loader and scheduled news ingestion
-- **Deployment** - Docker compose workflow with optional Redis cache profile
+- **Deployment** - Docker compose workflow with required Redis service for horizontal scale
 
 ## Features
 
@@ -146,6 +162,13 @@ Primary routes to validate quickly:
 - [x] Portfolio analytics: benchmarks, correlation, dividends, risk metrics, tax lots
 - [x] PWA shell with service worker, offline support, and mobile-optimized layouts
 - [x] Technical Screener with breakout scanner engine and real-time scanner alerts
+- [x] Economic Data Terminal with global calendar and macro indicators dashboard
+- [x] AI Research Copilot with Natural Language Query (NLQ) engine
+- [x] US Stock Options support with Greeks and IV analytics
+- [x] Relative Rotation Graphs (RRG) for visual sector analysis
+- [x] Redis Pub/Sub architecture for horizontally scalable quote broadcasting
+- [x] Multi-watchlist system with treemap heatmap visualization
+- [x] Intraday backtesting support with vectorized NumPy engine
 - [x] Institutional data layer: data versions, corp actions, EOD prices, PIT fundamentals
 - [x] Risk Engine: portfolio/backtest VaR, CVaR, and configurable stress scenarios
 - [x] Execution Simulator: commission, slippage, spread, and market-impact cost modeling in backtests

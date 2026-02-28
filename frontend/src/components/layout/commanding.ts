@@ -19,7 +19,12 @@ export type CommandFunctionCode =
   | "SET"
   | "OPS"
   | "LAUNCH"
-  | "COMP";
+  | "COMP"
+  | "YCURVE"
+  | "ECAL"
+  | "ECOF"
+  | "FRED"
+  | "RRG";
 
 export type ParsedCommand =
   | {
@@ -78,6 +83,11 @@ export const COMMAND_FUNCTIONS: CommandFunctionSpec[] = [
   { code: "OPS", label: "Ops Dashboard", description: "Open operations dashboard", aliases: ["OPERATIONS"] },
   { code: "LAUNCH", label: "Launchpad", description: "Open multi-panel launchpad", aliases: ["LP", "LAUNCHPAD"] },
   { code: "COMP", label: "Split Compare", description: "Open split-screen comparison", aliases: ["COMPARE"] },
+  { code: "YCURVE", label: "Yield Curve", description: "Open US Treasury yield curve dashboard", aliases: ["GC", "YIELD", "CURVE"] },
+  { code: "ECAL", label: "Economic Calendar", description: "Open global economic calendar", aliases: ["CALENDAR"] },
+  { code: "ECOF", label: "Macro Dashboard", description: "Open macro indicators dashboard", aliases: ["MACRO", "INDICATORS"] },
+  { code: "FRED", label: "FRED Series", description: "Chart a FRED economic series", aliases: ["SERIES"] },
+  { code: "RRG", label: "Sector Rotation Map", description: "Relative Rotation Graph (RRG)", aliases: ["SROT", "SECTOR"] },
 ];
 
 const FUNCTION_LOOKUP = new Map<string, CommandFunctionCode>(
@@ -115,6 +125,19 @@ export function parseCommand(input: string): ParsedCommand {
     return { kind: "function", raw, func: firstAsFn, modifiers: tokens.slice(1) };
   }
 
+  const lastToken = tokens[tokens.length - 1];
+  const lastAsFn = FUNCTION_LOOKUP.get(lastToken);
+
+  if (lastAsFn && tokens.length > 1) {
+    const previousTokens = tokens.slice(0, tokens.length - 1);
+    if (previousTokens.every(looksLikeTicker)) {
+      if (previousTokens.length > 1) {
+        return { kind: "function", raw, func: lastAsFn, modifiers: previousTokens };
+      }
+      return { kind: "ticker-function", raw, ticker: previousTokens[0], func: lastAsFn, modifiers: [] };
+    }
+  }
+
   const secondAsFn = FUNCTION_LOOKUP.get(tokens[1]);
   if (looksLikeTicker(tokens[0]) && secondAsFn) {
     return { kind: "ticker-function", raw, ticker: tokens[0], func: secondAsFn, modifiers: tokens.slice(2) };
@@ -127,8 +150,12 @@ export function parseCommand(input: string): ParsedCommand {
   return { kind: "natural-language", raw, query: raw };
 }
 
-function navigateToSecurityHub(navigate: NavigateFunction, ticker: string, tab: string = "overview") {
-  navigate(`/equity/security/${encodeURIComponent(ticker)}?tab=${encodeURIComponent(tab)}`);
+function navigateToSecurityHub(navigate: NavigateFunction, ticker: string, tab: string = "overview", modifiers: string[] = []) {
+  let url = `/equity/security/${encodeURIComponent(ticker)}?tab=${encodeURIComponent(tab)}`;
+  if (tab === "chart" && modifiers.length > 0) {
+    url += `&compare=${encodeURIComponent(modifiers.join(","))}`;
+  }
+  navigate(url);
 }
 
 function applyTicker(ticker: string) {
@@ -192,9 +219,12 @@ export function executeParsedCommand(parsed: ParsedCommand, navigate: NavigateFu
       case "PORT":
         navigate("/equity/portfolio");
         return { ok: true, target: "/equity/portfolio" };
-      case "WL":
-        navigate("/equity/watchlist");
+      case "WL": {
+        const name = mod0 || "";
+        const target = name ? `/equity/watchlist?name=${encodeURIComponent(name)}` : "/equity/watchlist";
+        navigate(target);
         return { ok: true, target: "/equity/watchlist" };
+      }
       case "NEWS":
         if (mod0 && looksLikeTicker(mod0)) {
           applyTicker(mod0);
@@ -218,6 +248,23 @@ export function executeParsedCommand(parsed: ParsedCommand, navigate: NavigateFu
       case "LAUNCH":
         navigate("/equity/launchpad");
         return { ok: true, target: "/equity/launchpad" };
+      case "YCURVE":
+        navigate("/equity/yield-curve");
+        return { ok: true, target: "/equity/yield-curve" };
+      case "ECAL":
+        navigate("/equity/economics?tab=calendar");
+        return { ok: true, target: "/equity/economics" };
+      case "ECOF":
+        navigate("/equity/economics?tab=macro");
+        return { ok: true, target: "/equity/economics" };
+      case "FRED": {
+        const series = mod0 || "CPIAUCSL";
+        navigate(`/equity/security/FRED:${series.toUpperCase()}?tab=chart`);
+        return { ok: true, target: "/equity/security" };
+      }
+      case "RRG":
+        navigate("/equity/sector-rotation");
+        return { ok: true, target: "/equity/sector-rotation" };
       case "COMP": {
         const left = mod0 && looksLikeTicker(mod0) ? mod0 : useStockStore.getState().ticker || "AAPL";
         const right = parsed.modifiers[1] && looksLikeTicker(parsed.modifiers[1]) ? parsed.modifiers[1] : "MSFT";
@@ -237,7 +284,8 @@ export function executeParsedCommand(parsed: ParsedCommand, navigate: NavigateFu
             navigate(`/fno?symbol=${encodeURIComponent(mod0)}`);
             return { ok: true, target: "/fno" };
           }
-          navigateToSecurityHub(navigate, mod0, securityFuncToTab(parsed.func));
+          const otherModifiers = parsed.modifiers.slice(1);
+          navigateToSecurityHub(navigate, mod0, securityFuncToTab(parsed.func), otherModifiers);
           return { ok: true, target: `/equity/security/${mod0}` };
         }
         return { ok: false, message: `${parsed.func} requires a ticker` };

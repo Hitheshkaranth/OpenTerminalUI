@@ -21,7 +21,12 @@ export type LaunchpadPanelType =
   | "portfolio-summary"
   | "heatmap"
   | "market-pulse"
-  | "fundamentals";
+  | "fundamentals"
+  | "yield-curve"
+  | "ai-research"
+  | "option-chain"
+  | "watchlist-heatmap"
+  | "sector-rotation";
 
 export type LaunchpadPanelConfig = {
   id: string;
@@ -137,6 +142,11 @@ const PANEL_REGISTRY: Record<LaunchpadPanelType, ComponentType<{ panel: Launchpa
   heatmap: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadHeatmapPanel }))),
   "market-pulse": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadMarketPulsePanel }))),
   fundamentals: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadFundamentalsPanel }))),
+  "yield-curve": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadYieldCurvePanel }))),
+  "ai-research": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadAIResearchPanel }))),
+  "option-chain": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadOptionChainPanel }))),
+  "watchlist-heatmap": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadWatchlistHeatmapPanel }))),
+  "sector-rotation": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadSectorRotationPanel }))),
 };
 
 export function LaunchpadProvider({ children }: { children: ReactNode }) {

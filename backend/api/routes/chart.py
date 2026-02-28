@@ -24,6 +24,61 @@ except Exception:  # pragma: no cover - adapter module may be absent in lightwei
 
 router = APIRouter()
 
+@router.get("/charts/compare")
+async def compare_charts(
+    symbols: str = Query(..., description="Comma-separated symbols to compare"),
+    period: str = Query("1y"),
+    interval: str = Query("1d")
+) -> Dict[str, Any]:
+    """Fetch aligned OHLCV data for multiple symbols for comparison."""
+    sym_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    if not sym_list:
+        raise HTTPException(400, "No symbols provided")
+
+    fetcher = await get_unified_fetcher()
+    # Fetch all data concurrently
+    import asyncio
+    tasks = []
+    for sym in sym_list:
+        tasks.append(fetcher.fetch_history(sym, range_val=period, interval=interval))
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Process into dataframes and align
+    dfs = {}
+    for sym, res in zip(sym_list, results):
+        if isinstance(res, Exception):
+            continue
+        # Expecting ChartResponse dict
+        if isinstance(res, dict) and "data" in res:
+            rows = res["data"]
+            if not rows:
+                continue
+            df = pd.DataFrame([{"date": pd.to_datetime(r["date"] if isinstance(r, dict) else getattr(r, "date")), "close": r["close"] if isinstance(r, dict) else getattr(r, "close")} for r in rows])
+            if not df.empty:
+                df.set_index("date", inplace=True)
+                # Keep only close price
+                dfs[sym] = df["close"]
+
+    if not dfs:
+        return {"dates": [], "series": {}}
+
+    # Combine and forward fill
+    combined = pd.DataFrame(dfs)
+    combined.sort_index(inplace=True)
+    combined.ffill(inplace=True)
+    combined.bfill(inplace=True) # Backfill initial NaNs if one stock starts later
+
+    # Format output
+    dates = [d.isoformat() if hasattr(d, "isoformat") else str(d) for d in combined.index]
+    series = {}
+    for col in combined.columns:
+        series[col] = combined[col].tolist()
+
+    return {
+        "dates": dates,
+        "series": series
+    }
 
 class ChartDrawingCreate(BaseModel):
     tool_type: str
@@ -227,6 +282,7 @@ async def get_chart(
                 registry = get_adapter_registry()
                 end_d = date.today()
                 start_d = end_d - timedelta(days=365)
+                # Ensure interval is passed here
                 adapter_rows = await registry.get_adapter(market).get_history(ticker, interval, start_d, end_d)
             except Exception:
                 adapter_rows = []

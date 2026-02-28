@@ -11,6 +11,7 @@ from backend.adapters.crypto import CryptoDataAdapter
 from backend.adapters.kite import KiteAdapter
 from backend.adapters.mock import MockDataAdapter
 from backend.adapters.yahoo import YahooFinanceAdapter
+from backend.adapters.us_options_adapter import USOptionsAdapter
 
 
 @dataclass
@@ -27,6 +28,7 @@ class AdapterRegistry:
         self._factory = {
             "kite": lambda: KiteAdapter(),
             "yahoo": lambda: YahooFinanceAdapter(),
+            "us_options": lambda: USOptionsAdapter(),
             "crypto": lambda: CryptoDataAdapter(),
             "mock": lambda: MockDataAdapter(),
         }

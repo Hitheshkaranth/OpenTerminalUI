@@ -21,6 +21,15 @@ class AppSettings(BaseModel):
         ]
     )
     sqlite_url: str = "sqlite:///backend/openterminalui.db"
+    redis_url: str = "redis://localhost:6379/0"
+    redis_quote_channels_ttl: int = 300
+    redis_max_connections: int = 50
+    fred_api_key: str | None = None
+    fmp_api_key: str | None = None
+    finnhub_api_key: str | None = None
+    ai_provider: str = "openai"  # openai or ollama
+    openai_api_key: str | None = None
+    ollama_base_url: str = "http://localhost:11434"
     price_cache_ttl_seconds: int = 60
     fundamentals_cache_ttl_seconds: int = 1800
 
@@ -83,6 +92,49 @@ def get_settings() -> AppSettings:
             _env("OPENTERMINALUI_SQLITE_URL")
             or _env("OPENSCREENS_SQLITE_URL", "TRADE_SCREENS_SQLITE_URL")
             or payload.get("sqlite_url", default_sqlite)
+        ),
+        redis_url=(
+            _env("OPENTERMINALUI_REDIS_URL")
+            or _env("REDIS_URL")
+            or app_cfg.get("redis_url", "redis://localhost:6379/0")
+        ),
+        redis_quote_channels_ttl=int(
+            _env("OPENTERMINALUI_REDIS_QUOTE_CHANNELS_TTL")
+            or app_cfg.get("redis_quote_channels_ttl", 300)
+        ),
+        redis_max_connections=int(
+            _env("OPENTERMINALUI_REDIS_MAX_CONNECTIONS")
+            or app_cfg.get("redis_max_connections", 50)
+        ),
+        fred_api_key=(
+            _env("OPENTERMINALUI_FRED_API_KEY")
+            or _env("FRED_API_KEY")
+            or app_cfg.get("fred_api_key")
+        ),
+        fmp_api_key=(
+            _env("OPENTERMINALUI_FMP_API_KEY")
+            or _env("FMP_API_KEY")
+            or app_cfg.get("fmp_api_key")
+        ),
+        finnhub_api_key=(
+            _env("OPENTERMINALUI_FINNHUB_API_KEY")
+            or _env("FINNHUB_API_KEY")
+            or app_cfg.get("finnhub_api_key")
+        ),
+        ai_provider=(
+            _env("OPENTERMINALUI_AI_PROVIDER")
+            or _env("AI_PROVIDER")
+            or app_cfg.get("ai_provider", "openai")
+        ),
+        openai_api_key=(
+            _env("OPENTERMINALUI_OPENAI_API_KEY")
+            or _env("OPENAI_API_KEY")
+            or app_cfg.get("openai_api_key")
+        ),
+        ollama_base_url=(
+            _env("OPENTERMINALUI_OLLAMA_BASE_URL")
+            or _env("OLLAMA_BASE_URL")
+            or app_cfg.get("ollama_base_url", "http://localhost:11434")
         ),
         price_cache_ttl_seconds=int(
             _env("OPENTERMINALUI_PRICE_CACHE_TTL_SECONDS")

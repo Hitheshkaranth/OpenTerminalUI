@@ -51,6 +51,9 @@ import { SecurityHubPage } from "./pages/SecurityHub";
 import { SplitComparisonPage } from "./pages/SplitComparison";
 import { ThemeRuntime } from "./components/layout/ThemeRuntime";
 import { LaunchpadPopoutPage } from "./pages/LaunchpadPopout";
+import { YieldCurveDashboard } from "./pages/fixed-income/YieldCurveDashboard";
+import { EconomicTerminal } from "./pages/economics/EconomicTerminal";
+import { SectorRotationPage } from "./pages/SectorRotation";
 
 function App() {
   return (
@@ -94,6 +97,9 @@ function App() {
             <Route path="launchpad" element={<LaunchpadPage />} />
             <Route path="launchpad/popout" element={<LaunchpadPopoutPage />} />
             <Route path="compare" element={<SplitComparisonPage />} />
+            <Route path="yield-curve" element={<YieldCurveDashboard />} />
+            <Route path="economics" element={<EconomicTerminal />} />
+            <Route path="sector-rotation" element={<SectorRotationPage />} />
           </Route>
 
           <Route path="/fno" element={<ProtectedRoute><FnoLayout /></ProtectedRoute>}>

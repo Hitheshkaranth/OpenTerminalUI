@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   PriceScaleMode,
   CandlestickSeries,
@@ -26,6 +26,7 @@ import { useIndicators } from "../../shared/chart/useIndicators";
 import type { IndicatorConfig } from "../../shared/chart/types";
 import { terminalColors, terminalOverlayPalette } from "../../theme/terminal";
 import type { Bar } from "oakscriptjs";
+import { useQuotesStream, type QuoteTick } from "../../realtime/useQuotesStream";
 
 import type {
   ExtendedHoursConfig,
@@ -208,6 +209,73 @@ export function TradingChart({
   const initializedDrawingsRef = useRef(false);
   const syncTimerRef = useRef<number | null>(null);
   const { pos: syncedPos, broadcast, syncEnabled } = useCrosshairSync();
+
+  const handleTick = useCallback((tick: QuoteTick) => {
+    if (tick.symbol !== ticker) return;
+    if (!candleRef.current || !volumeRef.current) return;
+
+    const intervalSec =
+      timeframe === "1m" ? 60 :
+      timeframe === "5m" ? 300 :
+      timeframe === "15m" ? 900 :
+      timeframe === "1h" ? 3600 :
+      timeframe === "1d" ? 86400 : 0;
+
+    if (intervalSec === 0) return;
+
+    const tickTime = Math.floor(new Date(tick.ts).getTime() / 1000);
+    const barTime = Math.floor(tickTime / intervalSec) * intervalSec;
+
+    // Update or add bar
+    const lastBar = lastParsedRef.current[lastParsedRef.current.length - 1];
+    const isNewBar = !lastBar || barTime > lastBar.time;
+
+    let updatedBar: any;
+    if (isNewBar) {
+      updatedBar = {
+        time: barTime as UTCTimestamp,
+        open: tick.ltp,
+        high: tick.ltp,
+        low: tick.ltp,
+        close: tick.ltp
+      };
+    } else {
+      updatedBar = {
+        time: lastBar.time as UTCTimestamp,
+        open: lastBar.open,
+        high: Math.max(lastBar.high, tick.ltp),
+        low: Math.min(lastBar.low, tick.ltp),
+        close: tick.ltp
+      };
+    }
+
+    candleRef.current.update(updatedBar);
+
+    if (isNewBar) {
+      lastParsedRef.current.push({
+        time: barTime,
+        open: updatedBar.open,
+        high: updatedBar.high,
+        low: updatedBar.low,
+        close: updatedBar.close,
+        volume: Number(tick.volume || 0)
+      });
+    } else {
+      lastParsedRef.current[lastParsedRef.current.length - 1] = {
+        ...lastBar,
+        high: updatedBar.high,
+        low: updatedBar.low,
+        close: updatedBar.close,
+        volume: (lastBar.volume || 0) + Number(tick.volume || 0)
+      };
+    }
+  }, [ticker, timeframe]);
+
+  const { subscribe } = useQuotesStream(market || "IN", handleTick);
+
+  useEffect(() => {
+    subscribe([ticker]);
+  }, [ticker, subscribe]);
 
   const parsed = useMemo(
     () =>
@@ -795,13 +863,14 @@ export function TradingChart({
     if (!apiRef.current) {
       return;
     }
+    const isCompare = comparisonSeries && comparisonSeries.length > 0;
     apiRef.current.applyOptions({
       rightPriceScale: {
         borderColor: terminalColors.border,
-        mode: logarithmic ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
+        mode: isCompare ? PriceScaleMode.Percentage : (logarithmic ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal),
       },
     });
-  }, [logarithmic]);
+  }, [logarithmic, comparisonSeries]);
 
   useEffect(() => {
     const chart = apiRef.current;

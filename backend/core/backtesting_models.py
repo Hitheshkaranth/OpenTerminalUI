@@ -12,6 +12,9 @@ class BacktestConfig(BaseModel):
     position_size: float = Field(1.0, gt=0)
     position_fraction: float | None = Field(default=None, gt=0, le=1)
     allow_short: bool = True
+    timeframe: str = Field("1d")
+    fill_delay_bars: int = Field(0, ge=0)
+    intraday_slippage_model: bool = Field(False)
 
 
 class TradeRecord(BaseModel):
@@ -21,6 +24,7 @@ class TradeRecord(BaseModel):
     price: float
     cash_after: float
     position_after: float
+    hold_time_minutes: float = 0.0
 
 
 class EquityPoint(BaseModel):
@@ -60,6 +64,11 @@ class BacktestResult(BaseModel):
     tail_ratio: float = 0.0
     max_consecutive_losses: int = 0
     return_stability_r2: float = 0.0
+    trades_per_day: float = 0.0
+    average_hold_time_minutes: float = 0.0
+    max_intraday_drawdown: float = 0.0
+    win_rate_morning: float = 0.0
+    win_rate_afternoon: float = 0.0
     drawdown_start: str | None = None
     drawdown_trough: str | None = None
     drawdown_recovery: str | None = None

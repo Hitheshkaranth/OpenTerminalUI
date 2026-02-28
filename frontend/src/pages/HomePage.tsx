@@ -54,11 +54,14 @@ const NAV_CARD_SECTIONS: Array<{ title: string; cards: NavCard[] }> = [
     title: "EQUITY",
     cards: [
       { label: "Market", to: "/equity/stocks", badge: "F1" },
+      { label: "Economics", to: "/equity/economics", badge: "E" },
+      { label: "Yield Curve", to: "/equity/yield-curve", badge: "YC" },
+      { label: "Rotation", to: "/equity/sector-rotation", badge: "ROT" },
+      { label: "Launchpad", to: "/equity/launchpad", badge: "LP" },
       { label: "Screener", to: "/equity/screener", badge: "F2" },
       { label: "Portfolio", to: "/equity/portfolio", badge: "F3" },
       { label: "Paper", to: "/equity/paper", badge: "P" },
-      { label: "News", to: "/equity/news", badge: "F5" },
-      { label: "Alerts", to: "/equity/alerts", badge: "A" },
+      { label: "Watchlist", to: "/equity/watchlist", badge: "F4" },
     ],
   },
   {
@@ -486,10 +489,11 @@ export function HomePage() {
               <span className="ot-panel-header-title">SYSTEM SNAPSHOT</span>
             </header>
             <div className="ot-command-actions ot-command-actions-single">
+              <button type="button" className="ot-action-button ot-action-green" onClick={() => navigate("/equity/sector-rotation")}>OPEN ROTATION</button>
+              <button type="button" className="ot-action-button ot-action-cyan" onClick={() => navigate("/equity/yield-curve")}>OPEN YIELD CURVE</button>
+              <button type="button" className="ot-action-button ot-action-amber" onClick={() => navigate("/equity/economics")}>OPEN ECONOMICS</button>
+              <button type="button" className="ot-action-button ot-action-cyan" onClick={() => navigate("/equity/launchpad")}>OPEN LAUNCHPAD</button>
               <button type="button" className="ot-action-button ot-action-amber" onClick={() => navigate("/equity/portfolio")}>OPEN PORTFOLIO</button>
-              <button type="button" className="ot-action-button ot-action-cyan" onClick={() => navigate("/fno")}>OPEN F&O</button>
-              <button type="button" className="ot-action-button ot-action-green" onClick={() => navigate("/backtesting")}>OPEN BACKTEST</button>
-              <button type="button" className="ot-action-button ot-action-red" onClick={() => navigate("/equity/settings")}>OPEN SETTINGS</button>
             </div>
             <p className="ot-system-health ot-value-up">DATA RELAY ACTIVE: EQUITY, F&O, BACK TEST, WATCHLIST, SETTINGS</p>
           </section>

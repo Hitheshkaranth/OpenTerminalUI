@@ -45,13 +45,16 @@ class HistoricalDataProvider(Protocol):
     def get_daily_ohlcv(self, symbol: Symbol, start: str, end: str) -> list[OhlcvBar]:
         ...
 
+    def get_intraday_ohlcv(self, symbol: Symbol, start: str, end: str, interval: str) -> list[OhlcvBar]:
+        ...
+
 
 class YahooHistoricalDataProvider:
     def get_daily_ohlcv(self, symbol: Symbol, start: str, end: str) -> list[OhlcvBar]:
         frame = pd.DataFrame()
         # Prefer direct chart endpoint first; this avoids yfinance parser/cache edge cases.
         try:
-            frame = self._fetch_history_chart_api(symbol.provider_symbol, start, end)
+            frame = self._fetch_history_chart_api(symbol.provider_symbol, start, end, "1d")
         except Exception:
             frame = pd.DataFrame()
 
@@ -72,7 +75,7 @@ class YahooHistoricalDataProvider:
         for idx, row in frame.iterrows():
             rows.append(
                 OhlcvBar(
-                    date=idx.strftime("%Y-%m-%d"),
+                    date=idx.strftime("%Y-%m-%d %H:%M:%S"),
                     open=float(row.get("Open", 0.0)),
                     high=float(row.get("High", 0.0)),
                     low=float(row.get("Low", 0.0)),
@@ -82,11 +85,50 @@ class YahooHistoricalDataProvider:
             )
         return rows
 
-    def _fetch_history_chart_api(self, provider_symbol: str, start: str, end: str) -> pd.DataFrame:
+    def get_intraday_ohlcv(self, symbol: Symbol, start: str, end: str, interval: str) -> list[OhlcvBar]:
+        frame = pd.DataFrame()
+        try:
+            frame = self._fetch_history_chart_api(symbol.provider_symbol, start, end, interval)
+        except Exception:
+            pass
+        if frame.empty:
+            # Fallback to yf download
+            try:
+                frame = yf.download(
+                    symbol.provider_symbol,
+                    start=start,
+                    end=end,
+                    interval=interval,
+                    auto_adjust=False,
+                    progress=False,
+                )
+            except Exception:
+                pass
+
+        if frame.empty:
+            return []
+        if isinstance(frame.columns, pd.MultiIndex):
+            frame.columns = frame.columns.get_level_values(0)
+
+        rows: list[OhlcvBar] = []
+        for idx, row in frame.iterrows():
+            rows.append(
+                OhlcvBar(
+                    date=idx.strftime("%Y-%m-%d %H:%M:%S"),
+                    open=float(row.get("Open", 0.0)),
+                    high=float(row.get("High", 0.0)),
+                    low=float(row.get("Low", 0.0)),
+                    close=float(row.get("Close", 0.0)),
+                    volume=int(row.get("Volume", 0) or 0),
+                )
+            )
+        return rows
+
+    def _fetch_history_chart_api(self, provider_symbol: str, start: str, end: str, interval: str = "1d") -> pd.DataFrame:
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{provider_symbol}"
         start_ts = int(datetime.fromisoformat(start).replace(tzinfo=timezone.utc).timestamp())
         end_ts = int(datetime.fromisoformat(end).replace(tzinfo=timezone.utc).timestamp()) + 86399
-        params = {"period1": start_ts, "period2": end_ts, "interval": "1d", "events": "div,splits"}
+        params = {"period1": start_ts, "period2": end_ts, "interval": interval, "events": "div,splits"}
         headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json,text/plain,*/*"}
         response = _HTTP.get(url, params=params, headers=headers, timeout=8)
         response.raise_for_status()
@@ -137,6 +179,97 @@ class HistoricalDataService:
         if limit > 0:
             bars = bars[-limit:]
         return symbol, bars
+
+    def fetch_intraday_ohlcv(
+        self,
+        raw_symbol: str,
+        timeframe: str,
+        market: str = "NSE",
+        start: str | None = None,
+        end: str | None = None,
+        limit: int = 0,
+    ) -> tuple[Symbol, list[OhlcvBar]]:
+        symbol = normalize_symbol(raw_symbol, market)
+        end_val = end or date.today().isoformat()
+        start_val = start or (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+
+        try:
+            bars = self._provider.get_intraday_ohlcv(symbol, start=start_val, end=end_val, interval=timeframe)
+        except Exception:
+            bars = []
+
+        if not bars:
+            # Fallback to synthetic intraday
+            bars = _synthetic_intraday_ohlcv(symbol.canonical, start_val, end_val, timeframe, market)
+
+        if limit > 0:
+            bars = bars[-limit:]
+        return symbol, bars
+
+
+def _synthetic_intraday_ohlcv(symbol: str, start: str, end: str, timeframe: str, market: str) -> list[OhlcvBar]:
+    start_dt = datetime.fromisoformat(start)
+    if start_dt.tzinfo is None:
+        start_dt = start_dt.replace(tzinfo=timezone.utc)
+
+    try:
+        end_dt = datetime.fromisoformat(end)
+    except Exception:
+        end_dt = datetime.now(timezone.utc)
+    if end_dt.tzinfo is None:
+        end_dt = end_dt.replace(tzinfo=timezone.utc)
+
+    if end_dt < start_dt:
+        return []
+
+    tf_map = {"1m": 1, "5m": 5, "15m": 15, "1h": 60}
+    minutes = tf_map.get(timeframe, 1)
+
+    # Session hours
+    if market == "US":
+        start_hr, start_min = 9, 30
+        end_hr, end_min = 16, 0
+    else:
+        # NSE
+        start_hr, start_min = 9, 15
+        end_hr, end_min = 15, 30
+
+    seed = abs(hash(f"{symbol}:{start}:{end}:{timeframe}")) % (2**32)
+    rng = random.Random(seed)
+    base = 100.0 + rng.uniform(-20.0, 20.0)
+    out: list[OhlcvBar] = []
+    px = base
+
+    curr = start_dt
+    while curr <= end_dt:
+        if curr.weekday() < 5:
+            # Only generate within market hours
+            curr_time = curr.time()
+            if (curr_time.hour > start_hr or (curr_time.hour == start_hr and curr_time.minute >= start_min)) and \
+               (curr_time.hour < end_hr or (curr_time.hour == end_hr and curr_time.minute <= end_min)):
+
+                drift = 0.05 * math.sin(len(out) / 50.0) + rng.uniform(-0.3, 0.3)
+                open_px = max(1.0, px)
+                close_px = max(1.0, open_px + drift)
+                high_px = max(open_px, close_px) + abs(rng.uniform(0.01, 0.2))
+                low_px = max(0.5, min(open_px, close_px) - abs(rng.uniform(0.01, 0.2)))
+                vol = int(max(100, 10_000 + rng.uniform(-5_000, 5_000)))
+
+                out.append(
+                    OhlcvBar(
+                        date=curr.strftime("%Y-%m-%d %H:%M:%S"),
+                        open=float(open_px),
+                        high=float(high_px),
+                        low=float(low_px),
+                        close=float(close_px),
+                        volume=vol,
+                    )
+                )
+                px = close_px
+        curr += timedelta(minutes=minutes)
+        if len(out) > 100_000:  # Safety limit
+            break
+    return out
 
 
 def _synthetic_ohlcv(symbol: str, start: str, end: str) -> list[OhlcvBar]:

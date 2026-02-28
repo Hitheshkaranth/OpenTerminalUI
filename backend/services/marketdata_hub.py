@@ -4,6 +4,7 @@ import asyncio
 import logging
 import re
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -16,6 +17,7 @@ from backend.services.candle_aggregator import CandleAggregator
 from backend.services.finnhub_ws import FinnhubWebSocket
 from backend.services.instrument_map import get_instrument_map_service
 from backend.services.kite_stream import KiteStreamAdapter
+from backend.services.redis_quote_bus import get_quote_bus
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +79,9 @@ class MarketDataHub:
         self._connections: dict[WebSocket, set[str]] = {}
         self._poll_task: asyncio.Task | None = None
         self._running = False
+        self._instance_id = str(uuid.uuid4())
+        self._is_aggregator = False
+        self._lock_task: asyncio.Task | None = None
 
         self._instrument_map = get_instrument_map_service()
         self._kite_stream: KiteStreamAdapter | None = None
@@ -90,14 +95,28 @@ class MarketDataHub:
         self._alert_connections: set[WebSocket] = set()
         self._candle_aggregator = CandleAggregator()
         self._finnhub_ws = FinnhubWebSocket(self._on_finnhub_trade)
-        self.register_tick_listener(self._on_tick_for_candles)
+
+        # Redis Quote Bus
+        self._bus = get_quote_bus()
+        self._bus.register_local_listener(self._on_bus_message)
+        self._market_status_task: asyncio.Task | None = None
 
     async def start(self) -> None:
         async with self._lock:
             if self._running:
                 return
             self._running = True
+
+            # Connect to Redis
+            await self._bus.connect()
+
+            # Auto-subscribe to all supported markets
+            for m in list(US_MARKETS) + list(IN_MARKETS):
+                await self._bus.subscribe_market(m)
+
             self._poll_task = asyncio.create_task(self._poll_loop(), name="marketdata-hub-poll")
+            self._lock_task = asyncio.create_task(self._aggregator_lock_loop(), name="aggregator-lock-loop")
+            self._market_status_task = asyncio.create_task(self._market_status_loop(), name="market-status-loop")
 
         fetcher = await get_unified_fetcher()
         await self._instrument_map.initialize()
@@ -107,13 +126,53 @@ class MarketDataHub:
         await self._kite_stream.start()
         await self._finnhub_ws.start()
         await self._sync_stream_subscriptions()
-        logger.info("MarketDataHub started")
+        logger.info("MarketDataHub started (Instance ID: %s)", self._instance_id)
+
+    async def _aggregator_lock_loop(self):
+        """Maintain aggregator status using distributed lock."""
+        while self._running:
+            try:
+                if not self._is_aggregator:
+                    self._is_aggregator = await self._bus.acquire_aggregator_lock(self._instance_id)
+                    if self._is_aggregator:
+                        logger.info("This instance (%s) is now the CANDLE AGGREGATOR", self._instance_id)
+                else:
+                    still_held = await self._bus.renew_aggregator_lock(self._instance_id)
+                    if not still_held:
+                        self._is_aggregator = False
+                        logger.warning("Lost CANDLE AGGREGATOR lock")
+            except Exception:
+                logger.exception("Aggregator lock loop error")
+            await asyncio.sleep(5)
+
+    async def _on_bus_message(self, channel: str, payload: dict[str, Any]):
+        """Handle incoming messages from Redis Bus (Ticks or Bars)."""
+        if channel.startswith("quotes:"):
+            symbol = payload.get("symbol")
+            if symbol:
+                # 1. Local Broadcast to connected WS clients
+                await self.broadcast(symbol, payload)
+                # 2. Emit to local tick listeners (e.g. alert engine)
+                await self._emit_tick(payload)
+                # 3. If I am the aggregator, update my candle state and publish results
+                if self._is_aggregator:
+                    await self._on_tick_for_candles(payload)
+
+        elif channel.startswith("bars:"):
+            # Completed bar arrived from the aggregator instance via Redis
+            symbol = payload.get("symbol")
+            if symbol:
+                await self.broadcast(symbol, payload)
 
     async def shutdown(self) -> None:
         async with self._lock:
             self._running = False
             task = self._poll_task
+            lock_task = self._lock_task
+            status_task = self._market_status_task
             self._poll_task = None
+            self._lock_task = None
+            self._market_status_task = None
             sockets = list(self._connections.keys())
             alert_sockets = list(self._alert_connections)
             self._connections.clear()
@@ -130,6 +189,22 @@ class MarketDataHub:
                 await task
             except asyncio.CancelledError:
                 pass
+
+        if lock_task:
+            lock_task.cancel()
+            try:
+                await lock_task
+            except asyncio.CancelledError:
+                pass
+
+        if status_task:
+            status_task.cancel()
+            try:
+                await status_task
+            except asyncio.CancelledError:
+                pass
+
+        await self._bus.disconnect()
 
         if self._kite_stream:
             await self._kite_stream.stop()
@@ -217,6 +292,39 @@ class MarketDataHub:
                     self._connections.pop(ws, None)
             logger.debug("Dropped %s stale WS clients", len(stale))
             await self._sync_stream_subscriptions()
+
+    async def broadcast_to_all(self, payload: dict[str, Any]) -> None:
+        async with self._lock:
+            sockets = list(self._connections.keys())
+        if not sockets:
+            return
+        stale: list[WebSocket] = []
+        for ws in sockets:
+            try:
+                await ws.send_json(payload)
+            except Exception:
+                stale.append(ws)
+        if stale:
+            async with self._lock:
+                for ws in stale:
+                    self._connections.pop(ws, None)
+            await self._sync_stream_subscriptions()
+
+    async def _market_status_loop(self) -> None:
+        from backend.api.routes.reports import market_status
+        while self._running:
+            try:
+                # Fetch fresh market status (indices, market state, etc)
+                status = await market_status()
+                payload = {
+                    "type": "market_status",
+                    "data": status,
+                    "ts": _now_iso()
+                }
+                await self.broadcast_to_all(payload)
+            except Exception:
+                logger.exception("Market status broadcast loop error")
+            await asyncio.sleep(5.0)
 
     async def _broadcast_candle(self, symbol: str, interval: str, candle: dict[str, Any], status: str = "closed") -> None:
         await self.broadcast(
@@ -333,8 +441,9 @@ class MarketDataHub:
                     if poll_tokens:
                         ticks = await self._fetch_ticks(poll_tokens)
                         for token, tick in ticks.items():
-                            await self.broadcast(token, tick)
-                            await self._emit_tick(tick)
+                            tick["provider"] = "polling"
+                            market = token.split(":", 1)[0]
+                            await self._bus.publish_tick(market, tick)
                 except Exception as exc:
                     logger.exception("MarketDataHub poll iteration failed: %s", exc)
                 await asyncio.sleep(self.poll_interval_seconds)
@@ -368,9 +477,10 @@ class MarketDataHub:
             "oi": _to_float(tick.get("oi")),
             "volume": _to_float(tick.get("volume") if tick.get("volume") is not None else tick.get("volume_traded")),
             "ts": _now_iso(),
+            "provider": "kite",
         }
-        await self.broadcast(symbol, payload)
-        await self._emit_tick(payload)
+        market = symbol.split(":", 1)[0]
+        await self._bus.publish_tick(market, payload)
 
     async def _on_finnhub_trade(self, raw_symbol: str, price: float, volume: float, ts_ms: int) -> None:
         symbol_candidates: set[str] = set()
@@ -393,9 +503,10 @@ class MarketDataHub:
                 "oi": None,
                 "volume": float(volume),
                 "ts": ts_iso,
+                "provider": "finnhub",
             }
-            await self.broadcast(symbol_token, payload)
-            await self._emit_tick(payload)
+            market = symbol_token.split(":", 1)[0]
+            await self._bus.publish_tick(market, payload)
 
     async def _on_tick_for_candles(self, payload: dict[str, Any]) -> None:
         symbol = str(payload.get("symbol") or "").strip().upper()
@@ -405,8 +516,30 @@ class MarketDataHub:
         volume = _to_float(payload.get("volume")) or 0.0
         ts = _parse_tick_ts(payload.get("ts"))
         completed = self._candle_aggregator.on_tick(symbol, ltp, volume, ts)
+
+        market = symbol.split(":", 1)[0]
         for sym, interval, candle in completed:
-            await self._broadcast_candle(sym, interval, candle, status="closed")
+            bar_payload = {
+                "type": "candle",
+                "symbol": sym,
+                "interval": interval,
+                "status": "closed",
+                **candle,
+            }
+            # Publish to Redis Bus so all instances can see the completed bar
+            await self._bus.publish_bar(market, interval, bar_payload)
+
+        # For partial candles, we still broadcast locally to our clients if they want it
+        # but we don't publish to Redis to avoid excessive traffic.
+        # Actually, the requirement says "Each backend instance subscribes to the relevant Redis channels"
+        # and "Only the aggregator processes raw ticks into bars".
+        # If Instance B wants to show a partial 1m candle, it needs to see all ticks.
+        # It DOES see all ticks via Redis. So Instance B can aggregate its own partials?
+        # No, the requirement says "Only the aggregator processes raw ticks into bars".
+        # So aggregator should probably publish partials too, or others should aggregate partials.
+        # Let's have everyone aggregate partials for their own local clients if they want,
+        # but the "Official" closed bars come from the aggregator.
+
         for sym, interval, candle in self._candle_aggregator.current_candles(symbol):
             await self._broadcast_candle(sym, interval, candle, status="partial")
 

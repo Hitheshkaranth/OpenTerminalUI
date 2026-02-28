@@ -8,6 +8,8 @@ import {
   fetchSecurityHubEsg,
   fetchSecurityHubEstimates,
   fetchSecurityHubOwnership,
+  fetchChartComparison,
+  generateAdvancedReport,
 } from "../api/client";
 import { TradingChart } from "../components/chart/TradingChart";
 import { DenseTable } from "../components/terminal/DenseTable";
@@ -15,7 +17,10 @@ import { SentimentBadge } from "../components/terminal/SentimentBadge";
 import { SentimentChart } from "../components/terminal/SentimentChart";
 import { TerminalBadge } from "../components/terminal/TerminalBadge";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
+import { TerminalButton } from "../components/terminal/TerminalButton";
 import { TerminalTabs, type TerminalTabItem } from "../components/terminal/TerminalTabs";
+import { TerminalInput } from "../components/terminal/TerminalInput";
+import { X, Search, FileText } from "lucide-react";
 import { useAnalystConsensus, useFinancials, usePeerComparison, useStock, useStockHistory } from "../hooks/useStocks";
 import { quickAddToFirstPortfolio } from "../shared/portfolioQuickAdd";
 import { useSettingsStore } from "../store/settingsStore";
@@ -101,11 +106,53 @@ export function SecurityHubPage() {
   const tabFromUrl = (searchParams.get("tab") || "overview").toLowerCase() as HubTab;
   const tab = HUB_TABS.some((t) => t.id === tabFromUrl) ? tabFromUrl : "overview";
   const [newsSelectedIndex, setNewsSelectedIndex] = useState(0);
+  const [compareSymbols, setCompareSymbols] = useState<string[]>(() => {
+    const comp = searchParams.get("compare");
+    if (!comp) return [];
+    return comp.split(",").filter(Boolean).map(s => s.trim().toUpperCase());
+  });
+  const [compareInput, setCompareInput] = useState("");
 
   useEffect(() => {
     setTicker(activeTicker);
     void loadTicker();
   }, [activeTicker, loadTicker, setTicker]);
+
+  const compareQuery = useQuery({
+    queryKey: ["security-hub", "compare", activeTicker, compareSymbols.join(",")],
+    queryFn: () => fetchChartComparison([activeTicker, ...compareSymbols], "1y", "1d"),
+    enabled: tab === "chart" && compareSymbols.length > 0,
+    staleTime: 60_000,
+  });
+
+  const comparisonSeriesData = useMemo(() => {
+    if (!compareQuery.data || !compareQuery.data.dates) return [];
+    const { dates, series } = compareQuery.data;
+    const res: Array<{ symbol: string; data: ChartPoint[]; color?: string }> = [];
+    const palette = ["#FF6B00", "#2196F3", "#00C853", "#FF1744", "#FFA726", "#9C27B0"];
+
+    // Series keys should match what we sent
+    [activeTicker, ...compareSymbols].forEach((sym, idx) => {
+      const vals = series[sym];
+      if (!vals) return;
+      const data = dates.map((d, i) => {
+        return {
+          t: new Date(d).getTime() / 1000,
+          c: vals[i],
+          o: vals[i],
+          h: vals[i],
+          l: vals[i],
+          v: 0
+        };
+      });
+      res.push({
+        symbol: sym,
+        data,
+        color: palette[idx % palette.length]
+      });
+    });
+    return res;
+  }, [compareQuery.data, activeTicker, compareSymbols]);
 
   const stockQuery = useStock(activeTicker);
   const historyQuery = useStockHistory(activeTicker, "6mo", "1d");
@@ -236,7 +283,7 @@ export function SecurityHubPage() {
               <MetricCell label="Volume" value={fmtNum(stock.volume)} />
             </div>
           </div>
-          <div className="mt-2">
+          <div className="mt-2 flex items-center justify-between">
             <TerminalTabs
               items={HUB_TABS}
               value={tab}
@@ -247,6 +294,26 @@ export function SecurityHubPage() {
               }}
               variant="accent"
             />
+            <TerminalButton
+              size="sm"
+              variant="default"
+              leftIcon={<FileText size={14} />}
+              onClick={async () => {
+                try {
+                  const blob = await generateAdvancedReport("stock", { ticker: activeTicker });
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `Report_${activeTicker}.pdf`;
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                } catch (e) {
+                  console.error("Export failed", e);
+                }
+              }}
+            >
+              EXPORT REPORT
+            </TerminalButton>
           </div>
         </div>
 
@@ -337,16 +404,42 @@ export function SecurityHubPage() {
         ) : null}
 
         {tab === "chart" ? (
-          <TerminalPanel title="Chart" subtitle="Security price history">
+          <TerminalPanel
+            title="Chart"
+            subtitle="Security price history"
+            actions={
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  {compareSymbols.map(sym => (
+                    <div key={sym} className="flex items-center gap-1 rounded bg-terminal-accent/20 px-2 py-0.5 text-[10px] text-terminal-accent">
+                      {sym}
+                      <button onClick={() => setCompareSymbols(p => p.filter(s => s !== sym))} className="hover:text-white"><X size={10} /></button>
+                    </div>
+                  ))}
+                </div>
+                {compareSymbols.length < 5 && (
+                  <form onSubmit={(e) => { e.preventDefault(); const val = compareInput.trim().toUpperCase(); if (val && !compareSymbols.includes(val)) { setCompareSymbols(p => [...p, val]); } setCompareInput(""); }} className="flex items-center gap-1">
+                    <input
+                      className="w-24 rounded border border-terminal-border bg-terminal-bg px-2 py-0.5 text-[10px] outline-none placeholder:text-terminal-muted focus:border-terminal-accent"
+                      placeholder="+ Compare"
+                      value={compareInput}
+                      onChange={(e) => setCompareInput(e.target.value)}
+                    />
+                  </form>
+                )}
+              </div>
+            }
+          >
             <div className="grid gap-2">
               <div className="h-[520px]">
                 <TradingChart
                   ticker={activeTicker}
-                  data={histData}
+                  data={compareSymbols.length > 0 ? (comparisonSeriesData.find(s => s.symbol === activeTicker)?.data || histData) : histData}
                   mode="candles"
                   timeframe="1D"
                   panelId={`security-hub-chart-${activeTicker}`}
                   crosshairSyncGroupId="security-hub"
+                  comparisonSeries={compareSymbols.length > 0 ? comparisonSeriesData.filter(s => s.symbol !== activeTicker) : []}
                   onAddToPortfolio={(symbol, priceHint) => {
                     void quickAddToFirstPortfolio(symbol, priceHint, "Added from Security Hub chart");
                   }}

@@ -41,12 +41,21 @@ export function FnoLayout() {
     }
   });
   const [expiry, setExpiry] = useState<string>("");
+  const [market, setMarket] = useState<"NSE" | "US">("NSE");
   const symbolUniverse = useMemo(() => new Set((DEFAULT_FNO_SYMBOLS as readonly string[]).map((s) => s.toUpperCase())), []);
   const setSelectedCountry = useSettingsStore((s) => s.setSelectedCountry);
 
   useEffect(() => {
-    setSelectedCountry("IN");
-  }, [setSelectedCountry]);
+    // Basic auto-detection for UI state
+    if (symbol.endsWith(".NS") || symbolUniverse.has(symbol)) {
+      setMarket("NSE");
+      setSelectedCountry("IN");
+    } else if (/^[A-Z]{1,5}$/.test(symbol)) {
+      // Common US ticker pattern
+      setMarket("US");
+      setSelectedCountry("US");
+    }
+  }, [symbol, symbolUniverse, setSelectedCountry]);
 
   useEffect(() => {
     try {
@@ -174,7 +183,9 @@ export function FnoLayout() {
 
               <div className="text-[11px]">
                 <span className="mb-1 block uppercase tracking-wide text-terminal-muted">Universe</span>
-                <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs">NSE F&O</div>
+                <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs">
+                  {market} F&O
+                </div>
               </div>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-1">

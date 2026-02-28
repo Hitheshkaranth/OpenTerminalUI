@@ -277,7 +277,7 @@ export function TerminalShell({
             }}
           />
           <TickerTape />
-          <TopBar hideTickerLoader={hideTickerLoader} hideMarketMarquee />
+          <TopBar hideTickerLoader={hideTickerLoader} />
           {showWorkspaceControls ? (
             <WorkspaceControlBar
               preset={preset}

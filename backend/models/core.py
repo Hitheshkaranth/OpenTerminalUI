@@ -31,12 +31,38 @@ class TaxLot(Base):
     buy_date: Mapped[str] = mapped_column(String(16), index=True)
 
 
+class WatchlistORM(Base):
+    __tablename__ = "watchlists"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(128), index=True)
+    symbols_json: Mapped[list] = mapped_column(JSON, default=list)  # Ordered array of tickers
+    column_config_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class WatchlistItem(Base):
     __tablename__ = "watchlist_items"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     watchlist_name: Mapped[str] = mapped_column(String(64), index=True)
     ticker: Mapped[str] = mapped_column(String(32), index=True)
+
+class InsiderTrade(Base):
+    __tablename__ = "insider_trades"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    symbol: Mapped[str] = mapped_column(String(32), index=True)
+    insider_name: Mapped[str] = mapped_column(String(128))
+    insider_title: Mapped[str] = mapped_column(String(128), nullable=True)
+    transaction_type: Mapped[str] = mapped_column(String(32))
+    shares: Mapped[int] = mapped_column(Integer)
+    price: Mapped[float] = mapped_column(Float, nullable=True)
+    value: Mapped[float] = mapped_column(Float, nullable=True)
+    date: Mapped[datetime] = mapped_column(DateTime, index=True)
+    filing_date: Mapped[datetime] = mapped_column(DateTime, index=True)
+    source: Mapped[str] = mapped_column(String(32))
 
 
 class AlertRuleORM(Base):

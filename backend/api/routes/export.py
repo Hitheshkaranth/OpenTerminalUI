@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from typing import Dict, Any
 
 from backend.api.deps import get_db
 from backend.reports.generator import generate_csv_bytes, generate_pdf_report, generate_xlsx_report, rows_for_data_type
@@ -13,6 +14,24 @@ from backend.reports.scheduler import scheduled_reports_service
 
 router = APIRouter()
 
+class ReportGenerationPayload(BaseModel):
+    type: str
+    params: Dict[str, Any] = Field(default_factory=dict)
+
+@router.post("/reports/generate")
+def generate_advanced_report(payload: ReportGenerationPayload) -> Response:
+    report_type = payload.type
+    params = payload.params
+
+    # Mocking advanced report generation output
+    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    body = b"%PDF-1.4\n%Mock Advanced PDF Content\n%%EOF\n"
+
+    return Response(
+        content=body,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="Terminal_Report_{report_type}_{timestamp}.pdf"'},
+    )
 
 class ScheduledReportCreate(BaseModel):
     report_type: str

@@ -26,6 +26,11 @@ const PANEL_TYPES: LaunchpadPanelType[] = [
   "portfolio-summary",
   "heatmap",
   "market-pulse",
+  "yield-curve",
+  "ai-research",
+  "option-chain",
+  "watchlist-heatmap",
+  "sector-rotation",
 ];
 
 function typeIconLabel(type: LaunchpadPanelType) {
@@ -40,6 +45,16 @@ function typeIconLabel(type: LaunchpadPanelType) {
       return "OB";
     case "market-pulse":
       return "MP";
+    case "yield-curve":
+      return "YC";
+    case "ai-research":
+      return "AI";
+    case "option-chain":
+      return "OC";
+    case "watchlist-heatmap":
+      return "HM";
+    case "sector-rotation":
+      return "RRG";
     default:
       return "PN";
   }

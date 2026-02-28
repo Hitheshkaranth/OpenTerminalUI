@@ -14,7 +14,7 @@ services:
       KITE_API_KEY: "${KITE_API_KEY:-}"
       KITE_API_SECRET: "${KITE_API_SECRET:-}"
       KITE_ACCESS_TOKEN: "${KITE_ACCESS_TOKEN:-}"
-      REDIS_URL: "${REDIS_URL:-}"
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
       OPENTERMINALUI_PREFETCH_ENABLED: "${OPENTERMINALUI_PREFETCH_ENABLED:-${OPENSCREENS_PREFETCH_ENABLED:-0}}"
       OPENTERMINALUI_SQLITE_URL: "${OPENTERMINALUI_SQLITE_URL:-${OPENSCREENS_SQLITE_URL:-sqlite:////data/openterminalui.db}}"
       OPENTERMINALUI_CORS_ORIGINS: "${OPENTERMINALUI_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}"
@@ -36,7 +36,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    profiles: ["redis"]
     ports:
       - "6379:6379"
     restart: unless-stopped

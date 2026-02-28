@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState, useRef, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import {
@@ -9,13 +9,263 @@ import {
   fetchSectorAllocation,
   fetchTopBarTickers,
   fetchWatchlist,
+  fetchYieldCurve,
+  aiQuery,
+  fetchWatchlists,
 } from "../../api/client";
+import { fetchExpiries, fetchOptionChain } from "../../fno/api/fnoApi";
 import { useStock, useStockHistory } from "../../hooks/useStocks";
+import { useSettingsStore } from "../../store/settingsStore";
+import { useQuotesStore } from "../../realtime/useQuotesStream";
 import type { AlertRule, WatchlistItem } from "../../types";
 import type { LaunchpadPanelConfig } from "./LaunchpadContext";
 import { TradingChart } from "../chart/TradingChart";
+import { HeatmapView } from "../watchlist/HeatmapView";
+import { SectorRotationMap } from "../analysis/SectorRotationMap";
+import { OptionChainTable } from "../../fno/components/OptionChainTable";
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { Send, Sparkles, User, Bot, Loader2 } from "lucide-react";
 
 type PanelProps = { panel: LaunchpadPanelConfig };
+
+export function LaunchpadAIResearchPanel({ panel }: PanelProps) {
+  const [query, setQuery] = useState("");
+  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant', text: string }>>([
+    { role: 'assistant', text: "Hello! I'm your AI Research Copilot. Ask me about market data, comparisons, or to find specific stocks." }
+  ]);
+  const [loading, setLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, loading]);
+
+  const handleSend = async () => {
+    if (!query.trim() || loading) return;
+    const currentQuery = query;
+    setQuery("");
+    setMessages(prev => [...prev, { role: 'user', text: currentQuery }]);
+    setLoading(true);
+
+    try {
+      const result = await aiQuery(currentQuery, {
+        active_symbol: panel.symbol,
+        history: messages.slice(-5).map(m => m.text)
+      });
+      setMessages(prev => [...prev, { role: 'assistant', text: result.explanation }]);
+    } catch (err) {
+      setMessages(prev => [...prev, { role: 'assistant', text: "Error: Failed to connect to AI service." }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex h-full flex-col bg-terminal-bg">
+      <div ref={scrollRef} className="flex-grow overflow-auto p-3 space-y-4">
+        {messages.map((m, i) => (
+          <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : ''}`}>
+            {m.role === 'assistant' && (
+              <div className="h-6 w-6 shrink-0 rounded-full bg-terminal-accent/20 flex items-center justify-center text-terminal-accent">
+                <Bot size={14} />
+              </div>
+            )}
+            <div className={`max-w-[85%] rounded-sm px-3 py-2 text-xs leading-relaxed ${
+              m.role === 'user'
+                ? 'bg-terminal-accent text-terminal-bg font-bold'
+                : 'bg-terminal-panel border border-terminal-border text-terminal-text'
+            }`}>
+              {m.text}
+            </div>
+            {m.role === 'user' && (
+              <div className="h-6 w-6 shrink-0 rounded-full bg-terminal-muted/20 flex items-center justify-center text-terminal-muted">
+                <User size={14} />
+              </div>
+            )}
+          </div>
+        ))}
+        {loading && (
+          <div className="flex gap-3">
+            <div className="h-6 w-6 shrink-0 rounded-full bg-terminal-accent/20 flex items-center justify-center text-terminal-accent">
+              <Bot size={14} />
+            </div>
+            <div className="flex items-center gap-2 rounded-sm border border-terminal-border bg-terminal-panel px-3 py-2 text-[10px] text-terminal-muted italic">
+              <Loader2 size={12} className="animate-spin" />
+              Thinking...
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-terminal-border p-2">
+        <div className="flex items-center gap-2 rounded-sm border border-terminal-border bg-terminal-panel px-2">
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSend()}
+            placeholder="Ask research question..."
+            className="h-9 min-w-0 flex-grow bg-transparent text-xs outline-none"
+          />
+          <button
+            onClick={handleSend}
+            disabled={!query.trim() || loading}
+            className="text-terminal-accent disabled:text-terminal-muted hover:text-terminal-text transition-colors"
+          >
+            <Send size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function LaunchpadOptionChainPanel({ panel }: PanelProps) {
+  const [expiry, setExpiry] = useState<string>("");
+  const symbol = panel.symbol || "AAPL";
+
+  const { data: expiries } = useQuery({
+    queryKey: ["fno-expiries", symbol],
+    queryFn: () => fetchExpiries(symbol),
+  });
+
+  useEffect(() => {
+    if (expiries?.length && !expiry) {
+      setExpiry(expiries[0]);
+    }
+  }, [expiries, expiry]);
+
+  const { data: chain, isLoading } = useQuery({
+    queryKey: ["fno-chain", symbol, expiry, 10],
+    queryFn: () => fetchOptionChain(symbol, expiry || undefined, 10),
+    enabled: !!expiry,
+  });
+
+  if (isLoading) return <div className="p-4 text-[10px] text-terminal-muted animate-pulse">LOADING CHAIN...</div>;
+
+  return (
+    <div className="flex h-full flex-col p-1 overflow-hidden">
+      <div className="flex items-center gap-2 mb-1">
+        <div className="text-[10px] font-bold text-terminal-accent">{symbol}</div>
+        <select
+          className="bg-terminal-bg text-[9px] border border-terminal-border rounded px-1 outline-none"
+          value={expiry}
+          onChange={(e) => setExpiry(e.target.value)}
+        >
+          {expiries?.map((e: string) => <option key={e} value={e}>{e}</option>)}
+        </select>
+      </div>
+      <div className="flex-1 overflow-auto">
+        <OptionChainTable rows={(chain?.strikes || []) as any} atmStrike={chain?.atm_strike || 0} />
+      </div>
+    </div>
+  );
+}
+
+export function LaunchpadWatchlistHeatmapPanel({ panel }: PanelProps) {
+  const [activeWlId, setActiveWlId] = useState<string>("");
+  const selectedMarket = useSettingsStore(s => s.selectedMarket);
+  const ticksByToken = useQuotesStore(s => s.ticksByToken);
+
+  const { data: watchlists } = useQuery({
+    queryKey: ["watchlists"],
+    queryFn: fetchWatchlists
+  });
+
+  const activeWl = useMemo(() =>
+    (watchlists || []).find(w => w.id === activeWlId) || watchlists?.[0]
+  , [watchlists, activeWlId]);
+
+  useEffect(() => {
+    if (activeWl && !activeWlId) setActiveWlId(activeWl.id);
+  }, [activeWl, activeWlId]);
+
+  const heatmapData = useMemo(() =>
+    activeWl?.symbols.map(s => {
+      const live = ticksByToken[`${selectedMarket}:${s}`];
+      return {
+        ticker: s,
+        changePct: live?.change_pct || 0,
+        value: 100,
+        price: live?.ltp || 0
+      };
+    }) || []
+  , [activeWl, ticksByToken, selectedMarket]);
+
+  if (!activeWl) return <div className="p-4 text-[10px] text-terminal-muted animate-pulse">LOADING HEATMAP...</div>;
+
+  return (
+    <div className="flex h-full flex-col p-1 overflow-hidden">
+      <div className="flex items-center justify-between mb-1">
+        <select
+          className="bg-terminal-bg text-[9px] border border-terminal-border rounded px-1 outline-none"
+          value={activeWlId}
+          onChange={(e) => setActiveWlId(e.target.value)}
+        >
+          {watchlists?.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+        </select>
+      </div>
+      <div className="flex-1 min-h-0 bg-terminal-panel/20 rounded">
+        <HeatmapView
+          data={heatmapData}
+          width={300}
+          height={200}
+          sizeBy="equal"
+        />
+      </div>
+    </div>
+  );
+}
+
+export function LaunchpadSectorRotationPanel({ panel }: PanelProps) {
+  return (
+    <div className="flex h-full flex-col">
+      <SectorRotationMap width="100%" height="100%" defaultBenchmark="SPY" />
+    </div>
+  );
+}
+
+export function LaunchpadYieldCurvePanel(_: PanelProps) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["launchpad", "yield-curve"],
+    queryFn: fetchYieldCurve,
+    staleTime: 300_000
+  });
+
+  if (isLoading) return <div className="flex h-full items-center justify-center text-[10px] text-terminal-muted animate-pulse">LOADING CURVE...</div>;
+
+  return (
+    <div className="h-full flex flex-col p-2">
+      <div className="flex-grow min-h-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data?.data}>
+            <XAxis dataKey="label" fontSize={8} stroke="#4B5563" tickLine={false} axisLine={false} />
+            <YAxis hide domain={['dataMin - 0.2', 'dataMax + 0.2']} />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#111827', borderColor: '#374151', fontSize: '10px' }}
+            />
+            <Area type="monotone" dataKey="yield" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.1} strokeWidth={2} isAnimationActive={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-1 grid grid-cols-3 gap-1">
+        <div className="rounded border border-terminal-border bg-terminal-bg p-1 text-center">
+          <div className="text-[8px] uppercase text-terminal-muted">2Y</div>
+          <div className="text-[10px] font-mono text-terminal-text">{(data?.data || []).find(d => d.label === "2Y")?.yield.toFixed(2) || "0.00"}%</div>
+        </div>
+        <div className="rounded border border-terminal-border bg-terminal-bg p-1 text-center">
+          <div className="text-[8px] uppercase text-terminal-muted">10Y</div>
+          <div className="text-[10px] font-mono text-terminal-text">{(data?.data || []).find(d => d.label === "10Y")?.yield.toFixed(2) || "0.00"}%</div>
+        </div>
+        <div className={`rounded border border-terminal-border bg-terminal-bg p-1 text-center ${Number(data?.spreads?.["2s10s"]) < 0 ? "border-terminal-neg/40" : ""}`}>
+          <div className="text-[8px] uppercase text-terminal-muted">2s10s</div>
+          <div className={`text-[10px] font-mono ${Number(data?.spreads?.["2s10s"]) < 0 ? "text-terminal-neg" : "text-terminal-pos"}`}>
+            {(data?.spreads?.["2s10s"] || 0).toFixed(3)}%
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function useJkListNavigation<T>(rows: T[]) {
   const [selected, setSelected] = useState(0);

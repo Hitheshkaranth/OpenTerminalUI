@@ -7,6 +7,8 @@ from typing import Any
 from backend.core.ttl_policy import market_open_now
 from backend.api.deps import get_unified_fetcher
 from backend.fno.services.greeks_engine import get_greeks_engine
+from backend.adapters.us_options_adapter import USOptionsAdapter
+from backend.shared.market_classifier import market_classifier
 from backend.shared.cache import cache as default_cache
 from backend.shared.nse_session import NSESession
 from backend.shared.symbol_resolver import SymbolResolver
@@ -27,6 +29,7 @@ class OptionChainFetcher:
         self._cache = cache or default_cache
         self._resolver = symbol_resolver or SymbolResolver()
         self._greeks = get_greeks_engine()
+        self._us_adapter = USOptionsAdapter()
 
     def _to_float(self, value: Any, default: float = 0.0) -> float:
         try:
@@ -247,7 +250,7 @@ class OptionChainFetcher:
 
     async def get_option_chain(self, symbol: str, expiry: str | None = None, strike_range: int = 20) -> dict[str, Any]:
         """
-        Fetch full option chain for an index or stock.
+        Fetch full option chain for an index or stock (NSE or US).
         """
         symbol_u = (symbol or "").strip().upper()
         if not symbol_u:
@@ -262,38 +265,73 @@ class OptionChainFetcher:
                 "totals": {"ce_oi_total": 0, "pe_oi_total": 0, "ce_volume_total": 0, "pe_volume_total": 0, "pcr_oi": 0.0, "pcr_volume": 0.0},
             }
 
+        cls = await market_classifier.classify(symbol_u)
+        is_us = cls.country_code == "US"
+
         cache_key = self._cache.build_key("fno_option_chain", symbol_u, {"expiry": expiry or "", "range": int(strike_range)})
         cached = await self._cache.get(cache_key)
         if cached:
             return cached
 
-        raw = await asyncio.to_thread(self._fetch_with_nsepython, symbol_u)
-        if not isinstance(raw, dict):
-            raw = await asyncio.to_thread(self._fetch_with_nse_api, symbol_u)
+        if is_us:
+            # US Logic
+            if not expiry:
+                expiries = await self._us_adapter.get_expiry_dates(symbol_u)
+                expiry = self._pick_expiry(expiries, None)
 
-        if isinstance(raw, dict):
-            chain = self._from_nse_records(symbol_u, raw, expiry, strike_range)
+            chain = await self._us_adapter.get_option_chain(symbol_u, expiry, strike_range)
+            if not chain.get("available_expiries"):
+                chain["available_expiries"] = await self._us_adapter.get_expiry_dates(symbol_u)
+            chain["market"] = "US"
         else:
-            spot_fallback = await asyncio.to_thread(self._fallback_spot_from_nsetools, symbol_u)
-            if spot_fallback <= 0:
-                spot_fallback = await self._fallback_spot_from_kite(symbol_u)
-            chain = {
-                "symbol": symbol_u,
-                "spot_price": spot_fallback,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "expiry_date": expiry or "",
-                "available_expiries": [expiry] if expiry else [],
-                "atm_strike": 0.0,
-                "strikes": [],
-                "totals": {"ce_oi_total": 0, "pe_oi_total": 0, "ce_volume_total": 0, "pe_volume_total": 0, "pcr_oi": 0.0, "pcr_volume": 0.0},
-            }
+            # NSE Logic (Existing)
+            raw = await asyncio.to_thread(self._fetch_with_nsepython, symbol_u)
+            if not isinstance(raw, dict):
+                raw = await asyncio.to_thread(self._fetch_with_nse_api, symbol_u)
+
+            if isinstance(raw, dict):
+                chain = self._from_nse_records(symbol_u, raw, expiry, strike_range)
+            else:
+                spot_fallback = await asyncio.to_thread(self._fallback_spot_from_nsetools, symbol_u)
+                if spot_fallback <= 0:
+                    spot_fallback = await self._fallback_spot_from_kite(symbol_u)
+                chain = {
+                    "symbol": symbol_u,
+                    "spot_price": spot_fallback,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "expiry_date": expiry or "",
+                    "available_expiries": [expiry] if expiry else [],
+                    "atm_strike": 0.0,
+                    "strikes": [],
+                    "totals": {"ce_oi_total": 0, "pe_oi_total": 0, "ce_volume_total": 0, "pe_volume_total": 0, "pcr_oi": 0.0, "pcr_volume": 0.0},
+                }
+            chain["market"] = "NSE"
+
+        # Add IV Rank and Percentile
+        try:
+            from backend.fno.services.iv_engine import get_iv_engine
+            iv_engine = get_iv_engine()
+            atm_iv = iv_engine._atm_iv(chain)
+            iv_percentile, iv_rank = await iv_engine._iv_rank_percentile(symbol_u, atm_iv)
+            chain["iv_rank"] = iv_rank
+            chain["iv_percentile"] = iv_percentile
+            chain["atm_iv"] = atm_iv
+        except Exception:
+            chain["iv_rank"] = 0.0
+            chain["iv_percentile"] = 0.0
+            chain["atm_iv"] = 0.0
 
         ttl = 60 if market_open_now() else 120
         await self._cache.set(cache_key, chain, ttl=ttl)
         return chain
 
     async def get_expiry_dates(self, symbol: str) -> list[str]:
-        chain = await self.get_option_chain(symbol, expiry=None, strike_range=40)
+        symbol_u = symbol.strip().upper()
+        cls = await market_classifier.classify(symbol_u)
+        if cls.country_code == "US":
+            return await self._us_adapter.get_expiry_dates(symbol_u)
+
+        chain = await self.get_option_chain(symbol_u, expiry=None, strike_range=40)
         expiries = chain.get("available_expiries")
         if not isinstance(expiries, list):
             return []

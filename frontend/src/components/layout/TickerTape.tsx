@@ -50,7 +50,10 @@ function formatPct(value: number | null) {
 
 export function TickerTape() {
   const navigate = useNavigate();
-  const { data: marketStatus } = useMarketStatus();
+  const { data: polledStatus } = useMarketStatus();
+  const realtimeStatus = useQuotesStore((s) => s.marketStatus);
+  const marketStatus = realtimeStatus || polledStatus;
+
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
   const selectedTicker = useStockStore((s) => s.ticker);
   const setTicker = useStockStore((s) => s.setTicker);
@@ -123,12 +126,17 @@ export function TickerTape() {
     return [
       { key: "NIFTY50", symbol: "NIFTY", label: "NIFTY 50", market: "NSE", price: mapNum("nifty50"), change: null, changePct: mapNum("nifty50Pct") },
       { key: "SENSEX", symbol: "SENSEX", label: "SENSEX", market: "BSE", price: mapNum("sensex"), change: null, changePct: mapNum("sensexPct") },
+      { key: "USDINR", symbol: "USDINR", label: "USD/INR", market: "FX", price: mapNum("usdInr"), change: null, changePct: mapNum("usdInrPct") },
       { key: "SPX", symbol: "SPX", label: "S&P 500", market: "NASDAQ", price: mapNum("sp500"), change: null, changePct: mapNum("sp500Pct") },
-      { key: "NDX", symbol: "NDX", label: "NASDAQ", market: "NASDAQ", price: mapNum("nasdaq"), change: null, changePct: mapNum("nasdaqPct") },
+      { key: "IXIC", symbol: "IXIC", label: "NASDAQ", market: "NASDAQ", price: mapNum("nasdaq"), change: null, changePct: mapNum("nasdaqPct") },
       { key: "DJI", symbol: "DJI", label: "DOW", market: "NYSE", price: mapNum("dowjones"), change: null, changePct: mapNum("dowjonesPct") },
       { key: "FTSE", symbol: "FTSE", label: "FTSE 100", market: "LSE", price: mapNum("ftse100"), change: null, changePct: mapNum("ftse100Pct") },
       { key: "DAX", symbol: "DAX", label: "DAX", market: "XETRA", price: mapNum("dax"), change: null, changePct: mapNum("daxPct") },
       { key: "NIKKEI", symbol: "N225", label: "Nikkei 225", market: "JPX", price: mapNum("nikkei225"), change: null, changePct: mapNum("nikkei225Pct") },
+      // Added from topIndicators
+      { key: "GOLD", symbol: "GC=F", label: "GOLD", market: "COMEX", price: mapNum("gold"), change: null, changePct: mapNum("goldPct") },
+      { key: "SILVER", symbol: "SI=F", label: "SILVER", market: "COMEX", price: mapNum("silver"), change: null, changePct: mapNum("silverPct") },
+      { key: "CRUDE", symbol: "CL=F", label: "CRUDE OIL", market: "NYMEX", price: mapNum("crude"), change: null, changePct: mapNum("crudePct") },
     ];
   }, [marketStatus]);
 
@@ -152,7 +160,9 @@ export function TickerTape() {
     const loadSymbol =
       item.symbol === "SPX" ? "^GSPC" :
       item.symbol === "DJI" ? "^DJI" :
-      item.symbol === "NDX" ? "^IXIC" :
+      item.symbol === "IXIC" ? "^IXIC" :
+      item.symbol === "FTSE" ? "^FTSE" :
+      item.symbol === "DAX" ? "^GDAXI" :
       item.symbol;
     setTicker(loadSymbol);
     void loadTicker();
@@ -160,7 +170,7 @@ export function TickerTape() {
   };
 
   return (
-    <div className="relative z-30 h-8 overflow-hidden border-b border-terminal-border bg-[#0D1117] text-[12px]">
+    <div className="relative z-30 h-8 overflow-hidden border-b border-terminal-border bg-terminal-bg text-[12px]">
       <div className="ticker-tape-track h-full hover:[animation-play-state:paused]">
         <div className="ticker-tape-segment">
           {items.map((item) => {
@@ -190,14 +200,23 @@ export function TickerTape() {
           })}
         </div>
         <div className="ticker-tape-segment" aria-hidden="true">
-          {items.map((item) => (
-            <span key={`${item.key}:ghost`} className="inline-flex h-6 items-center gap-2 px-2 ot-type-data text-[12px] text-terminal-muted">
-              <span className="text-[#FF6B00]">{item.label}</span>
-              <span>{formatPrice(item.price)}</span>
-              <span>{formatChange(item.change)}</span>
-              <span>{formatPct(item.changePct)}</span>
-            </span>
-          ))}
+          {items.map((item) => {
+            const pctClass =
+              item.changePct == null ? "text-terminal-muted" : item.changePct >= 0 ? "text-terminal-pos" : "text-terminal-neg";
+            return (
+              <div
+                key={`${item.key}:ghost`}
+                className="inline-flex h-6 items-center gap-2 px-2 ot-type-data text-[12px] text-terminal-text"
+              >
+                <span className="text-[#FF6B00]">{item.label}</span>
+                <span>{formatPrice(item.price)}</span>
+                <span className={item.change != null && item.change >= 0 ? "text-terminal-pos" : item.change != null ? "text-terminal-neg" : "text-terminal-muted"}>
+                  {formatChange(item.change)}
+                </span>
+                <span className={pctClass}>{formatPct(item.changePct)}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
       <style>{`

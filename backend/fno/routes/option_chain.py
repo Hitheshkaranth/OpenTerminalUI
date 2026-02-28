@@ -99,25 +99,14 @@ async def get_chain(
     range: int = Query(default=20, ge=5, le=100),
 ) -> dict[str, Any]:
     fetcher = get_option_chain_fetcher()
-    try:
-        chain = await fetcher.get_option_chain(symbol, expiry=expiry, strike_range=range)
-    except Exception:
-        chain = await _mock_chain(symbol, expiry, range)
-    if not chain.get("strikes"):
-        chain = await _mock_chain(symbol, expiry, range)
+    chain = await fetcher.get_option_chain(symbol, expiry=expiry, strike_range=range)
     return chain
 
 
 @router.get("/fno/chain/{symbol}/expiries")
 async def get_chain_expiries(symbol: str) -> dict[str, Any]:
     fetcher = get_option_chain_fetcher()
-    try:
-        items = await fetcher.get_expiry_dates(symbol)
-    except Exception:
-        items = []
-    if not items:
-        base = _nearest_thursday()
-        items = [(base + timedelta(days=7 * i)).isoformat() for i in range(4)]
+    items = await fetcher.get_expiry_dates(symbol)
     return {"symbol": symbol.strip().upper(), "expiries": items}
 
 
@@ -129,12 +118,7 @@ async def get_chain_summary(
 ) -> dict[str, Any]:
     fetcher = get_option_chain_fetcher()
     analyzer = get_oi_analyzer()
-    try:
-        chain = await fetcher.get_option_chain(symbol, expiry=expiry, strike_range=range)
-    except Exception:
-        chain = await _mock_chain(symbol, expiry, range)
-    if not chain.get("strikes"):
-        chain = await _mock_chain(symbol, expiry, range)
+    chain = await fetcher.get_option_chain(symbol, expiry=expiry, strike_range=range)
 
     atm = float(chain.get("atm_strike") or 0.0)
     atm_row = None
@@ -159,10 +143,13 @@ async def get_chain_summary(
     max_pain = analyzer.find_max_pain(chain)
     return {
         "symbol": chain.get("symbol"),
+        "market": chain.get("market"),
         "expiry_date": chain.get("expiry_date"),
         "spot_price": chain.get("spot_price"),
         "atm_strike": chain.get("atm_strike"),
         "atm_iv": round(atm_iv, 4),
+        "iv_rank": chain.get("iv_rank", 0.0),
+        "iv_percentile": chain.get("iv_percentile", 0.0),
         "pcr": pcr,
         "max_pain": max_pain,
         "support_resistance": sr,

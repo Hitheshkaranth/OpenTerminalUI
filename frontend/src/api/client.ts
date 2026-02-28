@@ -65,6 +65,12 @@ import type {
   PaperTrade,
   PaperPosition,
   PaperPerformance,
+  YieldCurveResponse,
+  SpreadHistoryResponse,
+  EconomicEvent,
+  MacroIndicatorsResponse,
+  AIQueryResult,
+  Watchlist,
 } from "../types";
 
 const api = axios.create({
@@ -1336,6 +1342,7 @@ export type BacktestJobSubmitPayload = {
   start?: string;
   end?: string;
   limit?: number;
+  timeframe?: string;
   strategy: string;
   context?: Record<string, unknown>;
   config?: Record<string, unknown>;
@@ -1360,6 +1367,11 @@ export type BacktestJobResult = {
     total_return: number;
     max_drawdown: number;
     sharpe: number;
+    trades_per_day?: number;
+    average_hold_time_minutes?: number;
+    max_intraday_drawdown?: number;
+    win_rate_morning?: number;
+    win_rate_afternoon?: number;
     trades: Array<{ date: string; action: string; quantity: number; price: number }>;
     equity_curve: Array<{
       date: string;
@@ -1466,5 +1478,96 @@ export async function deployBacktestToPaper(payload: {
   context?: Record<string, unknown>;
 }): Promise<{ portfolio_id: string; status: string }> {
   const { data } = await api.post<{ portfolio_id: string; status: string }>("/paper/deploy-strategy", payload);
+  return data;
+}
+
+export async function fetchYieldCurve(): Promise<YieldCurveResponse> {
+  const { data } = await api.get<YieldCurveResponse>("/fixed-income/yield-curve");
+  return data;
+}
+
+export async function fetchHistoricalYieldCurve(date: string): Promise<YieldCurveResponse> {
+  const { data } = await api.get<YieldCurveResponse>("/fixed-income/yield-curve/historical", { params: { date } });
+  return data;
+}
+
+export async function fetch2s10sHistory(): Promise<SpreadHistoryResponse> {
+  const { data } = await api.get<SpreadHistoryResponse>("/fixed-income/2s10s-spread-history");
+  return data;
+}
+
+export async function fetchEconomicCalendar(from: string, to: string): Promise<EconomicEvent[]> {
+  const { data } = await api.get<EconomicEvent[]>("/economics/calendar", { params: { from, to } });
+  return data;
+}
+
+export async function fetchMacroIndicators(): Promise<MacroIndicatorsResponse> {
+  const { data } = await api.get<MacroIndicatorsResponse>("/economics/indicators");
+  return data;
+}
+
+export async function aiQuery(query: string, context: Record<string, any>): Promise<AIQueryResult> {
+  const { data } = await api.post<AIQueryResult>("/ai/query", { query, context });
+  return data;
+}
+
+export async function fetchWatchlists(): Promise<Watchlist[]> {
+  const { data } = await api.get<Watchlist[]>("/watchlists");
+  return data;
+}
+
+export async function createWatchlist(name: string): Promise<Watchlist> {
+  const { data } = await api.post<Watchlist>("/watchlists", { name });
+  return data;
+}
+
+export async function updateWatchlist(id: string, payload: { name?: string; symbols?: string[]; column_config?: any }): Promise<Watchlist> {
+  const { data } = await api.put<Watchlist>(`/watchlists/${id}`, payload);
+  return data;
+}
+
+export async function deleteWatchlist(id: string): Promise<void> {
+  await api.delete(`/watchlists/${id}`);
+}
+
+export async function addWatchlistSymbols(id: string, symbols: string[]): Promise<Watchlist> {
+  const { data } = await api.post<Watchlist>(`/watchlists/${id}/symbols`, symbols);
+  return data;
+}
+
+export async function removeWatchlistSymbol(id: string, symbol: string): Promise<Watchlist> {
+  const { data } = await api.delete<Watchlist>(`/watchlists/${id}/symbols/${symbol}`);
+  return data;
+}
+
+export type SectorRotationData = {
+  benchmark: string;
+  timestamp: string;
+  sectors: Array<{
+    symbol: string;
+    current: { date: string; x: number; y: number };
+    trail: Array<{ date: string; x: number; y: number }>;
+  }>;
+};
+
+export async function fetchSectorRotation(benchmark: string = "SPY"): Promise<SectorRotationData> {
+  const { data } = await api.get<SectorRotationData>("/analytics/sector-rotation", { params: { benchmark } });
+  return data;
+}
+
+export type ChartComparisonResponse = {
+  dates: string[];
+  series: Record<string, number[]>;
+};
+
+export async function fetchChartComparison(symbols: string[], period = "1y", interval = "1d"): Promise<ChartComparisonResponse> {
+  const { data } = await api.get<ChartComparisonResponse>("/charts/compare", {
+    params: { symbols: symbols.join(","), period, interval },
+  });
+  return data;
+}
+
+export async function generateAdvancedReport(type: "stock" | "portfolio" | "backtest", params: Record<string, any> = {}): Promise<Blob> {
+  const { data } = await api.post<Blob>("/reports/generate", { type, params }, { responseType: "blob" });
   return data;
 }

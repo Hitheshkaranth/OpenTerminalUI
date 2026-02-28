@@ -16,6 +16,7 @@ from backend.core.historical_data_service import get_historical_data_service
 from backend.core.single_asset_backtest import BacktestEngine
 from backend.core.strategy_runner import StrategyRunner
 from backend.db.models import BacktestRun
+from backend.shared.ws_manager import ws_manager
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,7 @@ class BacktestJobRequest:
     start: str | None = None
     end: str | None = None
     limit: int = 500
+    timeframe: str = "1d"
     strategy: str = "example:sma_crossover"
     context: dict | None = None
     config: dict | None = None
@@ -77,17 +79,34 @@ class BacktestJobService:
             row.updated_at = datetime.utcnow().isoformat()
             db.commit()
 
+            await ws_manager.broadcast({"type": "backtest_progress", "run_id": run_id, "progress": 10, "status": "fetching data"})
+
             req = BacktestJobRequest(**json.loads(row.request_json))
             service = get_historical_data_service()
             raw_symbol = (req.asset or req.symbol)
-            symbol, bars, market_used = self._fetch_with_market_fallback(
-                service=service,
-                raw_symbol=raw_symbol,
-                market=req.market,
-                start=req.start,
-                end=req.end,
-                limit=req.limit,
-            )
+            if getattr(req, "timeframe", "1d") == "1d":
+                symbol, bars, market_used = self._fetch_with_market_fallback(
+                    service=service,
+                    raw_symbol=raw_symbol,
+                    market=req.market,
+                    start=req.start,
+                    end=req.end,
+                    limit=req.limit,
+                )
+            else:
+                # Intraday
+                symbol, bars = service.fetch_intraday_ohlcv(
+                    raw_symbol=raw_symbol,
+                    timeframe=req.timeframe,
+                    market=req.market,
+                    start=req.start,
+                    end=req.end,
+                    limit=req.limit,
+                )
+                market_used = req.market
+
+            await ws_manager.broadcast({"type": "backtest_progress", "run_id": run_id, "progress": 50, "status": "generating signals"})
+
             frame = pd.DataFrame(
                 [
                     {
@@ -110,6 +129,9 @@ class BacktestJobService:
             if frame.empty:
                 raise ValueError("No OHLCV bars available for request")
             strategy_out = self._runner.run(req.strategy, frame, context=req.context or {})
+
+            await ws_manager.broadcast({"type": "backtest_progress", "run_id": run_id, "progress": 80, "status": "running backtest"})
+
             cfg = BacktestConfig(**(req.config or {}))
             traded_asset = (req.asset or req.symbol or symbol.canonical).strip().upper()
             result = BacktestEngine(cfg).run(
@@ -129,6 +151,8 @@ class BacktestJobService:
             row.error = ""
             row.updated_at = datetime.utcnow().isoformat()
             db.commit()
+
+            await ws_manager.broadcast({"type": "backtest_progress", "run_id": run_id, "progress": 100, "status": "done"})
         except Exception as exc:
             row = db.query(BacktestRun).filter(BacktestRun.run_id == run_id).first()
             if row is not None:

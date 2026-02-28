@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { create } from "zustand";
 
 export type QuotesConnectionState = "connecting" | "connected" | "disconnected";
@@ -31,15 +31,18 @@ type QuotesStore = {
   connectionState: QuotesConnectionState;
   ticksByToken: Record<string, QuoteTick>;
   candlesByKey: Record<string, QuoteCandle>;
+  marketStatus: any | null;
   setConnectionState: (state: QuotesConnectionState) => void;
   upsertTick: (tick: QuoteTick) => void;
   upsertCandle: (candle: QuoteCandle) => void;
+  setMarketStatus: (status: any) => void;
 };
 
 export const useQuotesStore = create<QuotesStore>((set) => ({
   connectionState: "disconnected",
   ticksByToken: {},
   candlesByKey: {},
+  marketStatus: null,
   setConnectionState: (connectionState) => set({ connectionState }),
   upsertTick: (tick) =>
     set((state) => ({
@@ -55,6 +58,7 @@ export const useQuotesStore = create<QuotesStore>((set) => ({
         [`${candle.token}|${candle.interval}`]: candle,
       },
     })),
+  setMarketStatus: (marketStatus) => set({ marketStatus }),
 }));
 
 function normalizeSymbols(symbols: string[]): string[] {
@@ -93,6 +97,15 @@ class QuotesWsManager {
   private shouldReconnect = false;
   private wantedCounts = new Map<string, number>();
   private sentSubscriptions = new Set<string>();
+  private listeners = new Set<(tick: QuoteTick) => void>();
+
+  addListener(cb: (tick: QuoteTick) => void) {
+    this.listeners.add(cb);
+  }
+
+  removeListener(cb: (tick: QuoteTick) => void) {
+    this.listeners.delete(cb);
+  }
 
   subscribe(market: string, symbols: string[]) {
     const next = normalizeSymbols(symbols);
@@ -152,7 +165,14 @@ class QuotesWsManager {
     ws.onmessage = (event) => {
       try {
         const payload = JSON.parse(String(event.data));
-        if (!payload || typeof payload.symbol !== "string") return;
+        if (!payload) return;
+
+        if (payload.type === "market_status") {
+          useQuotesStore.getState().setMarketStatus(payload.data);
+          return;
+        }
+
+        if (typeof payload.symbol !== "string") return;
         if (payload.type === "candle") {
           const interval = String(payload.interval || "").trim();
           const t = Number(payload.t);
@@ -180,7 +200,7 @@ class QuotesWsManager {
         if (!parsed) return;
         const ltp = Number(payload.ltp);
         if (!Number.isFinite(ltp)) return;
-        useQuotesStore.getState().upsertTick({
+        const tick: QuoteTick = {
           token: payload.symbol.toUpperCase(),
           market: parsed.market,
           symbol: parsed.symbol,
@@ -190,7 +210,9 @@ class QuotesWsManager {
           oi: Number.isFinite(Number(payload.oi)) ? Number(payload.oi) : null,
           volume: Number.isFinite(Number(payload.volume)) ? Number(payload.volume) : null,
           ts: typeof payload.ts === "string" ? payload.ts : new Date().toISOString(),
-        });
+        };
+        useQuotesStore.getState().upsertTick(tick);
+        this.listeners.forEach((l) => l(tick));
       } catch {
         // Ignore malformed messages.
       }
@@ -258,8 +280,15 @@ class QuotesWsManager {
 
 const manager = new QuotesWsManager();
 
-export function useQuotesStream(market: string) {
+export function useQuotesStream(market: string, onTick?: (tick: QuoteTick) => void) {
   const connectionState = useQuotesStore((s) => s.connectionState);
+
+  useEffect(() => {
+    if (!onTick) return;
+    manager.addListener(onTick);
+    return () => manager.removeListener(onTick);
+  }, [onTick]);
+
   const subscribe = useCallback((symbols: string[]) => manager.subscribe(market, symbols), [market]);
   const unsubscribe = useCallback((symbols: string[]) => manager.unsubscribe(market, symbols), [market]);
   return {

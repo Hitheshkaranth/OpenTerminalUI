@@ -94,9 +94,18 @@ export function useStockHistory(ticker: string, range = "1y", interval = "1d", e
   const normalizedTicker = normalizeTicker(ticker);
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
   const isCrypto = /-USD$/i.test(normalizedTicker || "");
+
+  // Logic to allow 1m for US even if UI defaults to 1d
+  let safeInterval = interval;
+  const isUS = selectedMarket === "NASDAQ" || selectedMarket === "NYSE" || (!ticker.endsWith(".NS") && !ticker.endsWith(".BO") && !ticker.includes(":"));
+  if (isUS && (interval === "1d" || !interval) && (range === "1d" || range === "5d" || range === "1mo")) {
+    safeInterval = "1m";
+    if (range === "1mo") safeInterval = "5m"; // 1m not allowed for 1mo range by Yahoo
+  }
+
   return useQuery<ChartResponse>({
-    queryKey: ["history", selectedMarket, normalizedTicker, range, interval, extended, isCrypto ? "crypto" : "equity"],
-    queryFn: () => (isCrypto ? fetchCryptoCandles(normalizedTicker, interval, range) : getHistory(normalizedTicker, selectedMarket, interval, range, undefined, undefined, extended)),
+    queryKey: ["history", selectedMarket, normalizedTicker, range, safeInterval, extended, isCrypto ? "crypto" : "equity"],
+    queryFn: () => (isCrypto ? fetchCryptoCandles(normalizedTicker, safeInterval, range) : getHistory(normalizedTicker, selectedMarket, safeInterval, range, undefined, undefined, extended)),
     enabled: Boolean(normalizedTicker),
     staleTime: 5 * 60 * 1000,
     refetchInterval: 60 * 1000, // 1 minute realtime update interval

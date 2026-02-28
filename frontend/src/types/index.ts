@@ -363,9 +363,17 @@ export type ScheduledReport = {
   enabled: boolean;
 };
 
+export type Watchlist = {
+  id: string;
+  name: string;
+  symbols: string[];
+  column_config: Record<string, any>;
+  created_at: string;
+};
+
 export type WatchlistItem = {
-  id: number;
-  watchlist_name: string;
+  id: string;
+  watchlist_name?: string;
   ticker: string;
   exchange?: string | null;
   country_code?: string | null;
@@ -458,6 +466,58 @@ export type PaperPerformance = {
   avg_win_loss_ratio: number;
   profit_factor: number;
   trade_count: number;
+};
+
+export type YieldCurveDataPoint = {
+  label: string;
+  series_id: string;
+  order: number;
+  yield: number;
+  date: string;
+  chg_1d?: number | null;
+  chg_1w?: number | null;
+  chg_1m?: number | null;
+  chg_1y?: number | null;
+};
+
+export type YieldCurveResponse = {
+  date: string;
+  data: YieldCurveDataPoint[];
+  spreads?: Record<string, number>;
+};
+
+export type SpreadHistoryResponse = {
+  history: Array<{ date: string; value: number }>;
+};
+
+export type EconomicEvent = {
+  date: string;
+  time: string;
+  country: string;
+  event_name: string;
+  impact: 'high' | 'medium' | 'low';
+  actual?: number | string | null;
+  forecast?: number | string | null;
+  previous?: number | string | null;
+  unit?: string;
+  currency?: string;
+};
+
+export type MacroIndicator = {
+  value: number;
+  last_value: number;
+  date: string;
+  history: Array<{ date: string; value: number }>;
+};
+
+export type MacroRegion = Record<string, MacroIndicator>;
+
+export type MacroIndicatorsResponse = Record<string, MacroRegion>;
+
+export type AIQueryResult = {
+  type: 'screener_results' | 'data_table' | 'chart_command' | 'text_answer';
+  data: any;
+  explanation: string;
 };
 
 export type PriceRange = {

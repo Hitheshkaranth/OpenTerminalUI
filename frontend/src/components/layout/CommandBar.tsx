@@ -1,14 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, History, Command as CommandIcon, Loader2 } from "lucide-react";
+import { Search, History, Command as CommandIcon, Loader2, Sparkles, X, ArrowRight } from "lucide-react";
 import Fuse from "fuse.js";
+import { useNavigate } from "react-router-dom";
 
-import { fetchCryptoSearch, searchSymbols, type SearchSymbolItem } from "../../api/client";
+import { fetchCryptoSearch, searchSymbols, aiQuery, type SearchSymbolItem } from "../../api/client";
 import {
   COMMAND_FUNCTIONS,
+  parseCommand,
+  executeParsedCommand,
   type CommandExecutionResult,
   type CommandSuggestion,
 } from "./commanding";
 import { useSettingsStore } from "../../store/settingsStore";
+import { useStockStore } from "../../store/stockStore";
+import { AIQueryResult } from "../../types";
 
 type Props = {
   onExecute: (command: string) => Promise<CommandExecutionResult> | CommandExecutionResult;
@@ -49,10 +54,20 @@ function dedupeTickers(items: SearchSymbolItem[]): SearchSymbolItem[] {
 }
 
 export function CommandBar({ onExecute }: Props) {
+  const navigate = useNavigate();
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
+  const activeTicker = useStockStore((s) => s.ticker);
+
   const [value, setValue] = useState("");
   const [focused, setFocused] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // AI States
+  const [thinking, setThinking] = useState(false);
+  const [aiResult, setAiResult] = useState<AIQueryResult | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiHistory, setAiHistory] = useState<string[]>([]);
+
   const [flashState, setFlashState] = useState<VisualState>("idle");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [history, setHistory] = useState<string[]>(() => (typeof window !== "undefined" ? readJson<string[]>(HISTORY_KEY, []) : []));
@@ -330,12 +345,44 @@ export function CommandBar({ onExecute }: Props) {
     if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
   }, []);
 
+  const handleAiQuery = async (query: string) => {
+    setThinking(true);
+    setAiOpen(true);
+    setAiResult(null);
+    try {
+      const result = await aiQuery(query, {
+        active_symbol: activeTicker,
+        history: aiHistory.slice(-5)
+      });
+      setAiResult(result);
+      setAiHistory(prev => [...prev, query].slice(-5));
+
+      if (result.type === "chart_command" && result.data?.url) {
+        navigate(result.data.url);
+      }
+    } catch (err) {
+      setAiResult({ type: "text_answer", data: "Error connecting to AI service.", explanation: "Connection error" });
+    } finally {
+      setThinking(false);
+    }
+  };
+
   const submitCommand = async (rawCommand?: string) => {
     const command = (rawCommand ?? value).trim();
     if (!command) return;
+
+    const parsed = parseCommand(command);
+    if (parsed.kind === "natural-language" && command.includes(" ")) {
+      void handleAiQuery(command);
+      setValue("");
+      commitHistory(command);
+      return;
+    }
+
     setLoading(true);
     setIsOpen(false);
     setReverseSearchOpen(false);
+    setAiOpen(false);
     try {
       const result = await onExecute(command);
       if (result.ok) {
@@ -439,6 +486,93 @@ export function CommandBar({ onExecute }: Props) {
           GO
         </button>
       </div>
+
+      {/* AI Response Panel */}
+      {aiOpen && (
+        <div className="absolute left-3 right-3 top-[calc(100%+4px)] z-50 overflow-hidden rounded-sm border border-terminal-border bg-[#0D1117] shadow-2xl">
+          <div className="flex items-center justify-between border-b border-terminal-border bg-terminal-accent/10 px-3 py-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-terminal-accent">
+              <Sparkles size={14} />
+              AI RESEARCH COPILOT
+            </div>
+            <button onClick={() => setAiOpen(false)} className="text-terminal-muted hover:text-terminal-text">
+              <X size={14} />
+            </button>
+          </div>
+
+          <div className="max-h-[400px] overflow-auto p-4">
+            {thinking ? (
+              <div className="flex items-center gap-3 py-4 text-sm text-terminal-muted">
+                <Loader2 className="h-5 w-5 animate-spin text-terminal-accent" />
+                Synthesizing market data and intent...
+              </div>
+            ) : aiResult ? (
+              <div className="space-y-4">
+                <div className="text-sm leading-relaxed text-terminal-text">
+                  {aiResult.explanation}
+                </div>
+
+                {aiResult.type === 'data_table' && aiResult.data && (
+                  <div className="mt-2 overflow-x-auto rounded border border-terminal-border">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="bg-terminal-bg-accent text-terminal-muted">
+                        <tr>
+                          <th className="px-2 py-1">TICKER</th>
+                          <th className="px-2 py-1 text-right">PRICE</th>
+                          <th className="px-2 py-1 text-right">CHG%</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-terminal-border/50">
+                        {aiResult.data.map((row: any, i: number) => (
+                          <tr key={i} className="hover:bg-terminal-accent/5">
+                            <td className="px-2 py-1 font-bold text-terminal-accent">{row.symbol}</td>
+                            <td className="px-2 py-1 text-right">{row.last?.toFixed(2)}</td>
+                            <td className={`px-2 py-1 text-right ${row.changePct >= 0 ? 'text-terminal-pos' : 'text-terminal-neg'}`}>
+                              {row.changePct?.toFixed(2)}%
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {aiResult.type === 'screener_results' && aiResult.data && (
+                  <div className="mt-2 overflow-x-auto rounded border border-terminal-border">
+                    <table className="w-full text-left text-[10px] font-mono leading-tight">
+                      <thead className="bg-terminal-bg-accent text-terminal-muted border-b border-terminal-border">
+                        <tr>
+                          {Object.keys(aiResult.data[0] || {}).map(key => (
+                            <th key={key} className="px-2 py-1 uppercase tracking-wider">{key}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-terminal-border/20">
+                        {aiResult.data.map((row: any, i: number) => (
+                          <tr key={i} className="hover:bg-terminal-accent/10">
+                            {Object.values(row).map((val: any, j: number) => (
+                              <td key={j} className={`px-2 py-1 ${j === 0 ? 'font-bold text-terminal-accent' : 'text-terminal-text'}`}>
+                                {typeof val === 'number' ? val.toFixed(2) : val}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {aiResult.type === 'chart_command' && (
+                  <div className="flex items-center gap-2 rounded border border-terminal-pos/30 bg-terminal-pos/10 p-2 text-xs text-terminal-pos">
+                    <ArrowRight size={14} />
+                    Navigated to requested chart.
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {isOpen && (suggestions.length > 0 || searchingTickers) ? (
         <div className="absolute left-3 right-3 top-[calc(100%-2px)] z-50 mt-1 overflow-hidden rounded-sm border border-terminal-border bg-[#0F141B] shadow-2xl">

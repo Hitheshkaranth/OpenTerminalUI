@@ -87,11 +87,23 @@ from backend.experiments.routes import router as experiments_router
 from backend.instruments.routes import router as instruments_router
 from backend.data_quality.routes import router as data_quality_router
 from backend.tca.routes import router as tca_router
+from backend.api.routes.ai import router as ai_router
+from backend.api.routes.analytics import router as analytics_router
+from backend.api.routes.economics import router as economics_router
+from backend.api.routes.fixed_income import router as fixed_income_router
+from backend.api.routes.insider import router as insider_router
+from backend.api.routes.watchlists import router as watchlists_router
 from backend.routers.chart_workstation import router as chart_workstation_router
 from backend.routers.charts import router as charts_router
 
 app.include_router(equity_router)
 app.include_router(fno_router)
+app.include_router(fixed_income_router)
+app.include_router(economics_router)
+app.include_router(ai_router)
+app.include_router(analytics_router)
+app.include_router(watchlists_router)
+app.include_router(insider_router)
 
 # Quant Feature Pack Routers (Swarm 0 Stubs)
 app.include_router(cockpit_router, prefix="/api")
@@ -161,15 +173,19 @@ def health() -> dict[str, str]:
 
 @app.get("/healthz", tags=["health"])
 async def healthz() -> dict[str, object]:
+    from backend.services.redis_quote_bus import get_quote_bus
+    bus = get_quote_bus()
+
     redis_status = "disabled"
     if cache_instance.redis_url:
-        redis_status = "disabled"
         if cache_instance._redis is not None:
             try:
                 await cache_instance._redis.ping()
                 redis_status = "ok"
             except Exception:
-                redis_status = "disabled"
+                redis_status = "error"
+
+    bus_status = "ok" if bus.is_connected else "degraded"
 
     sqlite_status = "ok"
     try:
@@ -187,12 +203,16 @@ async def healthz() -> dict[str, object]:
             "redis": redis_status,
             "sqlite": sqlite_status,
         },
+        "quote_bus": bus_status,
     }
 
 
 @app.get("/metrics-lite", tags=["health"])
 async def metrics_lite() -> dict[str, object]:
     hub = get_marketdata_hub()
+    from backend.services.redis_quote_bus import get_quote_bus
+    bus = get_quote_bus()
+
     ws_metrics = await hub.metrics_snapshot()
     news_status = _news_ingestor.status_snapshot() if _news_ingestor else {
         "last_news_ingest_at": None,
@@ -211,6 +231,7 @@ async def metrics_lite() -> dict[str, object]:
     return {
         "ws_connected_clients": ws_metrics.get("ws_connected_clients", 0),
         "ws_subscriptions": ws_metrics.get("ws_subscriptions", 0),
+        "redis_bus_connected": bus.is_connected,
         "last_news_ingest_at": news_status.get("last_news_ingest_at"),
         "last_news_ingest_status": news_status.get("last_news_ingest_status"),
         "last_pcr_snapshot_date": pcr_status.get("last_pcr_snapshot_date"),

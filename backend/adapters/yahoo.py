@@ -38,22 +38,32 @@ class YahooFinanceAdapter(DataAdapter):
 
     async def get_history(self, symbol: str, timeframe: str, start: date, end: date) -> list[OHLCV]:
         rng_days = max(1, (end - start).days)
-        # To provide at least 30m resolution for backtesting charts, request 30m or finer if within allowed Yahoo windows
-        # Yahoo limits: 1m (7 days), 5m/15m/30m (60 days), 60m (730 days).
-        # We will try '30m' for 60-day ranges, '60m' (or '1h') for up to 730 days, else '1d'.
+
+        # Yahoo limits: 1m (7 days), 2m/5m/15m/30m/90m (60 days), 60m/1h (730 days).
+        # We try to use the requested timeframe if it's within limits, else fallback gracefully.
+
         if timeframe in ["1d", "1wk", "1mo"]:
             interval_str = timeframe
         else:
-            if rng_days <= 7:
-                interval_str = timeframe if timeframe in ["1m", "5m", "15m", "30m", "60m", "1h"] else "1m"
-            elif rng_days <= 60:
-                interval_str = timeframe if timeframe in ["5m", "15m", "30m", "60m", "1h"] else "30m"
-            elif rng_days <= 730:
-                interval_str = timeframe if timeframe in ["60m", "1h"] else "1h"
-            else:
+            is_intraday = timeframe.endswith("m") or timeframe.endswith("h")
+            if not is_intraday:
                 interval_str = "1d"
+            else:
+                if timeframe == "1m":
+                    interval_str = timeframe if rng_days <= 7 else "1h" if rng_days <= 730 else "1d"
+                elif timeframe in ["2m", "5m", "15m", "30m", "90m"]:
+                    interval_str = timeframe if rng_days <= 60 else "1h" if rng_days <= 730 else "1d"
+                elif timeframe in ["60m", "1h"]:
+                    interval_str = timeframe if rng_days <= 730 else "1d"
+                else:
+                    interval_str = "1h" if rng_days <= 730 else "1d"
 
+        # Determine best range_str for Yahoo if we don't have explicit dates or want to rely on their 'range' param
+        # However, we are using period1/period2 via get_chart usually.
+        # But YahooClient.get_chart takes a range_str.
         range_str = "1y" if rng_days > 220 else "6mo" if rng_days > 120 else "3mo" if rng_days > 45 else "1mo"
+        if interval_str == "1m": range_str = "7d"
+        elif is_intraday and rng_days <= 60: range_str = "60d"
         row = await self.yahoo.get_chart(symbol.strip().upper(), range_str=range_str, interval=interval_str)
         chart = ((row or {}).get("chart") or {}).get("result") or []
         if not chart:
