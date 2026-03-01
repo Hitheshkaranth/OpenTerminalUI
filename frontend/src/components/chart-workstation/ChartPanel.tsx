@@ -226,7 +226,7 @@ export function ChartPanel({
                 void quickAddToFirstPortfolio(symbol, priceHint, "Added from Chart Workstation");
               }}
             />
-            {showVolumeProfile ? <VolumeProfile profile={volumeProfile} /> : null}
+            {showVolumeProfile ? <VolumeProfile profile={volumeProfile} liveQuote={liveQuote} /> : null}
           </>
         )}
         {showVolumeProfile && slot.ticker ? (

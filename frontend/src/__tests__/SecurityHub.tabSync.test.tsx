@@ -38,7 +38,13 @@ function renderHub(route: string) {
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[route]}>
+      <MemoryRouter
+        initialEntries={[route]}
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <Routes>
           <Route
             path="/equity/security/:ticker"

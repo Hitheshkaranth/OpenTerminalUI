@@ -54,6 +54,15 @@ export const terminalThemeTokens = {
     warningSoft: "#ffb74d24",
     errorSoft: "#ff4d4f24",
   },
+  alert: {
+    info: "#4ea1ff",
+    warning: "#ffb74d",
+    critical: "#ff4d4f",
+    muted: "#8e98a8",
+    infoSoft: "#4ea1ff24",
+    warningSoft: "#ffb74d24",
+    criticalSoft: "#ff4d4f24",
+  },
   ops: {
     running: "#00c176",
     degraded: "#ffb74d",
@@ -119,6 +128,15 @@ export const terminalSemanticColorRoles = {
     infoSoft: terminalThemeTokens.feedback.infoSoft,
     warningSoft: terminalThemeTokens.feedback.warningSoft,
     errorSoft: terminalThemeTokens.feedback.errorSoft,
+  },
+  alert: {
+    info: terminalThemeTokens.alert.info,
+    warning: terminalThemeTokens.alert.warning,
+    critical: terminalThemeTokens.alert.critical,
+    muted: terminalThemeTokens.alert.muted,
+    infoSoft: terminalThemeTokens.alert.infoSoft,
+    warningSoft: terminalThemeTokens.alert.warningSoft,
+    criticalSoft: terminalThemeTokens.alert.criticalSoft,
   },
   status: {
     ok: terminalThemeTokens.system.ok,
@@ -201,6 +219,15 @@ export const terminalSemanticCssVars = {
     blocked: "--ot-color-ops-blocked",
     maintenance: "--ot-color-ops-maintenance",
     queued: "--ot-color-ops-queued",
+  },
+  alert: {
+    info: "--ot-color-alert-info",
+    warning: "--ot-color-alert-warning",
+    critical: "--ot-color-alert-critical",
+    muted: "--ot-color-alert-muted",
+    infoSoft: "--ot-color-alert-info-soft",
+    warningSoft: "--ot-color-alert-warning-soft",
+    criticalSoft: "--ot-color-alert-critical-soft",
   },
   interaction: {
     focusRing: "--ot-color-interaction-focus-ring",

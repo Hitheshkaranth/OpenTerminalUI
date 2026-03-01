@@ -42,13 +42,19 @@ class OHLCVCache:
         self.sqlite_path = _sqlite_file_from_url(settings.sqlite_url)
         self._init_lock = asyncio.Lock()
         self._ready = False
+        self._sqlite_available = True
+        self._mem_rows: dict[tuple[str, str], dict[int, dict[str, float | int]]] = {}
 
     async def initialize(self) -> None:
         async with self._init_lock:
             if self._ready:
                 return
-            self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
-            await asyncio.to_thread(self._initialize_sync)
+            try:
+                self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+                await asyncio.to_thread(self._initialize_sync)
+                self._sqlite_available = True
+            except Exception:
+                self._sqlite_available = False
             self._ready = True
 
     def _connect(self) -> sqlite3.Connection:
@@ -63,7 +69,14 @@ class OHLCVCache:
 
     async def get_range(self, symbol: str, interval: str, start_ms: int, end_ms: int) -> list[dict[str, Any]]:
         await self.initialize()
-        return await asyncio.to_thread(self._get_range_sync, symbol.upper(), interval, start_ms, end_ms)
+        symbol_upper = symbol.upper()
+        if not self._sqlite_available:
+            return self._get_range_mem(symbol_upper, interval, start_ms, end_ms)
+        try:
+            return await asyncio.to_thread(self._get_range_sync, symbol_upper, interval, start_ms, end_ms)
+        except Exception:
+            self._sqlite_available = False
+            return self._get_range_mem(symbol_upper, interval, start_ms, end_ms)
 
     def _get_range_sync(self, symbol: str, interval: str, start_ms: int, end_ms: int) -> list[dict[str, Any]]:
         with self._connect() as conn:
@@ -85,7 +98,15 @@ class OHLCVCache:
         if not bars:
             return
         await self.initialize()
-        await asyncio.to_thread(self._put_bars_sync, symbol.upper(), interval, bars)
+        symbol_upper = symbol.upper()
+        if not self._sqlite_available:
+            self._put_bars_mem(symbol_upper, interval, bars)
+            return
+        try:
+            await asyncio.to_thread(self._put_bars_sync, symbol_upper, interval, bars)
+        except Exception:
+            self._sqlite_available = False
+            self._put_bars_mem(symbol_upper, interval, bars)
 
     def _put_bars_sync(self, symbol: str, interval: str, bars: list[dict[str, Any]]) -> None:
         rows = [
@@ -113,6 +134,29 @@ class OHLCVCache:
                 rows,
             )
             conn.commit()
+
+    def _put_bars_mem(self, symbol: str, interval: str, bars: list[dict[str, Any]]) -> None:
+        bucket = self._mem_rows.setdefault((symbol, interval), {})
+        for b in bars:
+            if not all(k in b for k in ("t", "o", "h", "l", "c")):
+                continue
+            ts = int(b["t"])
+            bucket[ts] = {
+                "t": ts,
+                "o": float(b["o"]),
+                "h": float(b["h"]),
+                "l": float(b["l"]),
+                "c": float(b["c"]),
+                "v": float(b.get("v", 0) or 0),
+            }
+
+    def _get_range_mem(self, symbol: str, interval: str, start_ms: int, end_ms: int) -> list[dict[str, Any]]:
+        bucket = self._mem_rows.get((symbol, interval), {})
+        if not bucket:
+            return []
+        out = [row for ts, row in bucket.items() if int(start_ms) <= ts <= int(end_ms)]
+        out.sort(key=lambda row: int(row["t"]))
+        return out
 
 
 _ohlcv_cache = OHLCVCache()

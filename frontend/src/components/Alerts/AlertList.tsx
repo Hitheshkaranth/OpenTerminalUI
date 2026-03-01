@@ -21,6 +21,25 @@ export function AlertList({ alerts, onChanged }: Props) {
                 <div className="text-terminal-muted">
                   {row.condition_type || `${row.condition} ${row.threshold ?? ""}`} | status: {row.status || "active"}
                 </div>
+                {row.channels?.length ? (
+                  <div className="flex flex-wrap gap-1 pt-0.5">
+                    {row.channels.map((channel) => {
+                      const state = row.channel_status?.[channel];
+                      return (
+                        <span
+                          key={`${row.id}-${channel}`}
+                          className={`rounded border px-1 py-0 text-[10px] uppercase ${
+                            state?.configured
+                              ? "border-terminal-border text-terminal-muted"
+                              : "border-terminal-warn text-terminal-warn"
+                          }`}
+                        >
+                          {channel}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </div>
               <div className="flex items-center gap-2">
                 <button

@@ -15,9 +15,10 @@ type Props = {
   activeTab?: string;
   onChange: (id: string) => void;
   className?: string;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
   variant?: "default" | "accent";
   fullWidth?: boolean;
+  loading?: boolean;
 };
 
 function moveToEnabled(items: TerminalTabItem[], activeIndex: number, direction: 1 | -1) {
@@ -40,6 +41,7 @@ export function TerminalTabs({
   size = "md",
   variant = "default",
   fullWidth = false,
+  loading = false,
 }: Props) {
   const baseId = useId();
   const actualItems = items || tabs || [];
@@ -50,8 +52,10 @@ export function TerminalTabs({
     <div
       role="tablist"
       aria-orientation="horizontal"
+      aria-busy={loading || undefined}
       className={`inline-flex flex-wrap items-center gap-1 rounded-sm border border-terminal-border bg-terminal-panel p-1 ${fullWidth ? "w-full" : ""} ${className}`.trim()}
       onKeyDown={(event) => {
+        if (loading) return;
         if (!actualItems.length) return;
         if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") return;
         event.preventDefault();
@@ -81,12 +85,12 @@ export function TerminalTabs({
             aria-selected={active}
             aria-controls={`${baseId}-panel-${item.id}`}
             tabIndex={active ? 0 : -1}
-            disabled={item.disabled}
+            disabled={item.disabled || loading}
             className={[
               "inline-flex items-center gap-1.5 rounded-sm border px-2 outline-none transition-colors",
               fullWidth ? "flex-1 justify-center" : "",
               "focus-visible:ring-1 focus-visible:ring-terminal-accent/40 disabled:cursor-not-allowed disabled:opacity-50",
-              size === "sm" ? "min-h-8" : "min-h-9",
+              size === "sm" ? "min-h-8" : size === "lg" ? "min-h-10 px-3" : "min-h-9",
               active
                 ? variant === "accent"
                   ? "border-terminal-accent bg-terminal-accent/20 text-terminal-accent"
@@ -96,9 +100,10 @@ export function TerminalTabs({
               .join(" ")
               .trim()}
             onClick={() => {
-              if (!item.disabled) onChange(item.id);
+              if (!item.disabled && !loading) onChange(item.id);
             }}
           >
+            {loading ? <span className="inline-block h-2 w-2 animate-pulse rounded-sm bg-current opacity-80" aria-hidden="true" /> : null}
             {item.icon && <span className="flex-shrink-0 opacity-70">{item.icon}</span>}
             <span className="ot-type-label">{item.label}</span>
             {item.badge ? <span className="ot-type-badge text-terminal-muted">{item.badge}</span> : null}

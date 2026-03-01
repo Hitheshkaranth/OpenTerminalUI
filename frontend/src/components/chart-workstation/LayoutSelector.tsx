@@ -6,8 +6,8 @@ const LAYOUTS: Array<{ cols: number; rows: number; label: string }> = [
   { cols: 1, rows: 1, label: "1x1" },
   { cols: 2, rows: 1, label: "2x1" },
   { cols: 2, rows: 2, label: "2x2" },
-  { cols: 3, rows: 1, label: "3x1" },
   { cols: 3, rows: 2, label: "3x2" },
+  { cols: 3, rows: 3, label: "3x3" },
 ];
 
 interface Props {

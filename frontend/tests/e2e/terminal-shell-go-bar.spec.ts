@@ -21,6 +21,7 @@ async function loginAndOpen(page: import("@playwright/test").Page, targetPath: s
     [accessToken, refreshToken],
   );
   await page.goto(targetPath, { waitUntil: "domcontentloaded" });
+  await expect(page.getByPlaceholder(/Type ticker, command, or search/i)).toBeVisible();
 }
 
 test.describe("Terminal shell + GO bar", () => {
@@ -47,15 +48,18 @@ test.describe("Terminal shell + GO bar", () => {
     test.skip(testInfo.project.name !== "chromium", "Desktop keyboard workflow validation");
     await loginAndOpen(page, "/equity/dashboard");
 
+    const commandInput = page.getByPlaceholder(/Type ticker, command, or search/i);
+    await expect(commandInput).toBeVisible();
+    await page.waitForTimeout(100);
     await page.locator("body").click();
     await page.keyboard.press("Control+g");
-    const commandInput = page.getByPlaceholder(/Type ticker, command, or search/i);
     await expect(commandInput).toBeFocused();
 
     await commandInput.fill("WL");
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/equity\/watchlist/);
 
+    await page.locator("body").click();
     await page.keyboard.press("Control+G");
     await expect(commandInput).toBeFocused();
     await commandInput.fill("AAPL GP");
@@ -68,6 +72,8 @@ test.describe("Terminal shell + GO bar", () => {
     await loginAndOpen(page, "/equity/screener");
 
     const commandInput = page.getByPlaceholder(/Type ticker, command, or search/i);
+    await expect(commandInput).toBeVisible();
+    await page.waitForTimeout(100);
     await page.locator("body").click();
     await page.keyboard.press("Control+g");
     await expect(commandInput).toBeFocused();

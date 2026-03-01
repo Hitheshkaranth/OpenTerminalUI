@@ -21,6 +21,8 @@ type ScreenerContextValue = {
   presets: ScreenerPresetV3[];
   savedScreens: UserScreenV3[];
   publicScreens: UserScreenV3[];
+  activeSavedScreenId: string | null;
+  setActiveSavedScreenId: (id: string | null) => void;
   tab: ScreenerTab;
   setTab: (tab: ScreenerTab) => void;
   selectedPresetId: string | null;
@@ -34,6 +36,7 @@ type ScreenerContextValue = {
   result: ScreenerRunResponseV3 | null;
   selectedRow: Record<string, unknown> | null;
   setSelectedRow: (row: Record<string, unknown> | null) => void;
+  loadSavedScreen: (screen: UserScreenV3) => void;
   refreshScreens: () => Promise<void>;
   run: (override?: Partial<{ query: string; preset_id: string | null }>) => Promise<void>;
 };
@@ -46,6 +49,7 @@ export function ScreenerProvider({ children }: { children: React.ReactNode }) {
   const [presets, setPresets] = useState<ScreenerPresetV3[]>([]);
   const [savedScreens, setSavedScreens] = useState<UserScreenV3[]>([]);
   const [publicScreens, setPublicScreens] = useState<UserScreenV3[]>([]);
+  const [activeSavedScreenId, setActiveSavedScreenId] = useState<string | null>(null);
   const [tab, setTab] = useState<ScreenerTab>("library");
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [query, setQuery] = useState("Market Capitalization > 500 AND ROE > 15 AND Debt to equity < 0.5");
@@ -80,6 +84,19 @@ export function ScreenerProvider({ children }: { children: React.ReactNode }) {
       setQuery(selected.query);
     }
   }, [selectedPresetId, presets]);
+
+  useEffect(() => {
+    if (!activeSavedScreenId) return;
+    if (!savedScreens.some((screen) => screen.id === activeSavedScreenId)) {
+      setActiveSavedScreenId(null);
+    }
+  }, [activeSavedScreenId, savedScreens]);
+
+  const loadSavedScreen = useCallback((screen: UserScreenV3) => {
+    setSelectedPresetId(null);
+    setActiveSavedScreenId(screen.id);
+    setQuery(screen.query);
+  }, []);
 
   const run = useCallback(
     async (override?: Partial<{ query: string; preset_id: string | null }>) => {
@@ -127,6 +144,8 @@ export function ScreenerProvider({ children }: { children: React.ReactNode }) {
       presets,
       savedScreens,
       publicScreens,
+      activeSavedScreenId,
+      setActiveSavedScreenId,
       tab,
       setTab,
       selectedPresetId,
@@ -140,6 +159,7 @@ export function ScreenerProvider({ children }: { children: React.ReactNode }) {
       result,
       selectedRow,
       setSelectedRow,
+      loadSavedScreen,
       refreshScreens,
       run,
     }),
@@ -149,6 +169,7 @@ export function ScreenerProvider({ children }: { children: React.ReactNode }) {
       presets,
       savedScreens,
       publicScreens,
+      activeSavedScreenId,
       tab,
       selectedPresetId,
       query,
@@ -156,6 +177,7 @@ export function ScreenerProvider({ children }: { children: React.ReactNode }) {
       view,
       result,
       selectedRow,
+      loadSavedScreen,
       refreshScreens,
       run,
     ],

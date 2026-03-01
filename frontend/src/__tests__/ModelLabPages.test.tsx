@@ -90,7 +90,15 @@ function renderWithProviders(ui: React.ReactElement, route = "/") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter>
+      <MemoryRouter
+        initialEntries={[route]}
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
+        {ui}
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }

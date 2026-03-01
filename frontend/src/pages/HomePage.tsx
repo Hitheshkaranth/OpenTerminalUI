@@ -43,6 +43,8 @@ const TRANSITION_FLAG_KEY = "ot-terminal-transition";
 const NAV_TABS = [
   { label: "OVERVIEW", to: "/home" },
   { label: "EQUITY", to: "/equity/stocks" },
+  { label: "CHARTS", to: "/equity/chart-workstation" },
+  { label: "CRYPTO", to: "/equity/crypto" },
   { label: "F&O", to: "/fno" },
   { label: "BACKTEST", to: "/backtesting" },
   { label: "WATCHLIST", to: "/equity/watchlist" },
@@ -57,7 +59,11 @@ const NAV_CARD_SECTIONS: Array<{ title: string; cards: NavCard[] }> = [
       { label: "Economics", to: "/equity/economics", badge: "E" },
       { label: "Yield Curve", to: "/equity/yield-curve", badge: "YC" },
       { label: "Rotation", to: "/equity/sector-rotation", badge: "ROT" },
+      { label: "Security Hub", to: "/equity/security", badge: "SH" },
+      { label: "Compare", to: "/equity/compare", badge: "CMP" },
       { label: "Launchpad", to: "/equity/launchpad", badge: "LP" },
+      { label: "Workstation", to: "/equity/chart-workstation", badge: "6" },
+      { label: "Crypto", to: "/equity/crypto", badge: "CR" },
       { label: "Screener", to: "/equity/screener", badge: "F2" },
       { label: "Portfolio", to: "/equity/portfolio", badge: "F3" },
       { label: "Paper", to: "/equity/paper", badge: "P" },
@@ -80,13 +86,17 @@ const NAV_CARD_SECTIONS: Array<{ title: string; cards: NavCard[] }> = [
     cards: [
       { label: "Backtesting", to: "/backtesting", badge: "F9" },
       { label: "Model Lab", to: "/backtesting/model-lab", badge: "ML" },
+      { label: "Model Compare", to: "/backtesting/model-lab/compare", badge: "MC" },
       { label: "Portfolio Lab", to: "/equity/portfolio/lab", badge: "PL" },
+      { label: "Portfolio Blends", to: "/equity/portfolio/lab/blends", badge: "BL" },
     ],
   },
   {
-    title: "WATCHLIST",
+    title: "INTEL",
     cards: [
       { label: "Watchlist", to: "/equity/watchlist", badge: "F4" },
+      { label: "News", to: "/equity/news", badge: "N" },
+      { label: "Alerts", to: "/equity/alerts", badge: "A" },
       { label: "Plugins", to: "/equity/plugins", badge: "PLG" },
       { label: "About", to: "/equity/stocks/about", badge: "F7" },
     ],
@@ -96,6 +106,7 @@ const NAV_CARD_SECTIONS: Array<{ title: string; cards: NavCard[] }> = [
     cards: [
       { label: "Settings", to: "/equity/settings", badge: "F6" },
       { label: "Account", to: "/account", badge: "ACC" },
+      { label: "Cockpit", to: "/equity/cockpit", badge: "CP" },
     ],
   },
 ];
@@ -493,9 +504,12 @@ export function HomePage() {
               <button type="button" className="ot-action-button ot-action-cyan" onClick={() => navigate("/equity/yield-curve")}>OPEN YIELD CURVE</button>
               <button type="button" className="ot-action-button ot-action-amber" onClick={() => navigate("/equity/economics")}>OPEN ECONOMICS</button>
               <button type="button" className="ot-action-button ot-action-cyan" onClick={() => navigate("/equity/launchpad")}>OPEN LAUNCHPAD</button>
+              <button type="button" className="ot-action-button ot-action-cyan" onClick={() => navigate("/equity/chart-workstation")}>OPEN WORKSTATION</button>
+              <button type="button" className="ot-action-button ot-action-green" onClick={() => navigate("/equity/screener")}>OPEN SCREENER</button>
+              <button type="button" className="ot-action-button ot-action-green" onClick={() => navigate("/equity/crypto")}>OPEN CRYPTO</button>
               <button type="button" className="ot-action-button ot-action-amber" onClick={() => navigate("/equity/portfolio")}>OPEN PORTFOLIO</button>
             </div>
-            <p className="ot-system-health ot-value-up">DATA RELAY ACTIVE: EQUITY, F&O, BACK TEST, WATCHLIST, SETTINGS</p>
+            <p className="ot-system-health ot-value-up">DATA RELAY ACTIVE: EQUITY, F&O, CRYPTO, CHARTS, SCREENER, SENTIMENT</p>
           </section>
 
           <section className="ot-panel ot-panel-nav ot-stagger-cell" style={{ ["--cell-delay" as string]: "0.55s" }}>

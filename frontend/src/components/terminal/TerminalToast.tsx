@@ -6,6 +6,7 @@ type ToastProps = {
   title?: string;
   message: ReactNode;
   variant?: Variant;
+  size?: "sm" | "md";
   action?: ReactNode;
   className?: string;
 };
@@ -17,13 +18,18 @@ const variantClass: Record<Variant, string> = {
   danger: "border-terminal-neg bg-terminal-neg/10",
 };
 
-export function TerminalToast({ title, message, variant = "info", action, className = "" }: ToastProps) {
+const sizeClass = {
+  sm: "px-2.5 py-2",
+  md: "px-3 py-2.5",
+} as const;
+
+export function TerminalToast({ title, message, variant = "info", size = "md", action, className = "" }: ToastProps) {
   const liveMode = variant === "danger" ? "assertive" : "polite";
   return (
     <div
       role={variant === "danger" ? "alert" : "status"}
       aria-live={liveMode}
-      className={`rounded-sm border px-3 py-2 shadow-lg ${variantClass[variant]} ${className}`.trim()}
+      className={`rounded-sm border shadow-lg ${sizeClass[size]} ${variantClass[variant]} ${className}`.trim()}
     >
       {title ? (
         <div className={`ot-type-panel-title mb-1 ${variant === "danger" ? "text-terminal-neg" : variant === "warning" ? "text-terminal-warn" : "text-terminal-accent"}`}>

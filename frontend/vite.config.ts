@@ -37,4 +37,18 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
   },
+  build: {
+    sourcemap: false,
+    chunkSizeWarningLimit: 750,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("lightweight-charts")) return "vendor-charts";
+          if (id.includes("recharts")) return "vendor-recharts";
+          if (id.includes("react-router")) return "vendor-router";
+        },
+      },
+    },
+  },
 });

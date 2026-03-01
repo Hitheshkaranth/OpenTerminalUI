@@ -1,11 +1,11 @@
 import { NavLink } from "react-router-dom";
 
 const tabs = [
+  { label: "Home", path: "/home" },
   { label: "Watchlist", path: "/equity/watchlist" },
-  { label: "Charts", path: "/equity/stocks" },
+  { label: "Charts", path: "/equity/chart-workstation" },
+  { label: "Screener", path: "/equity/screener" },
   { label: "Portfolio", path: "/equity/portfolio" },
-  { label: "Alerts", path: "/equity/alerts" },
-  { label: "More", path: "/equity/settings" },
 ];
 
 export function MobileBottomNav() {

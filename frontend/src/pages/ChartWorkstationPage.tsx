@@ -11,9 +11,11 @@ import { TerminalToast, TerminalToastViewport } from "../components/terminal/Ter
 import { TerminalTooltip } from "../components/terminal/TerminalTooltip";
 import { useBatchChartData } from "../hooks/useBatchChartData";
 import { useWorkstationQuotes } from "../hooks/useWorkstationQuotes";
-import type { ChartSlotTimeframe, ChartSlotType, SlotMarket } from "../store/chartWorkstationStore";
+import type { ChartSlot, ChartSlotTimeframe, ChartSlotType, SlotMarket } from "../store/chartWorkstationStore";
 import type { IndicatorConfig } from "../shared/chart/types";
 import "../components/chart-workstation/ChartWorkstation.css";
+
+const MAX_WORKSTATION_SLOTS = 9;
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -64,8 +66,45 @@ function applyMultiTimeframePreset() {
   });
 }
 
+function createSlotId(): string {
+  return Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
+}
+
+function buildNewSlotFromActive(slots: ChartSlot[], activeSlotId: string | null): ChartSlot {
+  const active = slots.find((s) => s.id === activeSlotId) ?? slots[0];
+  const market = active?.market ?? "IN";
+  return {
+    id: createSlotId(),
+    ticker: active?.ticker ?? null,
+    companyName: active?.companyName ?? null,
+    market,
+    timeframe: active?.timeframe ?? "1D",
+    chartType: active?.chartType ?? "candle",
+    indicators: Array.isArray(active?.indicators) ? active.indicators : [],
+    extendedHours: active?.extendedHours
+      ? { ...active.extendedHours, enabled: market === "US" }
+      : {
+          enabled: market === "US",
+          showPreMarket: true,
+          showAfterHours: true,
+          visualMode: "merged",
+          colorScheme: "dimmed",
+        },
+    preMarketLevels: active?.preMarketLevels
+      ? { ...active.preMarketLevels }
+      : {
+          showPMHigh: true,
+          showPMLow: true,
+          showPMOpen: false,
+          showPMVWAP: false,
+          extendIntoRTH: true,
+          daysToShow: 1,
+        },
+  };
+}
+
 function getLayoutCapacity(cols: number, rows: number) {
-  return Math.max(1, Math.min(6, cols * rows));
+  return Math.max(1, Math.min(MAX_WORKSTATION_SLOTS, cols * rows));
 }
 
 export function ChartWorkstationPage() {
@@ -75,7 +114,6 @@ export function ChartWorkstationPage() {
     slots,
     activeSlotId,
     gridTemplate,
-    addSlot,
     removeSlot,
     updateSlotTicker,
     updateSlotTimeframe,
@@ -91,7 +129,8 @@ export function ChartWorkstationPage() {
   const visibleCapacity = getLayoutCapacity(gridTemplate.cols || 1, gridTemplate.rows || 1);
   const visibleSlots = useMemo(() => slots.slice(0, visibleCapacity), [slots, visibleCapacity]);
   const hiddenSlotCount = Math.max(0, slots.length - visibleSlots.length);
-  const canAddVisibleSlot = slots.length < 6 && visibleSlots.length < visibleCapacity;
+  const canAddVisibleSlot =
+    slots.length < MAX_WORKSTATION_SLOTS && visibleSlots.length < visibleCapacity;
 
   const { bySlotId: chartBatchBySlotId, loadingAny: batchLoadingAny, source: chartBatchSource } = useBatchChartData(visibleSlots);
   const { connectionState: quotesConnectionState, quoteBySlotId } = useWorkstationQuotes(visibleSlots);
@@ -197,6 +236,17 @@ export function ChartWorkstationPage() {
     [updateSlotIndicators],
   );
 
+  const handleAddSlot = useCallback(() => {
+    useChartWorkstationStore.setState((state) => {
+      if (state.slots.length >= MAX_WORKSTATION_SLOTS) return state;
+      const next = buildNewSlotFromActive(state.slots, state.activeSlotId);
+      return {
+        slots: [...state.slots, next],
+        activeSlotId: next.id,
+      };
+    });
+  }, []);
+
   useEffect(() => {
     if (fullscreenSlotId && !slots.some((slot) => slot.id === fullscreenSlotId)) {
       setFullscreenSlotId(null);
@@ -237,7 +287,7 @@ export function ChartWorkstationPage() {
         return;
       }
 
-      if (!event.ctrlKey && !event.metaKey && !event.altKey && /^[1-6]$/.test(event.key)) {
+      if (!event.ctrlKey && !event.metaKey && !event.altKey && /^[1-9]$/.test(event.key)) {
         const index = Number(event.key) - 1;
         const slot = visibleSlots[index];
         if (slot) {
@@ -271,7 +321,7 @@ export function ChartWorkstationPage() {
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "n") {
         if (!canAddVisibleSlot) return;
         event.preventDefault();
-        addSlot();
+        handleAddSlot();
         return;
       }
 
@@ -289,7 +339,16 @@ export function ChartWorkstationPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeSlotId, addSlot, canAddVisibleSlot, fullscreenSlotId, removeSlot, setActiveSlot, slots, visibleSlots]);
+  }, [
+    activeSlotId,
+    canAddVisibleSlot,
+    fullscreenSlotId,
+    handleAddSlot,
+    removeSlot,
+    setActiveSlot,
+    slots,
+    visibleSlots,
+  ]);
 
 
   return (
@@ -364,7 +423,7 @@ export function ChartWorkstationPage() {
                 size="sm"
                 variant="ghost"
                 className="px-2 font-bold uppercase"
-                onClick={addSlot}
+                onClick={handleAddSlot}
                 data-testid="add-chart-btn"
               >
                 + ADD PANE
@@ -409,7 +468,7 @@ export function ChartWorkstationPage() {
               />
             ))}
             {canAddVisibleSlot && (
-              <AddChartPlaceholder onClick={addSlot} />
+              <AddChartPlaceholder onClick={handleAddSlot} />
             )}
           </ChartGridContainer>
         </div>

@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+import ast
 from pathlib import Path
 import re
 from typing import Any, List, Optional
 
 import pandas as pd
 from fastapi import APIRouter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from backend.api.deps import fetch_stock_snapshot_coalesced
 from backend.core.models import ScreenerRunRequest, ScreenerRunResponse
 from backend.core.screener import ScreenerEngine, Rule
 from backend.equity.screener_v2 import FactorEngine, FactorSpec
+from backend.services.screener_scan_service import FMPScreenerAdapter, NSEScreenerAdapter, merge_scan_rows
 from backend.services.materialized_store import load_screener_df, upsert_screener_rows
 
 router = APIRouter()
@@ -39,10 +41,42 @@ class ScreenerScanFilter(BaseModel):
     op: str
     value: Any
 
+    @field_validator("field")
+    @classmethod
+    def validate_field(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in SCAN_ALLOWED_FIELDS:
+            raise ValueError(f"Unsupported filter field '{value}'.")
+        return normalized
+
+    @field_validator("op")
+    @classmethod
+    def validate_op(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in SCAN_ALLOWED_OPS:
+            raise ValueError(f"Unsupported operator '{value}'.")
+        return normalized
+
 
 class ScreenerScanSort(BaseModel):
     field: str
     order: str = "desc"
+
+    @field_validator("field")
+    @classmethod
+    def validate_sort_field(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in SCAN_ALLOWED_FIELDS:
+            raise ValueError(f"Unsupported sort field '{value}'.")
+        return normalized
+
+    @field_validator("order")
+    @classmethod
+    def validate_order(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"asc", "desc"}:
+            raise ValueError("Sort order must be 'asc' or 'desc'.")
+        return normalized
 
 
 class ScreenerScanRequest(BaseModel):
@@ -51,6 +85,19 @@ class ScreenerScanRequest(BaseModel):
     sort: ScreenerScanSort = Field(default_factory=lambda: ScreenerScanSort(field="market_cap", order="desc"))
     limit: int = Field(default=100, ge=1, le=500)
     formula: str | None = None
+
+    @field_validator("markets")
+    @classmethod
+    def validate_markets(cls, value: list[str]) -> list[str]:
+        normalized = []
+        for market in value:
+            market_upper = str(market).strip().upper()
+            if not market_upper:
+                continue
+            if market_upper not in SCAN_ALLOWED_MARKETS:
+                raise ValueError(f"Unsupported market '{market}'.")
+            normalized.append(market_upper)
+        return normalized or ["NSE", "NYSE", "NASDAQ"]
 
 
 SCAN_FIELD_MAP: dict[str, list[str]] = {
@@ -79,6 +126,26 @@ SCAN_FIELD_MAP: dict[str, list[str]] = {
     "country": ["country", "country_code"],
     "exchange": ["exchange", "market"],
 }
+SCAN_ALLOWED_FIELDS = set(SCAN_FIELD_MAP.keys())
+SCAN_ALLOWED_OPS = {"gte", "gt", "lte", "lt", "eq", "neq", "in", "contains"}
+SCAN_ALLOWED_MARKETS = {"NSE", "NYSE", "NASDAQ"}
+US_SCREENER_SEED = [
+    "AAPL",
+    "MSFT",
+    "NVDA",
+    "AMZN",
+    "GOOGL",
+    "META",
+    "TSLA",
+    "AVGO",
+    "JPM",
+    "XOM",
+    "LLY",
+    "AMD",
+    "NFLX",
+    "INTC",
+    "QCOM",
+]
 
 
 def _normalize_scan_value(row: dict[str, Any], field: str) -> Any:
@@ -140,16 +207,57 @@ def _passes_filter(row: dict[str, Any], filt: ScreenerScanFilter) -> bool:
 
 
 _TOKEN_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
+_FORMULA_ALLOWED_CMP = (ast.Eq, ast.NotEq, ast.Gt, ast.GtE, ast.Lt, ast.LtE, ast.In, ast.NotIn)
+_FORMULA_ALLOWED_BOOL_OP = (ast.And, ast.Or)
+_FORMULA_ALLOWED_UNARY_OP = (ast.Not,)
+_FORMULA_ALLOWED_BIN_OP = (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Mod)
+
+
+def _normalize_formula_expr(formula: str) -> str:
+    safe = re.sub(r"\bAND\b", " and ", formula, flags=re.IGNORECASE)
+    safe = re.sub(r"\bOR\b", " or ", safe, flags=re.IGNORECASE)
+    safe = re.sub(r"\bNOT\b", " not ", safe, flags=re.IGNORECASE)
+    safe = re.sub(r"\bIN\b", " in ", safe, flags=re.IGNORECASE)
+    safe = safe.replace("<>", "!=")
+    safe = re.sub(r"(?<![<>=!])=(?!=)", "==", safe)
+    return safe
+
+
+def _formula_node_is_allowed(node: ast.AST) -> bool:
+    if isinstance(node, ast.Expression):
+        return _formula_node_is_allowed(node.body)
+    if isinstance(node, ast.BoolOp):
+        if not isinstance(node.op, _FORMULA_ALLOWED_BOOL_OP):
+            return False
+        return all(_formula_node_is_allowed(v) for v in node.values)
+    if isinstance(node, ast.UnaryOp):
+        if not isinstance(node.op, _FORMULA_ALLOWED_UNARY_OP):
+            return False
+        return _formula_node_is_allowed(node.operand)
+    if isinstance(node, ast.Compare):
+        if not _formula_node_is_allowed(node.left):
+            return False
+        if not node.ops or any(not isinstance(op, _FORMULA_ALLOWED_CMP) for op in node.ops):
+            return False
+        return all(_formula_node_is_allowed(c) for c in node.comparators)
+    if isinstance(node, ast.BinOp):
+        return isinstance(node.op, _FORMULA_ALLOWED_BIN_OP) and _formula_node_is_allowed(node.left) and _formula_node_is_allowed(node.right)
+    if isinstance(node, ast.Name):
+        return True
+    if isinstance(node, ast.Constant):
+        return isinstance(node.value, (str, int, float, bool, type(None)))
+    if isinstance(node, ast.List):
+        return all(_formula_node_is_allowed(e) for e in node.elts)
+    if isinstance(node, ast.Tuple):
+        return all(_formula_node_is_allowed(e) for e in node.elts)
+    return False
 
 
 def _passes_formula(row: dict[str, Any], formula: str | None) -> bool:
     expr = (formula or "").strip()
     if not expr:
         return True
-    safe = expr.replace("AND", " and ").replace("OR", " or ").replace("NOT", " not ")
-    safe = safe.replace("=", "==").replace(">==", ">=").replace("<==", "<=").replace("!==", "!=")
-    safe = safe.replace("<>", "!=")
-    safe = safe.replace("===", "==")
+    safe = _normalize_formula_expr(expr)
     if "__" in safe:
         return False
 
@@ -162,7 +270,14 @@ def _passes_formula(row: dict[str, Any], formula: str | None) -> bool:
         vars_map[upper] = _normalize_scan_value(row, token.lower())
 
     try:
-        return bool(eval(safe, {"__builtins__": {}}, vars_map))
+        parsed = ast.parse(safe, mode="eval")
+    except SyntaxError:
+        return False
+    if not _formula_node_is_allowed(parsed):
+        return False
+    try:
+        compiled = compile(parsed, "<screener-formula>", "eval")
+        return bool(eval(compiled, {"__builtins__": {}}, vars_map))
     except Exception:
         return False
 
@@ -293,56 +408,30 @@ async def run_screener(request: ScreenerRunRequest) -> ScreenerRunResponse:
 
 @router.post("/screener/scan")
 async def run_multimarket_scan(request: ScreenerScanRequest) -> dict[str, Any]:
-    markets = [m.strip().upper() for m in request.markets if str(m).strip()]
-    if not markets:
-        markets = ["NSE", "NYSE", "NASDAQ"]
+    markets = request.markets or ["NSE", "NYSE", "NASDAQ"]
 
-    rows: list[dict[str, Any]] = []
     warnings: list[dict[str, str]] = []
 
+    rows: list[dict[str, Any]] = []
     if "NSE" in markets:
-        symbols = _load_universe("nse_eq")[:350]
-        nse_df, skipped = await _hydrate_missing_screener_rows(symbols, warnings, refresh_cap=60)
-        if skipped:
-            warnings.append({"code": "nse_partial", "message": f"Skipped {skipped} NSE symbols during refresh"})
-        if not nse_df.empty:
-            for rec in nse_df.where(pd.notnull(nse_df), None).to_dict(orient="records"):
-                rec["exchange"] = "NSE"
-                rec["market"] = "NSE"
-                rec["country"] = rec.get("country") or "IN"
-                rec["symbol"] = rec.get("ticker")
-                rows.append(rec)
+        nse_adapter = NSEScreenerAdapter(
+            hydrate_rows=_hydrate_missing_screener_rows,
+            load_universe=_load_universe,
+            universe_key="nse_eq",
+            universe_limit=350,
+            refresh_cap=60,
+        )
+        rows.extend(await nse_adapter.fetch(warnings))
 
-    us_seed = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "AVGO", "JPM", "XOM", "LLY", "AMD", "NFLX", "INTC", "QCOM"]
     if "NYSE" in markets or "NASDAQ" in markets:
-        sem = asyncio.Semaphore(8)
+        us_adapter = FMPScreenerAdapter(
+            snapshot_fetcher=fetch_stock_snapshot_coalesced,
+            seed_symbols=US_SCREENER_SEED,
+            max_concurrency=8,
+        )
+        rows.extend(await us_adapter.fetch(markets))
 
-        async def _fetch_us(sym: str) -> dict[str, Any] | None:
-            async with sem:
-                snap = await fetch_stock_snapshot_coalesced(sym)
-                if not snap:
-                    return None
-                ex = str(snap.get("exchange") or snap.get("market") or "NASDAQ").upper()
-                if ex not in {"NYSE", "NASDAQ"}:
-                    ex = "NASDAQ"
-                row = dict(snap)
-                row["exchange"] = ex
-                row["market"] = ex
-                row["country"] = row.get("country") or row.get("country_code") or "US"
-                row["symbol"] = row.get("ticker") or sym
-                row["pe_ratio"] = row.get("pe_ratio") or row.get("pe")
-                row["roe"] = row.get("roe") or row.get("roe_pct")
-                row["roa"] = row.get("roa") or row.get("roa_pct")
-                row["revenue_growth_yoy"] = row.get("revenue_growth_yoy") or row.get("rev_growth_pct")
-                row["earnings_growth_yoy"] = row.get("earnings_growth_yoy") or row.get("eps_growth_pct")
-                return row
-
-        fetched = await asyncio.gather(*[_fetch_us(sym) for sym in us_seed])
-        for row in fetched:
-            if row is None:
-                continue
-            if row.get("exchange") in markets:
-                rows.append(row)
+    rows = merge_scan_rows(rows)
 
     filtered: list[dict[str, Any]] = []
     for row in rows:

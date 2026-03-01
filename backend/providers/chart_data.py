@@ -198,12 +198,30 @@ class ChartDataProvider:
         start: datetime | None,
         end: datetime | None,
     ) -> list[OHLCVBar]:
-        try:
-            bars = await self._kite_historical(base_symbol, ticker, interval, start, end)
+        bars = await self._run_provider_step(
+            provider_name="kite",
+            ticker=ticker,
+            fetch_coro=self._kite_historical(base_symbol, ticker, interval, start, end),
+        )
+        if bars:
+            return bars
+        if self.fmp_key:
+            bars = await self._run_provider_step(
+                provider_name="fmp",
+                ticker=ticker,
+                fetch_coro=self._fmp_historical(base_symbol, ticker, interval, start, end),
+            )
             if bars:
                 return bars
-        except Exception as exc:
-            logger.warning("Kite historical failed for %s: %s", ticker, exc)
+        if self.finnhub_key:
+            bars = await self._run_provider_step(
+                provider_name="finnhub",
+                ticker=ticker,
+                fetch_coro=self._finnhub_candles(base_symbol, ticker, interval, start, end),
+            )
+            if bars:
+                return bars
+        logger.debug("Falling back to yfinance historical for %s after IN waterfall miss", ticker)
         return await self._yfinance_ohlcv(base_symbol, ticker, interval, period, start, end, market="IN")
 
     async def _us_ohlcv(
@@ -217,20 +235,40 @@ class ChartDataProvider:
         prepost: bool = False,
     ) -> list[OHLCVBar]:
         if self.fmp_key:
-            try:
-                bars = await self._fmp_historical(base_symbol, ticker, interval, start, end)
-                if bars:
-                    return bars
-            except Exception as exc:
-                logger.warning("FMP historical failed for %s: %s", ticker, exc)
+            bars = await self._run_provider_step(
+                provider_name="fmp",
+                ticker=ticker,
+                fetch_coro=self._fmp_historical(base_symbol, ticker, interval, start, end),
+            )
+            if bars:
+                return bars
         if self.finnhub_key:
-            try:
-                bars = await self._finnhub_candles(base_symbol, ticker, interval, start, end)
-                if bars:
-                    return bars
-            except Exception as exc:
-                logger.warning("Finnhub candles failed for %s: %s", ticker, exc)
+            bars = await self._run_provider_step(
+                provider_name="finnhub",
+                ticker=ticker,
+                fetch_coro=self._finnhub_candles(base_symbol, ticker, interval, start, end),
+            )
+            if bars:
+                return bars
+        logger.debug("Falling back to yfinance historical for %s after US waterfall miss", ticker)
         return await self._yfinance_ohlcv(base_symbol, ticker, interval, period, start, end, market="US", prepost=prepost)
+
+    async def _run_provider_step(
+        self,
+        provider_name: str,
+        ticker: str,
+        fetch_coro,
+    ) -> list[OHLCVBar]:
+        try:
+            bars = await fetch_coro
+        except Exception as exc:
+            logger.warning("%s historical failed for %s: %s", provider_name, ticker, exc)
+            return []
+        if bars:
+            logger.debug("%s historical resolved %s bars for %s", provider_name, len(bars), ticker)
+            return bars
+        logger.debug("%s historical returned no bars for %s", provider_name, ticker)
+        return []
 
     async def _yfinance_ohlcv(
         self,

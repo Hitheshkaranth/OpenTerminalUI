@@ -15,6 +15,7 @@ import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { TopBar } from "./TopBar";
 import { CommandBar } from "./CommandBar";
+import { CommandPalette } from "./CommandPalette";
 import { TickerTape } from "./TickerTape";
 import { executeParsedCommand, parseCommand } from "./commanding";
 import { useSettingsStore } from "../../store/settingsStore";
@@ -304,6 +305,7 @@ export function TerminalShell({
 
         {showInstallPrompt ? <InstallPromptBanner /> : null}
         {showMobileBottomNav ? <MobileBottomNav /> : null}
+        <CommandPalette />
         <HudOverlay />
         <AlertToasts />
       </div>

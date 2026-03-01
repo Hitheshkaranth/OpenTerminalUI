@@ -12,7 +12,6 @@ from fastapi import WebSocket
 
 from backend.api.deps import get_unified_fetcher
 from backend.core.ttl_policy import market_open_now
-from backend.fno.services.option_chain_fetcher import get_option_chain_fetcher
 from backend.services.candle_aggregator import CandleAggregator
 from backend.services.finnhub_ws import FinnhubWebSocket
 from backend.services.instrument_map import get_instrument_map_service
@@ -662,6 +661,9 @@ class MarketDataHub:
         return []
 
     async def _fetch_nfo_fallback_quotes(self, fetcher: Any, symbols: list[str], now_iso: str) -> list[dict[str, Any]]:
+        # Import lazily to avoid DB/service side effects during module import and isolated tests.
+        from backend.fno.services.option_chain_fetcher import get_option_chain_fetcher
+
         option_specs: dict[str, tuple[str, float, str]] = {}
         fut_underlyings: dict[str, set[str]] = {}
         for sym in symbols:

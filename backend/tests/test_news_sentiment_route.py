@@ -38,6 +38,9 @@ class _FakeQuery:
     def order_by(self, *args, **kwargs):  # noqa: ANN002, ANN003
         return self
 
+    def limit(self, *args, **kwargs):  # noqa: ANN002, ANN003
+        return self
+
     def all(self):
         return self._rows
 
@@ -98,3 +101,43 @@ def test_news_sentiment_summary_aggregates_payload(monkeypatch) -> None:
     assert result["total_articles"] == 3
     assert result["overall_label"] == "Neutral"
     assert len(result["daily_sentiment"]) == 2
+
+
+def test_news_sentiment_market_summary_payload(monkeypatch) -> None:
+    rows = [
+        _FakeRow(
+            title="Order pipeline remains strong",
+            summary="record quarterly order inflows",
+            published_at="2026-02-10T09:00:00+00:00",
+            sentiment_score=0.5,
+            sentiment_label="Bullish",
+            sentiment_confidence=0.8,
+        ),
+        _FakeRow(
+            title="Margins under pressure",
+            summary="guidance trimmed",
+            published_at="2026-02-11T11:00:00+00:00",
+            sentiment_score=-0.4,
+            sentiment_label="Bearish",
+            sentiment_confidence=0.7,
+        ),
+    ]
+    rows[0].source = "WireA"
+    rows[1].source = "WireB"
+
+    monkeypatch.setattr(news, "SessionLocal", lambda: _FakeSession(rows))
+
+    async def _fake_cache_get(key: str):  # noqa: ARG001
+        return None
+
+    async def _fake_cache_set(key: str, payload, ttl: int):  # noqa: ANN001, ARG001
+        return None
+
+    monkeypatch.setattr(news.cache_instance, "get", _fake_cache_get)
+    monkeypatch.setattr(news.cache_instance, "set", _fake_cache_set)
+
+    result = asyncio.run(news.get_news_sentiment_summary(days=7, limit=100))
+    assert result["period_days"] == 7
+    assert result["total_articles"] == 2
+    assert "distribution" in result
+    assert "top_sources" in result

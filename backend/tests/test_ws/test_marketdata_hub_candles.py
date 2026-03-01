@@ -78,3 +78,30 @@ def test_marketdata_hub_emits_partial_and_closed_candles_from_tick_stream(monkey
     assert closed["l"] == 100.0
     assert closed["c"] == 101.0
     assert closed["v"] == 15.0
+
+
+def test_marketdata_hub_finnhub_trade_publishes_us_ticks_for_subscribers() -> None:
+    hub = MarketDataHub()
+    published: list[tuple[str, dict]] = []
+
+    async def _fake_publish_tick(market: str, payload: dict) -> None:
+        published.append((market, payload))
+
+    hub._bus.publish_tick = _fake_publish_tick  # noqa: SLF001
+
+    class _WS:
+        pass
+
+    ws = _WS()
+
+    async def _run() -> None:
+        async with hub._lock:  # noqa: SLF001
+            hub._connections[ws] = {"NASDAQ:AAPL", "NYSE:AAPL"}  # noqa: SLF001
+        await hub._on_finnhub_trade("AAPL", 195.25, 10.0, 1700000000000)  # noqa: SLF001
+
+    asyncio.run(_run())
+
+    assert [row[0] for row in published] == ["NASDAQ", "NYSE"]
+    assert all(row[1]["provider"] == "finnhub" for row in published)
+    assert all(row[1]["symbol"] in {"NASDAQ:AAPL", "NYSE:AAPL"} for row in published)
+    assert all(row[1]["ltp"] == 195.25 for row in published)

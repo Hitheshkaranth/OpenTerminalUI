@@ -681,3 +681,91 @@ async def get_news_sentiment(
         ttl=ttl_seconds("news_latest", market_open_now()),
     )
     return payload
+
+
+@router.get("/news/sentiment/summary")
+async def get_news_sentiment_summary(
+    days: int = Query(default=7, ge=1, le=30),
+    limit: int = Query(default=200, ge=20, le=1000),
+) -> dict[str, Any]:
+    cache_key = cache_instance.build_key("news_latest", "sentiment:summary", {"days": days, "limit": limit})
+    cached = await cache_instance.get(cache_key)
+    if cached:
+        return cached
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff_iso = cutoff.isoformat()
+
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(NewsArticle)
+            .filter(NewsArticle.published_at >= cutoff_iso)
+            .order_by(desc(NewsArticle.published_at))
+            .limit(limit)
+            .all()
+        )
+    except OperationalError:
+        rows = []
+    finally:
+        db.close()
+
+    if not rows:
+        fallback_items = await _fallback_latest_news(limit=min(200, limit))
+        labels = {"Bullish": 0, "Bearish": 0, "Neutral": 0}
+        scores: list[float] = []
+        for item in fallback_items:
+            sent = item.get("sentiment") if isinstance(item, dict) else {}
+            score = float((sent or {}).get("score", 0.0))
+            label = str((sent or {}).get("label") or _label_from_score(score))
+            if label not in labels:
+                label = _label_from_score(score)
+            labels[label] += 1
+            scores.append(score)
+        total = len(scores)
+        avg = (sum(scores) / total) if total else 0.0
+        payload = {
+            "period_days": days,
+            "total_articles": total,
+            "average_score": round(avg, 4),
+            "overall_label": _label_from_score(avg),
+            "distribution": {
+                "bullish_pct": round((labels["Bullish"] * 100.0 / total), 1) if total else 0.0,
+                "bearish_pct": round((labels["Bearish"] * 100.0 / total), 1) if total else 0.0,
+                "neutral_pct": round((labels["Neutral"] * 100.0 / total), 1) if total else 0.0,
+            },
+            "top_sources": [],
+        }
+        await cache_instance.set(cache_key, payload, ttl=ttl_seconds("news_latest", market_open_now()))
+        return payload
+
+    source_counts: dict[str, int] = defaultdict(int)
+    labels = {"Bullish": 0, "Bearish": 0, "Neutral": 0}
+    scores: list[float] = []
+    for row in rows:
+        source_counts[str(row.source or "Unknown").strip() or "Unknown"] += 1
+        sentiment = _row_sentiment(row)
+        score = float(sentiment.get("score", 0.0))
+        label = str(sentiment.get("label") or _label_from_score(score))
+        if label not in labels:
+            label = _label_from_score(score)
+        labels[label] += 1
+        scores.append(score)
+
+    total = len(scores)
+    avg = (sum(scores) / total) if total else 0.0
+    top_sources = [{"source": src, "count": count} for src, count in sorted(source_counts.items(), key=lambda kv: kv[1], reverse=True)[:10]]
+    payload = {
+        "period_days": days,
+        "total_articles": total,
+        "average_score": round(avg, 4),
+        "overall_label": _label_from_score(avg),
+        "distribution": {
+            "bullish_pct": round((labels["Bullish"] * 100.0 / total), 1) if total else 0.0,
+            "bearish_pct": round((labels["Bearish"] * 100.0 / total), 1) if total else 0.0,
+            "neutral_pct": round((labels["Neutral"] * 100.0 / total), 1) if total else 0.0,
+        },
+        "top_sources": top_sources,
+    }
+    await cache_instance.set(cache_key, payload, ttl=ttl_seconds("news_latest", market_open_now()))
+    return payload

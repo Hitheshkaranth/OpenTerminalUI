@@ -3,6 +3,9 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 
+import pytest
+from fastapi import HTTPException
+
 from backend.api.routes import chart
 from backend.providers.chart_data import OHLCVBar
 
@@ -85,3 +88,81 @@ def test_chart_route_normalized_omitted_market_uses_autodetect(monkeypatch) -> N
     assert result["count"] == 0
     assert result["market_hint"] == ""
     assert calls["kwargs"]["market_hint"] is None
+
+
+def test_chart_route_rejects_invalid_interval() -> None:
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            chart.get_chart(
+                "AAPL",
+                market="NASDAQ",
+                interval="10m",
+                range="1d",
+                period="1d",
+                start=None,
+                end=None,
+                normalized=True,
+                limit=None,
+                cursor=None,
+            )
+        )
+    assert exc.value.status_code == 400
+    assert "Unsupported interval" in str(exc.value.detail)
+
+
+def test_chart_route_rejects_invalid_iso_date(monkeypatch) -> None:
+    class _FakeProvider:
+        async def get_ohlcv(self, *args, **kwargs):  # noqa: ANN002, ANN003
+            return []
+
+    async def _fake_get_chart_provider():
+        return _FakeProvider()
+
+    monkeypatch.setattr(chart, "get_chart_provider", _fake_get_chart_provider)
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            chart.get_chart(
+                "AAPL",
+                market="NASDAQ",
+                interval="1m",
+                range="1d",
+                period="1d",
+                start="bad-date",
+                end=None,
+                normalized=True,
+                limit=None,
+                cursor=None,
+            )
+        )
+    assert exc.value.status_code == 400
+    assert "Invalid ISO date for start" in str(exc.value.detail)
+
+
+def test_chart_route_rejects_start_after_end(monkeypatch) -> None:
+    class _FakeProvider:
+        async def get_ohlcv(self, *args, **kwargs):  # noqa: ANN002, ANN003
+            return []
+
+    async def _fake_get_chart_provider():
+        return _FakeProvider()
+
+    monkeypatch.setattr(chart, "get_chart_provider", _fake_get_chart_provider)
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            chart.get_chart(
+                "AAPL",
+                market="NASDAQ",
+                interval="1m",
+                range="1d",
+                period="1d",
+                start="2026-02-26T10:00:00Z",
+                end="2026-02-25T10:00:00Z",
+                normalized=True,
+                limit=None,
+                cursor=None,
+            )
+        )
+    assert exc.value.status_code == 400
+    assert "start must be less than or equal to end" in str(exc.value.detail)

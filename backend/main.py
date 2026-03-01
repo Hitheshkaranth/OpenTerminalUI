@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 # Load .env file from backend directory before anything reads os.getenv
@@ -40,7 +41,6 @@ if sys.platform.startswith("win"):
 
 settings = get_settings()
 
-app = FastAPI(title=settings.app_name, version=settings.app_version)
 _prefetch_worker = None
 _instruments_loader = None
 _news_ingestor = None
@@ -70,6 +70,65 @@ def _install_windows_loop_exception_filter() -> None:
             loop_.default_exception_handler(context)
 
     loop.set_exception_handler(_handler)
+
+
+async def _app_startup() -> None:
+    _install_windows_loop_exception_filter()
+    init_db()
+
+    global _prefetch_worker, _instruments_loader, _news_ingestor, _pcr_snapshot_service, _scanner_alert_scheduler
+    from backend.api.deps import get_unified_fetcher
+    fetcher = await get_unified_fetcher()
+    _prefetch_worker = get_prefetch_worker(fetcher)
+    _instruments_loader = get_instruments_loader()
+    _news_ingestor = get_news_ingestor()
+    _pcr_snapshot_service = get_pcr_snapshot_service()
+    _scanner_alert_scheduler = get_scanner_alert_scheduler_service()
+
+    if _prefetch_enabled:
+        await _prefetch_worker.start()
+    if _instruments_loader:
+        await _instruments_loader.start()
+    if _news_ingestor:
+        await _news_ingestor.start()
+    if _pcr_snapshot_service:
+        await _pcr_snapshot_service.start()
+
+    await get_marketdata_hub().start()
+    get_alert_evaluator_service().start(get_marketdata_hub())
+    get_paper_engine().start(get_marketdata_hub())
+    if _scanner_alert_scheduler:
+        await _scanner_alert_scheduler.start(get_marketdata_hub(), interval_seconds=900)
+
+
+async def _app_shutdown() -> None:
+    await get_us_tick_stream_service().shutdown()
+    await get_marketdata_hub().shutdown()
+    await get_alert_evaluator_service().shutdown()
+    await get_paper_engine().shutdown()
+    if _scanner_alert_scheduler:
+        await _scanner_alert_scheduler.stop()
+    if _pcr_snapshot_service:
+        await _pcr_snapshot_service.stop()
+    if _news_ingestor:
+        await _news_ingestor.stop()
+    if _instruments_loader:
+        await _instruments_loader.stop()
+    if _prefetch_enabled and _prefetch_worker:
+        await _prefetch_worker.stop()
+    await shutdown_unified_fetcher()
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    await _app_startup()
+    try:
+        yield
+    finally:
+        await _app_shutdown()
+
+
+app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -115,55 +174,6 @@ app.include_router(data_quality_router, prefix="/api")
 app.include_router(tca_router, prefix="/api")
 app.include_router(chart_workstation_router)
 app.include_router(charts_router)
-
-
-@app.on_event("startup")
-async def on_startup() -> None:
-    _install_windows_loop_exception_filter()
-    init_db()
-
-    global _prefetch_worker, _instruments_loader, _news_ingestor, _pcr_snapshot_service, _scanner_alert_scheduler
-    from backend.api.deps import get_unified_fetcher
-    fetcher = await get_unified_fetcher()
-    _prefetch_worker = get_prefetch_worker(fetcher)
-    _instruments_loader = get_instruments_loader()
-    _news_ingestor = get_news_ingestor()
-    _pcr_snapshot_service = get_pcr_snapshot_service()
-    _scanner_alert_scheduler = get_scanner_alert_scheduler_service()
-
-    if _prefetch_enabled:
-        await _prefetch_worker.start()
-    if _instruments_loader:
-        await _instruments_loader.start()
-    if _news_ingestor:
-        await _news_ingestor.start()
-    if _pcr_snapshot_service:
-        await _pcr_snapshot_service.start()
-
-    await get_marketdata_hub().start()
-    get_alert_evaluator_service().start(get_marketdata_hub())
-    get_paper_engine().start(get_marketdata_hub())
-    if _scanner_alert_scheduler:
-        await _scanner_alert_scheduler.start(get_marketdata_hub(), interval_seconds=900)
-
-
-@app.on_event("shutdown")
-async def on_shutdown() -> None:
-    await get_us_tick_stream_service().shutdown()
-    await get_marketdata_hub().shutdown()
-    await get_alert_evaluator_service().shutdown()
-    await get_paper_engine().shutdown()
-    if _scanner_alert_scheduler:
-        await _scanner_alert_scheduler.stop()
-    if _pcr_snapshot_service:
-        await _pcr_snapshot_service.stop()
-    if _news_ingestor:
-        await _news_ingestor.stop()
-    if _instruments_loader:
-        await _instruments_loader.stop()
-    if _prefetch_enabled and _prefetch_worker:
-        await _prefetch_worker.stop()
-    await shutdown_unified_fetcher()
 
 
 @app.get("/health", tags=["health"])

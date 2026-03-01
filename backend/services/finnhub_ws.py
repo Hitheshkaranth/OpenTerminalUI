@@ -121,18 +121,22 @@ class FinnhubWebSocket:
             sent = set(self._sent_symbols)
         to_sub = sorted(desired - sent)
         to_unsub = sorted(sent - desired)
+        applied = set(sent)
         for sym in to_unsub:
             try:
                 await ws.send(json.dumps({"type": "unsubscribe", "symbol": sym}))
+                applied.discard(sym)
             except Exception:
                 break
         for sym in to_sub:
             try:
                 await ws.send(json.dumps({"type": "subscribe", "symbol": sym}))
+                applied.add(sym)
             except Exception:
                 break
         async with self._lock:
-            self._sent_symbols = desired
+            # Keep local subscription bookkeeping aligned with what we actually sent.
+            self._sent_symbols = applied
 
     async def _listen_loop(self) -> None:
         ws = self._ws

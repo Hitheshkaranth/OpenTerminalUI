@@ -68,20 +68,21 @@ export function AboutPage({ terminalType = "market" }: AboutProps) {
       <div className="grid gap-3 lg:grid-cols-2">
         <TerminalPanel title="Equity Pack">
           <ul className="space-y-1 text-xs text-terminal-text">
-            <li>- Terminal Noir shell with GO command bar, ticker tape, and market status bar.</li>
-            <li>- Multi-timeframe chart workstation with realtime tick-to-candle updates.</li>
-            <li>- Security Hub (DES-style): overview, financials, chart, news, ownership, estimates, peers, ESG.</li>
-            <li>- Dense data workflows: screener, watchlist, and portfolio manager built on shared primitives.</li>
-            <li>- US + India market support with unified symbol routing and metadata badges.</li>
+            <li>- Terminal shell with GO bar, command palette, ticker tape, and keyboard navigation.</li>
+            <li>- Security, stock detail, chart workstation, and launchpad chart flows with realtime updates.</li>
+            <li>- Research flows: fundamentals, news/sentiment, events, and cockpit overview surfaces.</li>
+            <li>- Screener, watchlist, alerts, paper trading, and portfolio/mutual-fund workflows.</li>
+            <li>- Economics, yield-curve, sector-rotation, and split-comparison routes.</li>
+            <li>- India + US symbol routing across equity APIs and pages.</li>
           </ul>
         </TerminalPanel>
 
         <TerminalPanel title="F&O Pack">
           <ul className="space-y-1 text-xs text-terminal-text">
-            <li>- Option chain with Greeks + OI context for strike-level support.</li>
-            <li>- Futures terminal with shared chart engine and realtime stream.</li>
-            <li>- Strategy builder, PCR analytics, heatmap, and expiry dashboards.</li>
-            <li>- Unified navigation and ticker context across packs.</li>
+            <li>- Option chain, Greeks, OI analytics, IV views, heatmap, and expiry pages.</li>
+            <li>- Futures analytics with shared chart and streaming behavior.</li>
+            <li>- Strategy builder and PCR workflows.</li>
+            <li>- Unified navigation and ticker continuity with equity routes.</li>
           </ul>
         </TerminalPanel>
       </div>
@@ -91,21 +92,26 @@ export function AboutPage({ terminalType = "market" }: AboutProps) {
           <ul className="space-y-1 text-xs text-terminal-text">
             <li>- Risk Engine: portfolio VaR/CVaR and stress scenarios.</li>
             <li>- Risk Compute: EWMA volatility, beta, and PCA factor decomposition.</li>
-            <li>- Model Governance: run registration and model promotion workflow.</li>
-            <li>- Portfolio Backtest Jobs: async job-based testing with results.</li>
-            <li>- Scanner alerts + scheduler-backed runtime evaluation.</li>
+            <li>- Model Lab and Portfolio Lab flows for experiment and portfolio backtesting workflows.</li>
+            <li>- Portfolio backtest jobs with async execution and result retrieval.</li>
+            <li>- Model governance, OMS/compliance, ops monitoring, and data quality routes.</li>
+            <li>- WebSocket quote streams and alert channel integrations.</li>
           </ul>
         </TerminalPanel>
 
-        <TerminalPanel title="Navigation & Workspace">
+        <TerminalPanel title="Navigation & Workspaces">
           <div className="space-y-2 text-xs text-terminal-muted">
             <div className="grid grid-cols-2 gap-2">
               <Link className="rounded border border-terminal-border px-2 py-1 text-center hover:bg-terminal-accent/10" to="/equity/stocks">Market Home</Link>
               <Link className="rounded border border-terminal-border px-2 py-1 text-center hover:bg-terminal-accent/10" to="/equity/security">Security Hub</Link>
+              <Link className="rounded border border-terminal-border px-2 py-1 text-center hover:bg-terminal-accent/10" to="/equity/cockpit">Cockpit</Link>
               <Link className="rounded border border-terminal-border px-2 py-1 text-center hover:bg-terminal-accent/10" to="/equity/launchpad">Launchpad</Link>
+              <Link className="rounded border border-terminal-border px-2 py-1 text-center hover:bg-terminal-accent/10" to="/equity/crypto">Crypto</Link>
+              <Link className="rounded border border-terminal-border px-2 py-1 text-center hover:bg-terminal-accent/10" to="/equity/economics">Economics</Link>
               <Link className="rounded border border-terminal-border px-2 py-1 text-center hover:bg-terminal-accent/10" to="/fno">F&O Home</Link>
               <Link className="rounded border border-terminal-border px-2 py-1 text-center hover:bg-terminal-accent/10" to="/backtesting">Backtesting</Link>
               <Link className="rounded border border-terminal-border px-2 py-1 text-center hover:bg-terminal-accent/10" to="/equity/chart-workstation">Workstation</Link>
+              <Link className="rounded border border-terminal-border px-2 py-1 text-center hover:bg-terminal-accent/10" to="/ops">Ops</Link>
             </div>
           </div>
         </TerminalPanel>

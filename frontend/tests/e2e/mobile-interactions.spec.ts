@@ -22,6 +22,7 @@ async function loginAndOpen(page: import("@playwright/test").Page, targetPath: s
   );
   await page.goto(targetPath);
   await expect(page).toHaveURL(new RegExp(targetPath.replace("/", "\\/")));
+  await expect(page.getByPlaceholder(/Type ticker, command, or search/i)).toBeVisible();
 }
 
 async function dispatchTouch(
@@ -69,6 +70,8 @@ test.describe("mobile interactions", () => {
     await loginAndOpen(page, "/equity/watchlist");
 
     const rootSel = "div.space-y-3.p-4";
+    await expect(page.locator(rootSel).first()).toBeVisible();
+    await page.waitForTimeout(120);
     await dispatchTouch(page, rootSel, "touchstart", 120, 50);
     await dispatchTouch(page, rootSel, "touchmove", 120, 95);
     await expect(page.getByText("Pull to refresh")).toBeVisible();

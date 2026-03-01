@@ -14,7 +14,7 @@ type Props = {
   onSelect: (id: string) => void;
   className?: string;
   align?: "left" | "right";
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
   variant?: "default" | "accent" | "ghost";
   disabled?: boolean;
   loading?: boolean;
@@ -24,6 +24,7 @@ type Props = {
 const triggerSizeClass = {
   sm: "min-h-8 px-2 py-1 text-[10px]",
   md: "min-h-9 px-2.5 py-1 text-[11px]",
+  lg: "min-h-10 px-3 py-1.5 text-xs",
 } as const;
 
 const triggerVariantClass = {

@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import random
 from datetime import date, datetime, timedelta, timezone
+from time import perf_counter
 from typing import Any, Dict, Optional
 
 import pandas as pd
@@ -16,6 +17,7 @@ from backend.auth.deps import get_current_user
 from backend.core.models import ChartResponse, IndicatorPoint, IndicatorResponse, OhlcvPoint
 from backend.core.technicals import compute_indicator
 from backend.models import ChartDrawing, ChartTemplate, User
+from backend.services.volume_profile_service import compute_volume_profile, parse_period_to_days
 
 try:
     from backend.adapters.registry import get_adapter_registry
@@ -23,6 +25,110 @@ except Exception:  # pragma: no cover - adapter module may be absent in lightwei
     get_adapter_registry = None
 
 router = APIRouter()
+
+_SUPPORTED_CHART_INTERVALS = {
+    "1m",
+    "2m",
+    "5m",
+    "15m",
+    "30m",
+    "60m",
+    "90m",
+    "1h",
+    "4h",
+    "1d",
+    "5d",
+    "1wk",
+    "1mo",
+    "3mo",
+}
+
+
+def _coerce_query_str(value: Any, default: str) -> str:
+    return value.strip() if isinstance(value, str) and value.strip() else default
+
+
+def _coerce_query_int(value: Any, default: int) -> int:
+    if isinstance(value, bool):  # bool is a subclass of int; reject explicitly
+        return default
+    if isinstance(value, int):
+        return value
+    return default
+
+
+@router.get("/charts/volume-profile/{symbol}")
+async def get_volume_profile(
+    symbol: str,
+    period: str = Query(default="20d"),
+    bins: int = Query(default=50, ge=10, le=200),
+    market: str = Query(default="NSE"),
+) -> Dict[str, Any]:
+    period = _coerce_query_str(period, "20d")
+    market = _coerce_query_str(market, "NSE").upper()
+    bins = _coerce_query_int(bins, 50)
+    if bins < 10 or bins > 200:
+        raise HTTPException(status_code=400, detail="bins must be between 10 and 200")
+
+    try:
+        days = parse_period_to_days(period)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    key = cache_instance.build_key(
+        "volume_profile",
+        symbol.upper(),
+        {"period": period, "bins": bins, "market": market},
+    )
+    started = perf_counter()
+    cached = await cache_instance.get(key)
+    if cached:
+        payload = dict(cached)
+        payload["meta"] = {
+            **dict(payload.get("meta") or {}),
+            "cache_hit": True,
+            "compute_ms": round((perf_counter() - started) * 1000.0, 3),
+        }
+        return payload
+
+    provider = await get_chart_provider()
+    bars = await provider.get_ohlcv(
+        symbol.strip().upper(),
+        interval="1m",
+        period=period,
+        start=None,
+        end=None,
+        market_hint=market,
+    )
+    max_points = days * 24 * 60
+    recent = bars[-max_points:] if len(bars) > max_points else bars
+    bar_dicts = [
+        {
+            "open": float(bar.open),
+            "high": float(bar.high),
+            "low": float(bar.low),
+            "close": float(bar.close),
+            "volume": float(bar.volume),
+        }
+        for bar in recent
+    ]
+    result = compute_volume_profile(bar_dicts, bins=bins, value_area_ratio=0.70)
+
+    payload = {
+        "symbol": symbol.upper(),
+        "period": period,
+        "bins": result.bins,
+        "poc_price": result.poc_price,
+        "value_area_high": result.value_area_high,
+        "value_area_low": result.value_area_low,
+        "meta": {
+            "cache_hit": False,
+            "bars_count": result.bars_count,
+            "total_volume": result.total_volume,
+            "compute_ms": round((perf_counter() - started) * 1000.0, 3),
+        },
+    }
+    await cache_instance.set(key, payload, ttl=120)
+    return payload
 
 @router.get("/charts/compare")
 async def compare_charts(
@@ -94,6 +200,20 @@ class ChartDrawingUpdate(BaseModel):
 class ChartTemplateCreate(BaseModel):
     name: str
     layout_config: dict[str, Any] = Field(default_factory=dict)
+
+
+def _parse_iso_datetime_or_400(value: str | None, field_name: str) -> datetime | None:
+    if not value:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid ISO date for {field_name}: {value}") from exc
 
 def _synthetic_history(ticker: str, interval: str, range_val: str) -> pd.DataFrame:
     # Deterministic synthetic series for UI continuity when upstream market data is unavailable.
@@ -211,6 +331,10 @@ async def get_chart(
         market = None
     if not isinstance(interval, str):
         interval = "1d"
+    interval = interval.strip().lower() or "1d"
+    if interval not in _SUPPORTED_CHART_INTERVALS:
+        allowed = ", ".join(sorted(_SUPPORTED_CHART_INTERVALS))
+        raise HTTPException(status_code=400, detail=f"Unsupported interval '{interval}'. Allowed: {allowed}")
     if not isinstance(range, str):
         range = "1y"
     if not isinstance(period, str):
@@ -226,17 +350,10 @@ async def get_chart(
     # Keep the legacy ChartResponse branch below intact for pagination/backfill consumers.
     if normalized or period is not None or start is not None or end is not None:
         provider = await get_chart_provider()
-        start_dt = None
-        end_dt = None
-        try:
-            if start:
-                s = start[:-1] + "+00:00" if start.endswith("Z") else start
-                start_dt = datetime.fromisoformat(s)
-            if end:
-                e = end[:-1] + "+00:00" if end.endswith("Z") else end
-                end_dt = datetime.fromisoformat(e)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=f"Invalid ISO date: {exc}") from exc
+        start_dt = _parse_iso_datetime_or_400(start, "start")
+        end_dt = _parse_iso_datetime_or_400(end, "end")
+        if start_dt and end_dt and start_dt > end_dt:
+            raise HTTPException(status_code=400, detail="start must be less than or equal to end")
 
         bars = await provider.get_ohlcv(
             ticker,

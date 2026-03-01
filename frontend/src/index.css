@@ -60,6 +60,18 @@ label {
   background-color: var(--ot-color-interaction-disabled-surface, transparent);
 }
 
+.ot-alert-tone-info {
+  color: var(--ot-color-alert-info, var(--ot-color-feedback-info));
+}
+
+.ot-alert-tone-warning {
+  color: var(--ot-color-alert-warning, var(--ot-color-feedback-warning));
+}
+
+.ot-alert-tone-critical {
+  color: var(--ot-color-alert-critical, var(--ot-color-feedback-error));
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

@@ -84,6 +84,15 @@
   --ot-color-action-warning: #ffb74d;
   --ot-color-action-danger: #ff3d3d;
 
+  /* Alert channel / severity semantics */
+  --ot-color-alert-info: var(--ot-color-feedback-info);
+  --ot-color-alert-warning: var(--ot-color-feedback-warning);
+  --ot-color-alert-critical: var(--ot-color-feedback-error);
+  --ot-color-alert-muted: var(--ot-color-text-muted);
+  --ot-color-alert-info-soft: var(--ot-color-feedback-info-soft);
+  --ot-color-alert-warning-soft: var(--ot-color-feedback-warning-soft);
+  --ot-color-alert-critical-soft: var(--ot-color-feedback-error-soft);
+
   /* Feedback / state semantics */
   --ot-color-feedback-success: var(--ot-color-system-ok);
   --ot-color-feedback-info: var(--ot-color-accent-info);

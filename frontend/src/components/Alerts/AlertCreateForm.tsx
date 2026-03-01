@@ -21,6 +21,7 @@ export function AlertCreateForm({ onCreated }: Props) {
   const [threshold, setThreshold] = useState(3000);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [customExpression, setCustomExpression] = useState("ltp > 3000 and change_pct > 1");
+  const [channels, setChannels] = useState<string[]>(["in_app"]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,6 +47,7 @@ export function AlertCreateForm({ onCreated }: Props) {
         condition_type: conditionType,
         parameters,
         cooldown_seconds: cooldownSeconds,
+        channels,
       });
       onCreated();
     } catch (e) {
@@ -106,6 +108,27 @@ export function AlertCreateForm({ onCreated }: Props) {
         >
           {loading ? "Creating..." : "Create"}
         </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        {["in_app", "webhook", "email", "telegram", "push"].map((ch) => {
+          const active = channels.includes(ch);
+          return (
+            <button
+              key={ch}
+              type="button"
+              onClick={() =>
+                setChannels((prev) =>
+                  prev.includes(ch) ? prev.filter((x) => x !== ch) : [...prev, ch],
+                )
+              }
+              className={`rounded border px-2 py-1 uppercase ${
+                active ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted"
+              }`}
+            >
+              {ch}
+            </button>
+          );
+        })}
       </div>
       {error && <div className="text-xs text-terminal-neg">{error}</div>}
     </div>

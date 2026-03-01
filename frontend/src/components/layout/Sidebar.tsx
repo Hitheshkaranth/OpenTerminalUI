@@ -9,13 +9,17 @@ export function Sidebar() {
   const unreadCount = useAlertsStore((s) => s.unreadCount);
   const nav = [
     { label: "Market", path: "/equity/stocks", key: "F1" },
+    { label: "Security Hub", path: "/equity/security", key: "SH", hint: "Research" },
     { label: "Economics", path: "/equity/economics", key: "E", hint: "Macro" },
     { label: "Yield Curve", path: "/equity/yield-curve", key: "YC", hint: "Fixed Income" },
     { label: "Rotation", path: "/equity/sector-rotation", key: "ROT", hint: "Relative" },
+    { label: "Crypto", path: "/equity/crypto", key: "CR", hint: "Digital" },
+    { label: "Compare", path: "/equity/compare", key: "CMP", hint: "Split View" },
     { label: "Screener", path: "/equity/screener", key: "F2" },
     { label: "Launchpad", path: "/equity/launchpad", key: "LP", hint: "Workspace" },
     { label: "Workstation", path: "/equity/chart-workstation", key: "6", hint: "6 Charts" },
     { label: "Portfolio", path: "/equity/portfolio", key: "F3" },
+    { label: "Portfolio Lab", path: "/equity/portfolio/lab", key: "PLB", hint: "Research" },
     { label: "Paper", path: "/equity/paper", key: "P" },
     { label: "Watchlist", path: "/equity/watchlist", key: "F4" },
     { label: "News", path: "/equity/news", key: "F5" },
@@ -26,6 +30,8 @@ export function Sidebar() {
     { label: "Plugins", path: "/equity/plugins", key: "PL" },
     { label: "Settings", path: "/equity/settings", key: "F6" },
     { label: "About", path: "/equity/stocks/about", key: "F7" },
+    { label: "Model Lab", path: "/backtesting/model-lab", key: "ML", hint: "Backtest" },
+    { label: "Cockpit", path: "/equity/cockpit", key: "CP", hint: "Overview" },
     { label: "Backtesting", path: "/backtesting", key: "F9" },
   ];
 

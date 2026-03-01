@@ -96,3 +96,29 @@ def test_chart_cursor_moves_window_backward(monkeypatch) -> None:
     assert len(first.data) == 4
     assert len(second.data) == 4
     assert second.data[-1].t < first.data[0].t
+
+
+def test_chart_legacy_route_uses_synthetic_fallback_when_history_empty(monkeypatch) -> None:
+    class _FakeFetcher:
+        async def fetch_history(self, ticker: str, range_str: str = "1y", interval: str = "1d"):  # noqa: ARG002
+            return {}
+
+    async def _fake_get_unified_fetcher():
+        return _FakeFetcher()
+
+    async def _fake_cache_get(key: str):  # noqa: ARG001
+        return None
+
+    async def _fake_cache_set(key: str, payload, ttl: int):  # noqa: ANN001, ARG001
+        return None
+
+    monkeypatch.setattr(chart, "get_unified_fetcher", _fake_get_unified_fetcher)
+    monkeypatch.setattr(chart.cache_instance, "get", _fake_cache_get)
+    monkeypatch.setattr(chart.cache_instance, "set", _fake_cache_set)
+
+    result = asyncio.run(chart.get_chart("RELIANCE", interval="1d", range="1y", limit=10, cursor=None))
+
+    assert result.ticker == "RELIANCE"
+    assert len(result.data) == 10
+    assert result.meta.warnings
+    assert result.meta.warnings[0].code == "chart_data_fallback"

@@ -991,11 +991,12 @@ export async function createAlert(payload: {
   condition?: string;
   threshold?: number;
   note?: string;
+  channels?: string[];
 }): Promise<void> {
   await api.post("/alerts", payload);
 }
 
-export async function updateAlert(alertId: string, payload: { status?: string; cooldown_seconds?: number; parameters?: Record<string, unknown> }): Promise<void> {
+export async function updateAlert(alertId: string, payload: { status?: string; cooldown_seconds?: number; parameters?: Record<string, unknown>; channels?: string[] }): Promise<void> {
   await api.patch(`/alerts/${alertId}`, payload);
 }
 
@@ -1148,6 +1149,75 @@ export async function fetchCryptoCandles(symbol: string, interval = "1d", range 
   return data;
 }
 
+export type CryptoMarketRow = {
+  symbol: string;
+  name: string;
+  price: number;
+  change_24h: number;
+  volume_24h: number;
+  market_cap: number;
+  sector: string;
+};
+
+export type CryptoMoverRow = {
+  symbol: string;
+  name: string;
+  price: number;
+  change_24h: number;
+  volume_24h: number;
+  market_cap: number;
+};
+
+export type CryptoDominanceResponse = {
+  btc_pct: number;
+  eth_pct: number;
+  others_pct: number;
+  total_market_cap: number;
+  ts: string;
+};
+
+export type CryptoIndexResponse = {
+  index_name: string;
+  top_n: number;
+  component_count: number;
+  index_value: number;
+  change_24h: number;
+  total_market_cap: number;
+  ts: string;
+};
+
+export type CryptoSectorRow = {
+  sector: string;
+  change_24h: number;
+  market_cap: number;
+  components: Array<{ symbol: string; name: string; weight: number }>;
+};
+
+export async function fetchCryptoMarkets(limit = 50): Promise<CryptoMarketRow[]> {
+  const { data } = await api.get<{ items: CryptoMarketRow[] }>("/v1/crypto/markets", { params: { limit } });
+  return data.items || [];
+}
+
+export async function fetchCryptoMovers(metric: string, limit = 20): Promise<CryptoMoverRow[]> {
+  const { data } = await api.get<{ items: CryptoMoverRow[] }>(`/v1/crypto/movers/${encodeURIComponent(metric)}`, { params: { limit } });
+  return data.items || [];
+}
+
+export async function fetchCryptoDominance(): Promise<CryptoDominanceResponse> {
+  const { data } = await api.get<CryptoDominanceResponse>("/v1/crypto/dominance");
+  return data;
+}
+
+export async function fetchCryptoIndex(topN = 10): Promise<CryptoIndexResponse> {
+  const { data } = await api.get<CryptoIndexResponse>("/v1/crypto/index", { params: { top_n: topN } });
+  return data;
+}
+
+export async function fetchCryptoSectors(): Promise<CryptoSectorRow[]> {
+  const { data } = await api.get<{ items: CryptoSectorRow[] }>("/v1/crypto/sectors");
+  return data.items || [];
+}
+
 export async function executePython(payload: { code: string; timeout_seconds?: number }): Promise<PythonExecuteResponse> {
   const { data } = await api.post<PythonExecuteResponse>("/v1/scripting/python/execute", payload);
   return data;
@@ -1202,6 +1272,19 @@ export type MarketSentimentSummary = {
   }>;
 };
 
+export type NewsSentimentMarketSummary = {
+  period_days: number;
+  total_articles: number;
+  average_score: number;
+  overall_label: string;
+  distribution: {
+    bullish_pct: number;
+    bearish_pct: number;
+    neutral_pct: number;
+  };
+  top_sources: Array<{ source: string; count: number }>;
+};
+
 export async function fetchSymbolNews(market: string, symbol: string, limit = 30): Promise<NewsApiItem[]> {
   const { data } = await api.get<{ items: NewsApiItem[] }>("/news/symbol", { params: { market, symbol, limit } });
   return Array.isArray(data?.items) ? data.items : [];
@@ -1237,6 +1320,11 @@ export async function fetchNewsSentiment(ticker: string, days = 7, market?: stri
 
 export async function fetchMarketSentiment(days = 7, market?: string): Promise<MarketSentimentSummary> {
   const { data } = await api.get<MarketSentimentSummary>("/news/sentiment/market", { params: { days, market } });
+  return data;
+}
+
+export async function fetchNewsSentimentSummary(days = 7, limit = 200): Promise<NewsSentimentMarketSummary> {
+  const { data } = await api.get<NewsSentimentMarketSummary>("/news/sentiment/summary", { params: { days, limit } });
   return data;
 }
 

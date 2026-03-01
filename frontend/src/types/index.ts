@@ -390,6 +390,8 @@ export type AlertRule = {
   status?: string;
   triggered_at?: string | null;
   cooldown_seconds?: number;
+  channels?: string[];
+  channel_status?: Record<string, { enabled: boolean; configured: boolean }>;
   ticker: string;
   alert_type: string;
   condition: string;

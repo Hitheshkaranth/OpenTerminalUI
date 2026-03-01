@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-import { fetchLatestNews, fetchMarketSentiment, fetchNewsByTicker, fetchNewsSentiment, searchLatestNews, type NewsLatestApiItem } from "../api/client";
+import { fetchLatestNews, fetchMarketSentiment, fetchNewsByTicker, fetchNewsSentiment, fetchNewsSentimentSummary, searchLatestNews, type NewsLatestApiItem } from "../api/client";
 import { SentimentBadge } from "../components/terminal/SentimentBadge";
 import { useStock } from "../hooks/useStocks";
 import { useStockStore } from "../store/stockStore";
@@ -262,6 +262,13 @@ export function NewsPage() {
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
   });
+  const sentimentSummaryQuery = useQuery({
+    queryKey: ["news-sentiment-summary", periodDays],
+    queryFn: () => fetchNewsSentimentSummary(periodDays, 200),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
 
   const normalizedItems = useMemo(() => {
     const raw = newsQuery.data?.items ?? [];
@@ -507,6 +514,19 @@ export function NewsPage() {
             </div>
           ) : null}
         </div>
+        {sentimentSummaryQuery.data?.top_sources?.length ? (
+          <div className="mt-3 rounded border border-terminal-border bg-terminal-bg p-2">
+            <div className="mb-1 text-[11px] text-terminal-muted">Top News Sources ({periodDays}d)</div>
+            <div className="grid grid-cols-1 gap-1 md:grid-cols-2">
+              {sentimentSummaryQuery.data.top_sources.slice(0, 6).map((row) => (
+                <div key={row.source} className="flex items-center justify-between rounded border border-terminal-border px-2 py-1 text-[11px]">
+                  <span className="truncate">{row.source}</span>
+                  <span className="text-terminal-muted">{row.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {(newsQuery.isLoading || (isTickerMode && sentimentQuery.isLoading)) && (

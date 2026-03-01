@@ -24,7 +24,8 @@ export type CommandFunctionCode =
   | "ECAL"
   | "ECOF"
   | "FRED"
-  | "RRG";
+  | "RRG"
+  | "CRYP";
 
 export type ParsedCommand =
   | {
@@ -88,6 +89,7 @@ export const COMMAND_FUNCTIONS: CommandFunctionSpec[] = [
   { code: "ECOF", label: "Macro Dashboard", description: "Open macro indicators dashboard", aliases: ["MACRO", "INDICATORS"] },
   { code: "FRED", label: "FRED Series", description: "Chart a FRED economic series", aliases: ["SERIES"] },
   { code: "RRG", label: "Sector Rotation Map", description: "Relative Rotation Graph (RRG)", aliases: ["SROT", "SECTOR"] },
+  { code: "CRYP", label: "Crypto Workspace", description: "Open dedicated crypto workspace", aliases: ["CRYPTO"] },
 ];
 
 const FUNCTION_LOOKUP = new Map<string, CommandFunctionCode>(
@@ -265,6 +267,9 @@ export function executeParsedCommand(parsed: ParsedCommand, navigate: NavigateFu
       case "RRG":
         navigate("/equity/sector-rotation");
         return { ok: true, target: "/equity/sector-rotation" };
+      case "CRYP":
+        navigate("/equity/crypto");
+        return { ok: true, target: "/equity/crypto" };
       case "COMP": {
         const left = mod0 && looksLikeTicker(mod0) ? mod0 : useStockStore.getState().ticker || "AAPL";
         const right = parsed.modifiers[1] && looksLikeTicker(parsed.modifiers[1]) ? parsed.modifiers[1] : "MSFT";
