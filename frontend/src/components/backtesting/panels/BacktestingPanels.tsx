@@ -10,6 +10,13 @@ import { ThreeDSurface, type Surface3DPoint } from "./Backtesting3D";
 
 type BacktestTimeframe = "1D" | "1W" | "1M";
 
+function safeIsoDateFromUnixSeconds(ts: number): string | null {
+  if (!Number.isFinite(ts)) return null;
+  const d = new Date(ts * 1000);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
 function emptyState(icon: string, text: string) {
   return (
     <div className="flex h-[56vh] min-h-[360px] items-center justify-center rounded border border-terminal-border/40 bg-terminal-bg/50 text-center">
@@ -83,8 +90,9 @@ export function ChartTabPanel(props: ChartTabProps) {
 
   const selectionLabel = useMemo(() => {
     if (!selectedBars.length) return "";
-    const first = new Date(Number(selectedBars[0].time) * 1000).toISOString().slice(0, 10);
-    const last = new Date(Number(selectedBars[selectedBars.length - 1].time) * 1000).toISOString().slice(0, 10);
+    const first = safeIsoDateFromUnixSeconds(Number(selectedBars[0].time));
+    const last = safeIsoDateFromUnixSeconds(Number(selectedBars[selectedBars.length - 1].time));
+    if (!first || !last) return `${selectedBars.length} bars`;
     return `${first} -> ${last} (${selectedBars.length} bars)`;
   }, [selectedBars]);
   const previewSelectionLabel = useMemo(() => {
@@ -92,8 +100,9 @@ export function ChartTabPanel(props: ChartTabProps) {
     const from = Math.max(0, Math.floor(Math.min(previewBrushRange.from, previewBrushRange.to)));
     const to = Math.min(displayedBars.length - 1, Math.ceil(Math.max(previewBrushRange.from, previewBrushRange.to)));
     if (to < from) return null;
-    const first = new Date(Number(displayedBars[from].time) * 1000).toISOString().slice(0, 10);
-    const last = new Date(Number(displayedBars[to].time) * 1000).toISOString().slice(0, 10);
+    const first = safeIsoDateFromUnixSeconds(Number(displayedBars[from].time));
+    const last = safeIsoDateFromUnixSeconds(Number(displayedBars[to].time));
+    if (!first || !last) return null;
     return `${first} -> ${last}`;
   }, [previewBrushRange, displayedBars]);
 

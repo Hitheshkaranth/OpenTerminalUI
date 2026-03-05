@@ -1,9 +1,17 @@
+import { useEffect, useState } from "react";
 import type { ChartKind, ChartTimeframe } from "./types";
 import { useDisplayCurrency } from "../../hooks/useDisplayCurrency";
 import { TerminalBadge } from "../../components/terminal/TerminalBadge";
 import { TerminalButton } from "../../components/terminal/TerminalButton";
 import { TerminalInput } from "../../components/terminal/TerminalInput";
 import { TerminalTooltip } from "../../components/terminal/TerminalTooltip";
+import {
+  ALT_CHART_PARAMS_EVENT,
+  ALT_CHART_PARAMS_STORAGE_KEY,
+  DEFAULT_ALT_CHART_PARAMS,
+  sanitizeAlternativeChartParams,
+  type AlternativeChartParams,
+} from "./alternativeChartTransforms";
 
 const TIMEFRAMES: Array<{ label: string; value: ChartTimeframe }> = [
   { label: "1m", value: "1m" },
@@ -52,6 +60,7 @@ export function SharedChartToolbar({
   liveStatus,
 }: Props) {
   const { formatDisplayMoney } = useDisplayCurrency();
+  const [altParams, setAltParams] = useState<AlternativeChartParams>(DEFAULT_ALT_CHART_PARAMS);
   const pctBadgeVariant: "neutral" | "success" | "danger" =
     changePct === null ? "neutral" : changePct >= 0 ? "success" : "danger";
 
@@ -62,6 +71,36 @@ export function SharedChartToolbar({
       : liveStatus === "delayed"
       ? "text-terminal-warn border-terminal-warn"
       : "text-terminal-neg border-terminal-neg";
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(ALT_CHART_PARAMS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<AlternativeChartParams>;
+      setAltParams(sanitizeAlternativeChartParams(parsed));
+    } catch {
+      // ignore invalid saved params
+    }
+  }, []);
+
+  const updateAltParams = (patch: Partial<AlternativeChartParams>) => {
+    setAltParams((prev) => {
+      const next = sanitizeAlternativeChartParams({ ...prev, ...patch });
+      try {
+        localStorage.setItem(ALT_CHART_PARAMS_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore local storage failures
+      }
+      window.dispatchEvent(new CustomEvent(ALT_CHART_PARAMS_EVENT, { detail: next }));
+      return next;
+    });
+  };
+
+  const showAltChartParams =
+    chartType === "renko" ||
+    chartType === "kagi" ||
+    chartType === "point_figure" ||
+    chartType === "line_break";
 
   return (
     <div className="rounded border border-terminal-border bg-terminal-panel px-3 py-1.5 text-xs">
@@ -146,8 +185,75 @@ export function SharedChartToolbar({
               <option value="line">Line</option>
               <option value="area">Area</option>
               <option value="baseline">Baseline</option>
+              <option value="renko">Renko</option>
+              <option value="kagi">Kagi</option>
+              <option value="point_figure">Point &amp; Figure</option>
+              <option value="line_break">Line Break</option>
             </select>
           </div>
+
+          {showAltChartParams ? (
+            <>
+              <div className="h-4 w-px bg-terminal-border" />
+              <div className="flex items-center gap-1">
+                {chartType === "renko" ? (
+                  <TerminalInput
+                    as="input"
+                    value={String(altParams.renkoBrickSize)}
+                    onChange={(e) => updateAltParams({ renkoBrickSize: Number(e.target.value) })}
+                    className="h-6 w-16 text-[10px]"
+                    size="sm"
+                    tone="ui"
+                    aria-label="Renko brick size"
+                  />
+                ) : null}
+                {chartType === "kagi" ? (
+                  <TerminalInput
+                    as="input"
+                    value={String(altParams.kagiReversal)}
+                    onChange={(e) => updateAltParams({ kagiReversal: Number(e.target.value) })}
+                    className="h-6 w-16 text-[10px]"
+                    size="sm"
+                    tone="ui"
+                    aria-label="Kagi reversal amount"
+                  />
+                ) : null}
+                {chartType === "point_figure" ? (
+                  <>
+                    <TerminalInput
+                      as="input"
+                      value={String(altParams.pointFigureBoxSize)}
+                      onChange={(e) => updateAltParams({ pointFigureBoxSize: Number(e.target.value) })}
+                      className="h-6 w-14 text-[10px]"
+                      size="sm"
+                      tone="ui"
+                      aria-label="Point and figure box size"
+                    />
+                    <TerminalInput
+                      as="input"
+                      value={String(altParams.pointFigureReversalBoxes)}
+                      onChange={(e) => updateAltParams({ pointFigureReversalBoxes: Number(e.target.value) })}
+                      className="h-6 w-14 text-[10px]"
+                      size="sm"
+                      tone="ui"
+                      aria-label="Point and figure reversal boxes"
+                    />
+                  </>
+                ) : null}
+                {chartType === "line_break" ? (
+                  <TerminalInput
+                    as="input"
+                    value={String(altParams.lineBreakCount)}
+                    onChange={(e) => updateAltParams({ lineBreakCount: Number(e.target.value) })}
+                    className="h-6 w-14 text-[10px]"
+                    size="sm"
+                    tone="ui"
+                    aria-label="Line break count"
+                  />
+                ) : null}
+              </div>
+            </>
+          ) : null}
 
           <div className="h-4 w-px bg-terminal-border" />
 

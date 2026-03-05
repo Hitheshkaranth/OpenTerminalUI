@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 export type TerminalTableAlign = "left" | "right" | "center";
-export type TerminalTableDensity = "compact" | "normal" | "comfortable";
+export type TerminalTableDensity = "dense" | "compact" | "normal" | "comfortable";
 export type TerminalTableSortDirection = "asc" | "desc";
 
 export type TerminalTableColumn<T> = {
@@ -46,12 +46,14 @@ function alignClass(align?: TerminalTableAlign): string {
 }
 
 function rowDensityClass(density: TerminalTableDensity): string {
+  if (density === "dense") return "h-6";
   if (density === "compact") return "h-6";
   if (density === "comfortable") return "h-8";
   return "h-7";
 }
 
 function cellPaddingClass(density: TerminalTableDensity): string {
+  if (density === "dense") return "px-2 py-0.5";
   if (density === "compact") return "px-2 py-0.5";
   if (density === "comfortable") return "px-2.5 py-1.5";
   return "px-2 py-1";

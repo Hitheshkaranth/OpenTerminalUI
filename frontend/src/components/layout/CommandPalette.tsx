@@ -2,7 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { TerminalBadge, TerminalInput } from "../terminal";
 
-import { COMMAND_FUNCTIONS, executeParsedCommand, fuzzyScore, parseCommand } from "./commanding";
+import {
+  COMMAND_FUNCTIONS,
+  SHORTCUT_SPECS,
+  executeParsedCommand,
+  findShortcutConflicts,
+  fuzzyScore,
+  parseCommand,
+  type ShortcutScope,
+} from "./commanding";
 
 type PaletteItem = {
   id: string;
@@ -19,25 +27,63 @@ function looksLikeTicker(input: string): boolean {
 export function CommandPalette() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
 
+  const shortcutGroups = useMemo(() => {
+    const grouped = new Map<ShortcutScope, typeof SHORTCUT_SPECS>();
+    for (const spec of SHORTCUT_SPECS) {
+      const rows = grouped.get(spec.scope);
+      if (rows) rows.push(spec);
+      else grouped.set(spec.scope, [spec]);
+    }
+    return grouped;
+  }, []);
+
+  const shortcutConflicts = useMemo(() => findShortcutConflicts(SHORTCUT_SPECS), []);
+
   useEffect(() => {
     const onKeyDown = (ev: KeyboardEvent) => {
+      const target = ev.target as HTMLElement | null;
+      const isEditable = Boolean(
+        target &&
+          (target.tagName === "INPUT" ||
+            target.tagName === "TEXTAREA" ||
+            target.tagName === "SELECT" ||
+            target.isContentEditable),
+      );
+
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k") {
+        if (isEditable && !open) return;
         ev.preventDefault();
         setOpen((v) => !v);
+        setHelpOpen(false);
         setQuery("");
         setSelected(0);
         return;
       }
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === "/") {
+        if (isEditable && !open) return;
+        ev.preventDefault();
+        setOpen(true);
+        setHelpOpen((v) => !v);
+        return;
+      }
       if (ev.key === "Escape") {
-        setOpen(false);
+        if (helpOpen) {
+          ev.preventDefault();
+          setHelpOpen(false);
+          return;
+        }
+        if (open) {
+          setOpen(false);
+        }
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [helpOpen, open]);
 
   const items = useMemo<PaletteItem[]>(() => {
     const q = query.trim();
@@ -142,7 +188,51 @@ export function CommandPalette() {
           ))}
           {!items.length ? <div className="px-3 py-3 text-xs text-terminal-muted">No matches</div> : null}
         </div>
+        <div className="flex items-center justify-between border-t border-terminal-border px-3 py-2 text-[10px] text-terminal-muted">
+          <span>Enter: run | Esc: close | Ctrl/Cmd+/: shortcuts</span>
+          {shortcutConflicts.length ? (
+            <span className="text-amber-400">{shortcutConflicts.length} conflict(s)</span>
+          ) : (
+            <span className="text-emerald-400">No shortcut conflicts</span>
+          )}
+        </div>
       </div>
+      {helpOpen ? (
+        <div
+          className="mx-auto mt-3 max-w-2xl rounded border border-terminal-border bg-terminal-panel shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="border-b border-terminal-border px-3 py-2 text-xs uppercase tracking-[0.14em] text-terminal-muted">
+            Shortcut Help
+          </div>
+          <div className="grid gap-2 p-3 text-xs">
+            {(["global", "command-bar", "chart-workstation"] as ShortcutScope[]).map((scope) => {
+              const rows = shortcutGroups.get(scope) ?? [];
+              if (!rows.length) return null;
+              return (
+                <div key={scope} className="rounded border border-terminal-border/70">
+                  <div className="border-b border-terminal-border/70 px-2 py-1 uppercase tracking-[0.12em] text-terminal-muted">
+                    {scope}
+                  </div>
+                  <div className="divide-y divide-terminal-border/60">
+                    {rows.map((row) => (
+                      <div key={row.id} className="grid grid-cols-[auto_1fr] gap-2 px-2 py-1.5">
+                        <span className="text-terminal-accent">{row.combo}</span>
+                        <span className="text-terminal-text">{row.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {shortcutConflicts.length ? (
+              <div className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-200">
+                Review conflicts: {shortcutConflicts.map((c) => c.combo).join(", ")}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

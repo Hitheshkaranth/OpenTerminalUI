@@ -74,9 +74,12 @@ describe("ChartPanel Volume Profile controls", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     fetchVolumeProfileMock.mockReset();
-    fetchVolumeProfileMock.mockImplementation(async (_symbol: string, opts?: { period?: string; bins?: number; market?: string }) => ({
+    fetchVolumeProfileMock.mockImplementation(
+      async (_symbol: string, opts?: { period?: string; bins?: number; market?: string; mode?: "fixed" | "session" | "visible"; lookbackBars?: number }) => ({
       symbol: "AAPL",
       period: opts?.period ?? "20d",
+      mode: opts?.mode ?? "fixed",
+      lookback_bars: opts?.mode === "visible" ? (opts?.lookbackBars ?? 300) : null,
       bins: [
         { price_low: 100, price_high: 110, volume: 100, buy_volume: 60, sell_volume: 40 },
         { price_low: 110, price_high: 120, volume: 200, buy_volume: 120, sell_volume: 80 },
@@ -84,7 +87,8 @@ describe("ChartPanel Volume Profile controls", () => {
       poc_price: opts?.period === "10d" ? 118 : 115,
       value_area_high: 119,
       value_area_low: 108,
-    }));
+      }),
+    );
   });
 
   afterEach(() => {
@@ -115,17 +119,45 @@ describe("ChartPanel Volume Profile controls", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Show volume profile" }));
     await waitFor(() => expect(fetchVolumeProfileMock).toHaveBeenCalledTimes(1));
-    expect(fetchVolumeProfileMock).toHaveBeenLastCalledWith("AAPL", { period: "20d", bins: 50, market: "US" });
+    expect(fetchVolumeProfileMock).toHaveBeenLastCalledWith("AAPL", {
+      period: "20d",
+      bins: 50,
+      market: "US",
+      mode: "fixed",
+      lookbackBars: undefined,
+    });
     expect(screen.getByTestId("volume-profile-overlay")).toBeInTheDocument();
 
     const selects = screen.getAllByRole("combobox");
-    fireEvent.change(selects[0], { target: { value: "10d" } });
+    fireEvent.change(selects[1], { target: { value: "10d" } });
     await waitFor(() => expect(fetchVolumeProfileMock).toHaveBeenCalledTimes(2));
-    expect(fetchVolumeProfileMock).toHaveBeenLastCalledWith("AAPL", { period: "10d", bins: 50, market: "US" });
+    expect(fetchVolumeProfileMock).toHaveBeenLastCalledWith("AAPL", {
+      period: "10d",
+      bins: 50,
+      market: "US",
+      mode: "fixed",
+      lookbackBars: undefined,
+    });
 
-    fireEvent.change(selects[1], { target: { value: "80" } });
+    fireEvent.change(selects[2], { target: { value: "80" } });
     await waitFor(() => expect(fetchVolumeProfileMock).toHaveBeenCalledTimes(3));
-    expect(fetchVolumeProfileMock).toHaveBeenLastCalledWith("AAPL", { period: "10d", bins: 80, market: "US" });
+    expect(fetchVolumeProfileMock).toHaveBeenLastCalledWith("AAPL", {
+      period: "10d",
+      bins: 80,
+      market: "US",
+      mode: "fixed",
+      lookbackBars: undefined,
+    });
+
+    fireEvent.change(selects[0], { target: { value: "visible" } });
+    await waitFor(() => expect(fetchVolumeProfileMock).toHaveBeenCalledTimes(4));
+    expect(fetchVolumeProfileMock).toHaveBeenLastCalledWith("AAPL", {
+      period: "10d",
+      bins: 80,
+      market: "US",
+      mode: "visible",
+      lookbackBars: 300,
+    });
   });
 
   it("refreshes VP profile on interval for incremental updates", async () => {

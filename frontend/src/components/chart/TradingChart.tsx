@@ -24,9 +24,15 @@ import type { DrawMode } from "./DrawingTools";
 import { terminalChartTheme } from "../../shared/chart/chartTheme";
 import { useIndicators } from "../../shared/chart/useIndicators";
 import type { IndicatorConfig } from "../../shared/chart/types";
+import { REPLAY_SPEEDS, nextReplayIndex, replaySlice, replaySpeedToMs, type ReplaySpeed } from "../../shared/chart/replay";
+import {
+  buildEnhancedCandle,
+  buildEnhancedVolumeBar,
+} from "../../shared/chart/candlePresentation";
 import { terminalColors, terminalOverlayPalette } from "../../theme/terminal";
 import type { Bar } from "oakscriptjs";
-import { useQuotesStream, type QuoteTick } from "../../realtime/useQuotesStream";
+import { useQuotesStore, useQuotesStream, type QuoteTick } from "../../realtime/useQuotesStream";
+import { buildComparisonPoints, type ComparisonMode } from "../../shared/chart/comparison";
 
 import type {
   ExtendedHoursConfig,
@@ -37,9 +43,10 @@ import { useCrosshairSync } from "../../contexts/CrosshairSyncContext";
 
 type ChartMode = "candles" | "line" | "area";
 type TrendPoint = { time: number; price: number };
+type DrawingStyle = { color?: string; lineWidth?: number };
 type ChartDrawing =
-  | { id: string; type: "trendline"; p1: TrendPoint; p2: TrendPoint; remoteId?: string }
-  | { id: string; type: "hline"; price: number; remoteId?: string };
+  | { id: string; type: "trendline"; p1: TrendPoint; p2: TrendPoint; style?: DrawingStyle; remoteId?: string }
+  | { id: string; type: "hline"; price: number; style?: DrawingStyle; remoteId?: string };
 
 type CandlePoint = {
   time: number;
@@ -99,7 +106,12 @@ function sanitizeDrawings(input: unknown): ChartDrawing[] {
     if (!item || typeof item !== "object") continue;
     const d = item as Record<string, unknown>;
     if (d.type === "hline" && typeof d.price === "number") {
-      out.push({ id: String(d.id ?? `hl-${Date.now()}`), type: "hline", price: d.price });
+      out.push({
+        id: String(d.id ?? `hl-${Date.now()}`),
+        type: "hline",
+        price: d.price,
+        style: typeof d.style === "object" && d.style ? (d.style as DrawingStyle) : undefined,
+      });
       continue;
     }
     if (
@@ -125,6 +137,7 @@ function sanitizeDrawings(input: unknown): ChartDrawing[] {
           type: "trendline",
           p1: { time: p1.time, price: p1.price },
           p2: { time: p2.time, price: p2.price },
+          style: typeof d.style === "object" && d.style ? (d.style as DrawingStyle) : undefined,
         });
       }
     }
@@ -145,12 +158,14 @@ type Props = {
   drawMode?: DrawMode;
   clearDrawingsSignal?: number;
   onPendingTrendPointChange?: (pending: boolean) => void;
+  drawingWorkspaceId?: string;
   extendedHours?: ExtendedHoursConfig;
   preMarketLevels?: PreMarketLevelConfig;
   market?: "US" | "IN";
   panelId?: string;
   crosshairSyncGroupId?: string | null;
   comparisonSeries?: Array<{ symbol: string; data: ChartPoint[]; color?: string }>;
+  comparisonMode?: ComparisonMode;
   onAddToPortfolio?: (symbol: string, priceHint?: number) => void;
 };
 
@@ -167,12 +182,14 @@ export function TradingChart({
   drawMode = "none",
   clearDrawingsSignal = 0,
   onPendingTrendPointChange,
+  drawingWorkspaceId = "default-workspace",
   extendedHours,
   preMarketLevels,
   market = "IN",
   panelId,
   crosshairSyncGroupId = "chart-workstation",
   comparisonSeries = [],
+  comparisonMode: comparisonModeProp,
   onAddToPortfolio,
 }: Props) {
   const chartRef = useRef<HTMLDivElement | null>(null);
@@ -199,18 +216,33 @@ export function TradingChart({
   const selectedRef = useRef<CandlePoint | null>(null);
   const hoveredRef = useRef<CandlePoint | null>(null);
   const [drawings, setDrawings] = useState<ChartDrawing[]>([]);
+  const drawingsRef = useRef<ChartDrawing[]>([]);
+  const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
+  const [editingColor, setEditingColor] = useState<string>("#4ea1ff");
+  const [editingLineWidth, setEditingLineWidth] = useState<number>(2);
+  const dragRef = useRef<{ drawingId: string; point: "p1" | "p2" | "price" } | null>(null);
   const [selectedCandle, setSelectedCandle] = useState<CandlePoint | null>(null);
   const [syncedCandle, setSyncedCandle] = useState<CandlePoint | null>(null);
   const [syncedCrosshairX, setSyncedCrosshairX] = useState<number | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [replayEnabled, setReplayEnabled] = useState(false);
+  const [replayPlaying, setReplayPlaying] = useState(false);
+  const [replaySpeed, setReplaySpeed] = useState<ReplaySpeed>("1x");
+  const [replayIndex, setReplayIndex] = useState(0);
+  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>("normalized");
+  const effectiveComparisonMode = comparisonModeProp ?? comparisonMode;
   const [indicatorChartApi, setIndicatorChartApi] = useState<IChartApi | null>(null);
-  const storageKey = `lts:drawings:${ticker.toUpperCase()}`;
+  const storageKey = `lts:drawings:${ticker.toUpperCase()}:${timeframe ?? "1D"}:${drawingWorkspaceId}`;
   const remoteSyncEnabledRef = useRef(true);
   const initializedDrawingsRef = useRef(false);
+  const skipNextRemoteSyncRef = useRef(false);
   const syncTimerRef = useRef<number | null>(null);
   const { pos: syncedPos, broadcast, syncEnabled } = useCrosshairSync();
+  const useInternalRealtime = !String(crosshairSyncGroupId ?? "").startsWith("chart-workstation");
+  const quoteTokenMarket = market === "US" ? "NASDAQ" : market === "IN" ? "NSE" : String(market || "").toUpperCase();
+  const externalTick = useQuotesStore((s) => s.ticksByToken[`${quoteTokenMarket}:${ticker.toUpperCase()}`] ?? null);
 
-  const handleTick = useCallback((tick: QuoteTick) => {
+  const applyRealtimeTick = useCallback((tick: QuoteTick) => {
     if (tick.symbol !== ticker) return;
     if (!candleRef.current || !volumeRef.current) return;
 
@@ -231,6 +263,8 @@ export function TradingChart({
     const isNewBar = !lastBar || barTime > lastBar.time;
 
     let updatedBar: any;
+    let prevClose: number | null = null;
+    const prevBar = lastParsedRef.current[lastParsedRef.current.length - 2];
     if (isNewBar) {
       updatedBar = {
         time: barTime as UTCTimestamp,
@@ -239,6 +273,7 @@ export function TradingChart({
         low: tick.ltp,
         close: tick.ltp
       };
+      prevClose = lastBar ? Number(lastBar.close) : null;
     } else {
       updatedBar = {
         time: lastBar.time as UTCTimestamp,
@@ -247,9 +282,48 @@ export function TradingChart({
         low: Math.min(lastBar.low, tick.ltp),
         close: tick.ltp
       };
+      prevClose = prevBar ? Number(prevBar.close) : null;
     }
 
-    candleRef.current.update(updatedBar);
+    const volumeValue = isNewBar
+      ? Number(tick.volume || 0)
+      : (Number(lastBar.volume || 0) + Number(tick.volume || 0));
+
+    const enhancedCandle = buildEnhancedCandle(
+      {
+        time: barTime,
+        open: Number(updatedBar.open),
+        high: Number(updatedBar.high),
+        low: Number(updatedBar.low),
+        close: Number(updatedBar.close),
+        volume: volumeValue,
+        session: isNewBar ? "rth" : lastBar.session,
+        isExtended: isNewBar ? false : lastBar.isExtended,
+      },
+      prevClose,
+      { up: terminalColors.candleUp, down: terminalColors.candleDown },
+      extendedHours,
+    );
+    const enhancedVolume = buildEnhancedVolumeBar(
+      {
+        time: barTime,
+        open: Number(updatedBar.open),
+        high: Number(updatedBar.high),
+        low: Number(updatedBar.low),
+        close: Number(updatedBar.close),
+        volume: volumeValue,
+        session: isNewBar ? "rth" : lastBar.session,
+        isExtended: isNewBar ? false : lastBar.isExtended,
+      },
+      prevClose,
+      { up: terminalColors.candleUp, down: terminalColors.candleDown },
+      extendedHours,
+    );
+
+    candleRef.current.update(enhancedCandle as any);
+    lineRef.current?.update({ time: barTime as UTCTimestamp, value: Number(updatedBar.close) });
+    areaRef.current?.update({ time: barTime as UTCTimestamp, value: Number(updatedBar.close) });
+    volumeRef.current.update(enhancedVolume);
 
     if (isNewBar) {
       lastParsedRef.current.push({
@@ -266,16 +340,31 @@ export function TradingChart({
         high: updatedBar.high,
         low: updatedBar.low,
         close: updatedBar.close,
-        volume: (lastBar.volume || 0) + Number(tick.volume || 0)
+        volume: volumeValue
       };
     }
-  }, [ticker, timeframe]);
+    parsedByTimeRef.current.set(barTime, {
+      ...(lastParsedRef.current[lastParsedRef.current.length - 1] as CandlePoint),
+    });
+  }, [ticker, timeframe, extendedHours]);
+
+  const handleTick = useCallback((tick: QuoteTick) => {
+    if (!useInternalRealtime) return;
+    applyRealtimeTick(tick);
+  }, [applyRealtimeTick, useInternalRealtime]);
 
   const { subscribe } = useQuotesStream(market || "IN", handleTick);
 
   useEffect(() => {
+    if (!useInternalRealtime) return;
     subscribe([ticker]);
-  }, [ticker, subscribe]);
+  }, [ticker, subscribe, useInternalRealtime]);
+
+  useEffect(() => {
+    if (useInternalRealtime) return;
+    if (!externalTick) return;
+    applyRealtimeTick(externalTick);
+  }, [applyRealtimeTick, externalTick, useInternalRealtime, indicatorChartApi]);
 
   const parsed = useMemo(
     () =>
@@ -300,9 +389,13 @@ export function TradingChart({
       .sort((a, b) => Number(a.time) - Number(b.time)),
     [data]
   );
+  const replayParsed = useMemo(
+    () => replaySlice(parsed, replayEnabled, replayIndex),
+    [parsed, replayEnabled, replayIndex],
+  );
   const parsedByTime = useMemo(() => {
     const m = new Map<number, CandlePoint>();
-    for (const p of parsed) {
+    for (const p of replayParsed) {
       m.set(Number(p.time), {
         time: Number(p.time),
         open: p.open,
@@ -315,10 +408,10 @@ export function TradingChart({
       });
     }
     return m;
-  }, [parsed]);
+  }, [replayParsed]);
   const indicatorBars = useMemo<Bar[]>(
     () =>
-      parsed.map((p) => ({
+      replayParsed.map((p) => ({
         time: Number(p.time),
         open: p.open,
         high: p.high,
@@ -326,12 +419,12 @@ export function TradingChart({
         close: p.close,
         volume: Number.isFinite(Number(p.volume)) ? Number(p.volume) : 0,
       })),
-    [parsed],
+    [replayParsed],
   );
   useIndicators(indicatorChartApi, indicatorBars, indicatorConfigs, { nonOverlayPaneStartIndex: 1 });
   const showSessionLegend = useMemo(
-    () => hasVisibleSessionShading(parsed, extendedHours),
-    [parsed, extendedHours],
+    () => hasVisibleSessionShading(replayParsed, extendedHours),
+    [replayParsed, extendedHours],
   );
 
   const toUnixTime = (t: Time | undefined): number | null => {
@@ -355,22 +448,60 @@ export function TradingChart({
   }, [parsedByTime]);
 
   useEffect(() => {
+    if (!replayParsed.length) {
+      setReplayIndex(0);
+      setReplayPlaying(false);
+      return;
+    }
+    if (!replayEnabled) {
+      setReplayIndex(parsed.length - 1);
+      setReplayPlaying(false);
+      return;
+    }
+    setReplayIndex((prev) => Math.max(0, Math.min(prev, parsed.length - 1)));
+  }, [parsed, replayEnabled]);
+
+  useEffect(() => {
+    if (!replayEnabled || !replayPlaying) return;
+    const timer = window.setInterval(() => {
+      setReplayIndex((prev) => {
+        const next = nextReplayIndex(prev, parsed.length, 1);
+        if (next >= parsed.length - 1) {
+          setReplayPlaying(false);
+        }
+        return next;
+      });
+    }, replaySpeedToMs(replaySpeed));
+    return () => window.clearInterval(timer);
+  }, [parsed.length, replayEnabled, replayPlaying, replaySpeed]);
+
+  useEffect(() => {
     pendingTrendCbRef.current = onPendingTrendPointChange;
   }, [onPendingTrendPointChange]);
 
   useEffect(() => {
     let cancelled = false;
+    setSelectedDrawingId(null);
     const loadRemoteOrLocal = async () => {
       if (remoteSyncEnabledRef.current) {
         try {
-          const items = await listChartDrawings(ticker.toUpperCase());
+          const items = await listChartDrawings(ticker.toUpperCase(), {
+            timeframe: timeframe ?? "1D",
+            workspaceId: drawingWorkspaceId,
+          });
           if (!cancelled && Array.isArray(items) && items.length > 0) {
             const mapped: ChartDrawing[] = items
               .map((row) => {
                 if (row.tool_type === "hline") {
                   const price = Number((row.coordinates || {}).price);
                   if (!Number.isFinite(price)) return null;
-                  return { id: `remote-${row.id}`, remoteId: row.id, type: "hline", price } as ChartDrawing;
+                  return {
+                    id: `remote-${row.id}`,
+                    remoteId: row.id,
+                    type: "hline",
+                    price,
+                    style: row.style || {},
+                  } as ChartDrawing;
                 }
                 if (row.tool_type === "trendline") {
                   const p1 = (row.coordinates || {}).p1 as Record<string, unknown>;
@@ -387,11 +518,13 @@ export function TradingChart({
                     type: "trendline",
                     p1: { time: p1t, price: p1p },
                     p2: { time: p2t, price: p2p },
+                    style: row.style || {},
                   } as ChartDrawing;
                 }
                 return null;
               })
               .filter((x): x is ChartDrawing => x != null);
+            skipNextRemoteSyncRef.current = true;
             setDrawings(mapped);
             initializedDrawingsRef.current = true;
             return;
@@ -420,7 +553,7 @@ export function TradingChart({
     return () => {
       cancelled = true;
     };
-  }, [storageKey]);
+  }, [storageKey, ticker, timeframe, drawingWorkspaceId]);
 
   useEffect(() => {
     try {
@@ -431,26 +564,37 @@ export function TradingChart({
   }, [drawings, storageKey]);
 
   useEffect(() => {
+    drawingsRef.current = drawings;
+  }, [drawings]);
+
+  useEffect(() => {
     if (!initializedDrawingsRef.current) return;
     if (!remoteSyncEnabledRef.current) return;
+    if (skipNextRemoteSyncRef.current) {
+      skipNextRemoteSyncRef.current = false;
+      return;
+    }
     if (syncTimerRef.current !== null) window.clearTimeout(syncTimerRef.current);
     syncTimerRef.current = window.setTimeout(async () => {
       const symbol = ticker.toUpperCase();
       try {
-        const existing = await listChartDrawings(symbol);
+        const existing = await listChartDrawings(symbol, {
+          timeframe: timeframe ?? "1D",
+          workspaceId: drawingWorkspaceId,
+        });
         await Promise.all(existing.map((row) => deleteChartDrawing(symbol, row.id)));
         for (const d of drawings) {
           if (d.type === "hline") {
             await createChartDrawing(symbol, {
               tool_type: "hline",
-              coordinates: { price: d.price },
-              style: {},
+              coordinates: { price: d.price, timeframe: timeframe ?? "1D", workspace_id: drawingWorkspaceId },
+              style: d.style || {},
             });
           } else {
             await createChartDrawing(symbol, {
               tool_type: "trendline",
-              coordinates: { p1: d.p1, p2: d.p2 },
-              style: {},
+              coordinates: { p1: d.p1, p2: d.p2, timeframe: timeframe ?? "1D", workspace_id: drawingWorkspaceId },
+              style: d.style || {},
             });
           }
         }
@@ -464,7 +608,7 @@ export function TradingChart({
         syncTimerRef.current = null;
       }
     };
-  }, [drawings, ticker]);
+  }, [drawings, ticker, timeframe, drawingWorkspaceId]);
 
   useEffect(() => {
     if (!chartRef.current || apiRef.current) {
@@ -475,60 +619,90 @@ export function TradingChart({
       width: chartRef.current.clientWidth,
       height: chartRef.current.clientHeight || 520,
     });
-    const candles = chart.addSeries(CandlestickSeries, {
-      upColor: terminalColors.candleUp,
-      downColor: terminalColors.candleDown,
-      borderVisible: false,
-      wickUpColor: terminalColors.candleUp,
-      wickDownColor: terminalColors.candleDown,
-      visible: mode === "candles",
-    });
-    const line = chart.addSeries(LineSeries, {
-      color: terminalColors.accent,
-      lineWidth: 2,
-      visible: mode === "line",
-    });
-    const area = chart.addSeries(AreaSeries, {
-      lineColor: terminalColors.accent,
-      topColor: terminalColors.accentAreaTop,
-      bottomColor: terminalColors.accentAreaBottom,
-      visible: mode === "area",
-    });
-    const preSessionArea = chart.addSeries(AreaSeries, {
-      lineColor: "rgba(59, 143, 249, 0.55)",
-      topColor: "rgba(59, 143, 249, 0.30)",
-      bottomColor: "rgba(59, 143, 249, 0.10)",
-      lineWidth: 1,
-      lastValueVisible: false,
-      priceLineVisible: false,
-      crosshairMarkerVisible: false,
-      visible: false,
-    });
-    const postSessionArea = chart.addSeries(AreaSeries, {
-      lineColor: "rgba(155, 89, 182, 0.55)",
-      topColor: "rgba(155, 89, 182, 0.30)",
-      bottomColor: "rgba(155, 89, 182, 0.10)",
-      lineWidth: 1,
-      lastValueVisible: false,
-      priceLineVisible: false,
-      crosshairMarkerVisible: false,
-      visible: false,
-    });
-    const volume = chart.addSeries(HistogramSeries, {
-      priceScaleId: "",
-      color: terminalColors.accent,
-      priceFormat: { type: "volume" },
-      visible: showVolume,
-    });
-    const sessionShading = chart.addSeries(HistogramSeries, {
-      priceScaleId: "",
-      visible: true,
-      lastValueVisible: false,
-      priceLineVisible: false,
-    });
+    const candles = chart.addSeries(
+      CandlestickSeries,
+      {
+        upColor: terminalColors.candleUp,
+        downColor: terminalColors.candleDown,
+        borderVisible: true,
+        wickUpColor: terminalColors.candleUp,
+        wickDownColor: terminalColors.candleDown,
+        visible: mode === "candles",
+      },
+      0,
+    );
+    const line = chart.addSeries(
+      LineSeries,
+      {
+        color: terminalColors.accent,
+        lineWidth: 2,
+        visible: mode === "line",
+      },
+      0,
+    );
+    const area = chart.addSeries(
+      AreaSeries,
+      {
+        lineColor: terminalColors.accent,
+        topColor: terminalColors.accentAreaTop,
+        bottomColor: terminalColors.accentAreaBottom,
+        visible: mode === "area",
+      },
+      0,
+    );
+    const preSessionArea = chart.addSeries(
+      AreaSeries,
+      {
+        lineColor: "rgba(59, 143, 249, 0.55)",
+        topColor: "rgba(59, 143, 249, 0.30)",
+        bottomColor: "rgba(59, 143, 249, 0.10)",
+        lineWidth: 1,
+        lastValueVisible: false,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+        visible: false,
+      },
+      0,
+    );
+    const postSessionArea = chart.addSeries(
+      AreaSeries,
+      {
+        lineColor: "rgba(155, 89, 182, 0.55)",
+        topColor: "rgba(155, 89, 182, 0.30)",
+        bottomColor: "rgba(155, 89, 182, 0.10)",
+        lineWidth: 1,
+        lastValueVisible: false,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+        visible: false,
+      },
+      0,
+    );
+    const volume = chart.addSeries(
+      HistogramSeries,
+      {
+        priceScaleId: "",
+        color: terminalColors.accent,
+        priceFormat: { type: "volume" },
+        visible: showVolume,
+      },
+      1,
+    );
+    const sessionShading = chart.addSeries(
+      HistogramSeries,
+      {
+        priceScaleId: "",
+        visible: true,
+        lastValueVisible: false,
+        priceLineVisible: false,
+      },
+      0,
+    );
     chart.priceScale("").applyOptions({
       scaleMargins: { top: 0, bottom: 0 },
     });
+    chart.panes()[0]?.setStretchFactor(8);
+    chart.panes()[1]?.setStretchFactor(2);
 
     apiRef.current = chart;
     setIndicatorChartApi(chart);
@@ -597,6 +771,29 @@ export function TradingChart({
     const onClick = (param: MouseEventParams<Time>) => {
       const nextDraw = extractDrawPoint(param);
       const next = extractCandle(param);
+      if (drawModeRef.current === "none" && nextDraw) {
+        const drawingHit = drawingsRef.current.find((d) => {
+          if (d.type === "hline") {
+            return Math.abs(d.price - nextDraw.price) <= Math.max(0.25, Math.abs(nextDraw.price) * 0.002);
+          }
+          const p1Hit =
+            Math.abs(d.p1.time - nextDraw.time) <= 120 &&
+            Math.abs(d.p1.price - nextDraw.price) <= Math.max(0.25, Math.abs(nextDraw.price) * 0.002);
+          const p2Hit =
+            Math.abs(d.p2.time - nextDraw.time) <= 120 &&
+            Math.abs(d.p2.price - nextDraw.price) <= Math.max(0.25, Math.abs(nextDraw.price) * 0.002);
+          return p1Hit || p2Hit;
+        });
+        if (drawingHit) {
+          setSelectedDrawingId(drawingHit.id);
+          if (drawingHit.style?.color) setEditingColor(drawingHit.style.color);
+          if (drawingHit.style?.lineWidth) setEditingLineWidth(drawingHit.style.lineWidth);
+          selectedRef.current = null;
+          setSelectedCandle(null);
+          return;
+        }
+        setSelectedDrawingId(null);
+      }
       if (drawModeRef.current === "trendline" && nextDraw) {
         const clicked: TrendPoint = nextDraw;
         if (!pendingTrendPointRef.current) {
@@ -615,12 +812,15 @@ export function TradingChart({
         const p2 = start.time < clicked.time ? clicked : start;
         setDrawings((prev) => [
           ...prev,
-          { id: `tl-${Date.now()}`, type: "trendline", p1, p2 },
+          { id: `tl-${Date.now()}`, type: "trendline", p1, p2, style: { color: terminalColors.drawingTrend, lineWidth: 2 } },
         ]);
         return;
       }
       if (drawModeRef.current === "hline" && nextDraw) {
-        setDrawings((prev) => [...prev, { id: `hl-${Date.now()}`, type: "hline", price: nextDraw.price }]);
+        setDrawings((prev) => [
+          ...prev,
+          { id: `hl-${Date.now()}`, type: "hline", price: nextDraw.price, style: { color: terminalColors.drawingHLine, lineWidth: 1 } },
+        ]);
         return;
       }
       if (!next) {
@@ -674,7 +874,7 @@ export function TradingChart({
     if (!candleRef.current || !volumeRef.current || !lineRef.current || !areaRef.current || !sessionShadingRef.current) {
       return;
     }
-    if (!parsed.length) {
+    if (!replayParsed.length) {
       candleRef.current.setData([]);
       lineRef.current.setData([]);
       areaRef.current.setData([]);
@@ -690,78 +890,42 @@ export function TradingChart({
     areaRef.current.applyOptions({ visible: mode === "area" });
 
     const isIncremental =
-      parsed.length > 0 &&
+      replayParsed.length > 0 &&
       lastParsedRef.current.length > 0 &&
-      parsed.length === lastParsedRef.current.length &&
-      parsed[parsed.length - 2]?.time === lastParsedRef.current[lastParsedRef.current.length - 2]?.time;
+      replayParsed.length === lastParsedRef.current.length &&
+      replayParsed[replayParsed.length - 2]?.time === lastParsedRef.current[lastParsedRef.current.length - 2]?.time;
 
     const ethEnabled = extendedHours?.enabled;
-    const hasSessionMetadata = parsed.some((d) => d.session && d.session !== "rth");
+    const hasSessionMetadata = replayParsed.some((d) => d.session && d.session !== "rth");
     const showSessionOverlays = ethEnabled || hasSessionMetadata;
     const showAreaSessionHighlight = mode === "area" && showSessionOverlays;
     preSessionAreaRef.current?.applyOptions({ visible: showAreaSessionHighlight });
     postSessionAreaRef.current?.applyOptions({ visible: showAreaSessionHighlight });
     sessionShadingRef.current.applyOptions({ visible: showSessionOverlays });
 
-    // Handle session-aware candle coloring
-    if (ethEnabled && mode === "candles") {
-      const colorScheme = extendedHours.colorScheme || "dimmed";
-      const styledBars = parsed.map((d) => {
-        let color: string = d.close >= d.open ? terminalColors.candleUp : terminalColors.candleDown;
-        let wickColor: string = d.close >= d.open ? terminalColors.candleUp : terminalColors.candleDown;
+    const styledBars = replayParsed.map((d, idx) =>
+      buildEnhancedCandle(
+        d,
+        idx > 0 ? replayParsed[idx - 1].close : null,
+        { up: terminalColors.candleUp, down: terminalColors.candleDown },
+        extendedHours,
+      ),
+    );
 
-        if (d.isExtended) {
-          if (colorScheme === "dimmed") {
-            color = d.close >= d.open ? "rgba(38, 166, 91, 0.4)" : "rgba(232, 65, 66, 0.4)";
-            wickColor = d.close >= d.open ? "rgba(38, 166, 91, 0.2)" : "rgba(232, 65, 66, 0.2)";
-          } else if (colorScheme === "distinct") {
-             if (d.session === "pre" || d.session === "pre_open") color = "#5B8FF9";
-             else if (d.session === "post" || d.session === "closing") color = "#9B59B6";
-             wickColor = color;
-          }
-        }
-
-        return {
-          time: d.time as UTCTimestamp,
-          open: d.open,
-          high: d.high,
-          low: d.low,
-          close: d.close,
-          color,
-          wickColor,
-          borderColor: color,
-        };
-      });
-
-      if (isIncremental) {
-        candleRef.current.update(styledBars[styledBars.length - 1]);
-      } else {
-        candleRef.current.setData(styledBars);
-      }
+    if (isIncremental) {
+      candleRef.current.update(styledBars[styledBars.length - 1]);
     } else {
-      const standardBars = parsed.map(d => ({
-        time: d.time as UTCTimestamp,
-        open: d.open,
-        high: d.high,
-        low: d.low,
-        close: d.close
-      }));
-      if (isIncremental) {
-        candleRef.current.update(standardBars[standardBars.length - 1]);
-      } else {
-        candleRef.current.setData(standardBars);
-      }
+      candleRef.current.setData(styledBars);
     }
 
-    const lastPoint = parsed[parsed.length - 1];
+    const lastPoint = replayParsed[replayParsed.length - 1];
     const updatePoint = { time: lastPoint.time as UTCTimestamp, value: lastPoint.close };
-    const volUpdate = {
-      time: lastPoint.time as UTCTimestamp,
-      value: Number.isFinite(Number(lastPoint.volume)) ? Number(lastPoint.volume) : 0,
-      color: lastPoint.close >= lastPoint.open
-        ? (ethEnabled && lastPoint.isExtended ? "rgba(38, 166, 91, 0.2)" : terminalColors.candleUpAlpha88)
-        : (ethEnabled && lastPoint.isExtended ? "rgba(232, 65, 66, 0.2)" : terminalColors.candleDownAlpha88),
-    };
+    const volUpdate = buildEnhancedVolumeBar(
+      lastPoint,
+      replayParsed.length > 1 ? replayParsed[replayParsed.length - 2].close : null,
+      { up: terminalColors.candleUp, down: terminalColors.candleDown },
+      extendedHours,
+    );
 
     if (isIncremental) {
       lineRef.current.update(updatePoint);
@@ -793,25 +957,22 @@ export function TradingChart({
         sessionShadingRef.current.update({ time: lastPoint.time as UTCTimestamp, value: 0, color: "transparent" });
       }
     } else {
-      lineRef.current.setData(parsed.map((d) => ({ time: d.time as UTCTimestamp, value: d.close })));
-      areaRef.current.setData(parsed.map((d) => ({ time: d.time as UTCTimestamp, value: d.close })));
-      preSessionAreaRef.current?.setData(showAreaSessionHighlight ? buildSessionAreaMask(parsed, isPreSession) : []);
-      postSessionAreaRef.current?.setData(showAreaSessionHighlight ? buildSessionAreaMask(parsed, isPostSession) : []);
+      lineRef.current.setData(replayParsed.map((d) => ({ time: d.time as UTCTimestamp, value: d.close })));
+      areaRef.current.setData(replayParsed.map((d) => ({ time: d.time as UTCTimestamp, value: d.close })));
+      preSessionAreaRef.current?.setData(showAreaSessionHighlight ? buildSessionAreaMask(replayParsed, isPreSession) : []);
+      postSessionAreaRef.current?.setData(showAreaSessionHighlight ? buildSessionAreaMask(replayParsed, isPostSession) : []);
       volumeRef.current.setData(
-        parsed.map((d) => {
-          let color: string = d.close >= d.open ? terminalColors.candleUpAlpha88 : terminalColors.candleDownAlpha88;
-          if (ethEnabled && d.isExtended) {
-               color = d.close >= d.open ? "rgba(38, 166, 91, 0.2)" : "rgba(232, 65, 66, 0.2)";
-          }
-          return {
-              time: d.time as UTCTimestamp,
-              value: Number.isFinite(Number(d.volume)) ? Number(d.volume) : 0,
-              color,
-          };
-        })
+        replayParsed.map((d, idx) =>
+          buildEnhancedVolumeBar(
+            d,
+            idx > 0 ? replayParsed[idx - 1].close : null,
+            { up: terminalColors.candleUp, down: terminalColors.candleDown },
+            extendedHours,
+          ),
+        ),
       );
       sessionShadingRef.current.setData(
-        parsed.map((d) => ({
+        replayParsed.map((d) => ({
           time: d.time as UTCTimestamp,
           value: 1000000000,
           color: showSessionOverlays ? sessionShadeColor(d.session, extendedHours) : "transparent",
@@ -819,7 +980,7 @@ export function TradingChart({
       );
     }
 
-    lastParsedRef.current = parsed;
+    lastParsedRef.current = replayParsed;
     volumeRef.current.applyOptions({ visible: showVolume });
 
     // PM Levels
@@ -831,7 +992,7 @@ export function TradingChart({
         pmLevelLinesRef.current = [];
 
         if (preMarketLevels && extendedHours?.enabled) {
-            const levels = calculatePreMarketLevels(parsed as any);
+            const levels = calculatePreMarketLevels(replayParsed as any);
             pmLevelLinesRef.current = drawPreMarketLevels(candles, levels, preMarketLevels);
         }
     }
@@ -848,29 +1009,30 @@ export function TradingChart({
               : timeframe === "1h"
                 ? 180
                 : null;
-      if (intradayWindowBars && parsed.length > intradayWindowBars) {
+      if (intradayWindowBars && replayParsed.length > intradayWindowBars) {
         timeScale.setVisibleLogicalRange({
-          from: Math.max(0, parsed.length - intradayWindowBars - 1),
-          to: parsed.length + 2,
+          from: Math.max(0, replayParsed.length - intradayWindowBars - 1),
+          to: replayParsed.length + 2,
         });
       } else {
         timeScale.fitContent();
       }
     }
-  }, [mode, parsed, showVolume, extendedHours, preMarketLevels, timeframe]);
+  }, [mode, replayParsed, showVolume, extendedHours, preMarketLevels, timeframe]);
 
   useEffect(() => {
     if (!apiRef.current) {
       return;
     }
     const isCompare = comparisonSeries && comparisonSeries.length > 0;
+    const usePctScale = isCompare && effectiveComparisonMode === "normalized";
     apiRef.current.applyOptions({
       rightPriceScale: {
         borderColor: terminalColors.border,
-        mode: isCompare ? PriceScaleMode.Percentage : (logarithmic ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal),
+        mode: usePctScale ? PriceScaleMode.Percentage : (logarithmic ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal),
       },
     });
-  }, [logarithmic, comparisonSeries]);
+  }, [effectiveComparisonMode, logarithmic, comparisonSeries]);
 
   useEffect(() => {
     const chart = apiRef.current;
@@ -921,25 +1083,17 @@ export function TradingChart({
 
     const palette = ["#4EA1FF", "#A0E75A", "#FFB86B", "#D58CFF"];
     comparisonSeries.forEach((row, idx) => {
-      const sorted = (row.data || [])
-        .filter((p) => Number.isFinite(Number(p.t)) && Number.isFinite(Number(p.c)))
-        .sort((a, b) => Number(a.t) - Number(b.t));
-      if (!sorted.length) return;
-      const base = Number(sorted[0].c) || 1;
+      const points = buildComparisonPoints(row.data || [], effectiveComparisonMode);
+      if (!points.length) return;
       const line = chart.addSeries(LineSeries, {
         color: row.color || palette[idx % palette.length],
         lineWidth: 2,
         priceLineVisible: false,
       });
-      line.setData(
-        sorted.map((p) => ({
-          time: p.t as UTCTimestamp,
-          value: ((Number(p.c) - base) / base) * 100,
-        })),
-      );
+      line.setData(points);
       comparisonSeriesRef.current.push(line);
     });
-  }, [comparisonSeries]);
+  }, [comparisonSeries, effectiveComparisonMode]);
 
   useEffect(() => {
     const chart = apiRef.current;
@@ -963,8 +1117,8 @@ export function TradingChart({
           continue;
         }
         const line = chart.addSeries(LineSeries, {
-          color: terminalColors.drawingTrend,
-          lineWidth: 2,
+          color: drawing.style?.color || terminalColors.drawingTrend,
+          lineWidth: (drawing.style?.lineWidth ?? 2) as 1 | 2 | 3 | 4,
           lastValueVisible: false,
           priceLineVisible: false,
         });
@@ -976,8 +1130,8 @@ export function TradingChart({
       } else if (drawing.type === "hline") {
         const pl = candles.createPriceLine({
           price: drawing.price,
-          color: terminalColors.drawingHLine,
-          lineWidth: 1,
+          color: drawing.style?.color || terminalColors.drawingHLine,
+          lineWidth: (drawing.style?.lineWidth ?? 1) as 1 | 2 | 3 | 4,
           lineStyle: 2,
           axisLabelVisible: true,
           title: "HL",
@@ -994,6 +1148,7 @@ export function TradingChart({
     pendingTrendPointRef.current = null;
     pendingTrendCbRef.current?.(false);
     setDrawings([]);
+    setSelectedDrawingId(null);
   }, [clearDrawingsSignal]);
 
   useEffect(() => {
@@ -1076,11 +1231,83 @@ export function TradingChart({
 
   const displayCandle = selectedCandle ?? hoveredRef.current ?? syncedCandle;
   const selectedTime = displayCandle ? new Date(displayCandle.time * 1000).toLocaleString() : "-";
-  const latestClose = parsed.length ? Number(parsed[parsed.length - 1].close) : undefined;
+  const latestClose = replayParsed.length ? Number(replayParsed[replayParsed.length - 1].close) : undefined;
+  const replayProgress = replayParsed.length && parsed.length ? `${replayParsed.length}/${parsed.length}` : "0/0";
   const selectedChangePct =
     displayCandle && displayCandle.open
       ? ((displayCandle.close - displayCandle.open) / displayCandle.open) * 100
       : null;
+  const selectedDrawing = drawings.find((d) => d.id === selectedDrawingId) ?? null;
+
+  useEffect(() => {
+    if (!selectedDrawing) return;
+    setEditingColor(selectedDrawing.style?.color || (selectedDrawing.type === "hline" ? terminalColors.drawingHLine : terminalColors.drawingTrend));
+    setEditingLineWidth(selectedDrawing.style?.lineWidth ?? (selectedDrawing.type === "hline" ? 1 : 2));
+  }, [selectedDrawing]);
+
+  useEffect(() => {
+    if (!selectedDrawingId) return;
+    const selected = drawings.find((d) => d.id === selectedDrawingId);
+    if (!selected) {
+      setSelectedDrawingId(null);
+      return;
+    }
+    setDrawings((prev) =>
+      prev.map((d) =>
+        d.id === selectedDrawingId
+          ? { ...d, style: { ...(d.style || {}), color: editingColor, lineWidth: editingLineWidth } }
+          : d,
+      ),
+    );
+  }, [editingColor, editingLineWidth, selectedDrawingId]);
+
+  useEffect(() => {
+    const onMove = (event: MouseEvent) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const host = chartRef.current;
+      const chart = apiRef.current;
+      const candles = candleRef.current;
+      if (!host || !chart || !candles) return;
+      const rect = host.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      const price = candles.coordinateToPrice(y);
+      if (typeof price !== "number" || !Number.isFinite(price)) return;
+
+      setDrawings((prev) =>
+        prev.map((d) => {
+          if (d.id !== drag.drawingId) return d;
+          if (d.type === "hline" && drag.point === "price") {
+            return { ...d, price };
+          }
+          if (d.type === "trendline" && (drag.point === "p1" || drag.point === "p2")) {
+            const t = chart.timeScale().coordinateToTime(x);
+            const ts = toUnixTime(t ?? undefined);
+            if (!ts) return d;
+            const next = { time: ts, price };
+            if (drag.point === "p1") {
+              const p2 = d.p2.time === next.time ? { ...d.p2, time: d.p2.time + 60 } : d.p2;
+              return { ...d, p1: next, p2 };
+            }
+            const p1 = d.p1.time === next.time ? { ...d.p1, time: d.p1.time - 60 } : d.p1;
+            return { ...d, p1, p2: next };
+          }
+          return d;
+        }),
+      );
+    };
+    const onUp = () => {
+      dragRef.current = null;
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -1088,6 +1315,31 @@ export function TradingChart({
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, [contextMenu]);
+
+  const handleDots = (() => {
+    const chart = apiRef.current;
+    const candles = candleRef.current;
+    if (!chart || !candles || !selectedDrawing) return [];
+    const dots: Array<{ id: string; left: number; top: number; point: "p1" | "p2" | "price" }> = [];
+    if (selectedDrawing.type === "hline") {
+      const y = candles.priceToCoordinate(selectedDrawing.price);
+      if (typeof y === "number" && Number.isFinite(y)) {
+        dots.push({ id: `${selectedDrawing.id}-price`, left: 12, top: y, point: "price" });
+      }
+      return dots;
+    }
+    const x1 = chart.timeScale().timeToCoordinate(selectedDrawing.p1.time as UTCTimestamp);
+    const y1 = candles.priceToCoordinate(selectedDrawing.p1.price);
+    const x2 = chart.timeScale().timeToCoordinate(selectedDrawing.p2.time as UTCTimestamp);
+    const y2 = candles.priceToCoordinate(selectedDrawing.p2.price);
+    if (typeof x1 === "number" && typeof y1 === "number" && Number.isFinite(x1) && Number.isFinite(y1)) {
+      dots.push({ id: `${selectedDrawing.id}-p1`, left: x1, top: y1, point: "p1" });
+    }
+    if (typeof x2 === "number" && typeof y2 === "number" && Number.isFinite(x2) && Number.isFinite(y2)) {
+      dots.push({ id: `${selectedDrawing.id}-p2`, left: x2, top: y2, point: "p2" });
+    }
+    return dots;
+  })();
 
   return (
     <div
@@ -1099,6 +1351,146 @@ export function TradingChart({
       }}
     >
       <div ref={chartRef} className="h-full w-full" />
+      <div className="absolute left-2 top-2 z-[6] flex items-center gap-1 rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[10px] text-terminal-text">
+        <button
+          type="button"
+          className={`rounded border px-1.5 py-0.5 ${
+            replayEnabled ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted"
+          }`}
+          onClick={() => {
+            setReplayEnabled((v) => {
+              const next = !v;
+              if (next) {
+                setReplayIndex(0);
+              } else {
+                setReplayPlaying(false);
+              }
+              return next;
+            });
+          }}
+          aria-label={replayEnabled ? "Disable replay mode" : "Enable replay mode"}
+        >
+          REPLAY
+        </button>
+        {replayEnabled ? (
+          <>
+            <button
+              type="button"
+              className="rounded border border-terminal-border px-1.5 py-0.5"
+              onClick={() => setReplayPlaying((v) => !v)}
+              aria-label={replayPlaying ? "Pause replay" : "Play replay"}
+            >
+              {replayPlaying ? "PAUSE" : "PLAY"}
+            </button>
+            <button
+              type="button"
+              className="rounded border border-terminal-border px-1.5 py-0.5"
+              onClick={() => setReplayIndex((prev) => nextReplayIndex(prev, parsed.length, 1))}
+              aria-label="Step replay"
+            >
+              STEP
+            </button>
+            <button
+              type="button"
+              className="rounded border border-terminal-border px-1.5 py-0.5"
+              onClick={() => {
+                setReplayPlaying(false);
+                setReplayIndex(0);
+              }}
+              aria-label="Reset replay"
+            >
+              RESET
+            </button>
+            <select
+              className="rounded border border-terminal-border bg-terminal-bg px-1 py-0.5 text-[10px]"
+              value={replaySpeed}
+              onChange={(e) => setReplaySpeed(e.target.value as ReplaySpeed)}
+              aria-label="Replay speed"
+            >
+              {REPLAY_SPEEDS.map((speed) => (
+                <option key={speed} value={speed}>
+                  {speed}
+                </option>
+              ))}
+            </select>
+            <span data-testid="replay-progress">{replayProgress}</span>
+          </>
+        ) : null}
+        {comparisonSeries.length && !comparisonModeProp ? (
+          <>
+            <button
+              type="button"
+              className={`rounded border px-1.5 py-0.5 ${
+                effectiveComparisonMode === "normalized"
+                  ? "border-terminal-accent text-terminal-accent"
+                  : "border-terminal-border text-terminal-muted"
+              }`}
+              onClick={() => setComparisonMode("normalized")}
+              aria-label="Comparison normalized mode"
+            >
+              NORM
+            </button>
+            <button
+              type="button"
+              className={`rounded border px-1.5 py-0.5 ${
+                effectiveComparisonMode === "price"
+                  ? "border-terminal-accent text-terminal-accent"
+                  : "border-terminal-border text-terminal-muted"
+              }`}
+              onClick={() => setComparisonMode("price")}
+              aria-label="Comparison price mode"
+            >
+              PRICE
+            </button>
+          </>
+        ) : null}
+      </div>
+      {handleDots.map((dot) => (
+        <button
+          key={dot.id}
+          type="button"
+          className="absolute z-[40] h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-terminal-accent bg-terminal-bg"
+          style={{ left: `${dot.left}px`, top: `${dot.top}px` }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            dragRef.current = { drawingId: selectedDrawingId as string, point: dot.point };
+          }}
+          aria-label={`Drag ${dot.point} handle`}
+        />
+      ))}
+      {selectedDrawing ? (
+        <div className="absolute bottom-2 right-2 z-[45] flex items-center gap-1 rounded border border-terminal-border bg-terminal-panel/95 p-1 text-[10px]">
+          <span className="text-terminal-muted">DRAW</span>
+          <input
+            type="color"
+            value={editingColor}
+            onChange={(e) => setEditingColor(e.target.value)}
+            className="h-5 w-6 rounded border border-terminal-border bg-terminal-bg p-0"
+            aria-label="Drawing color"
+          />
+          <select
+            value={editingLineWidth}
+            onChange={(e) => setEditingLineWidth(Number(e.target.value))}
+            className="rounded border border-terminal-border bg-terminal-bg px-1 py-0.5 text-[10px]"
+            aria-label="Drawing line width"
+          >
+            <option value={1}>1px</option>
+            <option value={2}>2px</option>
+            <option value={3}>3px</option>
+            <option value={4}>4px</option>
+          </select>
+          <button
+            type="button"
+            className="rounded border border-terminal-border px-1 text-terminal-muted hover:text-terminal-neg"
+            onClick={() => {
+              setDrawings((prev) => prev.filter((d) => d.id !== selectedDrawing.id));
+              setSelectedDrawingId(null);
+            }}
+          >
+            Del
+          </button>
+        </div>
+      ) : null}
       {syncedCrosshairX !== null && (
         <div
           className="pointer-events-none absolute inset-y-0 z-[5] border-l border-dashed border-terminal-accent/90"

@@ -79,7 +79,7 @@ class BacktestJobService:
             row.updated_at = datetime.utcnow().isoformat()
             db.commit()
 
-            await ws_manager.broadcast({"type": "backtest_progress", "run_id": run_id, "progress": 10, "status": "fetching data"})
+            await ws_manager.broadcast_to_all({"type": "backtest_progress", "run_id": run_id, "progress": 10, "status": "fetching data"})
 
             req = BacktestJobRequest(**json.loads(row.request_json))
             service = get_historical_data_service()
@@ -105,7 +105,7 @@ class BacktestJobService:
                 )
                 market_used = req.market
 
-            await ws_manager.broadcast({"type": "backtest_progress", "run_id": run_id, "progress": 50, "status": "generating signals"})
+            await ws_manager.broadcast_to_all({"type": "backtest_progress", "run_id": run_id, "progress": 50, "status": "generating signals"})
 
             frame = pd.DataFrame(
                 [
@@ -130,7 +130,7 @@ class BacktestJobService:
                 raise ValueError("No OHLCV bars available for request")
             strategy_out = self._runner.run(req.strategy, frame, context=req.context or {})
 
-            await ws_manager.broadcast({"type": "backtest_progress", "run_id": run_id, "progress": 80, "status": "running backtest"})
+            await ws_manager.broadcast_to_all({"type": "backtest_progress", "run_id": run_id, "progress": 80, "status": "running backtest"})
 
             cfg = BacktestConfig(**(req.config or {}))
             traded_asset = (req.asset or req.symbol or symbol.canonical).strip().upper()
@@ -152,7 +152,7 @@ class BacktestJobService:
             row.updated_at = datetime.utcnow().isoformat()
             db.commit()
 
-            await ws_manager.broadcast({"type": "backtest_progress", "run_id": run_id, "progress": 100, "status": "done"})
+            await ws_manager.broadcast_to_all({"type": "backtest_progress", "run_id": run_id, "progress": 100, "status": "done"})
         except Exception as exc:
             row = db.query(BacktestRun).filter(BacktestRun.run_id == run_id).first()
             if row is not None:

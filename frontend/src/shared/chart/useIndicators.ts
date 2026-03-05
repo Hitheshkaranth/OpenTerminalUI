@@ -33,11 +33,12 @@ export function useIndicators(
   chart: IChartApi | null,
   bars: Bar[],
   configs: IndicatorConfig[],
-  options?: { nonOverlayPaneStartIndex?: number },
+  options?: { nonOverlayPaneStartIndex?: number; maxNonOverlayPanes?: number },
 ): void {
   const seriesMapRef = useRef<SeriesMap>({});
   const cacheRef = useRef<CacheMeta>({});
   const nonOverlayPaneStartIndex = options?.nonOverlayPaneStartIndex ?? 2;
+  const maxNonOverlayPanes = options?.maxNonOverlayPanes ?? 8;
 
   useEffect(() => {
     if (!chart) return;
@@ -133,6 +134,9 @@ export function useIndicators(
         }
       }
       if (!overlay) paneIndex += 1;
+      if (paneIndex - nonOverlayPaneStartIndex >= maxNonOverlayPanes) {
+        break;
+      }
       const nowLast = bars.length ? Number(bars[bars.length - 1].time) : null;
       cacheRef.current[key] = { length: bars.length, lastTime: nowLast };
     }
@@ -148,7 +152,7 @@ export function useIndicators(
         delete seriesMapRef.current[id];
       }
     };
-  }, [chart, bars, configs, nonOverlayPaneStartIndex]);
+  }, [chart, bars, configs, nonOverlayPaneStartIndex, maxNonOverlayPanes]);
 
   useEffect(() => {
     if (!chart) return;

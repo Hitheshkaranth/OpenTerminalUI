@@ -21,13 +21,16 @@ OpenTerminalUI is a full-stack platform with:
 ## Product surfaces
 
 ### Terminal shell
-- Unified shell with sidebar, status surfaces, GO bar, command palette (`Ctrl/Cmd+K`), and ticker tape
+- Unified shell with sidebar, status surfaces, GO bar (`Ctrl/Cmd+G`), command palette (`Ctrl/Cmd+K`), and ticker tape
 - Semantic theme token system and shared terminal primitives
 - Launchpad and multi-route navigation across market modules
 
 ### Equity and market intelligence
 - Stock detail and Security Hub workflows
 - Chart Workstation and Launchpad charting flows
+- Linked multi-chart crosshair sync across launchpad/workstation chart panels
+- Volume Profile overlay with VPOC and value-area lines
+- Replay utilities, alternative candle transforms, and comparison series helpers
 - Multi-market screener, watchlist, portfolio, and mutual-fund mode
 - News, sentiment, and event-aware workflows
 - Cockpit dashboard for cross-domain monitoring
@@ -50,7 +53,7 @@ OpenTerminalUI is a full-stack platform with:
 - Risk compute endpoints (VaR/CVaR/stress and related analytics)
 - OMS/compliance and Ops dashboards
 - Alerting channels and realtime WebSocket updates
-- Provider adapters/registry with fallback behavior
+- Provider adapters/registry with deterministic fallback + health-aware ordering
 - Plugin architecture for feature extension
 
 ## Repo layout

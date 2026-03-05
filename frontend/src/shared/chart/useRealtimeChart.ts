@@ -248,7 +248,9 @@ export function useRealtimeChart(
           high: Math.max(Number(last.high), ltp),
           low: Math.min(Number(last.low), ltp),
           close: ltp,
-          volume: Number.isFinite(Number(tick.volume)) ? Number(tick.volume) : last.volume,
+          volume: Number.isFinite(Number(tick.volume))
+            ? Number(last.volume ?? 0) + Number(tick.volume)
+            : Number(last.volume ?? 0),
         };
         return next;
       }
@@ -261,7 +263,9 @@ export function useRealtimeChart(
             high: Math.max(Number(row.high), ltp),
             low: Math.min(Number(row.low), ltp),
             close: ltp,
-            volume: Number.isFinite(Number(tick.volume)) ? Number(tick.volume) : row.volume,
+            volume: Number.isFinite(Number(tick.volume))
+              ? Number(row.volume ?? 0) + Number(tick.volume)
+              : Number(row.volume ?? 0),
           };
         }
         return next;

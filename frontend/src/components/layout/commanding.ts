@@ -326,6 +326,72 @@ export type CommandSuggestion =
       command: string;
     };
 
+export type ShortcutScope = "global" | "chart-workstation" | "command-bar";
+
+export type ShortcutSpec = {
+  id: string;
+  combo: string;
+  description: string;
+  scope: ShortcutScope;
+};
+
+export type ShortcutConflict = {
+  combo: string;
+  entries: ShortcutSpec[];
+};
+
+export const SHORTCUT_SPECS: ShortcutSpec[] = [
+  { id: "palette.toggle", combo: "Ctrl/Cmd+K", description: "Toggle command palette", scope: "global" },
+  { id: "shortcuts.help", combo: "Ctrl/Cmd+/", description: "Open shortcut help", scope: "global" },
+  { id: "command.focus", combo: "Ctrl/Cmd+G", description: "Focus GO command bar", scope: "command-bar" },
+  { id: "news.open", combo: "Ctrl/Cmd+N", description: "Open news", scope: "global" },
+  { id: "watchlist.open", combo: "Ctrl/Cmd+W", description: "Open watchlist (non-workstation pages)", scope: "global" },
+  { id: "launchpad.open", combo: "Ctrl/Cmd+9", description: "Open launchpad", scope: "global" },
+  { id: "ws.panel.next", combo: "Tab", description: "Focus next visible chart panel", scope: "chart-workstation" },
+  { id: "ws.panel.prev", combo: "Shift+Tab", description: "Focus previous visible chart panel", scope: "chart-workstation" },
+  { id: "ws.panel.pick", combo: "1-9", description: "Focus visible chart panel by index", scope: "chart-workstation" },
+  { id: "ws.panel.add", combo: "Ctrl/Cmd+Shift+N", description: "Add chart panel", scope: "chart-workstation" },
+  { id: "ws.panel.close", combo: "Ctrl/Cmd+W", description: "Close active chart panel", scope: "chart-workstation" },
+  { id: "ws.layout.focus", combo: "Ctrl/Cmd+L", description: "Focus layout selector", scope: "chart-workstation" },
+  { id: "ws.fullscreen", combo: "F", description: "Toggle active panel fullscreen", scope: "chart-workstation" },
+  { id: "ws.escape", combo: "Escape", description: "Exit fullscreen or clear active panel", scope: "chart-workstation" },
+  { id: "ws.tf.hotkeys", combo: "Alt+1..7", description: "Set timeframe (1m,5m,15m,1h,1D,1W,1M)", scope: "chart-workstation" },
+];
+
+function scopesOverlap(a: ShortcutScope, b: ShortcutScope): boolean {
+  if (a === b) return true;
+  if (a === "global" || b === "global") return true;
+  return false;
+}
+
+export function findShortcutConflicts(specs: ShortcutSpec[] = SHORTCUT_SPECS): ShortcutConflict[] {
+  const byCombo = new Map<string, ShortcutSpec[]>();
+  for (const spec of specs) {
+    const key = spec.combo.trim().toLowerCase();
+    const rows = byCombo.get(key);
+    if (rows) rows.push(spec);
+    else byCombo.set(key, [spec]);
+  }
+
+  const conflicts: ShortcutConflict[] = [];
+  for (const [combo, rows] of byCombo) {
+    if (rows.length < 2) continue;
+    let overlapping = false;
+    for (let i = 0; i < rows.length && !overlapping; i += 1) {
+      for (let j = i + 1; j < rows.length; j += 1) {
+        if (scopesOverlap(rows[i].scope, rows[j].scope)) {
+          overlapping = true;
+          break;
+        }
+      }
+    }
+    if (overlapping) {
+      conflicts.push({ combo, entries: rows });
+    }
+  }
+  return conflicts;
+}
+
 export function fuzzyScore(haystack: string, needle: string): number {
   const h = haystack.toLowerCase();
   const n = needle.toLowerCase().trim();

@@ -19,6 +19,22 @@ export type DataGridColumn<T> = {
   renderCell: (row: T, index: number) => ReactNode;
 };
 
+export type DataGridPreset = "default" | "watchlist" | "blotter" | "screener" | "option-chain";
+
+type DataGridPresetConfig = {
+  density: TerminalTableDensity;
+  stickyHeader: boolean;
+  keyboardNavigation: boolean;
+};
+
+export const DATA_GRID_PRESETS: Record<DataGridPreset, DataGridPresetConfig> = {
+  default: { density: "normal", stickyHeader: true, keyboardNavigation: true },
+  watchlist: { density: "dense", stickyHeader: true, keyboardNavigation: true },
+  blotter: { density: "compact", stickyHeader: true, keyboardNavigation: true },
+  screener: { density: "compact", stickyHeader: true, keyboardNavigation: true },
+  "option-chain": { density: "dense", stickyHeader: true, keyboardNavigation: true },
+};
+
 type Props<T> = {
   columns: DataGridColumn<T>[];
   rows: T[];
@@ -32,6 +48,8 @@ type Props<T> = {
   onRowOpen?: (index: number) => void;
   emptyText?: string;
   rowActions?: (row: T, index: number) => ReactNode;
+  preset?: DataGridPreset;
+  keyboardNavigation?: boolean;
 };
 
 export function DataGrid<T>({
@@ -47,7 +65,14 @@ export function DataGrid<T>({
   onRowOpen,
   emptyText,
   rowActions,
+  preset = "default",
+  keyboardNavigation,
 }: Props<T>) {
+  const presetConfig = DATA_GRID_PRESETS[preset];
+  const effectiveDensity = density ?? presetConfig.density;
+  const effectiveStickyHeader = stickyHeader ?? presetConfig.stickyHeader;
+  const effectiveKeyboardNavigation = keyboardNavigation ?? presetConfig.keyboardNavigation;
+
   const tableColumns: TerminalTableColumn<T>[] = columns.map((column) => ({
     key: column.key,
     label: column.header,
@@ -67,8 +92,9 @@ export function DataGrid<T>({
       rowKey={rowKey}
       className={className}
       tableClassName={tableClassName}
-      density={density}
-      stickyHeader={stickyHeader}
+      density={effectiveDensity}
+      stickyHeader={effectiveStickyHeader}
+      keyboardNavigation={effectiveKeyboardNavigation}
       selectedIndex={selectedIndex}
       onRowSelect={onRowSelect}
       onRowOpen={onRowOpen}

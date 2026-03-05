@@ -5,8 +5,10 @@ type CockpitSummary = {
   portfolio_snapshot?: { total_value?: unknown; daily_pnl?: unknown; active_jobs?: unknown };
   signal_summary?: { bullish_count?: unknown; bearish_count?: unknown; neutral_count?: unknown };
   risk_summary?: { var_95?: unknown; beta?: unknown };
-  events?: Array<{ symbol?: string; event_type?: string }>;
-  news?: Array<{ source?: string; headline?: string }>;
+  events?:
+    | Array<{ symbol?: string; event_type?: string; name?: string; date?: string }>
+    | { events?: Array<{ symbol?: string; event_type?: string; name?: string; date?: string }> };
+  news?: Array<{ source?: string; headline?: string }> | { news?: Array<{ source?: string; headline?: string }> };
 };
 
 function asNumber(value: unknown): number | null {
@@ -18,6 +20,10 @@ function fmtNumber(value: unknown, digits = 0): string {
   const n = asNumber(value);
   if (n == null) return "--";
   return n.toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits });
+}
+
+function toArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value : [];
 }
 
 export function CockpitDashboard() {
@@ -47,6 +53,10 @@ export function CockpitDashboard() {
   const dailyPnl = asNumber(data?.portfolio_snapshot?.daily_pnl);
   const dailyPnlLabel = dailyPnl == null ? "--" : `${dailyPnl >= 0 ? "+" : ""}${fmtNumber(dailyPnl, 0)}`;
   const beta = fmtNumber(data?.risk_summary?.beta, 2);
+  const events = toArray<{ symbol?: string; event_type?: string; name?: string; date?: string }>(
+    Array.isArray(data?.events) ? data?.events : data?.events?.events,
+  );
+  const news = toArray<{ source?: string; headline?: string }>(Array.isArray(data?.news) ? data?.news : data?.news?.news);
 
   return (
     <div className="space-y-4 p-4">
@@ -108,10 +118,10 @@ export function CockpitDashboard() {
               <div>
                 <h3 className="mb-1 border-b border-terminal-border pb-1 text-xs font-bold text-terminal-accent">Events</h3>
                 <ul className="mt-2 space-y-1 text-sm">
-                  {(data.events ?? []).map((event, i) => (
+                  {events.map((event, i) => (
                     <li key={`${event.symbol ?? "event"}-${i}`} className="flex justify-between">
-                      <span>{event.symbol ?? "--"}</span>
-                      <span className="text-terminal-dim">{event.event_type ?? "--"}</span>
+                      <span>{event.symbol ?? event.name ?? "--"}</span>
+                      <span className="text-terminal-dim">{event.event_type ?? event.date ?? "--"}</span>
                     </li>
                   ))}
                 </ul>
@@ -119,7 +129,7 @@ export function CockpitDashboard() {
               <div>
                 <h3 className="mb-1 border-b border-terminal-border pb-1 text-xs font-bold text-terminal-accent">News</h3>
                 <ul className="mt-2 space-y-1 text-sm">
-                  {(data.news ?? []).map((item, i) => (
+                  {news.map((item, i) => (
                     <li key={`${item.source ?? "news"}-${i}`} className="truncate" title={item.headline ?? ""}>
                       <span className="mr-2 text-terminal-dim">{item.source ?? "--"}</span>
                       {item.headline ?? "--"}

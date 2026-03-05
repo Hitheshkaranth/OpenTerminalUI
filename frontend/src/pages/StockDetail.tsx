@@ -32,6 +32,7 @@ import { useQuotesStore, useQuotesStream } from "../realtime/useQuotesStream";
 import { ChartEngine } from "../shared/chart/ChartEngine";
 import { SharedChartToolbar } from "../shared/chart/ChartToolbar";
 import { IndicatorPanel } from "../shared/chart/IndicatorPanel";
+import { shouldDefaultExtendedHoursOn } from "../shared/chart/candlePresentation";
 import { chartPointsToBars } from "../shared/chart/chartUtils";
 import type { ChartKind, ChartTimeframe, IndicatorConfig } from "../shared/chart/types";
 import { quickAddToFirstPortfolio } from "../shared/portfolioQuickAdd";
@@ -96,7 +97,7 @@ export function StockDetailPage() {
   const [showVolume, setShowVolume] = useState(true);
   const [showDeliveryOverlay, setShowDeliveryOverlay] = useState(false);
   const [showSessionShading, setShowSessionShading] = useState(true);
-  const [extended, setExtended] = useState(false);
+  const [extended, setExtended] = useState(() => shouldDefaultExtendedHoursOn(intervalToTimeframe(interval)));
   const [snapshotTick, setSnapshotTick] = useState<{ ltp: number; change: number; change_pct: number } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [chartPoints, setChartPoints] = useState<Array<{ t: number; o: number; h: number; l: number; c: number; v: number; s?: string; ext?: boolean }>>([]);
@@ -191,6 +192,10 @@ export function StockDetailPage() {
     const inferred = intervalToTimeframe(interval);
     setSelectedChartTimeframe((prev) => ((prev === "2m" || prev === "30m") && inferred === "1m") ? prev : inferred);
   }, [interval]);
+
+  useEffect(() => {
+    setExtended(shouldDefaultExtendedHoursOn(selectedChartTimeframe));
+  }, [selectedChartTimeframe]);
 
   useEffect(() => {
     const onFullscreenChange = () => {

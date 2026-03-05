@@ -55,6 +55,13 @@ type Props = {
   onBrushPreviewRangeChange?: (range: { from: number; to: number } | null) => void;
 };
 
+function safeIsoDateFromUnixSeconds(ts: number): string | null {
+  if (!Number.isFinite(ts)) return null;
+  const d = new Date(ts * 1000);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
 export function BacktestingTradingChart({
   bars,
   trades,
@@ -428,11 +435,11 @@ export function BacktestingTradingChart({
       <div className="pointer-events-none absolute left-2 top-2 z-10 rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[11px] text-terminal-text">
         {crosshair ? (
           <div>
-            <div>T: {new Date(crosshair.time * 1000).toISOString().slice(0, 10)}</div>
+            <div>T: {safeIsoDateFromUnixSeconds(crosshair.time) ?? "-"}</div>
             <div>O:{crosshair.open.toFixed(2)} H:{crosshair.high.toFixed(2)} L:{crosshair.low.toFixed(2)} C:{crosshair.close.toFixed(2)}</div>
             {activeExecution && (
               <div className={activeExecution.pnl >= 0 ? "text-terminal-pos" : "text-terminal-neg"}>
-                Exec: {new Date(activeExecution.entryTime * 1000).toISOString().slice(0, 10)} to {new Date(activeExecution.exitTime * 1000).toISOString().slice(0, 10)} ({activeExecution.pnl >= 0 ? "+" : ""}{activeExecution.pnl.toFixed(2)})
+                Exec: {safeIsoDateFromUnixSeconds(activeExecution.entryTime) ?? "-"} to {safeIsoDateFromUnixSeconds(activeExecution.exitTime) ?? "-"} ({activeExecution.pnl >= 0 ? "+" : ""}{activeExecution.pnl.toFixed(2)})
               </div>
             )}
           </div>

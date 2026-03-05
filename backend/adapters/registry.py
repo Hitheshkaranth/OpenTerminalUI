@@ -7,6 +7,7 @@ from typing import Any
 import yaml
 
 from backend.adapters.base import DataAdapter
+from backend.adapters.alpaca import AlpacaAdapter
 from backend.adapters.crypto import CryptoDataAdapter
 from backend.adapters.kite import KiteAdapter
 from backend.adapters.mock import MockDataAdapter
@@ -26,6 +27,7 @@ class AdapterRegistry:
         self._config = self._load_config()
         self._instances: dict[str, DataAdapter] = {}
         self._factory = {
+            "alpaca": lambda: AlpacaAdapter(),
             "kite": lambda: KiteAdapter(),
             "yahoo": lambda: YahooFinanceAdapter(),
             "us_options": lambda: USOptionsAdapter(),
@@ -40,8 +42,9 @@ class AdapterRegistry:
                 "exchanges": {
                     "NSE": {"primary": "kite", "fallback": ["yahoo"]},
                     "BSE": {"primary": "kite", "fallback": ["yahoo"]},
-                    "NASDAQ": {"primary": "yahoo", "fallback": []},
-                    "NYSE": {"primary": "yahoo", "fallback": []},
+                    "NASDAQ": {"primary": "alpaca", "fallback": ["yahoo"]},
+                    "NYSE": {"primary": "alpaca", "fallback": ["yahoo"]},
+                    "AMEX": {"primary": "alpaca", "fallback": ["yahoo"]},
                     "CRYPTO": {"primary": "crypto", "fallback": ["yahoo"]},
                 },
             }
@@ -53,6 +56,11 @@ class AdapterRegistry:
         row = exchanges.get(ex) or self._config.get("default") or {"primary": "kite", "fallback": ["yahoo"]}
         primary = str(row.get("primary") or "kite").strip().lower()
         fallback = [str(x).strip().lower() for x in (row.get("fallback") or []) if str(x).strip()]
+        if ex in {"NASDAQ", "NYSE", "AMEX"}:
+            if primary != "alpaca":
+                primary = "alpaca"
+            if "yahoo" not in fallback:
+                fallback.append("yahoo")
         return AdapterChain(primary=primary, fallback=fallback)
 
     def _instance(self, key: str) -> DataAdapter:

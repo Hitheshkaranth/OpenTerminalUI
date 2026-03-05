@@ -17,6 +17,21 @@ import { terminalChartTheme } from "./chartTheme";
 import { useIndicators } from "./useIndicators";
 import { useRealtimeChart } from "./useRealtimeChart";
 import type { ChartEngineProps } from "./types";
+import {
+  buildEnhancedCandle,
+  buildEnhancedVolumeBar,
+} from "./candlePresentation";
+import {
+  ALT_CHART_PARAMS_EVENT,
+  ALT_CHART_PARAMS_STORAGE_KEY,
+  DEFAULT_ALT_CHART_PARAMS,
+  sanitizeAlternativeChartParams,
+  transformKagiBars,
+  transformLineBreakBars,
+  transformPointFigureBars,
+  transformRenkoBars,
+  type AlternativeChartParams,
+} from "./alternativeChartTransforms";
 import { terminalColors } from "../../theme/terminal";
 import { useChartSync } from "./ChartSyncContext";
 
@@ -94,6 +109,7 @@ export function ChartEngine({
   const lastAutoViewportKeyRef = useRef<string | null>(null);
   const [chartApi, setChartApi] = useState<IChartApi | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [altParams, setAltParams] = useState<AlternativeChartParams>(DEFAULT_ALT_CHART_PARAMS);
   const { event: syncEvent, publish } = useChartSync();
   const { bars, liveTick, realtimeMeta } = useRealtimeChart(market, symbol, timeframe, historicalData, enableRealtime);
   const safeBars = useMemo(
@@ -112,6 +128,33 @@ export function ChartEngine({
     () => showSessionShading && showSessionLegendForBars(safeBars, extendedHours),
     [safeBars, extendedHours, showSessionShading],
   );
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(ALT_CHART_PARAMS_STORAGE_KEY);
+      if (raw) {
+        setAltParams(sanitizeAlternativeChartParams(JSON.parse(raw) as Partial<AlternativeChartParams>));
+      }
+    } catch {
+      // ignore invalid local storage content
+    }
+    const onParams = (event: Event) => {
+      const detail = (event as CustomEvent<Partial<AlternativeChartParams>>).detail;
+      setAltParams(sanitizeAlternativeChartParams(detail));
+    };
+    window.addEventListener(ALT_CHART_PARAMS_EVENT, onParams as EventListener);
+    return () => window.removeEventListener(ALT_CHART_PARAMS_EVENT, onParams as EventListener);
+  }, []);
+
+  const transformedBars = useMemo(() => {
+    if (chartType === "renko") return transformRenkoBars(safeBars, altParams.renkoBrickSize);
+    if (chartType === "kagi") return transformKagiBars(safeBars, altParams.kagiReversal);
+    if (chartType === "point_figure") {
+      return transformPointFigureBars(safeBars, altParams.pointFigureBoxSize, altParams.pointFigureReversalBoxes);
+    }
+    if (chartType === "line_break") return transformLineBreakBars(safeBars, altParams.lineBreakCount);
+    return safeBars;
+  }, [altParams.kagiReversal, altParams.lineBreakCount, altParams.pointFigureBoxSize, altParams.pointFigureReversalBoxes, altParams.renkoBrickSize, chartType, safeBars]);
 
   const byTime = useMemo(() => {
     const map = new Map<number, Bar>();
@@ -157,10 +200,15 @@ export function ChartEngine({
       {
         upColor: terminalColors.candleUp,
         downColor: terminalColors.candleDown,
-        borderVisible: false,
+        borderVisible: true,
         wickUpColor: terminalColors.candleUp,
         wickDownColor: terminalColors.candleDown,
-        visible: chartType === "candle",
+        visible:
+          chartType === "candle" ||
+          chartType === "renko" ||
+          chartType === "kagi" ||
+          chartType === "point_figure" ||
+          chartType === "line_break",
       },
       0,
     );
@@ -218,8 +266,8 @@ export function ChartEngine({
     });
 
     // Keep price action dominant and volume compact.
-    chart.panes()[0]?.setStretchFactor(950);
-    chart.panes()[1]?.setStretchFactor(90);
+    chart.panes()[0]?.setStretchFactor(8);
+    chart.panes()[1]?.setStretchFactor(2);
 
     let oi: ISeriesApi<"Area", Time> | null = null;
     if (symbolIsFnO) {
@@ -299,7 +347,14 @@ export function ChartEngine({
   useEffect(() => {
     const s = seriesRef.current;
     if (!s.candles || !s.line || !s.area || !s.baseline) return;
-    s.candles.applyOptions({ visible: chartType === "candle" });
+    s.candles.applyOptions({
+      visible:
+        chartType === "candle" ||
+        chartType === "renko" ||
+        chartType === "kagi" ||
+        chartType === "point_figure" ||
+        chartType === "line_break",
+    });
     s.line.applyOptions({ visible: chartType === "line" });
     s.area.applyOptions({ visible: chartType === "area" });
     s.baseline.applyOptions({ visible: chartType === "baseline" });
@@ -312,43 +367,54 @@ export function ChartEngine({
     if (!s.candles || !s.line || !s.area || !s.baseline || !s.volume || !s.delivery || !s.sessionShading) return;
 
     const isIncremental =
-      safeBars.length > 0 &&
+      transformedBars.length > 0 &&
       lastBarsRef.current.length > 0 &&
-      safeBars.length === lastBarsRef.current.length &&
-      safeBars[safeBars.length - 2]?.time === lastBarsRef.current[lastBarsRef.current.length - 2]?.time;
+      transformedBars.length === lastBarsRef.current.length &&
+      transformedBars[transformedBars.length - 2]?.time === lastBarsRef.current[lastBarsRef.current.length - 2]?.time;
 
     const ethEnabled = extendedHours?.enabled;
-    const hasSessionMetadata = safeBars.some((b) => (b as any).s && (b as any).s !== "rth");
+    const hasSessionMetadata = transformedBars.some((b) => (b as any).s && (b as any).s !== "rth");
     const renderSessionShading = showSessionShading && (ethEnabled || hasSessionMetadata);
 
     if (isIncremental) {
-      const last = safeBars[safeBars.length - 1];
+      const last = transformedBars[transformedBars.length - 1];
       const candleTime = Number(last.time) as UTCTimestamp;
-
-      let candleColor: any = Number(last.close) >= Number(last.open) ? terminalColors.candleUp : terminalColors.candleDown;
-      if (ethEnabled && (last as any).ext) {
-        candleColor = Number(last.close) >= Number(last.open) ? "rgba(38, 166, 91, 0.4)" : "rgba(232, 65, 66, 0.4)";
-      }
-
-      const candle = {
-        time: candleTime,
-        open: Number(last.open),
-        high: Number(last.high),
-        low: Number(last.low),
-        close: Number(last.close),
-        color: candleColor,
-        wickColor: candleColor,
-        borderColor: candleColor,
-      };
+      const candle = buildEnhancedCandle(
+        {
+          time: Number(last.time),
+          open: Number(last.open),
+          high: Number(last.high),
+          low: Number(last.low),
+          close: Number(last.close),
+          volume: Number(last.volume ?? 0),
+          session: (last as any).s,
+          isExtended: Boolean((last as any).ext),
+        },
+        transformedBars.length > 1 ? Number(transformedBars[transformedBars.length - 2].close) : null,
+        { up: terminalColors.candleUp, down: terminalColors.candleDown },
+        extendedHours,
+      );
       s.candles.update(candle as any);
       s.line.update({ time: candle.time, value: candle.close });
       s.area.update({ time: candle.time, value: candle.close });
       s.baseline.update({ time: candle.time, value: candle.close });
-      s.volume.update({
-        time: candle.time,
-        value: Number(last.volume ?? 0),
-        color: Number(last.close) >= Number(last.open) ? terminalColors.candleUpAlpha80 : terminalColors.candleDownAlpha80,
-      });
+      s.volume.update(
+        buildEnhancedVolumeBar(
+          {
+            time: Number(last.time),
+            open: Number(last.open),
+            high: Number(last.high),
+            low: Number(last.low),
+            close: Number(last.close),
+            volume: Number(last.volume ?? 0),
+            session: (last as any).s,
+            isExtended: Boolean((last as any).ext),
+          },
+          transformedBars.length > 1 ? Number(transformedBars[transformedBars.length - 2].close) : null,
+          { up: terminalColors.candleUp, down: terminalColors.candleDown },
+          extendedHours,
+        ),
+      );
 
       if (renderSessionShading) {
         const session = (last as any).s;
@@ -361,29 +427,42 @@ export function ChartEngine({
         s.sessionShading.update({ time: candleTime, value: 0, color: "transparent" });
       }
     } else {
-      const candles = safeBars.map((b) => {
-        let color: any = Number(b.close) >= Number(b.open) ? terminalColors.candleUp : terminalColors.candleDown;
-        if (ethEnabled && (b as any).ext) {
-          color = Number(b.close) >= Number(b.open) ? "rgba(38, 166, 91, 0.4)" : "rgba(232, 65, 66, 0.4)";
-        }
-        return {
-          time: Number(b.time) as UTCTimestamp,
-          open: Number(b.open),
-          high: Number(b.high),
-          low: Number(b.low),
-          close: Number(b.close),
-          color,
-          wickColor: color,
-          borderColor: color,
-        };
-      });
-      const closeLine = safeBars.map((b) => ({ time: Number(b.time) as UTCTimestamp, value: Number(b.close) }));
-      const vol = safeBars.map((b) => ({
-        time: Number(b.time) as UTCTimestamp,
-        value: Number(b.volume ?? 0),
-        color: Number(b.close) >= Number(b.open) ? terminalColors.candleUpAlpha80 : terminalColors.candleDownAlpha80,
-      }));
-      const shadings = safeBars.map((b) => {
+      const candles = transformedBars.map((b, idx) =>
+        buildEnhancedCandle(
+          {
+            time: Number(b.time),
+            open: Number(b.open),
+            high: Number(b.high),
+            low: Number(b.low),
+            close: Number(b.close),
+            volume: Number(b.volume ?? 0),
+            session: (b as any).s,
+            isExtended: Boolean((b as any).ext),
+          },
+          idx > 0 ? Number(transformedBars[idx - 1].close) : null,
+          { up: terminalColors.candleUp, down: terminalColors.candleDown },
+          extendedHours,
+        ),
+      );
+      const closeLine = transformedBars.map((b) => ({ time: Number(b.time) as UTCTimestamp, value: Number(b.close) }));
+      const vol = transformedBars.map((b, idx) =>
+        buildEnhancedVolumeBar(
+          {
+            time: Number(b.time),
+            open: Number(b.open),
+            high: Number(b.high),
+            low: Number(b.low),
+            close: Number(b.close),
+            volume: Number(b.volume ?? 0),
+            session: (b as any).s,
+            isExtended: Boolean((b as any).ext),
+          },
+          idx > 0 ? Number(transformedBars[idx - 1].close) : null,
+          { up: terminalColors.candleUp, down: terminalColors.candleDown },
+          extendedHours,
+        ),
+      );
+      const shadings = transformedBars.map((b) => {
         const color = renderSessionShading ? sessionShadeColor((b as any).s, extendedHours) : "transparent";
         return {
           time: Number(b.time) as UTCTimestamp,
@@ -399,9 +478,14 @@ export function ChartEngine({
       s.volume.setData(vol);
       s.sessionShading.setData(shadings);
     }
+    if (transformedBars.length > 0) {
+      s.baseline.applyOptions({
+        baseValue: { type: "price", price: Number(transformedBars[0].close) },
+      });
+    }
 
     const previousBarsLength = lastBarsRef.current.length;
-    lastBarsRef.current = safeBars;
+    lastBarsRef.current = transformedBars;
     s.volume.applyOptions({ visible: showVolume });
     s.delivery.setData(
       deliverySeries.map((row) => ({
@@ -411,7 +495,7 @@ export function ChartEngine({
     );
     s.delivery.applyOptions({ visible: showDeliveryOverlay });
     s.oi?.setData(
-      safeBars.map((b) => ({
+      transformedBars.map((b) => ({
         time: Number(b.time) as UTCTimestamp,
         value: Number(b.volume ?? 0),
       })),
@@ -422,7 +506,7 @@ export function ChartEngine({
       const viewportKey = `${market}:${symbol}|${timeframe}`;
       const shouldAutoViewport =
         (lastAutoViewportKeyRef.current !== viewportKey) ||
-        (previousBarsLength === 0 && safeBars.length > 0);
+        (previousBarsLength === 0 && transformedBars.length > 0);
       const intradayWindowBars =
         timeframe === "1m"
           ? 390
@@ -440,10 +524,10 @@ export function ChartEngine({
                   ? 120
                   : null;
       if (shouldAutoViewport) {
-        if (intradayWindowBars && safeBars.length > intradayWindowBars) {
+        if (intradayWindowBars && transformedBars.length > intradayWindowBars) {
           ts.setVisibleLogicalRange({
-            from: Math.max(0, safeBars.length - intradayWindowBars - 1),
-            to: safeBars.length + 2,
+            from: Math.max(0, transformedBars.length - intradayWindowBars - 1),
+            to: transformedBars.length + 2,
           });
         } else {
           ts.fitContent();
@@ -451,9 +535,9 @@ export function ChartEngine({
         lastAutoViewportKeyRef.current = viewportKey;
       }
     }
-  }, [safeBars, showVolume, deliverySeries, showDeliveryOverlay, extendedHours, timeframe, showSessionShading]);
+  }, [transformedBars, showVolume, deliverySeries, showDeliveryOverlay, extendedHours, timeframe, showSessionShading]);
 
-  useIndicators(chartApi, safeBars, activeIndicators);
+  useIndicators(chartApi, transformedBars, activeIndicators);
 
   useEffect(() => {
     if (!chartApi || !syncEvent || syncEvent.sourceId === panelId) return;
@@ -472,7 +556,7 @@ export function ChartEngine({
     return () => window.removeEventListener("click", close);
   }, [contextMenu]);
 
-  const latestClose = safeBars.length ? Number(safeBars[safeBars.length - 1].close) : undefined;
+  const latestClose = transformedBars.length ? Number(transformedBars[transformedBars.length - 1].close) : undefined;
 
   return (
     <div

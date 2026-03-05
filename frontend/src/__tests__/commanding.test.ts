@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-import { executeParsedCommand, parseCommand } from "../components/layout/commanding";
+import { executeParsedCommand, findShortcutConflicts, parseCommand } from "../components/layout/commanding";
 import { useStockStore } from "../store/stockStore";
 
 describe("GO commanding", () => {
@@ -40,5 +40,15 @@ describe("GO commanding", () => {
     expect(navigate).toHaveBeenCalledWith(
       expect.stringContaining("/equity/news?q="),
     );
+  });
+
+  it("detects overlapping shortcut conflicts", () => {
+    const conflicts = findShortcutConflicts([
+      { id: "a", combo: "Ctrl+W", description: "Global A", scope: "global" },
+      { id: "b", combo: "Ctrl+W", description: "Scoped B", scope: "chart-workstation" },
+      { id: "c", combo: "Ctrl+K", description: "Scoped C", scope: "chart-workstation" },
+    ]);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]?.combo).toBe("ctrl+w");
   });
 });

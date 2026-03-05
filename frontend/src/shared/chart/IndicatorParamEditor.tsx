@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { listIndicators } from "./IndicatorManager";
+import { getIndicatorDefaults, listIndicators } from "./IndicatorManager";
 import type { IndicatorConfig } from "./types";
 import { terminalColors } from "../../theme/terminal";
 
@@ -13,8 +13,23 @@ type Props = {
 export function IndicatorParamEditor({ config, onClose, onSave }: Props) {
   const [draft, setDraft] = useState<IndicatorConfig>(config);
   const info = useMemo(() => listIndicators().find((x) => x.id === config.id), [config.id]);
+  const defaultParams = useMemo(() => ({ ...(getIndicatorDefaults(config.id).params || {}) }), [config.id]);
 
   const entries = Object.entries(draft.params || {});
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        onSave(draft);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [draft, onClose, onSave]);
 
   return (
     <div className="absolute right-2 top-10 z-40 w-72 rounded border border-terminal-border bg-terminal-panel p-3 shadow-xl">
@@ -24,6 +39,7 @@ export function IndicatorParamEditor({ config, onClose, onSave }: Props) {
           <label key={key} className="block text-[11px] text-terminal-muted">
             <span className="mb-1 block">{key}</span>
             <input
+              type={typeof value === "number" ? "number" : "text"}
               className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs text-terminal-text outline-none focus:border-terminal-accent"
               value={String(value)}
               onChange={(e) => {
@@ -64,6 +80,13 @@ export function IndicatorParamEditor({ config, onClose, onSave }: Props) {
         </label>
       </div>
       <div className="mt-3 flex items-center justify-end gap-2">
+        <button
+          className="rounded border border-terminal-border px-2 py-1 text-xs text-terminal-muted"
+          onClick={() => setDraft((prev) => ({ ...prev, params: { ...defaultParams } }))}
+          data-testid="indicator-editor-reset-params"
+        >
+          Reset params
+        </button>
         <button className="rounded border border-terminal-border px-2 py-1 text-xs text-terminal-muted" onClick={onClose}>
           Cancel
         </button>

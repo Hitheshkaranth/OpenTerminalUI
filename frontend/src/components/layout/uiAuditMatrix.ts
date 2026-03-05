@@ -34,6 +34,20 @@ export const uiAuditMatrix: RouteAuditRow[] = [
     hotspotPriority: "P0",
   },
   {
+    route: "/equity/security/:ticker",
+    shellWrapper: "TerminalShell + EquityLayout",
+    topChrome: ["CommandBar", "TickerTape", "TopBar"],
+    statusChrome: ["MarketStatusBar", "ticker sentiment/status badges"],
+    pageShell: "SecurityHubPage",
+    chartOrTablePattern: ["TradingChart", "DenseTable", "multi-tab module panels"],
+    duplicationSignals: [
+      "Chart compare controls replicate split-comparison behavior",
+      "Metric card and badge treatments partially duplicate StockDetail and Dashboard",
+    ],
+    consolidationTarget: "Shared CompareControls + MetricCell primitive + PanelChrome",
+    hotspotPriority: "P0",
+  },
+  {
     route: "/equity/compare",
     shellWrapper: "TerminalShell + EquityLayout",
     topChrome: ["CommandBar", "TickerTape", "TopBar"],
@@ -62,6 +76,20 @@ export const uiAuditMatrix: RouteAuditRow[] = [
     hotspotPriority: "P0",
   },
   {
+    route: "/equity/launchpad",
+    shellWrapper: "TerminalShell + EquityLayout",
+    topChrome: ["CommandBar", "TickerTape", "TopBar"],
+    statusChrome: ["MarketStatusBar", "panel-local status rows"],
+    pageShell: "LaunchpadPage + LaunchpadPanels",
+    chartOrTablePattern: ["Panel grid", "compact watchlist/news/ticker cards"],
+    duplicationSignals: [
+      "Panel headers and row styles overlap with workstation/watchlist implementations",
+      "Local list/status micro-patterns diverge from DenseTable and MarketStatusBar",
+    ],
+    consolidationTarget: "PanelChrome + shared compact list primitive + shared status chips",
+    hotspotPriority: "P0",
+  },
+  {
     route: "/equity/screener",
     shellWrapper: "TerminalShell + EquityLayout",
     topChrome: ["CommandBar", "TickerTape", "TopBar"],
@@ -74,6 +102,20 @@ export const uiAuditMatrix: RouteAuditRow[] = [
     ],
     consolidationTarget: "DenseTable header actions + TerminalInput/TerminalButton",
     hotspotPriority: "P0",
+  },
+  {
+    route: "/equity/dashboard",
+    shellWrapper: "TerminalShell + EquityLayout",
+    topChrome: ["CommandBar", "TickerTape", "TopBar"],
+    statusChrome: ["MarketStatusBar", "dashboard metric strips"],
+    pageShell: "DashboardPage",
+    chartOrTablePattern: ["summary cards", "mixed chart/table cards"],
+    duplicationSignals: [
+      "Card header and metric rows repeated in Home, SecurityHub, Risk, Ops",
+      "Route-local action clusters mirror TerminalButton groups",
+    ],
+    consolidationTarget: "MetricCard + SectionHeader + shared toolbar action row",
+    hotspotPriority: "P1",
   },
   {
     route: "/equity/portfolio",
@@ -104,6 +146,20 @@ export const uiAuditMatrix: RouteAuditRow[] = [
     hotspotPriority: "P1",
   },
   {
+    route: "/equity/risk | /equity/oms | /equity/ops",
+    shellWrapper: "TerminalShell + EquityLayout",
+    topChrome: ["CommandBar", "TickerTape", "TopBar"],
+    statusChrome: ["MarketStatusBar", "ops/risk local status banners"],
+    pageShell: "RiskDashboardPage + OmsCompliancePage + OpsDashboardPage",
+    chartOrTablePattern: ["DenseTable", "status cards", "timeline/list rows"],
+    duplicationSignals: [
+      "Risk/ops cards and section chrome duplicate dashboard/security-hub motifs",
+      "Table wrappers and filters mix bespoke and shared primitives",
+    ],
+    consolidationTarget: "StatusCard + DenseTable wrapper + unified filter toolbar",
+    hotspotPriority: "P1",
+  },
+  {
     route: "/fno/*",
     shellWrapper: "FnoLayout",
     topChrome: ["module-specific top nav"],
@@ -116,6 +172,34 @@ export const uiAuditMatrix: RouteAuditRow[] = [
     ],
     consolidationTarget: "Adopt TerminalShell-compatible module chrome adapters",
     hotspotPriority: "P1",
+  },
+  {
+    route: "/backtesting/model-lab/*",
+    shellWrapper: "BacktestingLayout",
+    topChrome: ["module-specific top bar"],
+    statusChrome: ["module-specific status chips", "run state badges"],
+    pageShell: "ModelLab pages",
+    chartOrTablePattern: ["report tables", "experiment forms", "compare panels"],
+    duplicationSignals: [
+      "Command and section header treatments overlap with equity shell behavior",
+      "Form and status primitives diverge from terminal primitives",
+    ],
+    consolidationTarget: "Shared SectionHeader + TerminalForm controls + status badges",
+    hotspotPriority: "P2",
+  },
+  {
+    route: "/equity/crypto",
+    shellWrapper: "TerminalShell + EquityLayout",
+    topChrome: ["CommandBar", "TickerTape", "TopBar"],
+    statusChrome: ["MarketStatusBar", "workspace tab badges"],
+    pageShell: "CryptoWorkspacePage",
+    chartOrTablePattern: ["tabbed workspace", "watchlist/movers/alerts cards"],
+    duplicationSignals: [
+      "Workspace tabs and cards overlap with launchpad/dashboard patterns",
+      "Market summary rows duplicate watchlist compact row patterns",
+    ],
+    consolidationTarget: "WorkspaceTabs + compact market row primitive + shared card shell",
+    hotspotPriority: "P2",
   },
   {
     route: "/backtesting/*",
@@ -149,6 +233,13 @@ export const duplicationCandidates: DuplicationCandidate[] = [
     migrationPriority: "P0",
   },
   {
+    area: "navigation",
+    currentImplementations: ["Sidebar", "TopBar links", "module-local quick links"],
+    targetPrimitive: "GO-command routing + shared quick-nav schema",
+    rationale: "Reduces route-link duplication and keeps keyboard-first navigation consistent.",
+    migrationPriority: "P0",
+  },
+  {
     area: "status",
     currentImplementations: ["MarketStatusBar", "local status rows", "page-local toast/status blocks"],
     targetPrimitive: "MarketStatusBar + AlertToasts + TerminalBadge",
@@ -170,11 +261,11 @@ export const duplicationCandidates: DuplicationCandidate[] = [
     migrationPriority: "P1",
   },
   {
-    area: "navigation",
-    currentImplementations: ["Sidebar", "TopBar links", "module-local quick links"],
-    targetPrimitive: "GO-command routing + shared quick-nav schema",
-    rationale: "Reduces route-link duplication and keeps keyboard-first navigation consistent.",
-    migrationPriority: "P2",
+    area: "shell",
+    currentImplementations: ["TerminalPanel card wrappers", "dashboard/risk/ops/security metric cards"],
+    targetPrimitive: "SectionHeader + MetricCard + PanelChrome composition",
+    rationale: "Eliminates near-duplicate section/card chrome and standardizes dense panel hierarchy.",
+    migrationPriority: "P1",
   },
 ];
 
@@ -183,13 +274,16 @@ export const migrationHotspots = {
     "Unify chart/workstation/launchpad panel headers under PanelChrome",
     "Remove page-local toast viewports where AlertToasts already exists",
     "Normalize screener filter/status strips to terminal primitives",
+    "Standardize SecurityHub and SplitComparison compare controls into one primitive",
   ],
   nearTerm: [
     "Refactor portfolio legacy + manager form controls into shared field sections",
     "Adopt DenseTable list mode for news-like tabular feeds",
+    "Converge dashboard/risk/ops metric cards to shared SectionHeader + MetricCard composition",
   ],
   later: [
     "Introduce module adapters so FNO/backtesting inherit terminal shell chrome",
     "Converge route-link maps to GO-command-first navigation model",
+    "Unify crypto workspace tabs and launchpad compact rows under shared workspace primitives",
   ],
 } as const;

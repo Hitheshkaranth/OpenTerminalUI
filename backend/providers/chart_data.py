@@ -58,6 +58,10 @@ class ChartDataProvider:
     def __init__(self) -> None:
         self.fmp_key = os.getenv("FMP_API_KEY", "").strip()
         self.finnhub_key = os.getenv("FINNHUB_API_KEY", "").strip()
+        self.alpaca_key = os.getenv("ALPACA_API_KEY", "").strip()
+        self.alpaca_secret = os.getenv("ALPACA_SECRET_KEY", "").strip()
+        self.alpaca_feed = (os.getenv("ALPACA_FEED", "iex") or "iex").strip().lower()
+        self.alpaca_adjustment = (os.getenv("ALPACA_ADJUSTMENT", "raw") or "raw").strip().lower()
         self.chart_cache_ttl = int(os.getenv("CHART_CACHE_TTL", "900") or "900")
         self._mem_cache: dict[tuple[str, str, str], tuple[float, list[OHLCVBar]]] = {}
         self._cache = get_ohlcv_cache()
@@ -122,15 +126,16 @@ class ChartDataProvider:
             if cached and (now - cached[0]) < self.chart_cache_ttl:
                 return list(cached[1])
 
-        # SQLite cache lookup only for explicit ranges.
+        # Tiered cache lookup (hot -> warm -> cold) only for explicit ranges.
         if start and end and not prepost:
-            cached_rows = await self._cache.get_range(
+            cache_result = await self._cache.get_range_with_gaps(
                 provider_ticker,
                 interval,
                 int(start.timestamp() * 1000),
                 int(end.timestamp() * 1000),
             )
-            if cached_rows:
+            cached_rows = cache_result.rows
+            if cached_rows and cache_result.complete:
                 return [
                     OHLCVBar(
                         timestamp=datetime.fromtimestamp(r["t"] / 1000, tz=timezone.utc),
@@ -144,6 +149,36 @@ class ChartDataProvider:
                     )
                     for r in cached_rows
                 ]
+            if cache_result.missing_ranges:
+                backfilled = await self._backfill_missing_ranges(
+                    market=market,
+                    base_symbol=base_symbol,
+                    provider_ticker=provider_ticker,
+                    interval=interval,
+                    period=period,
+                    missing_ranges=cache_result.missing_ranges,
+                    prepost=prepost,
+                )
+                if backfilled:
+                    merged = {int(row["t"]): row for row in cached_rows}
+                    merged.update({int(row["t"]): row for row in backfilled})
+                    merged_rows = list(merged.values())
+                    merged_rows.sort(key=lambda r: int(r["t"]))
+                    await self._cache.put_bars(provider_ticker, interval, merged_rows)
+                    return [
+                        OHLCVBar(
+                            timestamp=datetime.fromtimestamp(r["t"] / 1000, tz=timezone.utc),
+                            open=float(r["o"]),
+                            high=float(r["h"]),
+                            low=float(r["l"]),
+                            close=float(r["c"]),
+                            volume=float(r.get("v", 0)),
+                            symbol=base_symbol,
+                            market=market,
+                        )
+                        for r in merged_rows
+                        if int(start.timestamp() * 1000) <= int(r["t"]) <= int(end.timestamp() * 1000)
+                    ]
 
         if market == "IN":
             bars = await self._india_ohlcv(base_symbol, provider_ticker, interval, period, start, end)
@@ -167,6 +202,40 @@ class ChartDataProvider:
             if start is None and end is None:
                 self._mem_cache[cache_key] = (now, list(bars))
         return bars
+
+    async def _backfill_missing_ranges(
+        self,
+        market: MarketType,
+        base_symbol: str,
+        provider_ticker: str,
+        interval: str,
+        period: str,
+        missing_ranges: list[tuple[int, int]],
+        prepost: bool,
+    ) -> list[dict[str, float | int]]:
+        rows: list[dict[str, float | int]] = []
+        for start_ms, end_ms in missing_ranges:
+            start_dt = datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc)
+            end_dt = datetime.fromtimestamp(end_ms / 1000, tz=timezone.utc)
+            if market == "IN":
+                gap_bars = await self._india_ohlcv(base_symbol, provider_ticker, interval, period, start_dt, end_dt)
+            else:
+                gap_bars = await self._us_ohlcv(base_symbol, provider_ticker, interval, period, start_dt, end_dt, prepost=prepost)
+            for b in gap_bars:
+                rows.append(
+                    {
+                        "t": int(_utc_dt(b.timestamp).timestamp() * 1000),
+                        "o": float(b.open),
+                        "h": float(b.high),
+                        "l": float(b.low),
+                        "c": float(b.close),
+                        "v": float(b.volume),
+                    }
+                )
+        dedup = {int(r["t"]): r for r in rows}
+        out = list(dedup.values())
+        out.sort(key=lambda r: int(r["t"]))
+        return out
 
     def _normalize_default_period_for_interval(
         self,
@@ -234,6 +303,14 @@ class ChartDataProvider:
         end: datetime | None,
         prepost: bool = False,
     ) -> list[OHLCVBar]:
+        if self.alpaca_key and self.alpaca_secret:
+            bars = await self._run_provider_step(
+                provider_name="alpaca",
+                ticker=ticker,
+                fetch_coro=self._alpaca_historical(base_symbol, ticker, interval, start, end, prepost=prepost),
+            )
+            if bars:
+                return bars
         if self.fmp_key:
             bars = await self._run_provider_step(
                 provider_name="fmp",
@@ -252,6 +329,91 @@ class ChartDataProvider:
                 return bars
         logger.debug("Falling back to yfinance historical for %s after US waterfall miss", ticker)
         return await self._yfinance_ohlcv(base_symbol, ticker, interval, period, start, end, market="US", prepost=prepost)
+
+    async def _alpaca_historical(
+        self,
+        base_symbol: str,
+        ticker: str,
+        interval: str,
+        start: datetime | None,
+        end: datetime | None,
+        prepost: bool = False,
+    ) -> list[OHLCVBar]:
+        if not (self.alpaca_key and self.alpaca_secret):
+            return []
+        timeframe_map = {
+            "1m": "1Min",
+            "2m": "2Min",
+            "3m": "3Min",
+            "5m": "5Min",
+            "15m": "15Min",
+            "30m": "30Min",
+            "1h": "1Hour",
+            "60m": "1Hour",
+            "4h": "4Hour",
+            "1d": "1Day",
+            "1wk": "1Week",
+            "1mo": "1Month",
+        }
+        timeframe = timeframe_map.get(interval, "1Day")
+        _end = _utc_dt(end) if end else datetime.now(timezone.utc)
+        _start = _utc_dt(start) if start else (_end - timedelta(days=180))
+        bars: list[OHLCVBar] = []
+        page_token: str | None = None
+        headers = {
+            "APCA-API-KEY-ID": self.alpaca_key,
+            "APCA-API-SECRET-KEY": self.alpaca_secret,
+        }
+        async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
+            while True:
+                params: dict[str, str | int] = {
+                    "symbols": ticker,
+                    "timeframe": timeframe,
+                    "start": _start.isoformat().replace("+00:00", "Z"),
+                    "end": _end.isoformat().replace("+00:00", "Z"),
+                    "feed": self.alpaca_feed,
+                    "adjustment": self.alpaca_adjustment,
+                    "sort": "asc",
+                    "limit": 10000,
+                }
+                if page_token:
+                    params["page_token"] = page_token
+                resp = await client.get("https://data.alpaca.markets/v2/stocks/bars", params=params, headers=headers)
+                if resp.status_code >= 400:
+                    return []
+                payload = resp.json()
+                if not isinstance(payload, dict):
+                    return []
+                rows = (payload.get("bars") or {}).get(ticker)
+                if not isinstance(rows, list) or not rows:
+                    break
+                for row in rows:
+                    if not isinstance(row, dict):
+                        continue
+                    dt = _parse_iso_dt(str(row.get("t") or ""))
+                    if dt is None:
+                        continue
+                    try:
+                        bars.append(
+                            OHLCVBar(
+                                timestamp=dt,
+                                open=float(row["o"]),
+                                high=float(row["h"]),
+                                low=float(row["l"]),
+                                close=float(row["c"]),
+                                volume=float(row.get("v", 0) or 0),
+                                symbol=base_symbol,
+                                market="US",
+                            )
+                        )
+                    except Exception:
+                        continue
+                next_page = payload.get("next_page_token")
+                page_token = str(next_page) if next_page else None
+                if not page_token:
+                    break
+        bars.sort(key=lambda b: b.timestamp)
+        return bars
 
     async def _run_provider_step(
         self,

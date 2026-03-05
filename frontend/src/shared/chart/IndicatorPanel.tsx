@@ -1,6 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { getIndicatorDefaults, listIndicators } from "./IndicatorManager";
+import {
+  CUSTOM_JS_INDICATORS_UPDATED_EVENT,
+  getIndicatorDefaults,
+  listIndicators,
+  removeCustomJsIndicator,
+  upsertCustomJsIndicator,
+} from "./IndicatorManager";
 import { IndicatorParamEditor } from "./IndicatorParamEditor";
 import type { IndicatorConfig } from "./types";
 
@@ -19,8 +25,21 @@ export function IndicatorPanel({ symbol, activeIndicators, onChange, templateSco
   const [editingId, setEditingId] = useState<string | null>(null);
   const [templateName, setTemplateName] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("");
-  const all = useMemo(() => listIndicators(), []);
+  const [catalogVersion, setCatalogVersion] = useState(0);
+  const [customName, setCustomName] = useState("");
+  const [customOverlay, setCustomOverlay] = useState(true);
+  const [customScript, setCustomScript] = useState(
+    "function calculate(bars, params) {\n  return {\n    plots: {\n      line: bars.map((bar) => ({ time: bar.time, value: Number(bar.close) }))\n    }\n  };\n}",
+  );
+  const [customError, setCustomError] = useState<string | null>(null);
+  const all = useMemo(() => listIndicators(), [catalogVersion]);
   const templateStorageKey = `chart:indicator-templates:${templateScope}`;
+
+  useEffect(() => {
+    const onCatalogUpdate = () => setCatalogVersion((v) => v + 1);
+    window.addEventListener(CUSTOM_JS_INDICATORS_UPDATED_EVENT, onCatalogUpdate);
+    return () => window.removeEventListener(CUSTOM_JS_INDICATORS_UPDATED_EVENT, onCatalogUpdate);
+  }, []);
 
   const grouped = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -72,14 +91,66 @@ export function IndicatorPanel({ symbol, activeIndicators, onChange, templateSco
   const loadTemplate = () => {
     const rows = templates[selectedTemplate];
     if (!rows?.length) return;
-    onChange(rows);
+    onChange(rows.map((row) => ({ ...row, params: { ...(row.params || {}) } })));
+  };
+  const toggleVisibility = (id: string) => {
+    onChange(activeIndicators.map((row) => (row.id === id ? { ...row, visible: !row.visible } : row)));
+  };
+  const resetIndicatorParams = (id: string) => {
+    const defaults = getIndicatorDefaults(id).params;
+    onChange(
+      activeIndicators.map((row) => (row.id === id ? { ...row, params: { ...(defaults || {}) } } : row)),
+    );
+  };
+  const resetAllParams = () => {
+    onChange(
+      activeIndicators.map((row) => {
+        const defaults = getIndicatorDefaults(row.id).params;
+        return {
+          ...row,
+          params: { ...(defaults || {}) },
+        };
+      }),
+    );
+  };
+  const saveCustomScript = () => {
+    try {
+      setCustomError(null);
+      const stored = upsertCustomJsIndicator({
+        id: customName || "custom-indicator",
+        name: customName || "Custom Indicator",
+        category: "Custom JS",
+        overlay: customOverlay,
+        defaultInputs: {},
+        script: customScript,
+      });
+      setCustomName(stored.name);
+      setCatalogVersion((v) => v + 1);
+    } catch (error) {
+      setCustomError(error instanceof Error ? error.message : "Failed to save custom script");
+    }
+  };
+  const deleteCustomScript = (id: string) => {
+    removeCustomJsIndicator(id);
+    onChange(activeIndicators.filter((row) => row.id !== id));
+    setCatalogVersion((v) => v + 1);
   };
 
   return (
     <div className="relative rounded border border-terminal-border bg-terminal-panel p-3">
       <div className="mb-2 flex items-center justify-between">
         <div className="text-xs font-semibold uppercase tracking-wide text-terminal-accent">Indicators</div>
-        <div className="text-[11px] text-terminal-muted">Active: {activeIndicators.length}</div>
+        <div className="flex items-center gap-2">
+          <div className="text-[11px] text-terminal-muted">Active: {activeIndicators.length}</div>
+          <button
+            className="rounded border border-terminal-border px-2 py-1 text-[10px] text-terminal-muted hover:text-terminal-text"
+            onClick={resetAllParams}
+            disabled={!activeIndicators.length}
+            data-testid="indicator-reset-all"
+          >
+            Reset params
+          </button>
+        </div>
       </div>
       <input
         value={search}
@@ -124,6 +195,16 @@ export function IndicatorPanel({ symbol, activeIndicators, onChange, templateSco
                             >cfg</button>
                             <button
                               className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted"
+                              onClick={() => toggleVisibility(item.id)}
+                              data-testid={`indicator-visibility-${item.id}`}
+                            >{current?.visible ? "hide" : "show"}</button>
+                            <button
+                              className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted"
+                              onClick={() => resetIndicatorParams(item.id)}
+                              data-testid={`indicator-reset-${item.id}`}
+                            >rst</button>
+                            <button
+                              className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted"
                               onClick={() => onChange(activeIndicators.filter((x) => x.id !== item.id))}
                             >del</button>
                           </>
@@ -133,6 +214,15 @@ export function IndicatorPanel({ symbol, activeIndicators, onChange, templateSco
                             {Object.values(current.params).slice(0, 3).join(",")}
                           </div>
                         )}
+                        {!active && item.isCustom ? (
+                          <button
+                            className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted"
+                            onClick={() => deleteCustomScript(item.id)}
+                            title="Delete custom script"
+                          >
+                            rm
+                          </button>
+                        ) : null}
                       </div>
                     );
                   })}
@@ -171,6 +261,34 @@ export function IndicatorPanel({ symbol, activeIndicators, onChange, templateSco
           <button className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-accent" onClick={loadTemplate}>
             Load
           </button>
+        </div>
+        <div className="rounded border border-terminal-border p-2">
+          <div className="mb-1 text-[11px] uppercase tracking-wide text-terminal-muted">Custom JS</div>
+          <input
+            value={customName}
+            onChange={(e) => setCustomName(e.target.value)}
+            placeholder="Custom indicator name"
+            className="mb-1 w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs text-terminal-text outline-none focus:border-terminal-accent"
+          />
+          <label className="mb-1 flex items-center gap-2 text-[11px] text-terminal-muted">
+            <input type="checkbox" checked={customOverlay} onChange={(e) => setCustomOverlay(e.target.checked)} />
+            Overlay on main chart
+          </label>
+          <textarea
+            value={customScript}
+            onChange={(e) => setCustomScript(e.target.value)}
+            className="h-28 w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs text-terminal-text outline-none focus:border-terminal-accent"
+            spellCheck={false}
+          />
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <button
+              className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-accent"
+              onClick={saveCustomScript}
+            >
+              Save JS
+            </button>
+            {customError ? <span className="text-[10px] text-terminal-neg">{customError}</span> : null}
+          </div>
         </div>
       </div>
       <div className="mt-2 flex items-center justify-between">

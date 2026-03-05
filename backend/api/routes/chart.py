@@ -62,12 +62,20 @@ async def get_volume_profile(
     period: str = Query(default="20d"),
     bins: int = Query(default=50, ge=10, le=200),
     market: str = Query(default="NSE"),
+    mode: str = Query(default="fixed"),
+    lookback_bars: int = Query(default=300, ge=50, le=5000),
 ) -> Dict[str, Any]:
     period = _coerce_query_str(period, "20d")
     market = _coerce_query_str(market, "NSE").upper()
+    mode = _coerce_query_str(mode, "fixed").lower()
     bins = _coerce_query_int(bins, 50)
+    lookback_bars = _coerce_query_int(lookback_bars, 300)
     if bins < 10 or bins > 200:
         raise HTTPException(status_code=400, detail="bins must be between 10 and 200")
+    if lookback_bars < 50 or lookback_bars > 5000:
+        raise HTTPException(status_code=400, detail="lookback_bars must be between 50 and 5000")
+    if mode not in {"fixed", "session", "visible"}:
+        raise HTTPException(status_code=400, detail="mode must be one of: fixed, session, visible")
 
     try:
         days = parse_period_to_days(period)
@@ -77,7 +85,7 @@ async def get_volume_profile(
     key = cache_instance.build_key(
         "volume_profile",
         symbol.upper(),
-        {"period": period, "bins": bins, "market": market},
+        {"period": period, "bins": bins, "market": market, "mode": mode, "lookback_bars": lookback_bars},
     )
     started = perf_counter()
     cached = await cache_instance.get(key)
@@ -100,7 +108,18 @@ async def get_volume_profile(
         market_hint=market,
     )
     max_points = days * 24 * 60
-    recent = bars[-max_points:] if len(bars) > max_points else bars
+    if mode == "visible":
+        recent = bars[-lookback_bars:] if len(bars) > lookback_bars else bars
+    elif mode == "session":
+        if bars:
+            last_day = bars[-1].timestamp.astimezone(timezone.utc).date()
+            recent = [bar for bar in bars if bar.timestamp.astimezone(timezone.utc).date() == last_day]
+            if not recent:
+                recent = bars[-max_points:] if len(bars) > max_points else bars
+        else:
+            recent = bars
+    else:
+        recent = bars[-max_points:] if len(bars) > max_points else bars
     bar_dicts = [
         {
             "open": float(bar.open),
@@ -116,6 +135,8 @@ async def get_volume_profile(
     payload = {
         "symbol": symbol.upper(),
         "period": period,
+        "mode": mode,
+        "lookback_bars": lookback_bars if mode == "visible" else None,
         "bins": result.bins,
         "poc_price": result.poc_price,
         "value_area_high": result.value_area_high,
@@ -564,6 +585,8 @@ def create_chart_drawing(
 @router.get("/chart-drawings/{symbol}")
 def list_chart_drawings(
     symbol: str,
+    timeframe: str | None = Query(default=None),
+    workspace_id: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
@@ -573,19 +596,26 @@ def list_chart_drawings(
         .order_by(ChartDrawing.created_at.asc())
         .all()
     )
-    return {
-        "items": [
+    tf = timeframe.strip() if isinstance(timeframe, str) and timeframe.strip() else None
+    ws = workspace_id.strip() if isinstance(workspace_id, str) and workspace_id.strip() else None
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        coordinates = row.coordinates if isinstance(row.coordinates, dict) else {}
+        if tf is not None and str(coordinates.get("timeframe") or "").strip() != tf:
+            continue
+        if ws is not None and str(coordinates.get("workspace_id") or "").strip() != ws:
+            continue
+        items.append(
             {
                 "id": row.id,
                 "symbol": row.symbol,
                 "tool_type": row.tool_type,
-                "coordinates": row.coordinates if isinstance(row.coordinates, dict) else {},
+                "coordinates": coordinates,
                 "style": row.style if isinstance(row.style, dict) else {},
                 "created_at": row.created_at.isoformat(),
             }
-            for row in rows
-        ]
-    }
+        )
+    return {"items": items}
 
 
 @router.put("/chart-drawings/{symbol}/{drawing_id}")

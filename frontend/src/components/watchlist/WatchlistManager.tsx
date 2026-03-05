@@ -24,7 +24,7 @@ export function WatchlistManager() {
   const [searchParams] = useSearchParams();
   const selectedMarket = useSettingsStore(s => s.selectedMarket);
   const { formatDisplayMoney } = useDisplayCurrency();
-  const { subscribe, unsubscribe } = useQuotesStream(selectedMarket);
+  const { subscribe, unsubscribe, connectionState } = useQuotesStream(selectedMarket);
   const ticksByToken = useQuotesStore(s => s.ticksByToken);
 
   const [activeWlId, setActiveWlId] = useState<string | null>(null);
@@ -219,6 +219,12 @@ export function WatchlistManager() {
             {activeWl && (
               <>
                 <h1 className="text-sm font-bold uppercase text-terminal-accent">{activeWl.name}</h1>
+                <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-0.5 text-[10px] uppercase text-terminal-muted" data-testid="watchlist-route-status">
+                  {selectedMarket} {connectionState}
+                </div>
+                <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-0.5 text-[10px] uppercase text-terminal-muted">
+                  {activeWl.symbols.length} symbols
+                </div>
                 <div className="flex rounded border border-terminal-border p-0.5 bg-terminal-bg">
                   <button
                     onClick={() => setViewByMode("table")}

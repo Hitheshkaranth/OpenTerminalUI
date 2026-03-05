@@ -56,6 +56,9 @@ test.describe("Multi-Chart Workstation E2E", () => {
   });
 
   test("should load chart workstation and manage panels", async ({ page }) => {
+    page.on('console', msg => console.log('PW_BROWSER_CONSOLE:', msg.text()));
+    page.on('pageerror', err => console.log('PW_BROWSER_ERROR:', err.message));
+
     // 1. data-testid='chart-workstation' is visible
     const workstation = page.getByTestId("chart-workstation");
     await expect(workstation).toBeVisible();

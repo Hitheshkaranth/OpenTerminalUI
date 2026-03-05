@@ -96,7 +96,11 @@ def test_chart_drawings_crud_smoke() -> None:
     created = client.post(
         f"/api/chart-drawings/{symbol}",
         headers=headers,
-        json={"tool_type": "trendline", "coordinates": {"x1": 1, "x2": 2}, "style": {"color": "#00ff00"}},
+        json={
+            "tool_type": "trendline",
+            "coordinates": {"x1": 1, "x2": 2, "timeframe": "1D", "workspace_id": "slot-a"},
+            "style": {"color": "#00ff00"},
+        },
     )
     assert created.status_code == 200
     drawing_id = created.json()["id"]
@@ -104,6 +108,10 @@ def test_chart_drawings_crud_smoke() -> None:
     listed = client.get(f"/api/chart-drawings/{symbol}", headers=headers)
     assert listed.status_code == 200
     assert any(str(row["id"]) == str(drawing_id) for row in listed.json()["items"])
+
+    filtered = client.get(f"/api/chart-drawings/{symbol}?timeframe=1D&workspace_id=slot-a", headers=headers)
+    assert filtered.status_code == 200
+    assert any(str(row["id"]) == str(drawing_id) for row in filtered.json()["items"])
 
     updated = client.put(
         f"/api/chart-drawings/{symbol}/{drawing_id}",

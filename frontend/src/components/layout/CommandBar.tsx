@@ -90,6 +90,13 @@ export function CommandBar({ onExecute }: Props) {
   }, [instrumentCache]);
 
   useEffect(() => {
+    const focusCommandBar = () => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+      setIsOpen(true);
+      setReverseSearchOpen(false);
+    };
+
     const onKeyDown = (ev: KeyboardEvent) => {
       const target = ev.target as HTMLElement | null;
       const isEditing = Boolean(
@@ -102,10 +109,7 @@ export function CommandBar({ onExecute }: Props) {
 
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "g") {
         ev.preventDefault();
-        inputRef.current?.focus();
-        inputRef.current?.select();
-        setIsOpen(true);
-        setReverseSearchOpen(false);
+        focusCommandBar();
         return;
       }
 
@@ -123,8 +127,12 @@ export function CommandBar({ onExecute }: Props) {
       }
     };
 
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("focus-command-bar", focusCommandBar as EventListener);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("focus-command-bar", focusCommandBar as EventListener);
+    };
   }, []);
 
   useEffect(() => {

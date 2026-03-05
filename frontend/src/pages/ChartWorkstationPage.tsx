@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { CrosshairSyncProvider } from "../contexts/CrosshairSyncContext";
 import { useChartWorkstationStore } from "../store/chartWorkstationStore";
 import { ChartGridContainer } from "../components/chart-workstation/ChartGridContainer";
@@ -13,9 +13,46 @@ import { useBatchChartData } from "../hooks/useBatchChartData";
 import { useWorkstationQuotes } from "../hooks/useWorkstationQuotes";
 import type { ChartSlot, ChartSlotTimeframe, ChartSlotType, SlotMarket } from "../store/chartWorkstationStore";
 import type { IndicatorConfig } from "../shared/chart/types";
+import { shouldDefaultExtendedHoursOn } from "../shared/chart/candlePresentation";
 import "../components/chart-workstation/ChartWorkstation.css";
 
 const MAX_WORKSTATION_SLOTS = 9;
+const WORKSPACE_TABS_KEY = "ot:chart-workstation:tabs:v1";
+const TIMEFRAME_HOTKEY_MAP: Record<string, ChartSlotTimeframe> = {
+  "1": "1m",
+  "2": "5m",
+  "3": "15m",
+  "4": "1h",
+  "5": "1D",
+  "6": "1W",
+  "7": "1M",
+};
+export const CUSTOM_SPLIT_TEMPLATE = {
+  cols: 3,
+  rows: 2,
+  arrangement: "custom" as const,
+  customAreas: `"a a b" "c d b"`,
+};
+
+export type WorkspaceLinkGroup = "off" | "A" | "B" | "C";
+
+type WorkspaceSnapshot = {
+  slots: ChartSlot[];
+  gridTemplate: {
+    cols: number;
+    rows: number;
+    arrangement: "grid" | "custom";
+    customAreas?: string;
+  };
+  syncCrosshair: boolean;
+};
+
+type WorkspaceTab = {
+  id: string;
+  name: string;
+  snapshot: WorkspaceSnapshot;
+  linkGroups: Record<string, WorkspaceLinkGroup>;
+};
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -84,27 +121,118 @@ function buildNewSlotFromActive(slots: ChartSlot[], activeSlotId: string | null)
     extendedHours: active?.extendedHours
       ? { ...active.extendedHours, enabled: market === "US" }
       : {
-          enabled: market === "US",
-          showPreMarket: true,
-          showAfterHours: true,
-          visualMode: "merged",
-          colorScheme: "dimmed",
-        },
+        enabled: market === "US",
+        showPreMarket: true,
+        showAfterHours: true,
+        visualMode: "merged",
+        colorScheme: "dimmed",
+      },
     preMarketLevels: active?.preMarketLevels
       ? { ...active.preMarketLevels }
       : {
-          showPMHigh: true,
-          showPMLow: true,
-          showPMOpen: false,
-          showPMVWAP: false,
-          extendIntoRTH: true,
-          daysToShow: 1,
-        },
+        showPMHigh: true,
+        showPMLow: true,
+        showPMOpen: false,
+        showPMVWAP: false,
+        extendIntoRTH: true,
+        daysToShow: 1,
+      },
   };
 }
 
 function getLayoutCapacity(cols: number, rows: number) {
   return Math.max(1, Math.min(MAX_WORKSTATION_SLOTS, cols * rows));
+}
+
+function createWorkspaceSnapshot(
+  slots: ChartSlot[],
+  gridTemplate: WorkspaceSnapshot["gridTemplate"],
+  syncCrosshair: boolean,
+): WorkspaceSnapshot {
+  return {
+    slots: slots.map((slot) => ({
+      ...slot,
+      indicators: Array.isArray(slot.indicators) ? [...slot.indicators] : [],
+      extendedHours: { ...slot.extendedHours },
+      preMarketLevels: { ...slot.preMarketLevels },
+    })),
+    gridTemplate: { ...gridTemplate },
+    syncCrosshair,
+  };
+}
+
+export function makeDefaultLinkGroups(slots: ChartSlot[]): Record<string, WorkspaceLinkGroup> {
+  const next: Record<string, WorkspaceLinkGroup> = {};
+  slots.forEach((slot, idx) => {
+    next[slot.id] = idx === 0 ? "A" : "off";
+  });
+  return next;
+}
+
+function normalizeLinkGroups(
+  slots: ChartSlot[],
+  groups: Record<string, WorkspaceLinkGroup> | null | undefined,
+): Record<string, WorkspaceLinkGroup> {
+  const base = makeDefaultLinkGroups(slots);
+  if (!groups) return base;
+  for (const slot of slots) {
+    const g = groups[slot.id];
+    if (g === "A" || g === "B" || g === "C" || g === "off") {
+      base[slot.id] = g;
+    }
+  }
+  return base;
+}
+
+export function propagateLinkedSlots(
+  slots: ChartSlot[],
+  groups: Record<string, WorkspaceLinkGroup>,
+  sourceSlotId: string,
+  apply: (slot: ChartSlot) => ChartSlot,
+): ChartSlot[] {
+  const sourceGroup = groups[sourceSlotId] ?? "off";
+  if (sourceGroup === "off") return slots;
+  return slots.map((slot) => {
+    if (slot.id === sourceSlotId) return slot;
+    if ((groups[slot.id] ?? "off") !== sourceGroup) return slot;
+    return apply(slot);
+  });
+}
+
+function readWorkspaceTabs(
+  fallbackSlots: ChartSlot[],
+  fallbackTemplate: WorkspaceSnapshot["gridTemplate"],
+  fallbackSyncCrosshair: boolean,
+): { tabs: WorkspaceTab[]; activeTabId: string } {
+  try {
+    const raw = localStorage.getItem(WORKSPACE_TABS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { tabs?: WorkspaceTab[]; activeTabId?: string };
+      if (Array.isArray(parsed?.tabs) && parsed.tabs.length) {
+        const validTabs = parsed.tabs.filter((tab) => tab && typeof tab.id === "string" && tab.snapshot?.slots?.length);
+        if (validTabs.length) {
+          const activeTabId = validTabs.some((tab) => tab.id === parsed.activeTabId)
+            ? (parsed.activeTabId as string)
+            : validTabs[0].id;
+          return { tabs: validTabs, activeTabId };
+        }
+      }
+    }
+  } catch {
+    // ignore invalid persisted payloads
+  }
+  const id = `ws-${Date.now()}`;
+  return {
+    tabs: [
+      {
+        id,
+        name: "Main",
+        snapshot: createWorkspaceSnapshot(fallbackSlots, fallbackTemplate, fallbackSyncCrosshair),
+        linkGroups: makeDefaultLinkGroups(fallbackSlots),
+      },
+    ],
+    activeTabId: id,
+  };
 }
 
 export function ChartWorkstationPage() {
@@ -125,6 +253,89 @@ export function ChartWorkstationPage() {
     setGridTemplate,
     syncCrosshair,
   } = useChartWorkstationStore();
+  const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceTab[]>([]);
+  const [activeWorkspaceTabId, setActiveWorkspaceTabId] = useState<string | null>(null);
+  const [slotLinkGroups, setSlotLinkGroups] = useState<Record<string, WorkspaceLinkGroup>>({});
+  const [workspaceReady, setWorkspaceReady] = useState(false);
+
+  const initRef = useRef(false);
+
+  useEffect(() => {
+    if (initRef.current) return;
+    initRef.current = true;
+
+    const persisted = readWorkspaceTabs(slots, gridTemplate, syncCrosshair);
+    setWorkspaceTabs(persisted.tabs);
+    setActiveWorkspaceTabId(persisted.activeTabId);
+
+    const active = persisted.tabs.find((tab) => tab.id === persisted.activeTabId) ?? persisted.tabs[0];
+    if (active) {
+      setSlotLinkGroups(normalizeLinkGroups(active.snapshot.slots, active.linkGroups));
+
+      const newSlots = active.snapshot.slots;
+      const currentSlotsJSON = JSON.stringify(slots);
+      const newSlotsJSON = JSON.stringify(newSlots);
+
+      if (currentSlotsJSON !== newSlotsJSON) {
+        useChartWorkstationStore.setState({
+          slots: newSlots,
+          gridTemplate: active.snapshot.gridTemplate,
+          syncCrosshair: active.snapshot.syncCrosshair,
+          activeSlotId: newSlots[0]?.id ?? null,
+        });
+      }
+    }
+
+    setWorkspaceReady(true);
+  }, [gridTemplate, slots, syncCrosshair]);
+
+  useEffect(() => {
+    if (!workspaceReady || !activeWorkspaceTabId) return;
+    setSlotLinkGroups((prev) => {
+      const next = normalizeLinkGroups(slots, prev);
+      if (JSON.stringify(prev) === JSON.stringify(next)) return prev;
+      return next;
+    });
+  }, [activeWorkspaceTabId, slots, workspaceReady]);
+
+  useEffect(() => {
+    if (!workspaceReady || !activeWorkspaceTabId) return;
+    setWorkspaceTabs((prev) => {
+      let changed = false;
+      const next = prev.map((tab) => {
+        if (tab.id !== activeWorkspaceTabId) return tab;
+        const newSnapshot = createWorkspaceSnapshot(slots, gridTemplate, syncCrosshair);
+        const newLinkGroups = normalizeLinkGroups(slots, slotLinkGroups);
+        const snapshotSame = JSON.stringify(tab.snapshot) === JSON.stringify(newSnapshot);
+        const linkGroupsSame = JSON.stringify(tab.linkGroups) === JSON.stringify(newLinkGroups);
+
+        if (snapshotSame && linkGroupsSame) return tab;
+
+        changed = true;
+        return {
+          ...tab,
+          snapshot: newSnapshot,
+          linkGroups: newLinkGroups,
+        };
+      });
+      return changed ? next : prev;
+    });
+  }, [activeWorkspaceTabId, gridTemplate, slotLinkGroups, slots, syncCrosshair, workspaceReady]);
+
+  useEffect(() => {
+    if (!workspaceReady || !workspaceTabs.length || !activeWorkspaceTabId) return;
+    try {
+      localStorage.setItem(
+        WORKSPACE_TABS_KEY,
+        JSON.stringify({
+          tabs: workspaceTabs,
+          activeTabId: activeWorkspaceTabId,
+        }),
+      );
+    } catch {
+      // ignore persistence failures
+    }
+  }, [activeWorkspaceTabId, workspaceReady, workspaceTabs]);
 
   const visibleCapacity = getLayoutCapacity(gridTemplate.cols || 1, gridTemplate.rows || 1);
   const visibleSlots = useMemo(() => slots.slice(0, visibleCapacity), [slots, visibleCapacity]);
@@ -158,7 +369,7 @@ export function ChartWorkstationPage() {
       if (nextCapacity < visibleCapacity && populatedThatWillBeHidden > 0) {
         const ok = window.confirm(
           `Switch layout to ${nextTemplate.cols}x${nextTemplate.rows}? ` +
-            `${populatedThatWillBeHidden} populated chart(s) will be hidden (not deleted).`,
+          `${populatedThatWillBeHidden} populated chart(s) will be hidden (not deleted).`,
         );
         if (!ok) return;
       }
@@ -192,16 +403,45 @@ export function ChartWorkstationPage() {
     (slotId: string) =>
       (ticker: string, market: SlotMarket, companyName?: string | null) => {
         updateSlotTicker(slotId, ticker, market, companyName);
+        const sourceGroup = slotLinkGroups[slotId] ?? "off";
+        if (sourceGroup === "off") return;
+        useChartWorkstationStore.setState((state) => ({
+          slots: propagateLinkedSlots(state.slots, slotLinkGroups, slotId, (slot) => ({
+            ...slot,
+            ticker,
+            companyName: typeof companyName === "string" ? companyName : slot.companyName ?? null,
+            market,
+            extendedHours: { ...slot.extendedHours, enabled: market === "US" },
+          })),
+        }));
       },
-    [updateSlotTicker],
+    [slotLinkGroups, updateSlotTicker],
   );
 
   const handleTimeframeChange = useCallback(
     (slotId: string) =>
       (tf: ChartSlotTimeframe) => {
         updateSlotTimeframe(slotId, tf);
+        const slot = slots.find((s) => s.id === slotId);
+        const isUS = (slot?.market ?? "IN") === "US";
+        updateSlotETH(slotId, { enabled: isUS && shouldDefaultExtendedHoursOn(tf) });
+        const sourceGroup = slotLinkGroups[slotId] ?? "off";
+        if (sourceGroup === "off") return;
+        useChartWorkstationStore.setState((state) => ({
+          slots: propagateLinkedSlots(state.slots, slotLinkGroups, slotId, (linkedSlot) => {
+            const linkedIsUS = (linkedSlot.market ?? "IN") === "US";
+            return {
+              ...linkedSlot,
+              timeframe: tf,
+              extendedHours: {
+                ...linkedSlot.extendedHours,
+                enabled: linkedIsUS && shouldDefaultExtendedHoursOn(tf),
+              },
+            };
+          }),
+        }));
       },
-    [updateSlotTimeframe],
+    [slotLinkGroups, slots, updateSlotTimeframe, updateSlotETH],
   );
 
   const handleChartTypeChange = useCallback(
@@ -234,6 +474,48 @@ export function ChartWorkstationPage() {
         updateSlotIndicators(slotId, indicators);
       },
     [updateSlotIndicators],
+  );
+
+  const switchWorkspaceTab = useCallback(
+    (tabId: string) => {
+      const next = workspaceTabs.find((tab) => tab.id === tabId);
+      if (!next) return;
+      setActiveWorkspaceTabId(tabId);
+      const normalizedGroups = normalizeLinkGroups(next.snapshot.slots, next.linkGroups);
+      setSlotLinkGroups(normalizedGroups);
+      useChartWorkstationStore.setState({
+        slots: next.snapshot.slots,
+        gridTemplate: next.snapshot.gridTemplate,
+        syncCrosshair: next.snapshot.syncCrosshair,
+        activeSlotId: next.snapshot.slots[0]?.id ?? null,
+      });
+      setFullscreenSlotId(null);
+    },
+    [workspaceTabs],
+  );
+
+  const handleAddWorkspaceTab = useCallback(() => {
+    const id = `ws-${Date.now()}`;
+    const nextTab: WorkspaceTab = {
+      id,
+      name: `Workspace ${workspaceTabs.length + 1}`,
+      snapshot: createWorkspaceSnapshot(slots, gridTemplate, syncCrosshair),
+      linkGroups: normalizeLinkGroups(slots, slotLinkGroups),
+    };
+    setWorkspaceTabs((prev) => [...prev, nextTab]);
+    setActiveWorkspaceTabId(id);
+  }, [gridTemplate, slotLinkGroups, slots, syncCrosshair, workspaceTabs.length]);
+
+  const handleRemoveWorkspaceTab = useCallback(
+    (tabId: string) => {
+      if (workspaceTabs.length <= 1) return;
+      const remaining = workspaceTabs.filter((tab) => tab.id !== tabId);
+      setWorkspaceTabs(remaining);
+      if (activeWorkspaceTabId === tabId) {
+        switchWorkspaceTab(remaining[0].id);
+      }
+    },
+    [activeWorkspaceTabId, switchWorkspaceTab, workspaceTabs],
   );
 
   const handleAddSlot = useCallback(() => {
@@ -298,6 +580,15 @@ export function ChartWorkstationPage() {
         return;
       }
 
+      if (!event.ctrlKey && !event.metaKey && event.altKey && !event.shiftKey && activeSlotId) {
+        const tf = TIMEFRAME_HOTKEY_MAP[event.key];
+        if (tf) {
+          event.preventDefault();
+          handleTimeframeChange(activeSlotId)(tf);
+          return;
+        }
+      }
+
       if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "f") {
         if (!activeSlotId) return;
         event.preventDefault();
@@ -344,6 +635,7 @@ export function ChartWorkstationPage() {
     canAddVisibleSlot,
     fullscreenSlotId,
     handleAddSlot,
+    handleTimeframeChange,
     removeSlot,
     setActiveSlot,
     slots,
@@ -357,6 +649,42 @@ export function ChartWorkstationPage() {
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2 border-b border-terminal-border bg-terminal-panel px-3 py-1.5 text-[10px]">
           <span className="ot-type-label text-terminal-accent font-bold uppercase tracking-widest">Workspace</span>
+
+          <div className="flex items-center gap-1">
+            {workspaceTabs.map((tab) => (
+              <div key={tab.id} className="inline-flex items-center rounded border border-terminal-border">
+                <button
+                  type="button"
+                  className={`px-2 py-0.5 text-[10px] uppercase ${tab.id === activeWorkspaceTabId
+                    ? "bg-terminal-accent/15 text-terminal-accent"
+                    : "text-terminal-muted hover:text-terminal-text"
+                    }`}
+                  onClick={() => switchWorkspaceTab(tab.id)}
+                >
+                  {tab.name}
+                </button>
+                {workspaceTabs.length > 1 ? (
+                  <button
+                    type="button"
+                    className="px-1 text-terminal-muted hover:text-terminal-neg"
+                    onClick={() => handleRemoveWorkspaceTab(tab.id)}
+                    aria-label={`Close ${tab.name}`}
+                  >
+                    x
+                  </button>
+                ) : null}
+              </div>
+            ))}
+            <TerminalButton
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="px-2 font-bold uppercase"
+              onClick={handleAddWorkspaceTab}
+            >
+              + TAB
+            </TerminalButton>
+          </div>
 
           <div className="h-4 w-px bg-terminal-border" />
 
@@ -438,6 +766,15 @@ export function ChartWorkstationPage() {
             >
               4-TF PRESET
             </TerminalButton>
+            <TerminalButton
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="px-2 font-bold uppercase"
+              onClick={() => handleLayoutChange(CUSTOM_SPLIT_TEMPLATE)}
+            >
+              CUSTOM SPLIT
+            </TerminalButton>
           </div>
         </div>
 
@@ -455,6 +792,10 @@ export function ChartWorkstationPage() {
                   setFullscreenSlotId((prev) => (prev === slot.id ? null : slot.id))
                 }
                 onRemove={() => removeSlot(slot.id)}
+                linkGroup={slotLinkGroups[slot.id] ?? "off"}
+                onLinkGroupChange={(group) =>
+                  setSlotLinkGroups((prev) => ({ ...prev, [slot.id]: group }))
+                }
                 onTickerChange={handleTickerChange(slot.id)}
                 onTimeframeChange={handleTimeframeChange(slot.id)}
                 onChartTypeChange={handleChartTypeChange(slot.id)}

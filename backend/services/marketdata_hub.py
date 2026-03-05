@@ -269,9 +269,21 @@ class MarketDataHub:
         await self._sync_stream_subscriptions()
         return removed
 
-    async def broadcast(self, symbol: str, payload: dict[str, Any]) -> None:
+    async def broadcast(self, symbol: str | dict[str, Any], payload: dict[str, Any] | None = None) -> None:
+        if payload is None:
+            if isinstance(symbol, dict):
+                logger.warning("MarketDataHub.broadcast(payload) used; falling back to broadcast_to_all")
+                await self.broadcast_to_all(symbol)
+                return
+            logger.warning("MarketDataHub.broadcast called without payload for symbol=%s", symbol)
+            return
+
+        symbol_token = str(symbol).strip().upper()
+        if not symbol_token:
+            return
+
         async with self._lock:
-            targets = [(ws, subs) for ws, subs in self._connections.items() if symbol in subs]
+            targets = [(ws, subs) for ws, subs in self._connections.items() if symbol_token in subs]
 
         if not targets:
             return

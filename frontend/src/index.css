@@ -13,6 +13,11 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Typography role guidance (UI-011):
+   - default body/data surfaces use mono (`--ot-font-data`)
+   - headings/navigation/labels use UI sans (`--ot-font-ui`)
+   - status/badges/table headers use compact uppercase role tokens */
+
 * {
   box-sizing: border-box;
 }
@@ -98,5 +103,12 @@ label {
     --ot-type-size-md: 13px;
     --ot-line-height-data: 1.3;
     --ot-line-height-ui: 1.35;
+    --ot-type-heading-xl-size: clamp(18px, 2.2vw, 22px);
+    --ot-type-heading-lg-size: 16px;
+    --ot-type-table-cell-size: 11px;
+    --ot-type-table-header-size: 10px;
+    --ot-type-status-size: 10px;
+    --ot-type-badge-size: 10px;
+    --ot-density-row-default: 26px;
   }
 }

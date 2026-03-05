@@ -186,12 +186,42 @@ const DEFAULT_SCRIPT = `def generate_signals(df, context):
 
 function fmtPct(value: number): string { return `${(value * 100).toFixed(2)}%`; }
 
+function parseBacktestDate(input: unknown): Date | null {
+  if (typeof input !== "string") return null;
+  const raw = input.trim();
+  if (!raw) return null;
+  const base = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const hasZone = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(base);
+  const candidates = hasZone ? [base] : [`${base}Z`, base];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) candidates.unshift(`${raw}T00:00:00Z`);
+  for (const candidate of candidates) {
+    const d = new Date(candidate);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
+function toUnixSeconds(input: unknown): number {
+  const d = parseBacktestDate(input);
+  if (!d) return NaN;
+  return Math.floor(d.getTime() / 1000);
+}
+
+function safeIsoDateFromUnixSeconds(ts: number): string | null {
+  if (!Number.isFinite(ts)) return null;
+  const d = new Date(ts * 1000);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
 function bucketKey(ts: number, tf: BacktestTimeframe): string {
   const d = new Date(ts * 1000);
+  if (Number.isNaN(d.getTime())) return "invalid";
   if (tf === "1D") return d.toISOString().slice(0, 10);
   if (tf === "1M") return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
   const day = (d.getUTCDay() + 6) % 7;
   const weekStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day));
+  if (Number.isNaN(weekStart.getTime())) return "invalid";
   return weekStart.toISOString().slice(0, 10);
 }
 
@@ -225,14 +255,21 @@ function toBarsFromEquityCurve(
   equityCurve: Array<{ date: string; open: number; high: number; low: number; close: number; position?: number }>,
 ): Bar[] {
   return equityCurve
-    .map((p) => ({
-      time: Math.floor(new Date(`${p.date}T00:00:00Z`).getTime() / 1000),
-      open: Number(p.open ?? p.close),
-      high: Number(p.high ?? p.close),
-      low: Number(p.low ?? p.close),
-      close: Number(p.close),
-      volume: Math.max(1, Math.round(Math.abs(Number(p.position ?? 0)) * 100)),
-    }))
+    .map((p) => {
+      const ts = toUnixSeconds(p.date);
+      const close = Number((p as { close?: number; equity?: number }).close ?? (p as { equity?: number }).equity);
+      const open = Number((p as { open?: number }).open ?? close);
+      const high = Number((p as { high?: number }).high ?? Math.max(open, close));
+      const low = Number((p as { low?: number }).low ?? Math.min(open, close));
+      return {
+        time: ts,
+        open,
+        high,
+        low,
+        close,
+        volume: Math.max(1, Math.round(Math.abs(Number(p.position ?? 0)) * 100)),
+      };
+    })
     .filter(
       (b) =>
         Number.isFinite(Number(b.time)) &&
@@ -249,12 +286,17 @@ function mapTradeMarkersToTimeframe(
   trades: Array<{ date: string; price: number; action: string }>,
 ): Array<{ date: string; price: number; action: "BUY" | "SELL" }> {
   const keyToTime = new Map<string, number>();
-  for (const b of bars) keyToTime.set(bucketKey(Number(b.time), timeframe), Number(b.time));
+  for (const b of bars) {
+    const key = bucketKey(Number(b.time), timeframe);
+    if (key !== "invalid") keyToTime.set(key, Number(b.time));
+  }
   return trades.map((m) => {
-    const ts = Math.floor(new Date(`${m.date}T00:00:00Z`).getTime() / 1000);
-    const mapped = keyToTime.get(bucketKey(ts, timeframe));
+    const ts = toUnixSeconds(m.date);
+    const key = bucketKey(ts, timeframe);
+    const mapped = key !== "invalid" ? keyToTime.get(key) : undefined;
+    const mappedDate = mapped ? safeIsoDateFromUnixSeconds(mapped) : null;
     return {
-      date: mapped ? new Date(mapped * 1000).toISOString().slice(0, 10) : m.date,
+      date: mappedDate ?? m.date,
       price: Number(m.price),
       action: (String(m.action).toUpperCase() === "BUY" ? "BUY" : "SELL") as "BUY" | "SELL",
     };
@@ -593,8 +635,9 @@ export function BacktestingPage() {
     const dates = equityData.map((p) => p.date).filter(Boolean);
     let missingWeekdays = 0;
     for (let i = 1; i < dates.length; i++) {
-      const prev = new Date(`${dates[i - 1]}T00:00:00Z`);
-      const curr = new Date(`${dates[i]}T00:00:00Z`);
+      const prev = parseBacktestDate(dates[i - 1]);
+      const curr = parseBacktestDate(dates[i]);
+      if (!prev || !curr) continue;
       for (let d = new Date(prev); d < curr; d.setUTCDate(d.getUTCDate() + 1)) {
         const wd = d.getUTCDay();
         if (wd >= 1 && wd <= 5) missingWeekdays += 1;
@@ -639,8 +682,8 @@ export function BacktestingPage() {
   const fallbackAnalytics = useMemo<Analytics>(() => {
     const monthlyMap = new Map<string, { year: number; month: number; first: number; last: number }>();
     for (const row of equityData) {
-      const dt = new Date(`${row.date}T00:00:00Z`);
-      if (Number.isNaN(dt.getTime())) continue;
+      const dt = parseBacktestDate(row.date);
+      if (!dt) continue;
       const year = dt.getUTCFullYear();
       const month = dt.getUTCMonth() + 1;
       const key = `${year}-${month}`;
@@ -722,8 +765,12 @@ export function BacktestingPage() {
       } else if (action === "SELL" && openTrade) {
         const qty = Math.min(Math.abs(Number(trade.quantity)), Math.abs(openTrade.quantity)) || 1;
         const pnl = (Number(trade.price) - openTrade.price) * qty;
-        const entry = new Date(`${openTrade.date}T00:00:00Z`);
-        const exit = new Date(`${trade.date}T00:00:00Z`);
+        const entry = parseBacktestDate(openTrade.date);
+        const exit = parseBacktestDate(trade.date);
+        if (!entry || !exit) {
+          openTrade = null;
+          continue;
+        }
         const days = Math.max(1, Math.round((exit.getTime() - entry.getTime()) / 86400000));
         const return_pct = openTrade.price ? ((Number(trade.price) - openTrade.price) / openTrade.price) * 100 : 0;
         scatter.push({ entry_date: openTrade.date, exit_date: trade.date, pnl, return_pct, holding_days: days });

@@ -11,12 +11,14 @@ import type {
 } from "../../store/chartWorkstationStore";
 import { TradingChart } from "../chart/TradingChart";
 import { VolumeProfile } from "../chart/VolumeProfile";
+import { DrawingTools, type DrawMode } from "../chart/DrawingTools";
 import { IndicatorPanel } from "../../shared/chart/IndicatorPanel";
 import type { IndicatorConfig } from "../../shared/chart/types";
 import { ChartPanelHeader } from "./ChartPanelHeader";
 import { ChartPanelFooter } from "./ChartPanelFooter";
 import type { QuoteTick } from "../../realtime/useQuotesStream";
 import { quickAddToFirstPortfolio } from "../../shared/portfolioQuickAdd";
+import type { WorkspaceLinkGroup } from "../../pages/ChartWorkstationPage";
 import "./ChartWorkstation.css";
 
 const CHART_MODE_MAP: Record<ChartSlotType, "candles" | "line" | "area"> = {
@@ -32,6 +34,8 @@ interface Props {
   onActivate: () => void;
   onToggleFullscreen: () => void;
   onRemove: () => void;
+  linkGroup: WorkspaceLinkGroup;
+  onLinkGroupChange: (group: WorkspaceLinkGroup) => void;
   onTickerChange: (ticker: string, market: SlotMarket, companyName?: string | null) => void;
   onTimeframeChange: (tf: ChartSlotTimeframe) => void;
   onChartTypeChange: (type: ChartSlotType) => void;
@@ -51,6 +55,8 @@ export function ChartPanel({
   onActivate,
   onToggleFullscreen,
   onRemove,
+  linkGroup,
+  onLinkGroupChange,
   onTickerChange,
   onTimeframeChange,
   onChartTypeChange,
@@ -63,8 +69,14 @@ export function ChartPanel({
   liveQuote = null,
 }: Props) {
   const [showIndicators, setShowIndicators] = useState(false);
+  const [showDrawingTools, setShowDrawingTools] = useState(false);
+  const [drawMode, setDrawMode] = useState<DrawMode>("none");
+  const [clearDrawingsSignal, setClearDrawingsSignal] = useState(0);
+  const [pendingTrendPoint, setPendingTrendPoint] = useState(false);
   const [showVolumeProfile, setShowVolumeProfile] = useState(false);
+  const [vpMode, setVpMode] = useState<"fixed" | "session" | "visible">("fixed");
   const [vpPeriod, setVpPeriod] = useState("20d");
+  const [vpLookbackBars, setVpLookbackBars] = useState(300);
   const [vpBins, setVpBins] = useState(50);
   const [volumeProfile, setVolumeProfile] = useState<VolumeProfileResponse | null>(null);
   const [vpLoading, setVpLoading] = useState(false);
@@ -119,6 +131,8 @@ export function ChartPanel({
           period: vpPeriod,
           bins: vpBins,
           market: slot.market,
+          mode: vpMode,
+          lookbackBars: vpMode === "visible" ? vpLookbackBars : undefined,
         });
         if (!cancelled) setVolumeProfile(payload);
       } catch {
@@ -135,7 +149,7 @@ export function ChartPanel({
       cancelled = true;
       clearInterval(timer);
     };
-  }, [showVolumeProfile, slot.ticker, slot.market, vpPeriod, vpBins]);
+  }, [showVolumeProfile, slot.ticker, slot.market, vpMode, vpPeriod, vpLookbackBars, vpBins]);
 
   return (
     <div
@@ -155,6 +169,8 @@ export function ChartPanel({
         onETHChange={onETHChange}
         onRemove={onRemove}
         onToggleFullscreen={onToggleFullscreen}
+        linkGroup={linkGroup}
+        onLinkGroupChange={onLinkGroupChange}
         chartData={renderChartData}
       />
 
@@ -175,6 +191,21 @@ export function ChartPanel({
               aria-label={showVolumeProfile ? "Hide volume profile" : "Show volume profile"}
             >
               VP
+            </button>
+            <button
+              type="button"
+              className={`rounded border px-2 py-0.5 text-[10px] ${
+                showDrawingTools
+                  ? "border-terminal-accent bg-terminal-accent/10 text-terminal-accent"
+                  : "border-terminal-border bg-terminal-panel/90 text-terminal-muted"
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDrawingTools((v) => !v);
+              }}
+              aria-label={showDrawingTools ? "Hide drawing tools" : "Show drawing tools"}
+            >
+              DRAW {drawMode !== "none" ? `(${drawMode})` : ""}
             </button>
             <button
               type="button"
@@ -215,11 +246,14 @@ export function ChartPanel({
               data={renderChartData}
               mode={CHART_MODE_MAP[slot.chartType]}
               timeframe={slot.timeframe}
-              drawMode="none"
               extendedHours={slot.extendedHours}
               preMarketLevels={slot.preMarketLevels}
               market={slot.market}
               indicatorConfigs={indicatorConfigs}
+              drawMode={drawMode}
+              clearDrawingsSignal={clearDrawingsSignal}
+              onPendingTrendPointChange={setPendingTrendPoint}
+              drawingWorkspaceId={slot.id}
               panelId={slot.id}
               crosshairSyncGroupId="chart-workstation-linked"
               onAddToPortfolio={(symbol, priceHint) => {
@@ -234,14 +268,35 @@ export function ChartPanel({
             <span>VP</span>
             <select
               className="rounded border border-terminal-border bg-terminal-bg px-1 py-0.5 text-[10px]"
+              value={vpMode}
+              onChange={(e) => setVpMode(e.target.value as "fixed" | "session" | "visible")}
+            >
+              <option value="fixed">Fixed</option>
+              <option value="session">Session</option>
+              <option value="visible">Visible</option>
+            </select>
+            <select
+              className="rounded border border-terminal-border bg-terminal-bg px-1 py-0.5 text-[10px]"
               value={vpPeriod}
               onChange={(e) => setVpPeriod(e.target.value)}
+              disabled={vpMode !== "fixed"}
             >
               <option value="5d">5d</option>
               <option value="10d">10d</option>
               <option value="20d">20d</option>
               <option value="30d">30d</option>
             </select>
+            {vpMode === "visible" ? (
+              <select
+                className="rounded border border-terminal-border bg-terminal-bg px-1 py-0.5 text-[10px]"
+                value={vpLookbackBars}
+                onChange={(e) => setVpLookbackBars(Number(e.target.value))}
+              >
+                <option value={150}>150</option>
+                <option value={300}>300</option>
+                <option value={500}>500</option>
+              </select>
+            ) : null}
             <select
               className="rounded border border-terminal-border bg-terminal-bg px-1 py-0.5 text-[10px]"
               value={vpBins}
@@ -275,6 +330,34 @@ export function ChartPanel({
                 activeIndicators={indicatorConfigs}
                 onChange={onIndicatorsChange}
                 templateScope="equity"
+              />
+            </div>
+          </div>
+        )}
+        {slot.ticker && showDrawingTools && (
+          <div
+            className="absolute bottom-2 left-2 z-20 w-[260px] max-w-[calc(100%-1rem)] overflow-hidden rounded border border-terminal-border bg-terminal-panel shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-terminal-border px-3 py-2 text-[11px]">
+              <span className="font-semibold text-terminal-accent">Drawings</span>
+              <button
+                type="button"
+                className="rounded border border-terminal-border px-2 py-0.5 text-terminal-muted"
+                onClick={() => setShowDrawingTools(false)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-2">
+              <DrawingTools
+                mode={drawMode}
+                onModeChange={setDrawMode}
+                onClear={() => {
+                  setPendingTrendPoint(false);
+                  setClearDrawingsSignal((v) => v + 1);
+                }}
+                pendingTrendPoint={pendingTrendPoint}
               />
             </div>
           </div>

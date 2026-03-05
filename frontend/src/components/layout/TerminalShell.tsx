@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { ErrorBoundary } from "../common/ErrorBoundary";
 import { InstallPromptBanner } from "./InstallPromptBanner";
@@ -222,6 +222,7 @@ export function TerminalShell({
   rightRailStorageKey,
 }: Props) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [preset, setPreset] = usePersistedState<WorkspacePreset>(
     workspacePresetStorageKey,
     defaultPreset,
@@ -248,7 +249,9 @@ export function TerminalShell({
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
       const key = event.key.toLowerCase();
+      const onChartWorkstation = location.pathname.includes("/equity/chart-workstation");
       if (key === "w") {
+        if (onChartWorkstation) return;
         event.preventDefault();
         navigate("/equity/watchlist");
       } else if (key === "n") {
@@ -261,7 +264,7 @@ export function TerminalShell({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [navigate]);
+  }, [location.pathname, navigate]);
 
   return (
     <TerminalShellContext.Provider value={shellCtx}>

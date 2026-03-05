@@ -100,7 +100,9 @@ describe("VolumeProfile", () => {
 
     const { rerender } = render(<VolumeProfile profile={SAMPLE_PROFILE} liveQuote={initialTick} />);
     const firstProfileRaf = rafQueue.shift();
-    firstProfileRaf?.(0);
+    act(() => {
+      firstProfileRaf?.(0);
+    });
 
     expect(screen.getByTestId("volume-profile-bin-0")).toHaveAttribute("data-volume", "400.0000");
 

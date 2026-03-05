@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 
 import {
   fetchAlerts,
@@ -16,7 +17,7 @@ import {
 import { fetchExpiries, fetchOptionChain } from "../../fno/api/fnoApi";
 import { useStock, useStockHistory } from "../../hooks/useStocks";
 import { useSettingsStore } from "../../store/settingsStore";
-import { useQuotesStore } from "../../realtime/useQuotesStream";
+import { useQuotesStore, useQuotesStream } from "../../realtime/useQuotesStream";
 import type { AlertRule, WatchlistItem } from "../../types";
 import type { LaunchpadPanelConfig } from "./LaunchpadContext";
 import { TradingChart } from "../chart/TradingChart";
@@ -298,19 +299,51 @@ export function LaunchpadChartPanel({ panel }: PanelProps) {
 }
 
 export function LaunchpadWatchlistPanel(_: PanelProps) {
+  const navigate = useNavigate();
+  const selectedMarket = useSettingsStore((s) => s.selectedMarket);
+  const { subscribe, unsubscribe, connectionState } = useQuotesStream(selectedMarket);
+  const ticksByToken = useQuotesStore((s) => s.ticksByToken);
   const watchlist = useQuery({ queryKey: ["launchpad", "watchlist"], queryFn: fetchWatchlist, staleTime: 30_000, refetchInterval: 60_000 });
   const rows = (watchlist.data ?? []) as WatchlistItem[];
   const nav = useJkListNavigation(rows);
 
+  useEffect(() => {
+    const symbols = rows.map((row) => row.ticker).filter(Boolean);
+    if (!symbols.length) return;
+    subscribe(symbols);
+    return () => unsubscribe(symbols);
+  }, [rows, subscribe, unsubscribe]);
+
   return (
     <div className="h-full overflow-auto p-2" tabIndex={0} onKeyDown={nav.onKeyDown}>
+      <div className="mb-1 flex items-center justify-between text-[10px] uppercase text-terminal-muted">
+        <span>{selectedMarket} feed: {connectionState}</span>
+        <span>{rows.length} symbols</span>
+      </div>
       {!rows.length ? <div className="text-xs text-terminal-muted">No watchlist rows.</div> : null}
       <div className="space-y-1">
         {rows.map((row, idx) => (
-          <div key={row.id} className={`rounded border px-2 py-1 text-xs ${idx === nav.selected ? "border-terminal-accent bg-terminal-accent/10" : "border-terminal-border bg-terminal-bg"}`}>
+          <button
+            key={row.id}
+            type="button"
+            onClick={() => navigate(`/equity/stocks?ticker=${encodeURIComponent(row.ticker)}`)}
+            className={`grid w-full grid-cols-4 rounded border px-2 py-1 text-left text-xs ${
+              idx === nav.selected ? "border-terminal-accent bg-terminal-accent/10" : "border-terminal-border bg-terminal-bg"
+            }`}
+          >
             <div className="ot-type-data text-terminal-text">{row.ticker}</div>
-            <div className="text-terminal-muted">{row.watchlist_name}</div>
-          </div>
+            <div className="truncate text-terminal-muted">{row.watchlist_name}</div>
+            <div className="text-right ot-type-data text-terminal-text">
+              {Number(ticksByToken[`${selectedMarket}:${row.ticker}`]?.ltp ?? NaN).toFixed(2).replace("NaN", "--")}
+            </div>
+            <div
+              className={`text-right ot-type-data ${
+                Number(ticksByToken[`${selectedMarket}:${row.ticker}`]?.change_pct ?? 0) >= 0 ? "text-terminal-pos" : "text-terminal-neg"
+              }`}
+            >
+              {Number(ticksByToken[`${selectedMarket}:${row.ticker}`]?.change_pct ?? NaN).toFixed(2).replace("NaN", "--")}%
+            </div>
+          </button>
         ))}
       </div>
     </div>

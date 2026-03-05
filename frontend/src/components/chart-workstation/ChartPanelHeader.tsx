@@ -7,6 +7,7 @@ import { TerminalBadge } from "../terminal/TerminalBadge";
 import { TerminalButton } from "../terminal/TerminalButton";
 import { TerminalDropdown } from "../terminal/TerminalDropdown";
 import { TerminalTooltip } from "../terminal/TerminalTooltip";
+import type { WorkspaceLinkGroup } from "../../pages/ChartWorkstationPage";
 import "./ChartWorkstation.css";
 
 const TIMEFRAMES: ChartSlotTimeframe[] = ["1m", "5m", "15m", "1h", "1D", "1W", "1M"];
@@ -15,6 +16,8 @@ const CHART_TYPES: ChartSlotType[] = ["candle", "line", "area"];
 interface Props {
   slot: ChartSlot;
   isFullscreen: boolean;
+  linkGroup: WorkspaceLinkGroup;
+  onLinkGroupChange: (group: WorkspaceLinkGroup) => void;
   onTickerChange: (ticker: string, market: SlotMarket, companyName?: string | null) => void;
   onTimeframeChange: (tf: ChartSlotTimeframe) => void;
   onChartTypeChange: (type: ChartSlotType) => void;
@@ -27,6 +30,8 @@ interface Props {
 export function ChartPanelHeader({
   slot,
   isFullscreen,
+  linkGroup,
+  onLinkGroupChange,
   onTickerChange,
   onTimeframeChange,
   onChartTypeChange,
@@ -81,6 +86,24 @@ export function ChartPanelHeader({
       <TerminalBadge variant="neutral" size="sm" className="font-bold">
         {slot.market}
       </TerminalBadge>
+
+      <TerminalDropdown
+        label={`L-${linkGroup === "off" ? "OFF" : linkGroup}`}
+        aria-label="Change link group"
+        size="sm"
+        variant="ghost"
+        items={[
+          { id: "off", label: "OFF", badge: linkGroup === "off" ? "ACTIVE" : undefined },
+          { id: "A", label: "A", badge: linkGroup === "A" ? "ACTIVE" : undefined },
+          { id: "B", label: "B", badge: linkGroup === "B" ? "ACTIVE" : undefined },
+          { id: "C", label: "C", badge: linkGroup === "C" ? "ACTIVE" : undefined },
+        ]}
+        onSelect={(id) => {
+          if (id === "off" || id === "A" || id === "B" || id === "C") {
+            onLinkGroupChange(id);
+          }
+        }}
+      />
 
       <div className="h-4 w-px bg-terminal-border" />
 

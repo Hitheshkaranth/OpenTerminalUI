@@ -679,8 +679,16 @@ export type ChartDrawingRecord = {
   created_at?: string;
 };
 
-export async function listChartDrawings(symbol: string): Promise<ChartDrawingRecord[]> {
-  const { data } = await api.get<{ items: ChartDrawingRecord[] }>(`/chart-drawings/${encodeURIComponent(symbol)}`);
+export async function listChartDrawings(
+  symbol: string,
+  opts?: { timeframe?: string; workspaceId?: string },
+): Promise<ChartDrawingRecord[]> {
+  const { data } = await api.get<{ items: ChartDrawingRecord[] }>(`/chart-drawings/${encodeURIComponent(symbol)}`, {
+    params: {
+      timeframe: opts?.timeframe,
+      workspace_id: opts?.workspaceId,
+    },
+  });
   return Array.isArray(data?.items) ? data.items : [];
 }
 
@@ -718,18 +726,25 @@ export type VolumeProfileBin = {
 export type VolumeProfileResponse = {
   symbol: string;
   period: string;
+  mode?: "fixed" | "session" | "visible";
+  lookback_bars?: number | null;
   bins: VolumeProfileBin[];
   poc_price: number | null;
   value_area_high: number | null;
   value_area_low: number | null;
 };
 
-export async function fetchVolumeProfile(symbol: string, opts?: { period?: string; bins?: number; market?: string }): Promise<VolumeProfileResponse> {
+export async function fetchVolumeProfile(
+  symbol: string,
+  opts?: { period?: string; bins?: number; market?: string; mode?: "fixed" | "session" | "visible"; lookbackBars?: number },
+): Promise<VolumeProfileResponse> {
   const { data } = await api.get<VolumeProfileResponse>(`/charts/volume-profile/${encodeURIComponent(symbol)}`, {
     params: {
       period: opts?.period ?? "20d",
       bins: opts?.bins ?? 50,
       market: opts?.market ?? "NSE",
+      mode: opts?.mode ?? "fixed",
+      lookback_bars: opts?.lookbackBars ?? 300,
     },
   });
   return data;

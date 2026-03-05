@@ -2,10 +2,16 @@ import { performance } from "node:perf_hooks";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { OptionChainTable } from "../fno/components/OptionChainTable";
 import type { StrikeData } from "../fno/types/fno";
+
+vi.mock("../hooks/useDisplayCurrency", () => ({
+  useDisplayCurrency: () => ({
+    formatDisplayMoney: (value: number) => value.toFixed(2),
+  }),
+}));
 
 const DEFAULT_RENDER_BUDGET_MS = 5000;
 

@@ -7,10 +7,17 @@ import {
 import {
   Calendar, Info, TrendingDown, TrendingUp, AlertTriangle, ArrowRight
 } from "lucide-react";
-import { format, parseISO, subDays } from "date-fns";
+import { format, isValid, parseISO, subDays } from "date-fns";
 
 import { fetchYieldCurve, fetchHistoricalYieldCurve, fetch2s10sHistory } from "../../api/client";
 import { TerminalPanel } from "../../components/terminal/TerminalPanel";
+
+function safeFormatIso(input: unknown, pattern: string, fallback = "-"): string {
+  if (typeof input !== "string" || !input.trim()) return fallback;
+  const parsed = parseISO(input);
+  if (!isValid(parsed)) return fallback;
+  return format(parsed, pattern);
+}
 
 export function YieldCurveDashboard() {
   const [compareDate, setCompareDate] = useState<string>("");
@@ -292,12 +299,12 @@ export function YieldCurveDashboard() {
                     dataKey="date"
                     stroke="#9CA3AF"
                     fontSize={8}
-                    tickFormatter={(val) => format(parseISO(val), "MMM yy")}
+                    tickFormatter={(val) => safeFormatIso(val, "MMM yy")}
                     minTickGap={50}
                   />
                   <YAxis stroke="#9CA3AF" fontSize={10} unit="%" />
                   <Tooltip
-                    labelFormatter={(label) => format(parseISO(label), "PPP")}
+                    labelFormatter={(label) => safeFormatIso(label, "PPP")}
                     contentStyle={{ backgroundColor: '#111827', borderColor: '#374151', fontSize: '12px' }}
                   />
                   <ReferenceLine y={0} stroke="#EF4444" strokeWidth={1} strokeDasharray="3 3" />

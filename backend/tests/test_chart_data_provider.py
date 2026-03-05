@@ -77,3 +77,135 @@ def test_get_ohlcv_prefers_in_memory_cache(monkeypatch) -> None:
         assert calls["count"] == 1
 
     asyncio.run(_run())
+
+
+def test_us_ohlcv_prefers_alpaca_before_other_providers(monkeypatch) -> None:
+    monkeypatch.setenv("ALPACA_API_KEY", "key")
+    monkeypatch.setenv("ALPACA_SECRET_KEY", "secret")
+    provider = ChartDataProvider()
+
+    sample = [
+        OHLCVBar(
+            timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            open=10.0,
+            high=11.0,
+            low=9.5,
+            close=10.8,
+            volume=1000.0,
+            symbol="AAPL",
+            market="US",
+        )
+    ]
+
+    async def _fake_alpaca(*args, **kwargs):  # noqa: ANN002, ANN003
+        return sample
+
+    async def _boom(*args, **kwargs):  # noqa: ANN002, ANN003
+        raise AssertionError("fallback provider should not be called when alpaca returns bars")
+
+    monkeypatch.setattr(provider, "_alpaca_historical", _fake_alpaca)
+    monkeypatch.setattr(provider, "_fmp_historical", _boom)
+    monkeypatch.setattr(provider, "_finnhub_candles", _boom)
+
+    async def _run() -> None:
+        bars = await provider._us_ohlcv("AAPL", "AAPL", "1m", "5d", None, None)
+        assert len(bars) == 1
+        assert bars[0].close == 10.8
+
+    asyncio.run(_run())
+
+
+def test_us_ohlcv_falls_back_when_alpaca_empty(monkeypatch) -> None:
+    monkeypatch.setenv("ALPACA_API_KEY", "key")
+    monkeypatch.setenv("ALPACA_SECRET_KEY", "secret")
+    monkeypatch.setenv("FMP_API_KEY", "fmp-key")
+    provider = ChartDataProvider()
+
+    from_fmp = [
+        OHLCVBar(
+            timestamp=datetime(2026, 1, 2, tzinfo=timezone.utc),
+            open=20.0,
+            high=21.0,
+            low=19.5,
+            close=20.4,
+            volume=1500.0,
+            symbol="MSFT",
+            market="US",
+        )
+    ]
+
+    async def _fake_alpaca(*args, **kwargs):  # noqa: ANN002, ANN003
+        return []
+
+    async def _fake_fmp(*args, **kwargs):  # noqa: ANN002, ANN003
+        return from_fmp
+
+    monkeypatch.setattr(provider, "_alpaca_historical", _fake_alpaca)
+    monkeypatch.setattr(provider, "_fmp_historical", _fake_fmp)
+
+    async def _run() -> None:
+        bars = await provider._us_ohlcv("MSFT", "MSFT", "1m", "5d", None, None)
+        assert len(bars) == 1
+        assert bars[0].symbol == "MSFT"
+
+    asyncio.run(_run())
+
+
+def test_get_ohlcv_backfills_missing_ranges_from_provider(monkeypatch) -> None:
+    provider = ChartDataProvider()
+    start_dt = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    end_dt = datetime(2026, 1, 1, 0, 4, tzinfo=timezone.utc)
+    start_ms = int(start_dt.timestamp() * 1000)
+    end_ms = int(end_dt.timestamp() * 1000)
+
+    cached_rows = [
+        {"t": start_ms, "o": 10, "h": 11, "l": 9, "c": 10.5, "v": 100},
+        {"t": start_ms + 60_000, "o": 10.5, "h": 11.2, "l": 10.1, "c": 11.0, "v": 120},
+        {"t": start_ms + 180_000, "o": 11.2, "h": 11.4, "l": 10.8, "c": 11.0, "v": 90},
+        {"t": end_ms, "o": 11.0, "h": 11.3, "l": 10.7, "c": 11.1, "v": 80},
+    ]
+
+    class _Result:
+        def __init__(self):
+            self.rows = cached_rows
+            self.tier = "warm"
+            self.complete = False
+            self.missing_ranges = [(start_ms + 120_000, start_ms + 120_000)]
+
+    async def _fake_get_range_with_gaps(*args, **kwargs):  # noqa: ANN002, ANN003
+        return _Result()
+
+    writes: list[list[dict[str, float | int]]] = []
+
+    async def _fake_put_bars(symbol: str, interval: str, bars):  # noqa: ANN001, ANN202
+        writes.append(bars)
+
+    async def _fake_resolve(symbol: str, market_hint: str | None = None):  # noqa: ARG001
+        return ("US", "AAPL", "AAPL")
+
+    async def _fake_us(*args, **kwargs):  # noqa: ANN002, ANN003
+        return [
+            OHLCVBar(
+                timestamp=datetime.fromtimestamp((start_ms + 120_000) / 1000, tz=timezone.utc),
+                open=11.0,
+                high=11.5,
+                low=10.9,
+                close=11.3,
+                volume=110.0,
+                symbol="AAPL",
+                market="US",
+            )
+        ]
+
+    monkeypatch.setattr(provider._cache, "get_range_with_gaps", _fake_get_range_with_gaps)
+    monkeypatch.setattr(provider._cache, "put_bars", _fake_put_bars)
+    monkeypatch.setattr(provider, "resolve_market", _fake_resolve)
+    monkeypatch.setattr(provider, "_us_ohlcv", _fake_us)
+
+    async def _run() -> None:
+        bars = await provider.get_ohlcv("AAPL", interval="1m", start=start_dt, end=end_dt, market_hint="NASDAQ")
+        assert len(bars) == 5
+        assert any(abs(b.close - 11.3) < 1e-9 for b in bars)
+        assert len(writes) == 1
+
+    asyncio.run(_run())

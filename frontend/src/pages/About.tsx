@@ -66,6 +66,16 @@ export function AboutPage({ terminalType = "market" }: AboutProps) {
       </TerminalPanel>
 
       <div className="grid gap-3 lg:grid-cols-2">
+        <TerminalPanel title="New In This Build">
+          <ul className="space-y-1 text-xs text-terminal-text">
+            <li>- Linked crosshair sync across multi-chart launchpad/workstation panels.</li>
+            <li>- Volume Profile overlay with VPOC and 70% value area controls.</li>
+            <li>- GO bar + command palette shortcut hardening (`Ctrl/Cmd+G`, `Ctrl/Cmd+K`).</li>
+            <li>- Chart replay helpers, alternative candle transforms, and comparison-series tools.</li>
+            <li>- Provider registry fallback ordering and expanded adapter test coverage.</li>
+          </ul>
+        </TerminalPanel>
+
         <TerminalPanel title="Equity Pack">
           <ul className="space-y-1 text-xs text-terminal-text">
             <li>- Terminal shell with GO bar, command palette, ticker tape, and keyboard navigation.</li>
