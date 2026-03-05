@@ -59,10 +59,14 @@ test.describe("Terminal shell + GO bar", () => {
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/equity\/watchlist/);
 
+    // Wait for CommandBar to remount and re-register keydown handler after navigation
+    const commandInputAfterNav = page.getByPlaceholder(/Type ticker, command, or search/i);
+    await expect(commandInputAfterNav).toBeVisible();
+    await page.waitForTimeout(200);
     await page.locator("body").click();
     await page.keyboard.press("Control+G");
-    await expect(commandInput).toBeFocused();
-    await commandInput.fill("AAPL GP");
+    await expect(commandInputAfterNav).toBeFocused();
+    await commandInputAfterNav.fill("AAPL GP");
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/equity\/security\/AAPL\?tab=chart/);
   });
