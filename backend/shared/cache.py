@@ -55,8 +55,10 @@ class MultiTierCache:
     async def close(self):
         if self._redis:
             await self._redis.close()
+            self._redis = None
         if self._db_conn:
             self._db_conn.close()
+            self._db_conn = None
 
     def _get_l1(self, key: str) -> Optional[Any]:
         if key in self._l1_cache:
@@ -90,7 +92,24 @@ class MultiTierCache:
         except Exception as e:
             logger.warning("L2 set error: %s", e)
 
+    def _ensure_db(self):
+        if self._db_conn is not None:
+            return
+        try:
+            self._db_conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=15)
+            self._db_conn.execute("PRAGMA journal_mode=WAL;")
+            self._db_conn.execute("PRAGMA synchronous=NORMAL;")
+            self._db_conn.execute("PRAGMA busy_timeout=5000;")
+            self._db_conn.execute(
+                "CREATE TABLE IF NOT EXISTS cache (key TEXT PRIMARY KEY, value BLOB, expiry REAL)"
+            )
+            self._db_conn.commit()
+        except Exception as e:
+            logger.warning("L3 reconnect failed: %s", e)
+            self._db_conn = None
+
     async def _get_l3(self, key: str) -> Optional[Any]:
+        self._ensure_db()
         if not self._db_conn:
             return None
 
@@ -109,6 +128,7 @@ class MultiTierCache:
         return await asyncio.to_thread(_read)
 
     async def _set_l3(self, key: str, value: Any, ttl: int):
+        self._ensure_db()
         if not self._db_conn:
             return
 

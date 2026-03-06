@@ -26,6 +26,8 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+/** Raw context ref for optional (non-throwing) usage outside AuthProvider */
+export { AuthContext as AuthContextRef };
 const ACCESS_TOKEN_KEY = "ot-access-token";
 const REFRESH_TOKEN_KEY = "ot-refresh-token";
 

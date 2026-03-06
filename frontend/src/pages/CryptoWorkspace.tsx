@@ -10,13 +10,77 @@ import {
   fetchCryptoSectors,
   type CryptoMoverRow,
 } from "../api/client";
+import { CryptoCorrelationMatrixPanel } from "../components/crypto/CryptoCorrelationMatrixPanel";
+import { CryptoDefiPanel } from "../components/crypto/CryptoDefiPanel";
+import { CryptoDerivativesPanel } from "../components/crypto/CryptoDerivativesPanel";
+import { CryptoHeatmapPanel } from "../components/crypto/CryptoHeatmapPanel";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { useStockStore } from "../store/stockStore";
 
-type CryptoTab = "markets" | "movers" | "index" | "sectors";
+type CryptoTab = "markets" | "movers" | "index" | "sectors" | "heatmap" | "derivatives" | "defi" | "correlation";
+
+type HeatmapResponse = {
+  items: Array<{
+    symbol: string;
+    name: string;
+    sector: string;
+    change_24h: number;
+    market_cap: number;
+    depth_imbalance: number;
+    bucket: string;
+  }>;
+};
+
+type DerivativesResponse = {
+  items: Array<{
+    symbol: string;
+    funding_rate_8h: number;
+    open_interest_usd: number;
+    long_liquidations_24h: number;
+    short_liquidations_24h: number;
+    liquidations_24h: number;
+  }>;
+  totals: {
+    open_interest_usd: number;
+    long_liquidations_24h: number;
+    short_liquidations_24h: number;
+    liquidations_24h: number;
+  };
+};
+
+type DefiResponse = {
+  headline: {
+    tvl_usd: number;
+    dex_volume_24h: number;
+    lending_borrowed_usd: number;
+    defi_change_24h: number;
+  };
+  protocols: Array<{
+    symbol: string;
+    name: string;
+    change_24h: number;
+    dominance_pct: number;
+    tvl_proxy_usd: number;
+  }>;
+};
+
+type CorrelationResponse = {
+  symbols: string[];
+  matrix: number[][];
+  window: number;
+};
 
 function pctClass(v: number): string {
   return v >= 0 ? "text-terminal-pos" : "text-terminal-neg";
+}
+
+async function fetchCryptoAdvanced<T>(path: string): Promise<T> {
+  const base = import.meta.env.VITE_API_BASE_URL || "/api";
+  const response = await fetch(`${base}${path}`);
+  if (!response.ok) {
+    throw new Error(`Crypto endpoint failed: ${response.status}`);
+  }
+  return (await response.json()) as T;
 }
 
 export function CryptoWorkspacePage() {
@@ -24,6 +88,7 @@ export function CryptoWorkspacePage() {
   const setTicker = useStockStore((s) => s.setTicker);
   const [tab, setTab] = useState<CryptoTab>("markets");
   const [moversMetric, setMoversMetric] = useState("gainers");
+  const [corrWindow, setCorrWindow] = useState(30);
 
   const marketsQuery = useQuery({
     queryKey: ["crypto", "markets"],
@@ -55,6 +120,30 @@ export function CryptoWorkspacePage() {
     staleTime: 30_000,
     refetchInterval: 30_000,
   });
+  const heatmapQuery = useQuery({
+    queryKey: ["crypto", "heatmap"],
+    queryFn: () => fetchCryptoAdvanced<HeatmapResponse>("/v1/crypto/heatmap?limit=48"),
+    staleTime: 20_000,
+    refetchInterval: 20_000,
+  });
+  const derivativesQuery = useQuery({
+    queryKey: ["crypto", "derivatives"],
+    queryFn: () => fetchCryptoAdvanced<DerivativesResponse>("/v1/crypto/derivatives?limit=24"),
+    staleTime: 10_000,
+    refetchInterval: 10_000,
+  });
+  const defiQuery = useQuery({
+    queryKey: ["crypto", "defi"],
+    queryFn: () => fetchCryptoAdvanced<DefiResponse>("/v1/crypto/defi"),
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  });
+  const correlationQuery = useQuery({
+    queryKey: ["crypto", "correlation", corrWindow],
+    queryFn: () => fetchCryptoAdvanced<CorrelationResponse>(`/v1/crypto/correlation?window=${corrWindow}&limit=8`),
+    staleTime: 45_000,
+    refetchInterval: 45_000,
+  });
 
   const topWatchlist = useMemo(() => (marketsQuery.data || []).slice(0, 12), [marketsQuery.data]);
 
@@ -69,10 +158,10 @@ export function CryptoWorkspacePage() {
       <div className="flex items-center justify-between">
         <div>
           <div className="ot-type-heading-lg text-terminal-text">Crypto Workspace</div>
-          <div className="text-xs text-terminal-muted">Markets, movers, dominance, index, and sectors</div>
+          <div className="text-xs text-terminal-muted">Markets, movers, dominance, index, sectors, and advanced analytics</div>
         </div>
         <div className="inline-flex items-center gap-1 rounded border border-terminal-border bg-terminal-panel p-1">
-          {(["markets", "movers", "index", "sectors"] as CryptoTab[]).map((id) => (
+          {(["markets", "movers", "index", "sectors", "heatmap", "derivatives", "defi", "correlation"] as CryptoTab[]).map((id) => (
             <button
               key={id}
               type="button"
@@ -220,6 +309,65 @@ export function CryptoWorkspacePage() {
               </div>
             ))}
           </div>
+        </TerminalPanel>
+      ) : null}
+
+      {tab === "heatmap" ? (
+        <TerminalPanel title="Heatmap + Depth" subtitle="Sector-colored market map with order-book pressure">
+          <CryptoHeatmapPanel items={heatmapQuery.data?.items || []} onSelect={openChart} />
+        </TerminalPanel>
+      ) : null}
+
+      {tab === "derivatives" ? (
+        <TerminalPanel title="Derivatives" subtitle="Funding and liquidation aggregation">
+          <CryptoDerivativesPanel
+            rows={derivativesQuery.data?.items || []}
+            totals={
+              derivativesQuery.data?.totals || {
+                open_interest_usd: 0,
+                long_liquidations_24h: 0,
+                short_liquidations_24h: 0,
+                liquidations_24h: 0,
+              }
+            }
+          />
+        </TerminalPanel>
+      ) : null}
+
+      {tab === "defi" ? (
+        <TerminalPanel title="DeFi Dashboard" subtitle="TVL, DEX flow, lending, and protocol leadership">
+          <CryptoDefiPanel
+            headline={
+              defiQuery.data?.headline || {
+                tvl_usd: 0,
+                dex_volume_24h: 0,
+                lending_borrowed_usd: 0,
+                defi_change_24h: 0,
+              }
+            }
+            protocols={defiQuery.data?.protocols || []}
+          />
+        </TerminalPanel>
+      ) : null}
+
+      {tab === "correlation" ? (
+        <TerminalPanel
+          title="Correlation Matrix"
+          subtitle="Rolling return relationship map"
+          actions={(
+            <select
+              className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs text-terminal-text"
+              value={corrWindow}
+              onChange={(e) => setCorrWindow(Number(e.target.value))}
+            >
+              <option value={14}>14d</option>
+              <option value={30}>30d</option>
+              <option value={60}>60d</option>
+              <option value={90}>90d</option>
+            </select>
+          )}
+        >
+          <CryptoCorrelationMatrixPanel data={{ symbols: correlationQuery.data?.symbols || [], matrix: correlationQuery.data?.matrix || [] }} />
         </TerminalPanel>
       ) : null}
     </div>

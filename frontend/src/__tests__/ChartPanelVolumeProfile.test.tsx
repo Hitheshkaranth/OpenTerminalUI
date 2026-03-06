@@ -6,6 +6,7 @@ import type { ChartSlot } from "../store/chartWorkstationStore";
 import type { ChartResponse, ChartPoint } from "../types";
 
 const fetchVolumeProfileMock = vi.fn();
+const tradingChartMock = vi.fn();
 
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
@@ -16,7 +17,10 @@ vi.mock("../api/client", async () => {
 });
 
 vi.mock("../components/chart/TradingChart", () => ({
-  TradingChart: () => <div data-testid="mock-trading-chart" />,
+  TradingChart: (props: unknown) => {
+    tradingChartMock(props);
+    return <div data-testid="mock-trading-chart" />;
+  },
 }));
 
 vi.mock("../components/chart-workstation/ChartPanelHeader", () => ({
@@ -74,6 +78,7 @@ describe("ChartPanel Volume Profile controls", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     fetchVolumeProfileMock.mockReset();
+    tradingChartMock.mockReset();
     fetchVolumeProfileMock.mockImplementation(
       async (_symbol: string, opts?: { period?: string; bins?: number; market?: string; mode?: "fixed" | "session" | "visible"; lookbackBars?: number }) => ({
       symbol: "AAPL",
@@ -95,7 +100,7 @@ describe("ChartPanel Volume Profile controls", () => {
     vi.useRealTimers();
   });
 
-  it("toggles VP overlay and reloads profile when period/bins change", async () => {
+  function renderPanel(linkGroup: "off" | "A" | "B" | "C" = "off") {
     render(
       <ChartPanel
         slot={SLOT}
@@ -104,6 +109,8 @@ describe("ChartPanel Volume Profile controls", () => {
         onActivate={vi.fn()}
         onToggleFullscreen={vi.fn()}
         onRemove={vi.fn()}
+        linkGroup={linkGroup}
+        onLinkGroupChange={vi.fn()}
         onTickerChange={vi.fn()}
         onTimeframeChange={vi.fn()}
         onChartTypeChange={vi.fn()}
@@ -116,6 +123,10 @@ describe("ChartPanel Volume Profile controls", () => {
         liveQuote={null}
       />,
     );
+  }
+
+  it("toggles VP overlay and reloads profile when period/bins change", async () => {
+    renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "Show volume profile" }));
     await waitFor(() => expect(fetchVolumeProfileMock).toHaveBeenCalledTimes(1));
@@ -161,26 +172,7 @@ describe("ChartPanel Volume Profile controls", () => {
   });
 
   it("refreshes VP profile on interval for incremental updates", async () => {
-    render(
-      <ChartPanel
-        slot={SLOT}
-        isActive={true}
-        isFullscreen={false}
-        onActivate={vi.fn()}
-        onToggleFullscreen={vi.fn()}
-        onRemove={vi.fn()}
-        onTickerChange={vi.fn()}
-        onTimeframeChange={vi.fn()}
-        onChartTypeChange={vi.fn()}
-        onETHChange={vi.fn()}
-        onPMLevelsChange={vi.fn()}
-        onIndicatorsChange={vi.fn()}
-        chartResponse={makeChartResponse([{ t: 1, o: 100, h: 105, l: 99, c: 104, v: 10 }])}
-        chartLoading={false}
-        chartError={null}
-        liveQuote={null}
-      />,
-    );
+    renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "Show volume profile" }));
     await waitFor(() => expect(fetchVolumeProfileMock).toHaveBeenCalledTimes(1));
@@ -189,5 +181,17 @@ describe("ChartPanel Volume Profile controls", () => {
       vi.advanceTimersByTime(15000);
     });
     await waitFor(() => expect(fetchVolumeProfileMock).toHaveBeenCalledTimes(2));
+  });
+
+  it("maps link groups to isolated or shared crosshair sync IDs", () => {
+    renderPanel("off");
+    const offProps = tradingChartMock.mock.calls.at(-1)?.[0] as Record<string, unknown> | undefined;
+    expect(offProps?.panelId).toBe("slot-1");
+    expect(offProps?.crosshairSyncGroupId).toBe("chart-workstation-solo-slot-1");
+
+    renderPanel("B");
+    const linkedProps = tradingChartMock.mock.calls.at(-1)?.[0] as Record<string, unknown> | undefined;
+    expect(linkedProps?.panelId).toBe("slot-1");
+    expect(linkedProps?.crosshairSyncGroupId).toBe("chart-workstation-linked-B");
   });
 });

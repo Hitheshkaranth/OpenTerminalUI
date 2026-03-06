@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { IndicatorPanel } from "../shared/chart/IndicatorPanel";
 import { IndicatorParamEditor } from "../shared/chart/IndicatorParamEditor";
@@ -21,6 +21,10 @@ vi.mock("../shared/chart/IndicatorManager", () => ({
 }));
 
 describe("indicator settings UX", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it("supports rapid visibility toggle and params reset from panel controls", () => {
     const onChange = vi.fn();
     const active: IndicatorConfig[] = [
@@ -59,5 +63,41 @@ describe("indicator settings UX", () => {
       params: { period: 14 },
       visible: true,
     });
+  });
+
+  it("saves and loads indicator templates in scoped storage", () => {
+    const onChange = vi.fn();
+    const active: IndicatorConfig[] = [{ id: "sma", params: { period: 30 }, visible: true }];
+
+    const { unmount } = render(
+      <IndicatorPanel
+        symbol="AAPL"
+        activeIndicators={active}
+        onChange={onChange}
+        templateScope="fno"
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Template name"), { target: { value: "Swing" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    const raw = window.localStorage.getItem("chart:indicator-templates:fno");
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw || "{}");
+    expect(parsed.Swing).toEqual([{ id: "sma", params: { period: 30 }, visible: true }]);
+    unmount();
+
+    render(
+      <IndicatorPanel
+        symbol="AAPL"
+        activeIndicators={[]}
+        onChange={onChange}
+        templateScope="fno"
+      />,
+    );
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "Swing" } });
+    fireEvent.click(screen.getByRole("button", { name: "Load" }));
+
+    expect(onChange).toHaveBeenCalledWith([{ id: "sma", params: { period: 30 }, visible: true }]);
   });
 });

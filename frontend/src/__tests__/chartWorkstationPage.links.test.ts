@@ -46,6 +46,16 @@ describe("chart workstation linking helpers", () => {
     expect(next.find((s) => s.id === "s3")?.ticker).toBe("NVDA");
   });
 
+  it("does not propagate when source slot is unlinked", () => {
+    const slots = [slot("s1", "AAPL"), slot("s2", "MSFT"), slot("s3", "NVDA")];
+    const groups = { s1: "off", s2: "A", s3: "A" } as const;
+    const next = propagateLinkedSlots(slots, groups, "s1", (row) => ({ ...row, ticker: "TSLA" }));
+
+    expect(next.find((s) => s.id === "s1")?.ticker).toBe("AAPL");
+    expect(next.find((s) => s.id === "s2")?.ticker).toBe("MSFT");
+    expect(next.find((s) => s.id === "s3")?.ticker).toBe("NVDA");
+  });
+
   it("exposes custom split layout template", () => {
     expect(CUSTOM_SPLIT_TEMPLATE.arrangement).toBe("custom");
     expect(CUSTOM_SPLIT_TEMPLATE.customAreas).toContain("a a b");

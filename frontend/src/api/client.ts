@@ -1174,6 +1174,14 @@ export type CryptoMarketRow = {
   sector: string;
 };
 
+export type CryptoMarketsQuery = {
+  limit?: number;
+  q?: string;
+  sector?: string;
+  sortBy?: "market_cap" | "volume_24h" | "change_24h" | "price" | "symbol";
+  sortOrder?: "asc" | "desc";
+};
+
 export type CryptoMoverRow = {
   symbol: string;
   name: string;
@@ -1208,8 +1216,31 @@ export type CryptoSectorRow = {
   components: Array<{ symbol: string; name: string; weight: number }>;
 };
 
-export async function fetchCryptoMarkets(limit = 50): Promise<CryptoMarketRow[]> {
-  const { data } = await api.get<{ items: CryptoMarketRow[] }>("/v1/crypto/markets", { params: { limit } });
+export type CryptoCoinDetail = {
+  symbol: string;
+  name: string;
+  sector: string;
+  price: number;
+  change_24h: number;
+  volume_24h: number;
+  market_cap: number;
+  high_24h: number;
+  low_24h: number;
+  sparkline: number[];
+  ts: string;
+};
+
+export async function fetchCryptoMarkets(query: number | CryptoMarketsQuery = 50): Promise<CryptoMarketRow[]> {
+  const params = typeof query === "number"
+    ? { limit: query }
+    : {
+      limit: query.limit ?? 50,
+      q: query.q,
+      sector: query.sector,
+      sort_by: query.sortBy,
+      sort_order: query.sortOrder,
+    };
+  const { data } = await api.get<{ items: CryptoMarketRow[] }>("/v1/crypto/markets", { params });
   return data.items || [];
 }
 
@@ -1231,6 +1262,12 @@ export async function fetchCryptoIndex(topN = 10): Promise<CryptoIndexResponse> 
 export async function fetchCryptoSectors(): Promise<CryptoSectorRow[]> {
   const { data } = await api.get<{ items: CryptoSectorRow[] }>("/v1/crypto/sectors");
   return data.items || [];
+}
+
+export async function fetchCryptoCoinDetail(symbol: string): Promise<CryptoCoinDetail> {
+  const normalized = symbol.trim().toUpperCase();
+  const { data } = await api.get<CryptoCoinDetail>(`/v1/crypto/coins/${encodeURIComponent(normalized)}`);
+  return data;
 }
 
 export async function executePython(payload: { code: string; timeout_seconds?: number }): Promise<PythonExecuteResponse> {

@@ -10,7 +10,6 @@ export function AccountLayout() {
       contentClassName="pb-16 md:pb-0"
       showInstallPrompt
       showMobileBottomNav
-      hideSidebarOnMobile
       workspacePresetStorageKey="ot:shell:account:preset"
     >
       <Outlet />

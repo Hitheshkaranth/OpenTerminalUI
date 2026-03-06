@@ -556,6 +556,7 @@ export function TradingChart({
   }, [storageKey, ticker, timeframe, drawingWorkspaceId]);
 
   useEffect(() => {
+    if (!initializedDrawingsRef.current) return;
     try {
       localStorage.setItem(storageKey, JSON.stringify(drawings));
     } catch {

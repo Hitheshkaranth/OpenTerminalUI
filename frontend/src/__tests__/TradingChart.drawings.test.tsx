@@ -85,6 +85,7 @@ vi.mock("../realtime/useQuotesStream", () => ({
 describe("TradingChart drawing persistence scope", () => {
   beforeEach(() => {
     vi.useRealTimers();
+    window.localStorage.clear();
     listChartDrawingsMock.mockReset();
     createChartDrawingMock.mockReset();
     deleteChartDrawingMock.mockReset();
@@ -122,5 +123,36 @@ describe("TradingChart drawing persistence scope", () => {
     await new Promise((resolve) => setTimeout(resolve, 900));
     expect(deleteChartDrawingMock).not.toHaveBeenCalled();
     expect(createChartDrawingMock).not.toHaveBeenCalled();
+  });
+
+  it("falls back to local drawing restore when remote list fails", async () => {
+    listChartDrawingsMock.mockRejectedValue(new Error("offline"));
+    window.localStorage.setItem(
+      "lts:drawings:AAPL:1D:slot-local",
+      JSON.stringify([
+        { id: "hl-1", type: "hline", price: 123.45, style: { color: "#00ff00", lineWidth: 1 } },
+        { id: "bad", type: "hline", price: "nan" },
+      ]),
+    );
+
+    render(
+      <div style={{ width: 800, height: 400 }}>
+        <TradingChart
+          ticker="AAPL"
+          timeframe="1D"
+          drawingWorkspaceId="slot-local"
+          mode="candles"
+          data={[{ t: 1_700_000_000, o: 100, h: 101, l: 99, c: 100.5, v: 1000 }]}
+        />
+      </div>,
+    );
+
+    await waitFor(() => expect(listChartDrawingsMock).toHaveBeenCalledTimes(1));
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    expect(createChartDrawingMock).not.toHaveBeenCalled();
+    expect(deleteChartDrawingMock).not.toHaveBeenCalled();
+
+    const restored = JSON.parse(window.localStorage.getItem("lts:drawings:AAPL:1D:slot-local") || "[]");
+    expect(restored).toEqual([{ id: "hl-1", type: "hline", price: 123.45, style: { color: "#00ff00", lineWidth: 1 } }]);
   });
 });

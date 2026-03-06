@@ -27,6 +27,11 @@ const CHART_MODE_MAP: Record<ChartSlotType, "candles" | "line" | "area"> = {
   area: "area",
 };
 
+function crosshairGroupIdForSlot(slotId: string, linkGroup: WorkspaceLinkGroup): string {
+  if (linkGroup === "off") return `chart-workstation-solo-${slotId}`;
+  return `chart-workstation-linked-${linkGroup}`;
+}
+
 interface Props {
   slot: ChartSlot;
   isActive: boolean;
@@ -255,7 +260,7 @@ export function ChartPanel({
               onPendingTrendPointChange={setPendingTrendPoint}
               drawingWorkspaceId={slot.id}
               panelId={slot.id}
-              crosshairSyncGroupId="chart-workstation-linked"
+              crosshairSyncGroupId={crosshairGroupIdForSlot(slot.id, linkGroup)}
               onAddToPortfolio={(symbol, priceHint) => {
                 void quickAddToFirstPortfolio(symbol, priceHint, "Added from Chart Workstation");
               }}

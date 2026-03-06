@@ -11,7 +11,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "../common/ErrorBoundary";
 import { InstallPromptBanner } from "./InstallPromptBanner";
 import { MobileBottomNav } from "./MobileBottomNav";
-import { Sidebar } from "./Sidebar";
+import { IconRail } from "./IconRail";
 import { StatusBar } from "./StatusBar";
 import { TopBar } from "./TopBar";
 import { CommandBar } from "./CommandBar";
@@ -57,7 +57,6 @@ type Props = {
   statusBarTickerOverride?: string;
   showInstallPrompt?: boolean;
   showMobileBottomNav?: boolean;
-  hideSidebarOnMobile?: boolean;
   workspacePresetStorageKey?: string;
   defaultPreset?: WorkspacePreset;
   showWorkspaceControls?: boolean;
@@ -211,7 +210,6 @@ export function TerminalShell({
   statusBarTickerOverride,
   showInstallPrompt = false,
   showMobileBottomNav = false,
-  hideSidebarOnMobile = true,
   workspacePresetStorageKey,
   defaultPreset = "trader",
   showWorkspaceControls = true,
@@ -269,9 +267,7 @@ export function TerminalShell({
   return (
     <TerminalShellContext.Provider value={shellCtx}>
       <div className="flex h-screen overflow-hidden bg-terminal-bg text-terminal-text">
-        <div className={hideSidebarOnMobile ? "hidden md:block" : ""}>
-          <Sidebar />
-        </div>
+        <IconRail />
 
         <div className="relative z-10 flex min-w-0 flex-1 flex-col">
           <CommandBar

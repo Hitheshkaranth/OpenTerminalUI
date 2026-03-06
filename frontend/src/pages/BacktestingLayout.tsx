@@ -71,7 +71,6 @@ function BacktestingRightRail() {
 export function BacktestingLayout() {
   return (
     <TerminalShell
-      hideSidebarOnMobile={false}
       workspacePresetStorageKey="ot:shell:backtesting:preset"
       rightRailStorageKey="ot:shell:backtesting:right-rail"
       rightRailContent={<BacktestingRightRail />}
