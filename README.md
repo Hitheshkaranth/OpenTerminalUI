@@ -36,6 +36,17 @@ Designed for **traders, quant researchers, portfolio managers, risk analysts, an
 
 ---
 
+## Latest Updates (2026-03)
+
+- Multi-chart crosshair synchronization for linked Launchpad and workstation panels.
+- Volume Profile with VPOC and 70% value-area overlays.
+- Stabilized indicator pane behavior so non-price indicators no longer collapse price visibility.
+- Expanded market top bar workflow with larger ticker search/load controls.
+- Unified in-app branding to match the web favicon icon across top bar and rail.
+- Dockerized production serving at a single app endpoint (`http://localhost:8000`).
+
+---
+
 ## Screenshots
 
 <p align="center">
@@ -173,7 +184,7 @@ cd OpenTerminalUI
 docker compose up -d --build
 ```
 
-Backend: `http://localhost:8000` | Frontend: `http://localhost:5173`
+App (backend + built frontend): `http://localhost:8000`
 
 ### Local Development
 

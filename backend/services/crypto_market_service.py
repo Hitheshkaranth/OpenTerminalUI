@@ -75,6 +75,11 @@ def _f(v: Any, default: float = 0.0) -> float:
         return default
 
 
+def _is_rate_limited_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "429" in text or "rate limit" in text or "too many requests" in text
+
+
 class CryptoMarketService:
     def __init__(
         self,
@@ -103,6 +108,7 @@ class CryptoMarketService:
         universe_limit = max(1, min(300, universe_limit))
         symbols = list(_CRYPTO_META.keys())[:universe_limit]
         cache_key = self._cache.build_key("crypto_quotes", "universe", {"limit": universe_limit})
+        stale_key = self._cache.build_key("crypto_quotes", "universe_stale", {"limit": universe_limit})
         cached = await self._cache.get(cache_key)
         if isinstance(cached, list):
             rows: list[CryptoRow] = []
@@ -126,8 +132,35 @@ class CryptoMarketService:
             if rows:
                 return rows
 
-        fetcher = await self._fetcher_factory()
-        quotes = await fetcher.yahoo.get_quotes(symbols)
+        try:
+            fetcher = await self._fetcher_factory()
+            quotes = await fetcher.yahoo.get_quotes(symbols)
+        except Exception as exc:
+            stale = await self._cache.get(stale_key)
+            if isinstance(stale, list):
+                rows: list[CryptoRow] = []
+                for row in stale:
+                    if not isinstance(row, dict):
+                        continue
+                    price = _f(row.get("price"))
+                    rows.append(
+                        CryptoRow(
+                            symbol=str(row.get("symbol") or ""),
+                            name=str(row.get("name") or ""),
+                            price=price,
+                            change_24h=_f(row.get("change_24h")),
+                            volume_24h=_f(row.get("volume_24h")),
+                            market_cap=_f(row.get("market_cap")),
+                            sector=str(row.get("sector") or "Other"),
+                            day_high=_f(row.get("day_high"), price),
+                            day_low=_f(row.get("day_low"), price),
+                        )
+                    )
+                if rows:
+                    return rows
+            if _is_rate_limited_error(exc):
+                return []
+            raise
         by_symbol = {(str(x.get("symbol") or "").upper()): x for x in quotes if isinstance(x, dict)}
 
         rows: list[CryptoRow] = []
@@ -156,7 +189,10 @@ class CryptoMarketService:
                 )
             )
 
-        await self._cache.set(cache_key, [r.__dict__ for r in rows], ttl=self._ttl())
+        ttl = self._ttl()
+        payload = [r.__dict__ for r in rows]
+        await self._cache.set(cache_key, payload, ttl=ttl)
+        await self._cache.set(stale_key, payload, ttl=max(ttl * 6, ttl))
         return rows
 
     async def markets(

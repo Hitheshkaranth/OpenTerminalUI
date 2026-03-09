@@ -68,6 +68,14 @@ class _FakeYahoo:
         }
 
 
+class _RateLimitedYahoo:
+    async def get_quotes(self, symbols: list[str]):  # noqa: ARG002
+        raise RuntimeError("429 Too Many Requests")
+
+    async def get_chart(self, symbol: str, range_str: str = "1mo", interval: str = "1d"):  # noqa: ARG002
+        return {"chart": {"result": []}}
+
+
 class _FakeFetcher:
     def __init__(self, yahoo: _FakeYahoo) -> None:
         self.yahoo = yahoo
@@ -128,3 +136,31 @@ def test_crypto_service_coin_detail_shape() -> None:
     assert detail["high_24h"] == 51000
     assert detail["low_24h"] == 49000
     assert detail["sparkline"] == [100.5, 101.5, 102.5]
+
+
+def test_crypto_service_uses_stale_cache_when_rate_limited() -> None:
+    cache = _FakeCache()
+    stale_payload = [
+        {
+            "symbol": "BTC-USD",
+            "name": "Bitcoin",
+            "price": 50000,
+            "change_24h": 1.2,
+            "volume_24h": 1000,
+            "market_cap": 50000000,
+            "sector": "L1",
+            "day_high": 51000,
+            "day_low": 49000,
+        }
+    ]
+    stale_key = cache.build_key("crypto_quotes", "universe_stale", {"limit": 300})
+    cache.data[stale_key] = stale_payload
+
+    async def _fetcher():
+        return _FakeFetcher(_RateLimitedYahoo())
+
+    service = CryptoMarketService(cache_backend=cache, fetcher_factory=_fetcher)
+    result = asyncio.run(service.markets(limit=10))
+
+    assert len(result["items"]) == 1
+    assert result["items"][0]["symbol"] == "BTC-USD"

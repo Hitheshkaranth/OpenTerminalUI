@@ -27,6 +27,8 @@ type TopBarProps = {
   hideMarketMarquee?: boolean;
 };
 
+const BRAND_ICON_SRC = "/favicon.png";
+
 export function TopBar({ hideTickerLoader = false, hideMarketMarquee = false }: TopBarProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -231,27 +233,35 @@ export function TopBar({ hideTickerLoader = false, hideMarketMarquee = false }: 
   return (
     <div className="relative z-20 border-b border-terminal-border bg-terminal-panel">
       <div className="relative flex items-center gap-2 px-3 py-1.5">
-        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/">
-          HOME
+        <Link
+          to="/"
+          className="inline-flex h-7 items-center rounded border border-terminal-border bg-terminal-bg px-1.5"
+          aria-label="OpenTerminalUI Home"
+        >
+          <img src={BRAND_ICON_SRC} alt="OpenTerminalUI" className="h-5 w-5 object-contain" />
         </Link>
-        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/equity/screener">
-          SCREENER
-        </Link>
-        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/equity/compare">
-          COMPARE
-        </Link>
-        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno/heatmap?symbol=${encodeURIComponent(safeTicker)}`}>
-          HEATMAP
-        </Link>
-        <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno?symbol=${encodeURIComponent(safeTicker)}`}>
-          F&O -&gt;
-        </Link>
-        <div className="flex-1 min-w-0" />
+        <div className="flex shrink-0 items-center gap-2">
+          <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/">
+            HOME
+          </Link>
+          <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/equity/screener">
+            SCREENER
+          </Link>
+          <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/equity/compare">
+            COMPARE
+          </Link>
+          <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno/heatmap?symbol=${encodeURIComponent(safeTicker)}`}>
+            HEATMAP
+          </Link>
+          <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno?symbol=${encodeURIComponent(safeTicker)}`}>
+            F&O -&gt;
+          </Link>
+        </div>
         {!hideTickerLoader ? (
-          <>
+          <div className="ml-2 flex min-w-[360px] flex-[1.4] items-center gap-1 xl:min-w-[460px]">
             <input
               ref={searchInputRef}
-              className="w-64 rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs outline-none focus:border-terminal-accent"
+              className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs outline-none focus:border-terminal-accent"
               placeholder={`Search ${selectedMarket} symbol ( / )`}
               value={query}
               onChange={(e) => {
@@ -290,9 +300,9 @@ export function TopBar({ hideTickerLoader = false, hideMarketMarquee = false }: 
             >
               Load
             </button>
-          </>
+          </div>
         ) : null}
-        <div className="flex items-center gap-1 border-l border-terminal-border pl-2">
+        <div className="flex shrink-0 items-center gap-1 border-l border-terminal-border pl-2">
           <select
             className="w-[88px] rounded border border-terminal-border bg-terminal-bg px-1 py-1 text-[11px] uppercase text-terminal-text outline-none"
             value={selectedCountry}
@@ -313,7 +323,7 @@ export function TopBar({ hideTickerLoader = false, hideMarketMarquee = false }: 
             ))}
           </select>
         </div>
-        <div className="flex items-center gap-1 border-l border-terminal-border pl-2">
+        <div className="flex shrink-0 items-center gap-1 border-l border-terminal-border pl-2">
           <select
             className="w-[72px] rounded border border-terminal-border bg-terminal-bg px-1 py-1 text-[11px] uppercase text-terminal-text outline-none"
             value={displayCurrency}
@@ -325,10 +335,18 @@ export function TopBar({ hideTickerLoader = false, hideMarketMarquee = false }: 
             <option value="USD">USD</option>
           </select>
         </div>
-        <div className="inline-flex items-center gap-1 border-l border-terminal-border pl-2 text-[11px] uppercase tracking-wide text-terminal-muted">
+        <div className="inline-flex shrink-0 items-center gap-1 border-l border-terminal-border pl-2 text-[11px] uppercase tracking-wide text-terminal-muted">
           <CountryFlag countryCode={selectedCountry} size="sm" />
           <span>{selectedMarket}</span>
         </div>
+        <Link
+          to="/"
+          className="inline-flex h-7 shrink-0 items-center border-l border-terminal-border pl-2"
+          aria-label="OpenTerminalUI Home (Top Right)"
+          title="OpenTerminalUI"
+        >
+          <img src={BRAND_ICON_SRC} alt="OpenTerminalUI" className="h-5 w-5 object-contain" />
+        </Link>
         {!hideTickerLoader && isSuggestionsOpen && results.length > 0 && (
           <div className="absolute left-3 right-3 top-10 z-10 max-h-72 overflow-auto rounded border border-terminal-border bg-terminal-panel">
             {results.map((item) => (

@@ -9,6 +9,28 @@ import { terminalColors } from "../../theme/terminal";
 type SeriesMap = Record<string, Record<string, ISeriesApi<"Line", Time>>>;
 type CacheMeta = Record<string, { length: number; lastTime: number | null }>;
 
+function normalizeIndicatorId(id: string): string {
+  return String(id || "").trim().toLowerCase().replace(/[_\s]+/g, "-");
+}
+
+function forceSeparatePane(id: string): boolean {
+  const normalized = normalizeIndicatorId(id);
+  return [
+    "volume-oscillator",
+    "volumeoscillator",
+    "vo",
+    "macd",
+    "rsi",
+    "stoch",
+    "stochastic",
+    "atr",
+    "adx",
+    "cci",
+    "mfi",
+    "obv",
+  ].includes(normalized);
+}
+
 function toPlotData(points: Array<{ time: unknown; value: unknown }>): Array<{ time: UTCTimestamp; value: number }> {
   const out: Array<{ time: UTCTimestamp; value: number }> = [];
   for (const point of points) {
@@ -59,6 +81,10 @@ export function useIndicators(
     if (!chart || !bars.length) return;
 
     let paneIndex = nonOverlayPaneStartIndex;
+    const nonOverlayPaneIndexes: number[] = [];
+    // Keep price pane dominant while leaving room for non-overlay indicators.
+    chart.panes()[0]?.setStretchFactor(8);
+    chart.panes()[1]?.setStretchFactor(2);
     for (const cfg of configs.filter((c) => c.visible)) {
       let result;
       try {
@@ -66,7 +92,11 @@ export function useIndicators(
       } catch {
         continue;
       }
-      const overlay = Boolean(result.metadata?.overlay);
+      const overlay = Boolean(result.metadata?.overlay) && !forceSeparatePane(cfg.id);
+      const targetPaneIndex = overlay ? 0 : paneIndex;
+      if (!overlay) {
+        nonOverlayPaneIndexes.push(paneIndex);
+      }
       const plots = result.plots ?? {};
       const key = cfg.id;
       if (!seriesMapRef.current[key]) {
@@ -99,7 +129,7 @@ export function useIndicators(
                 lineWidth: ((cfg.lineWidth ?? 2) as 1 | 2 | 3 | 4),
                 lastValueVisible: true,
               },
-              overlay ? 0 : paneIndex,
+              targetPaneIndex,
             );
           } catch {
             continue;
@@ -117,7 +147,7 @@ export function useIndicators(
             continue;
           }
           if (!overlay) {
-            chart.panes()[paneIndex]?.setStretchFactor(300);
+            chart.panes()[targetPaneIndex]?.setStretchFactor(1);
           }
           continue;
         }
@@ -139,6 +169,14 @@ export function useIndicators(
       }
       const nowLast = bars.length ? Number(bars[bars.length - 1].time) : null;
       cacheRef.current[key] = { length: bars.length, lastTime: nowLast };
+    }
+
+    if (nonOverlayPaneIndexes.length > 0) {
+      chart.panes()[0]?.setStretchFactor(12);
+      chart.panes()[1]?.setStretchFactor(2);
+      for (const idx of nonOverlayPaneIndexes) {
+        chart.panes()[idx]?.setStretchFactor(1);
+      }
     }
 
     return () => {

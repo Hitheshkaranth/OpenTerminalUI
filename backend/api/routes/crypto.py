@@ -6,6 +6,7 @@ import math
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 from backend.api.deps import cache_instance, get_unified_fetcher
 from backend.api.routes.chart import _parse_yahoo_chart
@@ -56,6 +57,158 @@ class _Row:
     sector: str
 
 
+class CryptoMarketRow(BaseModel):
+    symbol: str
+    name: str
+    price: float
+    change_24h: float
+    volume_24h: float
+    market_cap: float
+    sector: str
+
+
+class CryptoMarketsResponse(BaseModel):
+    items: list[CryptoMarketRow]
+    count: int
+    ts: str
+
+
+class CryptoMoverRow(BaseModel):
+    symbol: str
+    name: str
+    price: float
+    change_24h: float
+    volume_24h: float
+    market_cap: float
+
+
+class CryptoMoversResponse(BaseModel):
+    metric: str
+    items: list[CryptoMoverRow]
+    ts: str
+
+
+class CryptoDominanceResponse(BaseModel):
+    btc_pct: float
+    eth_pct: float
+    others_pct: float
+    total_market_cap: float
+    ts: str
+
+
+class CryptoIndexResponse(BaseModel):
+    index_name: str
+    top_n: int
+    component_count: int
+    index_value: float
+    change_24h: float
+    total_market_cap: float
+    ts: str
+
+
+class CryptoSectorComponent(BaseModel):
+    symbol: str
+    name: str
+    weight: float
+
+
+class CryptoSectorRow(BaseModel):
+    sector: str
+    change_24h: float
+    market_cap: float
+    components: list[CryptoSectorComponent]
+
+
+class CryptoSectorsResponse(BaseModel):
+    items: list[CryptoSectorRow]
+    ts: str
+
+
+class CryptoHeatmapRow(BaseModel):
+    symbol: str
+    name: str
+    sector: str
+    price: float
+    change_24h: float
+    market_cap: float
+    depth_bid_notional: float
+    depth_ask_notional: float
+    depth_imbalance: float
+    bucket: str
+
+
+class CryptoHeatmapResponse(BaseModel):
+    items: list[CryptoHeatmapRow]
+    ts: str
+
+
+class CryptoDerivativesRow(BaseModel):
+    symbol: str
+    funding_rate_8h: float
+    open_interest_usd: float
+    long_liquidations_24h: float
+    short_liquidations_24h: float
+    liquidations_24h: float
+    updated_at: str
+
+
+class CryptoDerivativesTotals(BaseModel):
+    open_interest_usd: float
+    long_liquidations_24h: float
+    short_liquidations_24h: float
+    liquidations_24h: float
+
+
+class CryptoDerivativesResponse(BaseModel):
+    items: list[CryptoDerivativesRow]
+    totals: CryptoDerivativesTotals
+    ts: str
+
+
+class CryptoDefiHeadline(BaseModel):
+    tvl_usd: float
+    dex_volume_24h: float
+    lending_borrowed_usd: float
+    defi_change_24h: float
+
+
+class CryptoDefiProtocol(BaseModel):
+    symbol: str
+    name: str
+    price: float
+    change_24h: float
+    market_cap: float
+    dominance_pct: float
+    tvl_proxy_usd: float
+
+
+class CryptoDefiResponse(BaseModel):
+    headline: CryptoDefiHeadline
+    protocols: list[CryptoDefiProtocol]
+    ts: str
+
+
+class CryptoCorrelationResponse(BaseModel):
+    symbols: list[str]
+    window: int
+    matrix: list[list[float]]
+    ts: str
+
+
+class CryptoCoinDetailResponse(BaseModel):
+    symbol: str
+    name: str
+    sector: str
+    price: float
+    change_24h: float
+    volume_24h: float
+    market_cap: float
+    high_24h: float
+    low_24h: float
+    sparkline: list[float]
+    ts: str
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -72,6 +225,11 @@ def _f(v: Any, default: float = 0.0) -> float:
 
 def _clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
+
+
+def _is_rate_limited_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "429" in text or "rate limit" in text or "too many requests" in text
 
 
 def _depth_bucket(change_24h: float) -> str:
@@ -122,6 +280,7 @@ async def _load_rows(limit: int = 100) -> list[_Row]:
     capped_limit = max(1, min(300, limit))
     symbols = list(_CRYPTO_META.keys())[:capped_limit]
     cache_key = cache_instance.build_key("crypto_quotes", "universe", {"limit": capped_limit})
+    stale_key = cache_instance.build_key("crypto_quotes", "universe_stale", {"limit": capped_limit})
     cached = await cache_instance.get(cache_key)
     if isinstance(cached, list):
         rows: list[_Row] = []
@@ -142,8 +301,32 @@ async def _load_rows(limit: int = 100) -> list[_Row]:
         if rows:
             return rows
 
-    fetcher = await get_unified_fetcher()
-    quotes = await fetcher.yahoo.get_quotes(symbols)
+    try:
+        fetcher = await get_unified_fetcher()
+        quotes = await fetcher.yahoo.get_quotes(symbols)
+    except Exception as exc:
+        stale = await cache_instance.get(stale_key)
+        if isinstance(stale, list):
+            rows: list[_Row] = []
+            for item in stale:
+                if not isinstance(item, dict):
+                    continue
+                rows.append(
+                    _Row(
+                        symbol=str(item.get("symbol") or ""),
+                        name=str(item.get("name") or ""),
+                        price=_f(item.get("price")),
+                        change_24h=_f(item.get("change_24h")),
+                        volume_24h=_f(item.get("volume_24h")),
+                        market_cap=_f(item.get("market_cap")),
+                        sector=str(item.get("sector") or "Other"),
+                    )
+                )
+            if rows:
+                return rows
+        if _is_rate_limited_error(exc):
+            return []
+        raise
     by_symbol = {(str(x.get("symbol") or "").upper()): x for x in quotes if isinstance(x, dict)}
 
     rows: list[_Row] = []
@@ -168,22 +351,21 @@ async def _load_rows(limit: int = 100) -> list[_Row]:
             )
         )
 
-    await cache_instance.set(
-        cache_key,
-        [
-            {
-                "symbol": row.symbol,
-                "name": row.name,
-                "price": row.price,
-                "change_24h": row.change_24h,
-                "volume_24h": row.volume_24h,
-                "market_cap": row.market_cap,
-                "sector": row.sector,
-            }
-            for row in rows
-        ],
-        ttl=ttl_seconds("crypto", market_open_now()),
-    )
+    payload = [
+        {
+            "symbol": row.symbol,
+            "name": row.name,
+            "price": row.price,
+            "change_24h": row.change_24h,
+            "volume_24h": row.volume_24h,
+            "market_cap": row.market_cap,
+            "sector": row.sector,
+        }
+        for row in rows
+    ]
+    ttl = ttl_seconds("crypto", market_open_now())
+    await cache_instance.set(cache_key, payload, ttl=ttl)
+    await cache_instance.set(stale_key, payload, ttl=max(ttl * 6, ttl))
     return rows
 
 
@@ -244,14 +426,14 @@ async def crypto_candles(
     return ChartResponse(ticker=symbol.upper(), interval=interval, currency="USD", data=rows)
 
 
-@router.get("/v1/crypto/markets")
+@router.get("/v1/crypto/markets", response_model=CryptoMarketsResponse)
 async def crypto_markets(
     limit: int = Query(default=50, ge=1, le=300),
     q: str = Query(default=""),
     sector: str = Query(default=""),
     sort_by: str = Query(default="market_cap"),
     sort_order: str = Query(default="desc"),
-) -> dict[str, Any]:
+) -> CryptoMarketsResponse:
     rows = await _load_rows(limit=limit)
     query_term = (q if isinstance(q, str) else "").strip().lower()
     if query_term:
@@ -285,7 +467,7 @@ async def crypto_markets(
     }
 
 
-@router.get("/v1/crypto/movers/{metric}")
+@router.get("/v1/crypto/movers/{metric}", response_model=CryptoMoversResponse)
 async def crypto_movers(metric: str, limit: int = Query(default=20, ge=1, le=100)) -> dict[str, Any]:
     metric_key = (metric or "change_24h").strip().lower()
     rows = await _load_rows(limit=300)
@@ -318,8 +500,8 @@ async def crypto_movers(metric: str, limit: int = Query(default=20, ge=1, le=100
     }
 
 
-@router.get("/v1/crypto/dominance")
-async def crypto_dominance() -> dict[str, Any]:
+@router.get("/v1/crypto/dominance", response_model=CryptoDominanceResponse)
+async def crypto_dominance() -> CryptoDominanceResponse:
     rows = await _load_rows(limit=300)
     total_cap = sum(r.market_cap for r in rows) or 1.0
     cap_by_symbol = {r.symbol: r.market_cap for r in rows}
@@ -335,8 +517,8 @@ async def crypto_dominance() -> dict[str, Any]:
     }
 
 
-@router.get("/v1/crypto/index")
-async def crypto_index(top_n: int = Query(default=10, ge=1, le=100)) -> dict[str, Any]:
+@router.get("/v1/crypto/index", response_model=CryptoIndexResponse)
+async def crypto_index(top_n: int = Query(default=10, ge=1, le=100)) -> CryptoIndexResponse:
     rows = await _load_rows(limit=300)
     rows.sort(key=lambda x: x.market_cap, reverse=True)
     top = rows[:top_n]
@@ -354,8 +536,8 @@ async def crypto_index(top_n: int = Query(default=10, ge=1, le=100)) -> dict[str
     }
 
 
-@router.get("/v1/crypto/sectors")
-async def crypto_sectors() -> dict[str, Any]:
+@router.get("/v1/crypto/sectors", response_model=CryptoSectorsResponse)
+async def crypto_sectors() -> CryptoSectorsResponse:
     rows = await _load_rows(limit=300)
     row_by_symbol = {r.symbol: r for r in rows}
     items: list[dict[str, Any]] = []
@@ -385,8 +567,8 @@ async def crypto_sectors() -> dict[str, Any]:
     return {"items": items, "ts": _now_iso()}
 
 
-@router.get("/v1/crypto/heatmap")
-async def crypto_heatmap(limit: int = Query(default=80, ge=1, le=200)) -> dict[str, Any]:
+@router.get("/v1/crypto/heatmap", response_model=CryptoHeatmapResponse)
+async def crypto_heatmap(limit: int = Query(default=80, ge=1, le=200)) -> CryptoHeatmapResponse:
     rows = await _load_rows(limit=max(60, limit))
     rows.sort(key=lambda x: x.market_cap, reverse=True)
     items: list[dict[str, Any]] = []
@@ -411,8 +593,8 @@ async def crypto_heatmap(limit: int = Query(default=80, ge=1, le=200)) -> dict[s
     return {"items": items, "ts": _now_iso()}
 
 
-@router.get("/v1/crypto/derivatives")
-async def crypto_derivatives(limit: int = Query(default=40, ge=1, le=200)) -> dict[str, Any]:
+@router.get("/v1/crypto/derivatives", response_model=CryptoDerivativesResponse)
+async def crypto_derivatives(limit: int = Query(default=40, ge=1, le=200)) -> CryptoDerivativesResponse:
     from backend.realtime.binance_ws import get_binance_derivatives_state
 
     rows = await _load_rows(limit=max(60, limit))
@@ -448,8 +630,8 @@ async def crypto_derivatives(limit: int = Query(default=40, ge=1, le=200)) -> di
     return {"items": items, "totals": snapshot["totals"], "ts": _now_iso()}
 
 
-@router.get("/v1/crypto/defi")
-async def crypto_defi_dashboard() -> dict[str, Any]:
+@router.get("/v1/crypto/defi", response_model=CryptoDefiResponse)
+async def crypto_defi_dashboard() -> CryptoDefiResponse:
     rows = await _load_rows(limit=200)
     defi_rows = [r for r in rows if r.sector == "DeFi"]
     if not defi_rows:
@@ -493,11 +675,11 @@ async def crypto_defi_dashboard() -> dict[str, Any]:
     }
 
 
-@router.get("/v1/crypto/correlation")
+@router.get("/v1/crypto/correlation", response_model=CryptoCorrelationResponse)
 async def crypto_correlation_matrix(
     window: int = Query(default=30, ge=5, le=180),
     limit: int = Query(default=8, ge=2, le=20),
-) -> dict[str, Any]:
+) -> CryptoCorrelationResponse:
     rows = await _load_rows(limit=120)
     rows.sort(key=lambda x: x.market_cap, reverse=True)
     selected = rows[:limit]
@@ -528,8 +710,8 @@ async def crypto_correlation_matrix(
     }
 
 
-@router.get("/v1/crypto/coins/{symbol}")
-async def crypto_coin_detail(symbol: str) -> dict[str, Any]:
+@router.get("/v1/crypto/coins/{symbol}", response_model=CryptoCoinDetailResponse)
+async def crypto_coin_detail(symbol: str) -> CryptoCoinDetailResponse:
     detail = await market_service.coin_detail(symbol)
     if detail is None:
         raise HTTPException(status_code=404, detail="Crypto asset not found")

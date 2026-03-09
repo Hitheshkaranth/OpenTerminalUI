@@ -70,6 +70,9 @@ export function AboutPage({ terminalType = "market" }: AboutProps) {
           <ul className="space-y-1 text-xs text-terminal-text">
             <li>- Linked crosshair sync across multi-chart launchpad/workstation panels.</li>
             <li>- Volume Profile overlay with VPOC and 70% value area controls.</li>
+            <li>- Non-price indicator panes now preserve price-chart visibility (no abrupt chart collapse).</li>
+            <li>- Expanded top-bar ticker loader with improved space for search + quick load actions.</li>
+            <li>- In-app branding now uses the same icon asset as the web page favicon.</li>
             <li>- GO bar + command palette shortcut hardening (`Ctrl/Cmd+G`, `Ctrl/Cmd+K`).</li>
             <li>- Chart replay helpers, alternative candle transforms, and comparison-series tools.</li>
             <li>- Provider registry fallback ordering and expanded adapter test coverage.</li>

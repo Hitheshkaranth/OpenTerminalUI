@@ -66,6 +66,22 @@ def _patch_fetcher(monkeypatch) -> None:
     return _FakeFetcher.yahoo
 
 
+def _clear_crypto_quote_cache(limit: int) -> None:
+    key = crypto.cache_instance.build_key("crypto_quotes", "universe", {"limit": limit})
+    stale_key = crypto.cache_instance.build_key("crypto_quotes", "universe_stale", {"limit": limit})
+
+    crypto.cache_instance._l1_cache.pop(key, None)
+    crypto.cache_instance._l1_cache.pop(stale_key, None)
+
+    if crypto.cache_instance._redis:
+        asyncio.run(crypto.cache_instance._redis.delete(key, stale_key))
+
+    if crypto.cache_instance._db_conn:
+        with crypto.cache_instance._db_lock:
+            crypto.cache_instance._db_conn.execute("DELETE FROM cache WHERE key IN (?, ?)", (key, stale_key))
+            crypto.cache_instance._db_conn.commit()
+
+
 def test_crypto_search_returns_matches(monkeypatch) -> None:
     class _FakeYahoo:
         pass
@@ -108,7 +124,7 @@ def test_crypto_markets_returns_normalized_items(monkeypatch) -> None:
 
 def test_crypto_markets_is_cache_aware(monkeypatch) -> None:
     fake_yahoo = _patch_fetcher(monkeypatch)
-    crypto.cache_instance._l1_cache.clear()
+    _clear_crypto_quote_cache(limit=17)
     asyncio.run(crypto.crypto_markets(limit=17))
     asyncio.run(crypto.crypto_markets(limit=17))
     assert fake_yahoo.quote_calls == 1
@@ -191,3 +207,40 @@ def test_crypto_coin_detail_shape(monkeypatch) -> None:
     assert detail["name"] == "Bitcoin"
     assert "high_24h" in detail and "low_24h" in detail
     assert isinstance(detail["sparkline"], list)
+
+
+def test_crypto_markets_uses_stale_cache_when_rate_limited(monkeypatch) -> None:
+    class _RateLimitedYahoo:
+        async def get_quotes(self, symbols: list[str]):  # noqa: ARG002
+            raise RuntimeError("429 Too Many Requests")
+
+    class _FakeFetcher:
+        yahoo = _RateLimitedYahoo()
+
+    async def _fake_get_unified_fetcher():
+        return _FakeFetcher()
+
+    monkeypatch.setattr(crypto, "get_unified_fetcher", _fake_get_unified_fetcher)
+    crypto.cache_instance._l1_cache.clear()
+    stale_key = crypto.cache_instance.build_key("crypto_quotes", "universe_stale", {"limit": 12})
+    asyncio.run(
+        crypto.cache_instance.set(
+            stale_key,
+            [
+                {
+                    "symbol": "BTC-USD",
+                    "name": "Bitcoin",
+                    "price": 50000,
+                    "change_24h": 1.5,
+                    "volume_24h": 1000,
+                    "market_cap": 50000000,
+                    "sector": "L1",
+                }
+            ],
+            ttl=300,
+        )
+    )
+
+    result = asyncio.run(crypto.crypto_markets(limit=12))
+    assert len(result["items"]) == 1
+    assert result["items"][0]["symbol"] == "BTC-USD"
