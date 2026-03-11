@@ -2,6 +2,19 @@ import type { Bar } from "oakscriptjs";
 import type { ChartPoint } from "../../types";
 import type { ChartTimeframe } from "./types";
 
+type ComparableChartBar = {
+  time: unknown;
+  open: unknown;
+  high: unknown;
+  low: unknown;
+  close: unknown;
+  volume?: unknown;
+  session?: unknown;
+  isExtended?: unknown;
+  s?: unknown;
+  ext?: unknown;
+};
+
 const TF_SECONDS: Record<ChartTimeframe, number> = {
   "1m": 60,
   "2m": 120,
@@ -53,6 +66,56 @@ export function chartPointsToBars(points: ChartPoint[]): Bar[] {
     byTime.set(time, bar);
   }
   return Array.from(byTime.values()).sort((a, b) => Number(a.time) - Number(b.time));
+}
+
+function normalizeTime(value: unknown): number | null {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function normalizeValue(value: unknown, fallback = 0): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function normalizeSession(value: unknown): string | null {
+  return typeof value === "string" && value ? value : null;
+}
+
+function normalizeExtended(value: unknown): boolean {
+  return value === true;
+}
+
+function sameStableBar(a: ComparableChartBar, b: ComparableChartBar): boolean {
+  return (
+    normalizeTime(a.time) === normalizeTime(b.time) &&
+    normalizeValue(a.open) === normalizeValue(b.open) &&
+    normalizeValue(a.high) === normalizeValue(b.high) &&
+    normalizeValue(a.low) === normalizeValue(b.low) &&
+    normalizeValue(a.close) === normalizeValue(b.close) &&
+    normalizeValue(a.volume) === normalizeValue(b.volume) &&
+    normalizeSession(a.session ?? a.s) === normalizeSession(b.session ?? b.s) &&
+    normalizeExtended(a.isExtended ?? a.ext) === normalizeExtended(b.isExtended ?? b.ext)
+  );
+}
+
+export function canApplyTailUpdate<T extends ComparableChartBar>(previous: T[], next: T[]): boolean {
+  if (!previous.length || !next.length || previous.length !== next.length) {
+    return false;
+  }
+
+  const lastIndex = next.length - 1;
+  if (normalizeTime(previous[lastIndex]?.time) !== normalizeTime(next[lastIndex]?.time)) {
+    return false;
+  }
+
+  for (let idx = 0; idx < lastIndex; idx += 1) {
+    if (!sameStableBar(previous[idx], next[idx])) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function formatCompact(value: number | null | undefined): string {

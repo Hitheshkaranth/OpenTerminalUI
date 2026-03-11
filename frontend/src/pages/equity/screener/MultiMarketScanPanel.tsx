@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { addPortfolioHolding, addWatchlistItem, fetchPortfolios, runScreenerScan, type ScreenerScanFilter } from "../../../api/client";
 import { DenseTable } from "../../../components/terminal/DenseTable";
@@ -6,6 +7,7 @@ import { TerminalBadge } from "../../../components/terminal/TerminalBadge";
 import { TerminalButton } from "../../../components/terminal/TerminalButton";
 import { TerminalInput } from "../../../components/terminal/TerminalInput";
 import { TerminalPanel } from "../../../components/terminal/TerminalPanel";
+import { useStockStore } from "../../../store/stockStore";
 
 type Preset = {
   id: string;
@@ -13,6 +15,20 @@ type Preset = {
   filters: ScreenerScanFilter[];
   formula?: string;
 };
+
+type SavedScanTemplate = {
+  markets: string[];
+  limit: number;
+  marketCapMin: string;
+  peMax: string;
+  sectorCsv: string;
+  formulaMode: boolean;
+  formula: string;
+  rows: Array<Record<string, unknown>>;
+  selectedSymbol: string;
+};
+
+const SCAN_TEMPLATE_STORAGE_KEY = "screener:scan:last-template:v2";
 
 const PRESETS: Preset[] = [
   {
@@ -85,7 +101,17 @@ function highlightFormula(formula: string): string {
     .replace(/(\d+(\.\d+)?)/g, "<span class='text-emerald-300'>$1</span>");
 }
 
+function getRowSymbol(row: Record<string, unknown>): string {
+  return String(row.symbol || row.ticker || "").toUpperCase();
+}
+
+function getRowPrice(row: Record<string, unknown>): number {
+  return Number(row.current_price ?? row.price ?? row.last_price ?? 0);
+}
+
 export function MultiMarketScanPanel() {
+  const navigate = useNavigate();
+  const setTicker = useStockStore((state) => state.setTicker);
   const [markets, setMarkets] = useState<string[]>(["NSE", "NYSE", "NASDAQ"]);
   const [limit, setLimit] = useState(100);
   const [marketCapMin, setMarketCapMin] = useState("1000000000");
@@ -96,6 +122,7 @@ export function MultiMarketScanPanel() {
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<string>("");
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
 
   const baseFilters = useMemo(() => {
     const filters: ScreenerScanFilter[] = [];
@@ -111,17 +138,43 @@ export function MultiMarketScanPanel() {
     return filters;
   }, [marketCapMin, peMax, sectorCsv]);
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SCAN_TEMPLATE_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<SavedScanTemplate>;
+      if (Array.isArray(parsed.markets) && parsed.markets.length) setMarkets(parsed.markets);
+      if (typeof parsed.limit === "number" && Number.isFinite(parsed.limit)) setLimit(parsed.limit);
+      if (typeof parsed.marketCapMin === "string") setMarketCapMin(parsed.marketCapMin);
+      if (typeof parsed.peMax === "string") setPeMax(parsed.peMax);
+      if (typeof parsed.sectorCsv === "string") setSectorCsv(parsed.sectorCsv);
+      if (typeof parsed.formulaMode === "boolean") setFormulaMode(parsed.formulaMode);
+      if (typeof parsed.formula === "string") setFormula(parsed.formula);
+      if (Array.isArray(parsed.rows)) setRows(parsed.rows);
+      if (typeof parsed.selectedSymbol === "string") setSelectedSymbol(parsed.selectedSymbol);
+    } catch {
+      // Ignore malformed local cache and keep defaults.
+    }
+  }, []);
+
   const runScan = async (preset?: Preset) => {
     setLoading(true);
+    setScanMessage(null);
     try {
+      const filters = formulaMode
+        ? [...baseFilters, ...parseFormulaToFilters(formula)]
+        : [...baseFilters, ...(preset?.filters ?? [])];
       const payload = await runScreenerScan({
         markets,
-        filters: formulaMode ? [...baseFilters, ...parseFormulaToFilters(formula)] : (preset?.filters ?? baseFilters),
+        filters,
         sort: { field: "market_cap", order: "desc" },
         limit,
         formula: formulaMode ? formula : preset?.formula,
       });
-      setRows(payload.rows || []);
+      const nextRows = payload.rows || [];
+      setRows(nextRows);
+      setSelectedSymbol(nextRows.length ? getRowSymbol(nextRows[0]) : "");
+      setScanMessage(`Loaded ${nextRows.length} scan results`);
     } finally {
       setLoading(false);
     }
@@ -129,22 +182,86 @@ export function MultiMarketScanPanel() {
 
   const onAddToWatchlist = async (symbol: string) => {
     if (!symbol) return;
-    await addWatchlistItem({ watchlist_name: "Default", ticker: symbol });
+    try {
+      await addWatchlistItem({ watchlist_name: "Default", ticker: symbol });
+      setScanMessage(`${symbol} added to watchlist`);
+    } catch (error) {
+      setScanMessage(error instanceof Error ? error.message : "Failed to add to watchlist");
+    }
   };
 
   const onAddToPortfolio = async (symbol: string, costHint?: number) => {
     if (!symbol) return;
-    const portfolios = await fetchPortfolios();
-    const target = portfolios[0];
-    if (!target) return;
-    const safeCost = Number.isFinite(Number(costHint)) && Number(costHint) > 0 ? Number(costHint) : 1;
-    await addPortfolioHolding(target.id, {
-      symbol,
-      shares: 1,
-      cost_basis_per_share: safeCost,
-      purchase_date: new Date().toISOString().slice(0, 10),
-      notes: "Added from Screener context menu",
-    });
+    try {
+      const portfolios = await fetchPortfolios();
+      const target = portfolios[0];
+      if (!target) {
+        setScanMessage("No portfolio available for quick add");
+        return;
+      }
+      const safeCost = Number.isFinite(Number(costHint)) && Number(costHint) > 0 ? Number(costHint) : 1;
+      await addPortfolioHolding(target.id, {
+        symbol,
+        shares: 1,
+        cost_basis_per_share: safeCost,
+        purchase_date: new Date().toISOString().slice(0, 10),
+        notes: "Added from Screener context menu",
+      });
+      setScanMessage(`${symbol} added to portfolio ${target.name}`);
+    } catch (error) {
+      setScanMessage(error instanceof Error ? error.message : "Failed to add to portfolio");
+    }
+  };
+
+  const saveTemplate = () => {
+    const payload: SavedScanTemplate = {
+      markets,
+      limit,
+      marketCapMin,
+      peMax,
+      sectorCsv,
+      formulaMode,
+      formula,
+      rows,
+      selectedSymbol,
+    };
+    localStorage.setItem(SCAN_TEMPLATE_STORAGE_KEY, JSON.stringify(payload));
+    setScanMessage("Saved full scan setup");
+  };
+
+  const loadTemplate = () => {
+    const raw = localStorage.getItem(SCAN_TEMPLATE_STORAGE_KEY);
+    if (!raw) {
+      setScanMessage("No saved scan setup found");
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw) as SavedScanTemplate;
+      setMarkets(Array.isArray(parsed.markets) && parsed.markets.length ? parsed.markets : ["NSE", "NYSE", "NASDAQ"]);
+      setLimit(typeof parsed.limit === "number" ? parsed.limit : 100);
+      setMarketCapMin(parsed.marketCapMin || "1000000000");
+      setPeMax(parsed.peMax || "25");
+      setSectorCsv(parsed.sectorCsv || "");
+      setFormulaMode(Boolean(parsed.formulaMode));
+      setFormula(parsed.formula || "PE < 15 AND (ROE > 20 OR ROIC > 15) AND DividendYield > 2");
+      setRows(Array.isArray(parsed.rows) ? parsed.rows : []);
+      setSelectedSymbol(parsed.selectedSymbol || "");
+      setScanMessage("Loaded saved scan setup");
+    } catch {
+      setScanMessage("Saved scan setup is invalid");
+    }
+  };
+
+  const openChart = (symbol: string) => {
+    if (!symbol) return;
+    setTicker(symbol);
+    navigate("/equity/chart-workstation");
+  };
+
+  const openSecurity = (symbol: string, tab: "overview" | "news") => {
+    if (!symbol) return;
+    setTicker(symbol);
+    navigate(`/equity/security/${encodeURIComponent(symbol)}?tab=${tab}`);
   };
 
   return (
@@ -172,28 +289,8 @@ export function MultiMarketScanPanel() {
           <TerminalButton variant="accent" onClick={() => void runScan()}>
             {loading ? "Scanning..." : "Run Scan"}
           </TerminalButton>
-          <TerminalButton
-            variant="default"
-            onClick={() => {
-              const saved = localStorage.getItem("screener:scan:last");
-              if (!saved) return;
-              const parsed = JSON.parse(saved) as { rows?: Array<Record<string, unknown>> };
-              setRows(parsed.rows || []);
-            }}
-          >
-            Load Template
-          </TerminalButton>
-          <TerminalButton
-            variant="default"
-            onClick={() => localStorage.setItem("screener:scan:last", JSON.stringify({ rows }))}
-          >
-            Save as Template
-          </TerminalButton>
-          {selectedSymbol ? (
-            <TerminalButton variant="default" onClick={() => void onAddToWatchlist(selectedSymbol)}>
-              Add {selectedSymbol} to Watchlist
-            </TerminalButton>
-          ) : null}
+          <TerminalButton variant="default" onClick={loadTemplate}>Load Setup</TerminalButton>
+          <TerminalButton variant="default" onClick={saveTemplate}>Save Setup</TerminalButton>
         </div>
 
         <div className="grid gap-2 md:grid-cols-3">
@@ -226,10 +323,21 @@ export function MultiMarketScanPanel() {
           </div>
         ) : null}
 
+        {selectedSymbol ? (
+          <div className="flex flex-wrap items-center gap-2 rounded border border-terminal-border bg-terminal-bg px-2 py-2 text-xs">
+            <TerminalBadge variant="accent">{selectedSymbol}</TerminalBadge>
+            <TerminalButton size="sm" variant="accent" onClick={() => openChart(selectedSymbol)}>Open Chart</TerminalButton>
+            <TerminalButton size="sm" variant="default" onClick={() => openSecurity(selectedSymbol, "overview")}>Security Hub</TerminalButton>
+            <TerminalButton size="sm" variant="default" onClick={() => openSecurity(selectedSymbol, "news")}>News</TerminalButton>
+            <TerminalButton size="sm" variant="default" onClick={() => void onAddToWatchlist(selectedSymbol)}>Add Watchlist</TerminalButton>
+            <TerminalButton size="sm" variant="default" onClick={() => void onAddToPortfolio(selectedSymbol)}>Add Portfolio</TerminalButton>
+          </div>
+        ) : null}
+
         <div className="flex items-center justify-between text-xs text-terminal-muted">
           <div className="inline-flex items-center gap-2">
             <TerminalBadge variant="neutral">{rows.length} results</TerminalBadge>
-            <span>Sparkline + sortable dense table</span>
+            <span>{markets.join(" / ")} scan board</span>
           </div>
           <TerminalButton
             variant="default"
@@ -243,6 +351,8 @@ export function MultiMarketScanPanel() {
             Add Top 25 to Watchlist
           </TerminalButton>
         </div>
+
+        {scanMessage ? <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs text-terminal-muted">{scanMessage}</div> : null}
 
         <DenseTable
           id="multi-market-scan-results"
@@ -260,16 +370,24 @@ export function MultiMarketScanPanel() {
             { key: "sparkline", title: "1M", type: "sparkline", width: 96, getValue: (r) => (Array.isArray(r.sparkline) ? r.sparkline : []) },
           ]}
           onRowClick={(row) => {
-            setSelectedSymbol(String(row.symbol || row.ticker || "").toUpperCase());
+            setSelectedSymbol(getRowSymbol(row));
+          }}
+          onRowOpenInChart={(row) => {
+            const symbol = getRowSymbol(row);
+            if (symbol) openChart(symbol);
           }}
           onAddToWatchlist={(row) => {
-            const symbol = String(row.symbol || row.ticker || "").toUpperCase();
+            const symbol = getRowSymbol(row);
             if (symbol) void onAddToWatchlist(symbol);
           }}
           onAddToPortfolio={(row) => {
-            const symbol = String(row.symbol || row.ticker || "").toUpperCase();
-            const px = Number(row.current_price ?? row.price ?? row.last_price ?? 0);
+            const symbol = getRowSymbol(row);
+            const px = getRowPrice(row);
             if (symbol) void onAddToPortfolio(symbol, px);
+          }}
+          onViewDetails={(row) => {
+            const symbol = getRowSymbol(row);
+            if (symbol) openSecurity(symbol, "overview");
           }}
         />
       </div>

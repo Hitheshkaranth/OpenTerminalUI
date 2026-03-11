@@ -1,5 +1,8 @@
+import { useNavigate } from "react-router-dom";
+
 import { TerminalPanel } from "../../../components/terminal/TerminalPanel";
 import { DataGrid } from "../../../components/common/DataGrid";
+import { useStockStore } from "../../../store/stockStore";
 import { InlineBar } from "./InlineBar";
 import { ScoreBadge } from "./ScoreBadge";
 import { SparklineCell } from "./SparklineCell";
@@ -14,10 +17,30 @@ function toNum(value: unknown): number {
   return 0;
 }
 
+function getTicker(row: Record<string, unknown>): string {
+  return String(row.ticker || row.symbol || "").toUpperCase();
+}
+
 export function ResultsTable() {
+  const navigate = useNavigate();
+  const setTicker = useStockStore((state) => state.setTicker);
   const { result, selectedRow, setSelectedRow } = useScreenerContext();
   const rows = result?.results || [];
   const selectedIndex = selectedRow ? rows.indexOf(selectedRow) : -1;
+
+  const openChart = (row: Record<string, unknown>) => {
+    const ticker = getTicker(row);
+    if (!ticker) return;
+    setTicker(ticker);
+    navigate("/equity/chart-workstation");
+  };
+
+  const openSecurity = (row: Record<string, unknown>, tab: "overview" | "news") => {
+    const ticker = getTicker(row);
+    if (!ticker) return;
+    setTicker(ticker);
+    navigate(`/equity/security/${encodeURIComponent(ticker)}?tab=${tab}`);
+  };
 
   return (
     <TerminalPanel title="Results" subtitle={`Rows: ${rows.length}`}>
@@ -28,6 +51,40 @@ export function ResultsTable() {
         selectedIndex={selectedIndex >= 0 ? selectedIndex : undefined}
         onRowSelect={(idx) => setSelectedRow(rows[idx] || null)}
         onRowOpen={(idx) => setSelectedRow(rows[idx] || null)}
+        rowActions={(row) => (
+          <div className="flex gap-1">
+            <button
+              type="button"
+              className="rounded border border-terminal-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"
+              onClick={(event) => {
+                event.stopPropagation();
+                openChart(row);
+              }}
+            >
+              Chart
+            </button>
+            <button
+              type="button"
+              className="rounded border border-terminal-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"
+              onClick={(event) => {
+                event.stopPropagation();
+                openSecurity(row, "overview");
+              }}
+            >
+              Research
+            </button>
+            <button
+              type="button"
+              className="rounded border border-terminal-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"
+              onClick={(event) => {
+                event.stopPropagation();
+                openSecurity(row, "news");
+              }}
+            >
+              News
+            </button>
+          </div>
+        )}
         className="max-h-[52vh] xl:max-h-[56vh]"
         columns={[
           {

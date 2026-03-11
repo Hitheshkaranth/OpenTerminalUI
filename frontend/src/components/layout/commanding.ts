@@ -3,6 +3,7 @@ import type { NavigateFunction } from "react-router-dom";
 import { useStockStore } from "../../store/stockStore";
 
 export type CommandFunctionCode =
+  | "DESK"
   | "DES"
   | "GP"
   | "FA"
@@ -67,6 +68,7 @@ export type CommandFunctionSpec = {
 };
 
 export const COMMAND_FUNCTIONS: CommandFunctionSpec[] = [
+  { code: "DESK", label: "Analyst Desk", description: "Open the cockpit analyst workspace", aliases: ["COCKPIT", "MONITOR"] },
   { code: "DES", label: "Description / Security Hub", description: "Open security hub overview", securityScoped: true, aliases: ["SECURITY", "HUB"] },
   { code: "GP", label: "Graph Price", description: "Open chart tab", securityScoped: true, aliases: ["CHART"] },
   { code: "FA", label: "Financial Analysis", description: "Open financials tab", securityScoped: true, aliases: ["FIN", "FUNDAMENTALS"] },
@@ -160,6 +162,10 @@ function navigateToSecurityHub(navigate: NavigateFunction, ticker: string, tab: 
   navigate(url);
 }
 
+function navigateToMarketStock(navigate: NavigateFunction, ticker: string) {
+  navigate(`/equity/stocks?ticker=${encodeURIComponent(ticker)}`);
+}
+
 function applyTicker(ticker: string) {
   const store = useStockStore.getState();
   store.setTicker(ticker);
@@ -198,12 +204,16 @@ export function executeParsedCommand(parsed: ParsedCommand, navigate: NavigateFu
 
   if (parsed.kind === "ticker") {
     applyTicker(parsed.ticker);
-    navigateToSecurityHub(navigate, parsed.ticker, "overview");
-    return { ok: true, target: `/equity/security/${parsed.ticker}` };
+    navigateToMarketStock(navigate, parsed.ticker);
+    return { ok: true, target: `/equity/stocks?ticker=${parsed.ticker}` };
   }
 
   if (parsed.kind === "ticker-function") {
     applyTicker(parsed.ticker);
+    if (parsed.func === "DESK") {
+      navigate(`/equity/cockpit?ticker=${encodeURIComponent(parsed.ticker)}`);
+      return { ok: true, target: "/equity/cockpit" };
+    }
     if (parsed.func === "OPT") {
       navigate(`/fno?symbol=${encodeURIComponent(parsed.ticker)}`);
       return { ok: true, target: "/fno" };
@@ -215,6 +225,14 @@ export function executeParsedCommand(parsed: ParsedCommand, navigate: NavigateFu
   if (parsed.kind === "function") {
     const mod0 = parsed.modifiers[0];
     switch (parsed.func) {
+      case "DESK":
+        if (mod0 && looksLikeTicker(mod0)) {
+          applyTicker(mod0);
+          navigate(`/equity/cockpit?ticker=${encodeURIComponent(mod0)}`);
+          return { ok: true, target: "/equity/cockpit" };
+        }
+        navigate("/equity/cockpit");
+        return { ok: true, target: "/equity/cockpit" };
       case "EQS":
         navigate("/equity/screener");
         return { ok: true, target: "/equity/screener" };

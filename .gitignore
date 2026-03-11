@@ -33,6 +33,7 @@ coverage.xml
 pytest-report.xml
 
 # Frontend artifacts
+node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
@@ -47,6 +48,7 @@ Thumbs.db
 .idea/
 
 .claude/
+.codex-run/
 .forge/
 .codex_tmp_forge_schema/
 AGENTS.md

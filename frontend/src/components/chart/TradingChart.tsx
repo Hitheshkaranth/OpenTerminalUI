@@ -29,6 +29,7 @@ import {
   buildEnhancedCandle,
   buildEnhancedVolumeBar,
 } from "../../shared/chart/candlePresentation";
+import { canApplyTailUpdate } from "../../shared/chart/chartUtils";
 import { terminalColors, terminalOverlayPalette } from "../../theme/terminal";
 import type { Bar } from "oakscriptjs";
 import { useQuotesStore, useQuotesStream, type QuoteTick } from "../../realtime/useQuotesStream";
@@ -890,11 +891,7 @@ export function TradingChart({
     lineRef.current.applyOptions({ visible: mode === "line" });
     areaRef.current.applyOptions({ visible: mode === "area" });
 
-    const isIncremental =
-      replayParsed.length > 0 &&
-      lastParsedRef.current.length > 0 &&
-      replayParsed.length === lastParsedRef.current.length &&
-      replayParsed[replayParsed.length - 2]?.time === lastParsedRef.current[lastParsedRef.current.length - 2]?.time;
+    const isIncremental = canApplyTailUpdate(lastParsedRef.current, replayParsed);
 
     const ethEnabled = extendedHours?.enabled;
     const hasSessionMetadata = replayParsed.some((d) => d.session && d.session !== "rth");

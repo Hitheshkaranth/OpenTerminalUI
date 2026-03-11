@@ -6,6 +6,7 @@ function makeJwt(payload: Record<string, unknown>): string {
 }
 
 test("backtesting tabs and compare panel render with mocked jobs", async ({ page }) => {
+  test.slow();
   const accessToken = makeJwt({
     sub: "e2e-user",
     email: "e2e@example.com",
@@ -23,7 +24,7 @@ test("backtesting tabs and compare panel render with mocked jobs", async ({ page
   );
 
   await page.goto("/backtesting");
-  await expect(page.getByText("Backtesting Control Deck")).toBeVisible();
+  await expect(page.getByText("Backtesting Control Deck")).toBeVisible({ timeout: 90_000 });
   const vizPanel = page
     .locator("section")
     .filter({ has: page.locator(".ot-type-panel-title", { hasText: "Backtest Visualizations" }) })

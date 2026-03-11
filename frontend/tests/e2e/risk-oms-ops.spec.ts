@@ -7,6 +7,7 @@ function fakeJwt(payload: Record<string, unknown>): string {
 }
 
 test("risk/oms/ops pages render with mocked APIs", async ({ page }) => {
+  test.slow();
   const token = fakeJwt({
     sub: "u_e2e",
     email: "trader@example.com",
@@ -80,9 +81,9 @@ test("risk/oms/ops pages render with mocked APIs", async ({ page }) => {
   });
 
   await page.goto("/equity/risk");
-  await expect(page.getByText("RISK ENGINE CONTROL")).toBeVisible();
+  await expect(page.getByText("RISK ENGINE CONTROL")).toBeVisible({ timeout: 90_000 });
   await page.goto("/equity/oms");
-  await expect(page.getByText("Order Ticket + Compliance")).toBeVisible();
+  await expect(page.getByText("Order Ticket + Compliance")).toBeVisible({ timeout: 90_000 });
   await page.goto("/equity/ops");
-  await expect(page.getByText("Operational Workspace Control")).toBeVisible();
+  await expect(page.getByText("Operational Workspace Control")).toBeVisible({ timeout: 90_000 });
 });

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { CUSTOM_SPLIT_TEMPLATE, makeDefaultLinkGroups, propagateLinkedSlots } from "../pages/ChartWorkstationPage";
+import {
+  CUSTOM_SPLIT_TEMPLATE,
+  makeDefaultLinkGroups,
+  normalizeCompareSymbols,
+  parseWorkspaceTemplateConfig,
+  propagateLinkedSlots,
+} from "../pages/ChartWorkstationPage";
 import type { ChartSlot } from "../store/chartWorkstationStore";
 
 function slot(id: string, ticker: string | null): ChartSlot {
@@ -59,5 +65,38 @@ describe("chart workstation linking helpers", () => {
   it("exposes custom split layout template", () => {
     expect(CUSTOM_SPLIT_TEMPLATE.arrangement).toBe("custom");
     expect(CUSTOM_SPLIT_TEMPLATE.customAreas).toContain("a a b");
+  });
+
+  it("normalizes compare symbols by uppercasing, deduping, and excluding active", () => {
+    expect(normalizeCompareSymbols([" msft ", "nvda", "MSFT", "AAPL", "qqq"], "AAPL")).toEqual(["MSFT", "NVDA", "QQQ"]);
+  });
+
+  it("parses saved workstation template config and legacy panel templates", () => {
+    const saved = parseWorkspaceTemplateConfig({
+      slots: [
+        { ticker: "AAPL", market: "US", timeframe: "1D", chartType: "candle" },
+        { ticker: "MSFT", market: "US", timeframe: "1h", chartType: "line" },
+      ],
+      gridTemplate: { cols: 2, rows: 1, arrangement: "grid" },
+      syncCrosshair: false,
+      linkGroups: { placeholder: "off" },
+      compareSymbols: ["NVDA", "QQQ"],
+    });
+    expect(saved?.snapshot.slots).toHaveLength(2);
+    expect(saved?.snapshot.gridTemplate.cols).toBe(2);
+    expect(saved?.snapshot.syncCrosshair).toBe(false);
+    expect(saved?.compareSymbols).toEqual(["NVDA", "QQQ"]);
+
+    const legacy = parseWorkspaceTemplateConfig({
+      panels: [
+        { ticker: "TSLA", timeframe: "15m", market: "US" },
+        { ticker: "AMD", timeframe: "1D", market: "US" },
+      ],
+      link_groups: { ignored: "A" },
+    });
+    expect(legacy?.snapshot.slots).toHaveLength(2);
+    expect(legacy?.snapshot.gridTemplate.cols).toBe(2);
+    expect(legacy?.snapshot.slots[0]?.ticker).toBe("TSLA");
+    expect(legacy?.snapshot.slots[1]?.timeframe).toBe("1D");
   });
 });

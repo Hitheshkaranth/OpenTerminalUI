@@ -1,3 +1,5 @@
+import type { CountryCode, MarketCode } from "./markets";
+
 export type ChartPoint = {
   t: number;
   o: number;
@@ -943,6 +945,78 @@ export type ScreenerRunResponseV3 = {
   execution_time_ms: number;
   results: Array<Record<string, unknown>>;
   viz_data: Record<string, unknown>;
+};
+
+export type AccountRiskProfile = "conservative" | "moderate" | "aggressive";
+
+export type AccountTradingStyle = "discretionary" | "systematic" | "hybrid";
+
+export type AccountNotificationMode = "quiet" | "balanced" | "priority";
+
+export type AccountSecurityTier = "standard" | "elevated" | "restricted";
+
+export type AccountProfile = {
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  dateOfBirth: string;
+  phone: string;
+  timezone: string;
+  location: string;
+  deskFocus: string;
+  riskProfile: AccountRiskProfile;
+  tradingStyle: AccountTradingStyle;
+  notificationMode: AccountNotificationMode;
+  securityTier: AccountSecurityTier;
+  bio: string;
+  avatarDataUrl: string;
+};
+
+export type AccountConnectionSettings = {
+  brokerName: string;
+  accountAlias: string;
+  preferredCountry: CountryCode;
+  preferredExchange: MarketCode;
+  defaultCurrency: "INR" | "USD";
+};
+
+export type AccountAggregatorSettings = {
+  marketDataApiKey: string;
+  executionApiKey: string;
+  newsApiKey: string;
+  webhookUrl: string;
+};
+
+export type AccountShortcutTone = "accent" | "info" | "success" | "warn";
+
+export type AccountShortcutCard = {
+  id: string;
+  label: string;
+  detail: string;
+  keycap: string;
+  to: string;
+  tone: AccountShortcutTone;
+};
+
+export type AccountSessionActivityTone = "success" | "info" | "warn" | "danger";
+
+export type AccountSessionActivityItem = {
+  id: string;
+  label: string;
+  value: string;
+  detail: string;
+  tone: AccountSessionActivityTone;
+};
+
+export type AccountExportBundle = {
+  exportedAt: string;
+  user: {
+    email: string;
+    role: string;
+  };
+  profile: AccountProfile;
+  connected: AccountConnectionSettings;
+  aggregators: AccountAggregatorSettings;
 };
 
 export type UserScreenV3 = {

@@ -253,6 +253,56 @@ describe("TradingChart realtime updates", () => {
     });
   });
 
+  it("falls back to setData when the last bar time regresses at the same series length", async () => {
+    const initialData = [
+      { t: 100, o: 10, h: 11, l: 9, c: 10.5, v: 100 },
+      { t: 200, o: 10.5, h: 12, l: 10, c: 11.5, v: 110 },
+      { t: 300, o: 11.5, h: 13, l: 11, c: 12.5, v: 120 },
+    ];
+    const regressedTailData = [
+      { t: 100, o: 10, h: 11, l: 9, c: 10.5, v: 100 },
+      { t: 200, o: 10.5, h: 12, l: 10, c: 11.5, v: 110 },
+      { t: 250, o: 11.5, h: 12.7, l: 11, c: 12.1, v: 115 },
+    ];
+
+    const { rerender } = render(
+      <div style={{ width: 800, height: 400 }}>
+        <TradingChart
+          ticker="AAPL"
+          timeframe="1m"
+          mode="candles"
+          crosshairSyncGroupId="chart-workstation"
+          data={initialData}
+        />
+      </div>,
+    );
+
+    await waitFor(() => {
+      expect(setDataByPane.get(1)?.mock.calls.length).toBeGreaterThan(0);
+    });
+    const volumeSetData = setDataByPane.get(1);
+    const volumeUpdate = updateByPane.get(1);
+    expect(volumeSetData?.mock.calls.length).toBe(1);
+    expect(volumeUpdate?.mock.calls.length ?? 0).toBe(0);
+
+    rerender(
+      <div style={{ width: 800, height: 400 }}>
+        <TradingChart
+          ticker="AAPL"
+          timeframe="1m"
+          mode="candles"
+          crosshairSyncGroupId="chart-workstation"
+          data={regressedTailData}
+        />
+      </div>,
+    );
+
+    await waitFor(() => {
+      expect(setDataByPane.get(1)?.mock.calls.length).toBe(2);
+    });
+    expect(updateByPane.get(1)?.mock.calls.length ?? 0).toBe(0);
+  });
+
   it("shows comparison mode controls for multi-symbol overlays", async () => {
     await act(async () => {
       render(

@@ -109,7 +109,7 @@ export function CommandPalette() {
       rows.unshift({
         id: `ticker-${q.toUpperCase()}`,
         label: q.toUpperCase(),
-        description: "Open security hub",
+        description: "Open market page",
         command: q.toUpperCase(),
         score: 2000,
       });

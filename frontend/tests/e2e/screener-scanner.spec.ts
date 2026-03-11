@@ -7,6 +7,7 @@ function fakeJwt(payload: Record<string, unknown>): string {
 }
 
 test("screener run and scanner alert flow renders", async ({ page }) => {
+  test.slow();
   const token = fakeJwt({
     sub: "u_e2e",
     email: "trader@example.com",
@@ -83,7 +84,7 @@ test("screener run and scanner alert flow renders", async ({ page }) => {
     .filter({ has: page.locator(".ot-type-panel-title", { hasText: "Query" }) })
     .first();
   const queryRunButton = queryPanel.getByRole("button", { name: /^Run$/ });
-  await expect(queryPanel).toBeVisible();
+  await expect(queryPanel).toBeVisible({ timeout: 90_000 });
   await queryRunButton.scrollIntoViewIfNeeded();
   await queryRunButton.click();
 

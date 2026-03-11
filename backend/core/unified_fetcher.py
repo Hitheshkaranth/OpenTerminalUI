@@ -165,6 +165,7 @@ class UnifiedFetcher:
         yahoo_summary_task = self.yahoo.get_quote_summary(
             ysym, ["financialData", "summaryDetail", "defaultKeyStatistics", "assetProfile"]
         )
+        yahoo_quotes_task = self.yahoo.get_quotes([ysym])
         # If Kite is live, avoid FMP/Finnhub fallback calls to reduce 403 spam.
         fmp_task = asyncio.sleep(0, result={}) if has_kite else self.fmp.get_quote(symbol)
         finnhub_task = asyncio.sleep(0, result={}) if has_kite else self.finnhub.get_company_profile(symbol)
@@ -175,11 +176,11 @@ class UnifiedFetcher:
         )
 
         results = await asyncio.gather(
-            nse_task, nse_trade_task, yahoo_summary_task, fmp_task, finnhub_task, kite_quote_task,
+            nse_task, nse_trade_task, yahoo_summary_task, yahoo_quotes_task, fmp_task, finnhub_task, kite_quote_task,
             return_exceptions=True,
         )
 
-        nse_q, nse_t, yahoo_summary, fmp_q, finnhub_p, kite_quote = results
+        nse_q, nse_t, yahoo_summary, yahoo_quotes, fmp_q, finnhub_p, kite_quote = results
 
         # Helpers
         def _get_val(obj, *keys):
@@ -201,6 +202,8 @@ class UnifiedFetcher:
         nq = nse_q if isinstance(nse_q, dict) else {}
         nt = nse_t if isinstance(nse_t, dict) else {}
         ys = yahoo_summary if isinstance(yahoo_summary, dict) else {}
+        yq_rows = yahoo_quotes if isinstance(yahoo_quotes, list) else []
+        yq = yq_rows[0] if yq_rows and isinstance(yq_rows[0], dict) else {}
         fq = fmp_q if isinstance(fmp_q, dict) else {}
         fp = finnhub_p if isinstance(finnhub_p, dict) else {}
         kq = kite_quote if isinstance(kite_quote, dict) else {}
@@ -232,6 +235,8 @@ class UnifiedFetcher:
                      _to_float(fq.get("marketCap"))
 
         company_name = _get_val(nq, "info", "companyName") or \
+                       yq.get("shortName") or \
+                       yq.get("longName") or \
                        fq.get("name") or \
                        fp.get("name")
         exchange = _get_val(nq, "info", "exchange") or _get_val(nq, "metadata", "exchange") or cls.exchange or "NSE"

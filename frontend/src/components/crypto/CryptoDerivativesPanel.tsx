@@ -17,9 +17,11 @@ export type CryptoDerivativesTotals = {
 export function CryptoDerivativesPanel({
   rows,
   totals,
+  onSelect,
 }: {
   rows: CryptoDerivativesRow[];
   totals: CryptoDerivativesTotals;
+  onSelect?: (symbol: string) => void;
 }) {
   return (
     <div className="space-y-3" data-testid="crypto-derivatives-panel">
@@ -54,7 +56,15 @@ export function CryptoDerivativesPanel({
         <tbody>
           {rows.map((row) => (
             <tr key={row.symbol} className="border-t border-terminal-border/50">
-              <td className="text-terminal-accent">{row.symbol}</td>
+              <td>
+                {onSelect ? (
+                  <button type="button" className="text-terminal-accent hover:underline" onClick={() => onSelect(row.symbol)}>
+                    {row.symbol}
+                  </button>
+                ) : (
+                  <span className="text-terminal-accent">{row.symbol}</span>
+                )}
+              </td>
               <td className={`text-right ${row.funding_rate_8h >= 0 ? "text-terminal-pos" : "text-terminal-neg"}`}>
                 {(row.funding_rate_8h * 100).toFixed(3)}%
               </td>

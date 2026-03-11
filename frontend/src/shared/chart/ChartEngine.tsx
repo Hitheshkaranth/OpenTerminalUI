@@ -21,6 +21,7 @@ import {
   buildEnhancedCandle,
   buildEnhancedVolumeBar,
 } from "./candlePresentation";
+import { canApplyTailUpdate } from "./chartUtils";
 import {
   ALT_CHART_PARAMS_EVENT,
   ALT_CHART_PARAMS_STORAGE_KEY,
@@ -366,11 +367,7 @@ export function ChartEngine({
     const s = seriesRef.current;
     if (!s.candles || !s.line || !s.area || !s.baseline || !s.volume || !s.delivery || !s.sessionShading) return;
 
-    const isIncremental =
-      transformedBars.length > 0 &&
-      lastBarsRef.current.length > 0 &&
-      transformedBars.length === lastBarsRef.current.length &&
-      transformedBars[transformedBars.length - 2]?.time === lastBarsRef.current[lastBarsRef.current.length - 2]?.time;
+    const isIncremental = canApplyTailUpdate(lastBarsRef.current, transformedBars);
 
     const ethEnabled = extendedHours?.enabled;
     const hasSessionMetadata = transformedBars.some((b) => (b as any).s && (b as any).s !== "rth");

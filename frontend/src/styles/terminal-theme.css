@@ -142,6 +142,20 @@
   --ot-color-workstation-panel-sync-indicator: var(--ot-color-accent-secondary);
   --ot-color-workstation-panel-sync-muted: color-mix(in srgb, var(--ot-color-accent-secondary) 35%, var(--ot-color-text-muted));
 
+  /* Shared home widgets */
+  --ot-color-home-widget-surface: var(--ot-color-surface-2);
+  --ot-color-home-widget-surface-hover: color-mix(in srgb, var(--ot-color-surface-2) 88%, var(--ot-color-accent-primary) 12%);
+  --ot-color-home-widget-surface-selected: color-mix(in srgb, var(--ot-color-surface-2) 80%, var(--ot-color-accent-primary) 20%);
+  --ot-color-home-widget-border: var(--ot-color-border-subtle);
+  --ot-color-home-widget-border-strong: color-mix(in srgb, var(--ot-color-accent-primary) 36%, var(--ot-color-border-default));
+  --ot-color-home-widget-chart-fill-top: color-mix(in srgb, var(--ot-color-accent-primary) 18%, transparent);
+  --ot-color-home-widget-chart-benchmark: color-mix(in srgb, var(--ot-color-accent-secondary) 70%, var(--ot-color-text-muted));
+  --ot-color-home-widget-chart-grid: color-mix(in srgb, var(--ot-color-border-default) 74%, transparent);
+  --ot-color-home-widget-ring-track: color-mix(in srgb, var(--ot-color-border-default) 72%, transparent);
+  --ot-color-home-widget-tooltip-surface: color-mix(in srgb, var(--ot-color-canvas-elevated) 94%, transparent);
+  --ot-color-home-widget-tooltip-border: var(--ot-color-border-strong);
+  --ot-color-home-widget-shadow: color-mix(in srgb, var(--ot-color-canvas) 54%, transparent);
+
   --ot-density-row-compact: 24px;
   --ot-density-row-default: 28px;
   --ot-density-row-comfortable: 32px;
@@ -853,6 +867,657 @@
   z-index: 3;
 }
 
+.ot-home-widget-empty {
+  display: grid;
+  min-height: 100%;
+  place-items: center;
+  padding: var(--ot-space-3);
+  color: var(--ot-color-text-muted);
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-xs);
+  letter-spacing: var(--ot-letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+.ot-home-widget-card {
+  border: 1px solid var(--ot-color-home-widget-border);
+  background: var(--ot-color-home-widget-surface);
+  border-radius: var(--ot-radius-md);
+  padding: var(--ot-space-3);
+}
+
+.ot-home-widget-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ot-space-2);
+}
+
+.ot-home-widget-card-kicker {
+  margin: 0;
+  color: var(--ot-color-text-muted);
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-2xs);
+  font-weight: var(--ot-font-weight-medium);
+  letter-spacing: var(--ot-letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+.ot-home-widget-card-value {
+  margin: var(--ot-space-2) 0 0;
+  color: var(--ot-color-text-primary);
+  font-family: var(--ot-font-data);
+  font-size: 24px;
+  line-height: 1.05;
+  font-weight: var(--ot-font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.ot-home-widget-card-value[data-tone="accent"] {
+  color: var(--ot-color-accent-primary);
+}
+
+.ot-home-widget-card-value[data-tone="up"] {
+  color: var(--ot-color-market-up);
+}
+
+.ot-home-widget-card-value[data-tone="down"] {
+  color: var(--ot-color-market-down);
+}
+
+.ot-home-widget-card-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ot-home-widget-delta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  margin-top: var(--ot-space-2);
+  padding: 0 var(--ot-space-2);
+  border: 1px solid var(--ot-color-home-widget-border);
+  border-radius: 999px;
+  background: var(--ot-color-canvas-elevated);
+  color: var(--ot-color-text-secondary);
+  font-family: var(--ot-font-data);
+  font-size: var(--ot-type-size-sm);
+  font-weight: var(--ot-font-weight-medium);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ot-home-widget-delta[data-tone="up"] {
+  border-color: color-mix(in srgb, var(--ot-color-market-up) 32%, var(--ot-color-home-widget-border));
+  background: var(--ot-color-market-up-soft);
+  color: var(--ot-color-market-up);
+}
+
+.ot-home-widget-delta[data-tone="down"] {
+  border-color: color-mix(in srgb, var(--ot-color-market-down) 32%, var(--ot-color-home-widget-border));
+  background: var(--ot-color-market-down-soft);
+  color: var(--ot-color-market-down);
+}
+
+.ot-home-widget-delta[data-tone="accent"] {
+  border-color: var(--ot-color-home-widget-border-strong);
+  color: var(--ot-color-accent-primary);
+}
+
+.ot-home-widget-card-sparkline {
+  margin-top: var(--ot-space-3);
+}
+
+.ot-home-widget-card-body,
+.ot-home-widget-card-footer {
+  margin-top: var(--ot-space-3);
+}
+
+.ot-home-widget-metric-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ot-space-2);
+  margin: var(--ot-space-3) 0 0;
+}
+
+.ot-home-widget-metric-detail {
+  min-width: 0;
+}
+
+.ot-home-widget-metric-detail-label {
+  color: var(--ot-color-text-muted);
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-2xs);
+  font-weight: var(--ot-font-weight-medium);
+  letter-spacing: var(--ot-letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+.ot-home-widget-metric-detail-value {
+  margin: var(--ot-space-1) 0 0;
+  color: var(--ot-color-text-primary);
+  font-family: var(--ot-font-data);
+  font-size: var(--ot-type-size-sm);
+  line-height: var(--ot-line-height-data);
+  font-variant-numeric: tabular-nums;
+}
+
+.ot-home-widget-metric-detail-value[data-tone="up"] {
+  color: var(--ot-color-market-up);
+}
+
+.ot-home-widget-metric-detail-value[data-tone="down"] {
+  color: var(--ot-color-market-down);
+}
+
+.ot-home-widget-metric-detail-value[data-tone="accent"] {
+  color: var(--ot-color-accent-primary);
+}
+
+.ot-home-widget-sparkline {
+  position: relative;
+  display: block;
+  min-height: 42px;
+  outline: none;
+}
+
+.ot-home-widget-sparkline[data-interactive="true"] {
+  cursor: crosshair;
+}
+
+.ot-home-widget-sparkline:focus-visible {
+  border-radius: var(--ot-radius-sm);
+  box-shadow: 0 0 0 2px var(--ot-color-interaction-focus-ring);
+}
+
+.ot-home-widget-sparkline-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 42px;
+}
+
+.ot-home-widget-sparkline-benchmark {
+  stroke-dasharray: 4 4;
+  opacity: 0.8;
+}
+
+.ot-home-widget-sparkline-crosshair,
+.ot-home-widget-chart-crosshair,
+.ot-home-widget-chart-grid-line {
+  stroke: var(--ot-color-home-widget-chart-grid);
+  stroke-width: 1;
+}
+
+.ot-home-widget-sparkline-marker,
+.ot-home-widget-chart-marker {
+  stroke: var(--ot-color-canvas);
+  stroke-width: 1.5;
+}
+
+.ot-home-widget-tooltip {
+  position: absolute;
+  top: 0;
+  z-index: 3;
+  min-width: max-content;
+  padding: 3px 6px;
+  border: 1px solid var(--ot-color-home-widget-tooltip-border);
+  border-radius: var(--ot-radius-sm);
+  background: var(--ot-color-home-widget-tooltip-surface);
+  color: var(--ot-color-text-primary);
+  font-family: var(--ot-font-data);
+  font-size: var(--ot-type-size-2xs);
+  font-variant-numeric: tabular-nums;
+  transform: translate(-50%, calc(-100% - 6px));
+  pointer-events: none;
+  box-shadow: 0 8px 24px var(--ot-color-home-widget-shadow);
+}
+
+.ot-home-widget-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.ot-home-widget-strip-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  min-width: 152px;
+  min-height: 34px;
+  padding: 0 var(--ot-space-3);
+  border: 1px solid var(--ot-color-home-widget-border);
+  border-radius: var(--ot-radius-sm);
+  background: var(--ot-color-home-widget-surface);
+  color: var(--ot-color-text-primary);
+  font-family: var(--ot-font-data);
+  font-size: var(--ot-type-size-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+button.ot-home-widget-strip-chip {
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+button.ot-home-widget-strip-chip:hover {
+  border-color: var(--ot-color-home-widget-border-strong);
+  background: var(--ot-color-home-widget-surface-hover);
+  box-shadow: 0 10px 24px var(--ot-color-home-widget-shadow);
+}
+
+.ot-home-widget-strip-chip:focus-visible {
+  outline: none;
+  border-color: var(--ot-color-interaction-selected-border);
+  box-shadow: 0 0 0 2px var(--ot-color-interaction-focus-ring);
+}
+
+.ot-home-widget-strip-chip[data-selected="true"] {
+  border-color: var(--ot-color-interaction-selected-border);
+  background: var(--ot-color-home-widget-surface-selected);
+}
+
+.ot-home-widget-strip-chip[data-tone="up"] {
+  background: color-mix(in srgb, var(--ot-color-home-widget-surface) 88%, var(--ot-color-market-up-soft));
+}
+
+.ot-home-widget-strip-chip[data-tone="down"] {
+  background: color-mix(in srgb, var(--ot-color-home-widget-surface) 88%, var(--ot-color-market-down-soft));
+}
+
+.ot-home-widget-strip-label {
+  color: var(--ot-color-text-secondary);
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-2xs);
+  font-weight: var(--ot-font-weight-medium);
+  letter-spacing: var(--ot-letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+.ot-home-widget-strip-value {
+  color: var(--ot-color-text-primary);
+}
+
+.ot-home-widget-strip-change[data-tone="up"] {
+  color: var(--ot-color-market-up);
+}
+
+.ot-home-widget-strip-change[data-tone="down"] {
+  color: var(--ot-color-market-down);
+}
+
+.ot-home-widget-strip-change[data-tone="neutral"] {
+  color: var(--ot-color-text-muted);
+}
+
+.ot-home-widget-nav {
+  display: grid;
+  gap: var(--ot-space-3);
+}
+
+.ot-home-widget-nav-section {
+  display: grid;
+  gap: var(--ot-space-2);
+}
+
+.ot-home-widget-nav-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ot-home-widget-nav-section-title {
+  margin: 0;
+  color: var(--ot-color-text-muted);
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-2xs);
+  font-weight: var(--ot-font-weight-semibold);
+  letter-spacing: var(--ot-letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+.ot-home-widget-nav-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.ot-home-widget-nav-tile {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-height: 76px;
+  padding: var(--ot-space-3);
+  border: 1px solid var(--ot-color-home-widget-border);
+  border-radius: var(--ot-radius-sm);
+  background: var(--ot-color-home-widget-surface);
+  color: var(--ot-color-text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.ot-home-widget-nav-tile:hover:not(:disabled) {
+  border-color: var(--ot-color-home-widget-border-strong);
+  background: var(--ot-color-home-widget-surface-hover);
+  box-shadow: 0 10px 24px var(--ot-color-home-widget-shadow);
+}
+
+.ot-home-widget-nav-tile:focus-visible {
+  outline: none;
+  border-color: var(--ot-color-interaction-selected-border);
+  box-shadow: 0 0 0 2px var(--ot-color-interaction-focus-ring);
+}
+
+.ot-home-widget-nav-tile[data-selected="true"] {
+  border-color: var(--ot-color-interaction-selected-border);
+  background: var(--ot-color-home-widget-surface-selected);
+}
+
+.ot-home-widget-nav-tile:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ot-home-widget-nav-label {
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-sm);
+  font-weight: var(--ot-font-weight-semibold);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.ot-home-widget-nav-description {
+  color: var(--ot-color-text-muted);
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-xs);
+  line-height: var(--ot-line-height-ui);
+}
+
+.ot-home-widget-shortcut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: 36px;
+  min-height: 20px;
+  padding: 0 8px;
+  border: 1px solid var(--ot-color-home-widget-border);
+  border-radius: 999px;
+  background: var(--ot-color-canvas-elevated);
+  color: var(--ot-color-accent-primary);
+  font-family: var(--ot-font-data);
+  font-size: var(--ot-type-size-2xs);
+  font-weight: var(--ot-font-weight-medium);
+  letter-spacing: var(--ot-letter-spacing-wide);
+}
+
+.ot-home-widget-status-bar {
+  border: 1px solid var(--ot-color-home-widget-border);
+  border-radius: var(--ot-radius-md);
+  background: var(--ot-color-home-widget-surface);
+  padding: var(--ot-space-2) var(--ot-space-3);
+}
+
+.ot-home-widget-status-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ot-home-widget-status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--ot-color-home-widget-border);
+  border-radius: 999px;
+  background: var(--ot-color-canvas-elevated);
+}
+
+.ot-home-widget-status-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ot-home-widget-status-label {
+  color: var(--ot-color-text-muted);
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-2xs);
+  font-weight: var(--ot-font-weight-medium);
+  letter-spacing: var(--ot-letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+.ot-home-widget-status-value {
+  color: var(--ot-color-text-primary);
+  font-family: var(--ot-font-data);
+  font-size: var(--ot-type-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ot-home-widget-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--ot-color-text-muted);
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.ot-home-widget-status-item[data-tone="ok"] .ot-home-widget-status-dot {
+  background: var(--ot-color-system-ok);
+}
+
+.ot-home-widget-status-item[data-tone="warning"] .ot-home-widget-status-dot,
+.ot-home-widget-status-item[data-tone="stale"] .ot-home-widget-status-dot {
+  background: var(--ot-color-system-warning);
+}
+
+.ot-home-widget-status-item[data-tone="critical"] .ot-home-widget-status-dot {
+  background: var(--ot-color-system-critical);
+}
+
+.ot-home-widget-status-item[data-tone="offline"] .ot-home-widget-status-dot,
+.ot-home-widget-status-item[data-tone="neutral"] .ot-home-widget-status-dot {
+  background: var(--ot-color-system-offline);
+}
+
+.ot-home-widget-status-item[data-tone="info"] .ot-home-widget-status-dot {
+  background: var(--ot-color-feedback-info);
+}
+
+.ot-home-widget-chart {
+  display: grid;
+  gap: var(--ot-space-2);
+  min-width: 0;
+}
+
+.ot-home-widget-chart-frame {
+  position: relative;
+  min-height: 196px;
+  padding-left: 42px;
+  border: 1px solid var(--ot-color-home-widget-border);
+  border-radius: var(--ot-radius-md);
+  background: var(--ot-color-home-widget-surface);
+  outline: none;
+}
+
+.ot-home-widget-chart-frame:focus-visible {
+  box-shadow: 0 0 0 2px var(--ot-color-interaction-focus-ring);
+}
+
+.ot-home-widget-chart-axis {
+  display: flex;
+  color: var(--ot-color-text-muted);
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-2xs);
+  font-weight: var(--ot-font-weight-medium);
+  letter-spacing: var(--ot-letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+.ot-home-widget-chart-axis-y {
+  position: absolute;
+  inset: var(--ot-space-3) auto var(--ot-space-3) 0;
+  width: 36px;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.ot-home-widget-chart-axis-x {
+  justify-content: space-between;
+}
+
+.ot-home-widget-chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 196px;
+}
+
+.ot-home-widget-chart-benchmark {
+  stroke-dasharray: 5 5;
+  opacity: 0.8;
+}
+
+.ot-home-widget-chart-tooltip {
+  position: absolute;
+  top: var(--ot-space-2);
+  right: var(--ot-space-2);
+  display: grid;
+  gap: 2px;
+  padding: 5px 8px;
+  border: 1px solid var(--ot-color-home-widget-tooltip-border);
+  border-radius: var(--ot-radius-sm);
+  background: var(--ot-color-home-widget-tooltip-surface);
+  box-shadow: 0 8px 24px var(--ot-color-home-widget-shadow);
+}
+
+.ot-home-widget-chart-tooltip-label {
+  color: var(--ot-color-text-muted);
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-2xs);
+  font-weight: var(--ot-font-weight-medium);
+  letter-spacing: var(--ot-letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+.ot-home-widget-chart-tooltip-value {
+  color: var(--ot-color-text-primary);
+  font-family: var(--ot-font-data);
+  font-size: var(--ot-type-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ot-home-widget-chart-meta {
+  display: grid;
+  gap: var(--ot-space-2);
+}
+
+.ot-home-widget-chart-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--ot-space-2);
+  color: var(--ot-color-text-secondary);
+  font-family: var(--ot-font-data);
+  font-size: var(--ot-type-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ot-home-widget-clock-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ot-home-widget-clock-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--ot-color-home-widget-border);
+  border-radius: 999px;
+  background: var(--ot-color-home-widget-surface);
+}
+
+.ot-home-widget-clock-label {
+  color: var(--ot-color-text-muted);
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-2xs);
+  font-weight: var(--ot-font-weight-medium);
+  letter-spacing: var(--ot-letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+.ot-home-widget-clock-value {
+  color: var(--ot-color-text-primary);
+  font-family: var(--ot-font-data);
+  font-size: var(--ot-type-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ot-home-widget-ring {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ot-space-3);
+}
+
+.ot-home-widget-ring-svg {
+  display: block;
+  overflow: visible;
+}
+
+.ot-home-widget-ring-track {
+  stroke: var(--ot-color-home-widget-ring-track);
+}
+
+.ot-home-widget-ring-progress {
+  stroke: var(--ot-color-accent-primary);
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+.ot-home-widget-ring-value {
+  fill: var(--ot-color-text-primary);
+  font-family: var(--ot-font-data);
+  font-size: var(--ot-type-size-2xs);
+  font-weight: var(--ot-font-weight-semibold);
+}
+
+.ot-home-widget-ring-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.ot-home-widget-ring-label {
+  color: var(--ot-color-text-primary);
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-xs);
+  font-weight: var(--ot-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--ot-letter-spacing-wide);
+}
+
+.ot-home-widget-ring-summary {
+  color: var(--ot-color-text-muted);
+  font-family: var(--ot-font-ui);
+  font-size: var(--ot-type-size-xs);
+  line-height: var(--ot-line-height-ui);
+}
+
 .ot-home-toolbar {
   position: sticky;
   top: 28px;
@@ -1513,6 +2178,11 @@
     top: 62px;
     overflow-x: auto;
     justify-content: flex-start;
+  }
+
+  .ot-home-widget-metric-details,
+  .ot-home-widget-nav-grid {
+    grid-template-columns: 1fr;
   }
 
   .ot-home-brand-text {

@@ -33,6 +33,13 @@ describe("GO commanding", () => {
     expect(navigate).toHaveBeenCalledWith("/equity/watchlist");
   });
 
+  it("routes ticker-only commands to the market stock page", () => {
+    const navigate = vi.fn();
+    const result = executeParsedCommand(parseCommand("AAPL"), navigate as any);
+    expect(result.ok).toBe(true);
+    expect(navigate).toHaveBeenCalledWith("/equity/stocks?ticker=AAPL");
+  });
+
   it("executes natural language command to AI news route", () => {
     const navigate = vi.fn();
     const result = executeParsedCommand(parseCommand("what's the top semiconductor earnings news"), navigate as any);

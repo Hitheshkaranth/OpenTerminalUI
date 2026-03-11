@@ -16,9 +16,11 @@ export type CryptoDefiProtocol = {
 export function CryptoDefiPanel({
   headline,
   protocols,
+  onSelect,
 }: {
   headline: CryptoDefiHeadline;
   protocols: CryptoDefiProtocol[];
+  onSelect?: (symbol: string) => void;
 }) {
   return (
     <div className="space-y-3" data-testid="crypto-defi-panel">
@@ -47,7 +49,13 @@ export function CryptoDefiPanel({
         {protocols.map((row) => (
           <div key={row.symbol} className="rounded border border-terminal-border bg-terminal-bg p-2 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-terminal-accent">{row.symbol}</span>
+              {onSelect ? (
+                <button type="button" className="text-terminal-accent hover:underline" onClick={() => onSelect(row.symbol)}>
+                  {row.symbol}
+                </button>
+              ) : (
+                <span className="text-terminal-accent">{row.symbol}</span>
+              )}
               <span className={row.change_24h >= 0 ? "text-terminal-pos" : "text-terminal-neg"}>{row.change_24h.toFixed(2)}%</span>
             </div>
             <div className="text-terminal-muted">{row.name}</div>

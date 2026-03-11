@@ -29,6 +29,7 @@
   overflow: hidden;
   transition: border-color 200ms ease;
   min-height: 0;
+  scroll-margin-bottom: 5.5rem;
 }
 
 .chart-panel.active {

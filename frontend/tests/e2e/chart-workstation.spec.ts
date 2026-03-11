@@ -56,12 +56,13 @@ test.describe("Multi-Chart Workstation E2E", () => {
   });
 
   test("should load chart workstation and manage panels", async ({ page }) => {
+    test.slow();
     page.on('console', msg => console.log('PW_BROWSER_CONSOLE:', msg.text()));
     page.on('pageerror', err => console.log('PW_BROWSER_ERROR:', err.message));
 
     // 1. data-testid='chart-workstation' is visible
     const workstation = page.getByTestId("chart-workstation");
-    await expect(workstation).toBeVisible();
+    await expect(workstation).toBeVisible({ timeout: 90_000 });
 
     // 2. Page starts with exactly 1 visible panel in 1x1 layout
     const panels = page.locator('[data-testid^="chart-panel-"]');

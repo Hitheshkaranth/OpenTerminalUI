@@ -51,6 +51,8 @@ interface Props {
   chartLoading?: boolean;
   chartError?: string | null;
   liveQuote?: QuoteTick | null;
+  comparisonSeries?: Array<{ symbol: string; data: ChartPoint[]; color?: string }>;
+  comparisonMode?: "normalized" | "price";
 }
 
 export function ChartPanel({
@@ -72,6 +74,8 @@ export function ChartPanel({
   chartLoading = false,
   chartError = null,
   liveQuote = null,
+  comparisonSeries = [],
+  comparisonMode = "normalized",
 }: Props) {
   const [showIndicators, setShowIndicators] = useState(false);
   const [showDrawingTools, setShowDrawingTools] = useState(false);
@@ -261,6 +265,8 @@ export function ChartPanel({
               drawingWorkspaceId={slot.id}
               panelId={slot.id}
               crosshairSyncGroupId={crosshairGroupIdForSlot(slot.id, linkGroup)}
+              comparisonSeries={comparisonSeries}
+              comparisonMode={comparisonMode}
               onAddToPortfolio={(symbol, priceHint) => {
                 void quickAddToFirstPortfolio(symbol, priceHint, "Added from Chart Workstation");
               }}

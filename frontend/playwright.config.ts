@@ -5,11 +5,13 @@ const useExistingServer = process.env.PLAYWRIGHT_USE_EXISTING_SERVER === "1";
 const e2eBackendPort = Number(process.env.E2E_BACKEND_PORT || 8010);
 const e2eFrontendPort = Number(process.env.E2E_FRONTEND_PORT || 4173);
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+const chromiumLaunchArgs = ["--disable-gpu"];
 
 export default defineConfig({
   testDir: "tests/e2e",
   timeout: 90_000,
   workers: 2,
+  globalSetup: "./tests/e2e/global-setup.ts",
   fullyParallel: false,
   expect: {
     timeout: 15_000,
@@ -48,11 +50,17 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: { args: chromiumLaunchArgs },
+      },
     },
     {
       name: "mobile-chromium",
-      use: { ...devices["Pixel 7"] },
+      use: {
+        ...devices["Pixel 7"],
+        launchOptions: { args: chromiumLaunchArgs },
+      },
     },
   ],
 });

@@ -100,7 +100,10 @@ describe("ChartPanel Volume Profile controls", () => {
     vi.useRealTimers();
   });
 
-  function renderPanel(linkGroup: "off" | "A" | "B" | "C" = "off") {
+  function renderPanel(
+    linkGroup: "off" | "A" | "B" | "C" = "off",
+    compareProps?: { comparisonSeries?: Array<{ symbol: string; data: ChartPoint[]; color?: string }>; comparisonMode?: "normalized" | "price" },
+  ) {
     render(
       <ChartPanel
         slot={SLOT}
@@ -121,6 +124,8 @@ describe("ChartPanel Volume Profile controls", () => {
         chartLoading={false}
         chartError={null}
         liveQuote={null}
+        comparisonSeries={compareProps?.comparisonSeries}
+        comparisonMode={compareProps?.comparisonMode}
       />,
     );
   }
@@ -193,5 +198,18 @@ describe("ChartPanel Volume Profile controls", () => {
     const linkedProps = tradingChartMock.mock.calls.at(-1)?.[0] as Record<string, unknown> | undefined;
     expect(linkedProps?.panelId).toBe("slot-1");
     expect(linkedProps?.crosshairSyncGroupId).toBe("chart-workstation-linked-B");
+  });
+
+  it("forwards compare overlays to the chart renderer", () => {
+    renderPanel("off", {
+      comparisonMode: "price",
+      comparisonSeries: [{ symbol: "MSFT", data: [{ t: 1, o: 10, h: 11, l: 9, c: 10.5, v: 100 }], color: "#4EA1FF" }],
+    });
+
+    const props = tradingChartMock.mock.calls.at(-1)?.[0] as Record<string, unknown> | undefined;
+    expect(props?.comparisonMode).toBe("price");
+    expect(props?.comparisonSeries).toEqual([
+      { symbol: "MSFT", data: [{ t: 1, o: 10, h: 11, l: 9, c: 10.5, v: 100 }], color: "#4EA1FF" },
+    ]);
   });
 });

@@ -64,7 +64,11 @@ async def fetch_stock_snapshot_coalesced(ticker: str) -> dict[str, Any]:
     cache_key = cache_instance.build_key("snapshot", symbol, {})
     cached_data = await cache_instance.get(cache_key)
     if cached_data:
-        return cached_data
+        if not isinstance(cached_data, dict):
+            return cached_data
+        if str(cached_data.get("company_name") or "").strip():
+            return cached_data
+        logger.info("Cached snapshot missing company_name for %s; refreshing snapshot", symbol)
 
     # 2. Coalescing (Single Flight)
     # Since we lack a dedicated single-flight mechanism in cache.py, we can use a lock
@@ -83,4 +87,6 @@ async def fetch_stock_snapshot_coalesced(ticker: str) -> dict[str, Any]:
         return data
     except Exception as e:
         logger.error(f"Snapshot fetch failed for {symbol}: {e}")
+        if isinstance(cached_data, dict):
+            return cached_data
         return {}

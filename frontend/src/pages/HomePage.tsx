@@ -1,12 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
-import { fetchBacktestV1Presets, fetchPortfolio, fetchQuotesBatch, fetchWatchlist, fetchLatestNews, fetchPortfolioBenchmarkOverlay, type NewsLatestApiItem } from "../api/client";
-import { StatusBar } from "../components/StatusBar";
+import {
+  fetchBacktestV1Presets,
+  fetchLatestNews,
+  fetchPortfolio,
+  fetchPortfolioBenchmarkOverlay,
+  fetchQuotesBatch,
+  fetchWatchlist,
+  type NewsLatestApiItem,
+} from "../api/client";
+import { LiveClockStrip } from "../components/home/LiveClockStrip";
+import { MarketHeatStrip, type MarketHeatStripItem } from "../components/home/MarketHeatStrip";
+import { MetricCard } from "../components/home/MetricCard";
+import { PortfolioMiniChart } from "../components/home/PortfolioMiniChart";
+import { ProfileCompletionRing } from "../components/home/ProfileCompletionRing";
+import { QuickNavGrid, type QuickNavSection } from "../components/home/QuickNavGrid";
+import { SystemHealthBar, type SystemHealthItem } from "../components/home/SystemHealthBar";
+import { TerminalShell } from "../components/layout/TerminalShell";
 import { useAuth } from "../contexts/AuthContext";
 import { fetchChainSummary } from "../fno/api/fnoApi";
 import { useSettingsStore } from "../store/settingsStore";
-import logo from "../assets/logo.png";
 
 type MarketRow = {
   symbol: string;
@@ -16,7 +30,6 @@ type MarketRow = {
   chgPct: number;
   flash: "up" | "down" | null;
 };
-
 
 type DashboardSnapshot = {
   equityValue: number | null;
@@ -39,45 +52,35 @@ type NavCard = {
 };
 
 const TRANSITION_FLAG_KEY = "ot-terminal-transition";
-
-const NAV_TABS = [
-  { label: "OVERVIEW", to: "/home" },
-  { label: "EQUITY", to: "/equity/stocks" },
-  { label: "CHARTS", to: "/equity/chart-workstation" },
-  { label: "CRYPTO", to: "/equity/crypto" },
-  { label: "F&O", to: "/fno" },
-  { label: "BACKTEST", to: "/backtesting" },
-  { label: "WATCHLIST", to: "/equity/watchlist" },
-  { label: "SETTINGS", to: "/equity/settings" },
-] as const;
+const NEWS_LIMIT = 15;
 
 const NAV_CARD_SECTIONS: Array<{ title: string; cards: NavCard[] }> = [
   {
     title: "EQUITY",
     cards: [
       { label: "Market", to: "/equity/stocks", badge: "F1" },
-      { label: "Economics", to: "/equity/economics", badge: "E" },
+      { label: "Economics", to: "/equity/economics", badge: "EC" },
       { label: "Yield Curve", to: "/equity/yield-curve", badge: "YC" },
       { label: "Rotation", to: "/equity/sector-rotation", badge: "ROT" },
       { label: "Security Hub", to: "/equity/security", badge: "SH" },
       { label: "Compare", to: "/equity/compare", badge: "CMP" },
       { label: "Launchpad", to: "/equity/launchpad", badge: "LP" },
-      { label: "Workstation", to: "/equity/chart-workstation", badge: "6" },
+      { label: "Workstation", to: "/equity/chart-workstation", badge: "WS" },
       { label: "Crypto", to: "/equity/crypto", badge: "CR" },
       { label: "Screener", to: "/equity/screener", badge: "F2" },
       { label: "Portfolio", to: "/equity/portfolio", badge: "F3" },
-      { label: "Paper", to: "/equity/paper", badge: "P" },
+      { label: "Paper", to: "/equity/paper", badge: "PP" },
       { label: "Watchlist", to: "/equity/watchlist", badge: "F4" },
     ],
   },
   {
     title: "F&O",
     cards: [
-      { label: "Option Chain", to: "/fno", badge: "O" },
-      { label: "Greeks", to: "/fno/greeks", badge: "G" },
+      { label: "Option Chain", to: "/fno", badge: "OP" },
+      { label: "Greeks", to: "/fno/greeks", badge: "GR" },
       { label: "OI Analysis", to: "/fno/oi", badge: "OI" },
       { label: "PCR", to: "/fno/pcr", badge: "PCR" },
-      { label: "Heatmap", to: "/fno/heatmap", badge: "F8" },
+      { label: "Heatmap", to: "/fno/heatmap", badge: "HM" },
       { label: "Expiry", to: "/fno/expiry", badge: "EXP" },
     ],
   },
@@ -94,11 +97,11 @@ const NAV_CARD_SECTIONS: Array<{ title: string; cards: NavCard[] }> = [
   {
     title: "INTEL",
     cards: [
-      { label: "Watchlist", to: "/equity/watchlist", badge: "F4" },
-      { label: "News", to: "/equity/news", badge: "N" },
-      { label: "Alerts", to: "/equity/alerts", badge: "A" },
+      { label: "Watchlist", to: "/equity/watchlist", badge: "WL" },
+      { label: "News", to: "/equity/news", badge: "NW" },
+      { label: "Alerts", to: "/equity/alerts", badge: "AL" },
       { label: "Plugins", to: "/equity/plugins", badge: "PLG" },
-      { label: "About", to: "/equity/stocks/about", badge: "F7" },
+      { label: "About", to: "/equity/stocks/about", badge: "AB" },
     ],
   },
   {
@@ -120,6 +123,7 @@ const INITIAL_MARKET_ROWS: MarketRow[] = [
   { symbol: "SI=F", label: "SILVER", ltp: 0, chg: 0, chgPct: 0, flash: null },
   { symbol: "CL=F", label: "CRUDE OIL", ltp: 0, chg: 0, chgPct: 0, flash: null },
 ];
+
 const MARKET_PULSE_SYMBOLS = INITIAL_MARKET_ROWS.map((row) => row.symbol);
 
 const FALLBACK_PERFORMANCE_POINTS = [
@@ -146,33 +150,61 @@ function formatPrice(value: number): string {
   return value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatPercent(value: number | null, digits = 2): string {
+  if (value == null || !Number.isFinite(value)) return "--";
+  return `${value >= 0 ? "+" : ""}${value.toFixed(digits)}%`;
+}
+
 function formatInr(value: number | null): string {
   if (value == null || !Number.isFinite(value)) return "INR --";
   return `INR ${value.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 }
 
-function buildLinePath(points: number[], width: number, height: number): string {
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const range = max - min || 1;
-  return points
-    .map((point, index) => {
-      const x = (index / (points.length - 1)) * width;
-      const y = height - ((point - min) / range) * height;
-      return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
-    })
-    .join(" ");
+function formatSignedInr(value: number | null): string {
+  if (value == null || !Number.isFinite(value)) return "INR --";
+  const sign = value >= 0 ? "+" : "-";
+  return `${sign}INR ${Math.abs(value).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 }
 
-function buildAreaPath(points: number[], width: number, height: number): string {
-  const line = buildLinePath(points, width, height);
-  return `${line} L ${width} ${height} L 0 ${height} Z`;
+function formatCompactDateLabel(date: string): string {
+  const parsed = Date.parse(`${date}T00:00:00Z`);
+  if (!Number.isFinite(parsed)) return date;
+  return new Date(parsed).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function slugify(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function getMetricTone(value: number | null): "accent" | "up" | "down" | "neutral" {
+  if (value == null || !Number.isFinite(value) || value === 0) return "neutral";
+  return value > 0 ? "up" : "down";
+}
+
+function getSignalTone(signal: string): "accent" | "up" | "down" | "neutral" {
+  const normalized = signal.trim().toUpperCase();
+  if (normalized.includes("BULL")) return "up";
+  if (normalized.includes("BEAR")) return "down";
+  if (normalized === "NA") return "neutral";
+  return "accent";
+}
+
+function getSystemTone(signal: string): SystemHealthItem["tone"] {
+  const normalized = signal.trim().toUpperCase();
+  if (normalized.includes("BULL")) return "ok";
+  if (normalized.includes("BEAR")) return "warning";
+  if (normalized === "NA") return "neutral";
+  return "info";
+}
+
+function getSentimentClass(label?: string): string {
+  if (label === "Bullish") return "text-terminal-pos";
+  if (label === "Bearish") return "text-terminal-neg";
+  return "text-terminal-muted";
+}
 
 export function HomePage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user } = useAuth();
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
   const displayCurrency = useSettingsStore((s) => s.displayCurrency);
@@ -184,6 +216,9 @@ export function HomePage() {
   const [newsLog, setNewsLog] = useState<NewsLatestApiItem[]>([]);
   const [snapshot, setSnapshot] = useState<DashboardSnapshot>(EMPTY_SNAPSHOT);
   const [performancePoints, setPerformancePoints] = useState<number[]>(FALLBACK_PERFORMANCE_POINTS);
+  const [performanceBenchmarkPoints, setPerformanceBenchmarkPoints] = useState<number[]>([]);
+  const [performanceLabels, setPerformanceLabels] = useState<string[]>([]);
+  const [selectedHeatId, setSelectedHeatId] = useState<string | null>(INITIAL_MARKET_ROWS[0]?.symbol ?? null);
   const [initializing, setInitializing] = useState(() => sessionStorage.getItem(TRANSITION_FLAG_KEY) === "1");
 
   const loadSnapshot = useCallback(async () => {
@@ -196,6 +231,8 @@ export function HomePage() {
     ]);
 
     let next = { ...EMPTY_SNAPSHOT };
+    let nextBenchmarkPoints: number[] = [];
+    let nextPerformanceLabels: string[] = [];
 
     if (portfolioRes.status === "fulfilled") {
       const data = portfolioRes.value;
@@ -230,29 +267,51 @@ export function HomePage() {
     if (benchmarkRes.status === "fulfilled" && benchmarkRes.value?.equity_curve?.length > 0) {
       const curve = benchmarkRes.value.equity_curve;
       const cutoffMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
-      const by30d = curve.filter((pt) => {
+      const recentCurve = curve.filter((pt) => {
         const ms = Date.parse(`${pt.date}T00:00:00Z`);
         return Number.isFinite(ms) && ms >= cutoffMs;
       });
-      const windowCurve = (by30d.length >= 2 ? by30d : curve.slice(-30));
+      const windowCurve = (recentCurve.length >= 2 ? recentCurve : curve.slice(-30)).filter((pt) =>
+        Number.isFinite(Number(pt.portfolio)) && Number(pt.portfolio) > 0,
+      );
 
       const currentPortfolioValue =
         next.equityValue != null && Number.isFinite(next.equityValue)
           ? next.equityValue
           : null;
-      const lastNorm = Number(windowCurve[windowCurve.length - 1]?.portfolio ?? NaN);
-      const canScale = currentPortfolioValue != null && Number.isFinite(lastNorm) && lastNorm > 0;
+      const lastPortfolio = Number(windowCurve[windowCurve.length - 1]?.portfolio ?? NaN);
+      const lastBenchmark = Number(windowCurve[windowCurve.length - 1]?.benchmark ?? NaN);
+      const canScalePortfolio = currentPortfolioValue != null && Number.isFinite(lastPortfolio) && lastPortfolio > 0;
+      const canScaleBenchmark = currentPortfolioValue != null && Number.isFinite(lastBenchmark) && lastBenchmark > 0;
 
-      const scaledPoints = windowCurve.map((pt) => {
-          const p = Number(pt.portfolio);
-          if (!Number.isFinite(p)) return 0;
-          return canScale ? (p / lastNorm) * currentPortfolioValue! : p;
-        }).filter((v) => Number.isFinite(v) && v > 0);
+      const scaledPoints = windowCurve
+        .map((pt) => {
+          const portfolio = Number(pt.portfolio);
+          if (!Number.isFinite(portfolio)) return 0;
+          return canScalePortfolio ? (portfolio / lastPortfolio) * currentPortfolioValue! : portfolio;
+        })
+        .filter((value) => Number.isFinite(value) && value > 0);
+
+      const scaledBenchmarkPoints = windowCurve
+        .map((pt) => {
+          const benchmark = Number(pt.benchmark);
+          if (!Number.isFinite(benchmark)) return 0;
+          return canScaleBenchmark ? (benchmark / lastBenchmark) * currentPortfolioValue! : benchmark;
+        })
+        .filter((value) => Number.isFinite(value) && value > 0);
+
       if (scaledPoints.length >= 2) {
         setPerformancePoints(scaledPoints);
+        nextPerformanceLabels = windowCurve.map((pt) => formatCompactDateLabel(pt.date));
+      }
+
+      if (scaledBenchmarkPoints.length >= 2) {
+        nextBenchmarkPoints = scaledBenchmarkPoints;
       }
     }
 
+    setPerformanceBenchmarkPoints(nextBenchmarkPoints);
+    setPerformanceLabels(nextPerformanceLabels);
     next.updatedAt = Date.now();
     setSnapshot(next);
   }, []);
@@ -312,23 +371,29 @@ export function HomePage() {
 
   useEffect(() => {
     let active = true;
+
     const loadNews = async () => {
       try {
-        const items = await fetchLatestNews(15);
+        const items = await fetchLatestNews(NEWS_LIMIT);
         if (active && items.length) {
           setNewsLog(items);
         }
       } catch {
-        // ignore
+        if (!active) return;
       }
     };
+
     void loadNews();
     if (newsAutoRefresh) {
       const timer = window.setInterval(() => {
         void loadNews();
       }, newsRefreshSec * 1000);
-      return () => window.clearInterval(timer);
+      return () => {
+        active = false;
+        window.clearInterval(timer);
+      };
     }
+
     return () => {
       active = false;
     };
@@ -343,206 +408,467 @@ export function HomePage() {
     return () => window.clearTimeout(timer);
   }, [initializing]);
 
+  useEffect(() => {
+    if (marketRows.some((row) => row.symbol === selectedHeatId)) return;
+    setSelectedHeatId(marketRows[0]?.symbol ?? null);
+  }, [marketRows, selectedHeatId]);
+
   const equityPnlPct = useMemo(() => {
     if (snapshot.equityPnl == null || snapshot.equityCost <= 0) return null;
     return (snapshot.equityPnl / snapshot.equityCost) * 100;
   }, [snapshot.equityCost, snapshot.equityPnl]);
 
-  const perfLinePath = useMemo(() => buildLinePath(performancePoints, 360, 128), [performancePoints]);
-  const perfAreaPath = useMemo(() => buildAreaPath(performancePoints, 360, 128), [performancePoints]);
+  const performanceSeries = useMemo(
+    () =>
+      performancePoints.map((value, index) => ({
+        label: performanceLabels[index] ?? `D${index + 1}`,
+        value,
+      })),
+    [performanceLabels, performancePoints],
+  );
 
-  const activeTab = location.pathname.startsWith("/home") || location.pathname === "/" ? "OVERVIEW" : "";
-  const updatedLabel = snapshot.updatedAt ? new Date(snapshot.updatedAt).toLocaleTimeString("en-IN", { hour12: false }) : "--:--:--";
+  const benchmarkSeries = useMemo(
+    () =>
+      performanceBenchmarkPoints.map((value, index) => ({
+        label: performanceLabels[index] ?? `D${index + 1}`,
+        value,
+      })),
+    [performanceBenchmarkPoints, performanceLabels],
+  );
+
+  const heatItems = useMemo<MarketHeatStripItem[]>(
+    () =>
+      marketRows.map((row) => ({
+        id: row.symbol,
+        label: row.label || row.symbol,
+        value: row.ltp > 0 ? row.ltp : null,
+        changePct: row.ltp > 0 ? row.chgPct : null,
+        changeLabel:
+          row.ltp > 0
+            ? `${row.chg >= 0 ? "+" : ""}${formatPrice(row.chg)} / ${formatPercent(row.chgPct)}`
+            : "--",
+        flash: row.flash,
+      })),
+    [marketRows],
+  );
+
+  const focusedMarket = useMemo(
+    () => marketRows.find((row) => row.symbol === selectedHeatId) ?? marketRows[0] ?? null,
+    [marketRows, selectedHeatId],
+  );
+
+  const launchSections = useMemo<QuickNavSection[]>(
+    () =>
+      NAV_CARD_SECTIONS.map((section) => ({
+        id: slugify(section.title),
+        title: section.title,
+        items: section.cards.map((card) => ({
+          id: `${slugify(section.title)}-${slugify(card.label)}`,
+          label: card.label,
+          shortcut: card.badge,
+          description: `${section.title} desk access`,
+          onSelect: () => navigate(card.to),
+        })),
+      })),
+    [navigate],
+  );
+
+  const updatedLabel = snapshot.updatedAt
+    ? new Date(snapshot.updatedAt).toLocaleTimeString("en-IN", { hour12: false })
+    : "--:--:--";
+
+  const profileMissingFields = useMemo(() => {
+    const missing: string[] = [];
+    if (!user?.email) missing.push("Email");
+    if (!user?.role) missing.push("Role");
+    if (snapshot.updatedAt == null) missing.push("Snapshot");
+    if (newsLog.length === 0) missing.push("News");
+    return missing;
+  }, [newsLog.length, snapshot.updatedAt, user?.email, user?.role]);
+
+  const profileCompletion = Math.round(((4 - profileMissingFields.length) / 4) * 100);
+
+  const systemHealthItems = useMemo<SystemHealthItem[]>(
+    () => [
+      {
+        id: "auth",
+        label: "AUTH",
+        value: user ? `${user.role.toUpperCase()} READY` : "GUEST",
+        tone: user ? "ok" : "warning",
+      },
+      {
+        id: "relay",
+        label: "RELAY",
+        value: `${selectedMarket} ${realtimeMode.toUpperCase()}`,
+        tone: realtimeMode === "ws" ? "ok" : "info",
+      },
+      {
+        id: "snapshot",
+        label: "SNAPSHOT",
+        value: updatedLabel,
+        tone: snapshot.updatedAt ? "stale" : "offline",
+      },
+      {
+        id: "news",
+        label: "NEWS",
+        value: newsAutoRefresh ? `AUTO ${newsRefreshSec}s` : "MANUAL",
+        tone: newsAutoRefresh ? "info" : "neutral",
+      },
+      {
+        id: "fno",
+        label: "F&O",
+        value: `${snapshot.fnoSignal}${snapshot.fnoPcr != null ? ` | ${snapshot.fnoPcr.toFixed(2)}` : ""}`,
+        tone: getSystemTone(snapshot.fnoSignal),
+      },
+    ],
+    [newsAutoRefresh, newsRefreshSec, realtimeMode, selectedMarket, snapshot.fnoPcr, snapshot.fnoSignal, snapshot.updatedAt, updatedLabel, user],
+  );
+
+  const leadHeadline = newsLog[0] ?? null;
 
   return (
-    <div className="ot-home-layout">
-      <StatusBar left="OPENTERMINALUI | DASHBOARD" center={`USER: ${(user?.email || "unknown").toUpperCase()}`} />
-
-      <div className="ot-home-toolbar">
-        <div className="ot-home-brand">
-          <img src={logo} alt="OpenTerminalUI" className="ot-home-brand-logo" />
-          <span className="ot-home-brand-text">OPENTERMINALUI</span>
-        </div>
-        <div className="ot-home-tabs">
-          {NAV_TABS.map((tab) => (
-            <button
-              key={tab.label}
-              type="button"
-              className={`ot-tab ${tab.label === activeTab ? "is-active" : ""}`}
-              onClick={() => navigate(tab.to)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {!initializing ? (
-        <main className="ot-dashboard-grid">
-          <section className="ot-panel ot-panel-portfolio ot-stagger-cell" style={{ ["--cell-delay" as string]: "0.05s" }}>
-            <header className="ot-panel-header">
-              <span className="ot-panel-header-title">PORTFOLIO OVERVIEW</span>
-              <span className="ot-live-dot ot-live-dot-green" />
-            </header>
-            <p className="ot-portfolio-value">{formatInr(snapshot.equityValue)}</p>
-            <p className={`ot-portfolio-change ${(snapshot.equityPnl ?? 0) >= 0 ? "ot-value-up" : "ot-value-down"}`}>
-              {snapshot.equityPnl == null ? "--" : `${snapshot.equityPnl >= 0 ? "+" : ""}${formatInr(snapshot.equityPnl)} (${equityPnlPct == null ? "--" : `${equityPnlPct.toFixed(2)}%`})`}
-            </p>
-
-            <div className="ot-portfolio-stats">
-              <span>EQUITY HOLDINGS: {snapshot.holdingsCount}</span>
-              <span>WATCHLIST: {snapshot.watchlistCount}</span>
-              <span>F&O SPOT NIFTY: {snapshot.fnoSpot == null ? "--" : formatPrice(snapshot.fnoSpot)}</span>
-              <span>SYNC: {updatedLabel}</span>
+    <TerminalShell
+      contentClassName="bg-terminal-bg"
+      hideTickerLoader
+      showMobileBottomNav
+      showWorkspaceControls={false}
+      statusBarTickerOverride="MISSION CONTROL"
+    >
+      <div className="relative min-h-full bg-terminal-bg">
+        {initializing ? (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-terminal-bg/95" role="status" aria-live="polite">
+            <p className="ot-type-panel-title uppercase tracking-[0.18em] text-terminal-accent">Initializing Mission Control</p>
+            <div className="h-1.5 w-64 overflow-hidden rounded-full border border-terminal-border bg-terminal-panel/80">
+              <span className="block h-full w-2/3 animate-pulse bg-terminal-accent/80" />
             </div>
+          </div>
+        ) : null}
 
-            <div className="ot-valuation-strip">
-              <button type="button" className="ot-valuation-chip" onClick={() => navigate("/equity/portfolio")}>
-                <span className="ot-chip-label">EQUITY</span>
-                <strong>{formatInr(snapshot.equityValue)}</strong>
-              </button>
-              <button type="button" className="ot-valuation-chip" onClick={() => navigate("/fno")}>
-                <span className="ot-chip-label">F&O</span>
-                <strong>{snapshot.fnoSignal} | PCR {snapshot.fnoPcr == null ? "--" : snapshot.fnoPcr.toFixed(2)}</strong>
-              </button>
-              <button type="button" className="ot-valuation-chip" onClick={() => navigate("/backtesting")}>
-                <span className="ot-chip-label">BACK TEST</span>
-                <strong>{snapshot.backtestPresetCount} presets</strong>
-              </button>
-              <button type="button" className="ot-valuation-chip" onClick={() => navigate("/equity/watchlist")}>
-                <span className="ot-chip-label">WATCHLIST</span>
-                <strong>{snapshot.watchlistCount} symbols ({snapshot.watchlistDerivativesCount} F&O)</strong>
-              </button>
-              <button type="button" className="ot-valuation-chip" onClick={() => navigate("/equity/settings")}>
-                <span className="ot-chip-label">SETTINGS</span>
-                <strong>{selectedMarket} | {displayCurrency} | {realtimeMode.toUpperCase()}</strong>
-              </button>
-            </div>
-          </section>
-
-          <section className="ot-panel ot-panel-market ot-stagger-cell" style={{ ["--cell-delay" as string]: "0.15s" }}>
-            <header className="ot-panel-header">
-              <span className="ot-panel-header-title">MARKET PULSE</span>
-              <span className="ot-live-dot ot-live-dot-cyan" />
-            </header>
-            <table className="ot-market-table">
-              <thead>
-                <tr>
-                  <th>SYMBOL</th>
-                  <th>LTP</th>
-                  <th>CHG</th>
-                  <th>CHG%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {marketRows.map((row) => {
-                  const isUp = row.chg >= 0;
-                  return (
-                    <tr key={row.symbol} className={row.flash ? `ot-flash-${row.flash}` : ""}>
-                      <td>{row.label || row.symbol}</td>
-                      <td className="ot-align-right">{row.ltp > 0 ? formatPrice(row.ltp) : "--"}</td>
-                      <td className={`ot-align-right ${isUp ? "ot-value-up" : "ot-value-down"}`}>{isUp && row.chg > 0 ? "+" : ""}{row.chg !== 0 ? formatPrice(row.chg) : "--"}</td>
-                      <td className={`ot-align-right ${isUp ? "ot-value-up" : "ot-value-down"}`}>{isUp && row.chgPct > 0 ? "+" : ""}{row.chgPct !== 0 ? `${row.chgPct.toFixed(2)}%` : "--"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </section>
-
-          <section className="ot-panel ot-panel-orders ot-stagger-cell" style={{ ["--cell-delay" as string]: "0.25s" }}>
-            <header className="ot-panel-header">
-              <span className="ot-panel-header-title">GLOBAL NEWS</span>
-              <span className="ot-live-dot ot-live-dot-amber" />
-            </header>
-            <div className="ot-order-list" role="log" aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              {newsLog.map((entry, index) => (
-                <a key={entry.id} href={entry.url} target="_blank" rel="noreferrer" className={`ot-order-entry ${index === 0 ? "ot-order-new" : ""}`} style={{ textDecoration: "none", display: "block", background: "rgba(255,255,255,0.03)", padding: "0.5rem", borderRadius: "0.25rem", border: "1px solid rgba(255,255,255,0.1)" }}>
-                  <div style={{ fontSize: "0.75rem", marginBottom: "0.25rem", color: "#FF9500" }}>{entry.source} &bull; {entry.published_at ? new Date(entry.published_at).toLocaleTimeString() : ""}</div>
-                  <div style={{ color: "#ffffff", fontWeight: 600, fontSize: "0.8rem", whiteSpace: "normal" }}>{entry.title}</div>
-                  {entry.sentiment && (
-                    <div style={{ marginTop: "0.25rem", fontSize: "0.7rem", color: entry.sentiment.label === "Bullish" ? "#34C759" : entry.sentiment.label === "Bearish" ? "#FF3B30" : "#8E8E93" }}>
-                      {entry.sentiment.label} ({Math.round(entry.sentiment.confidence * 100)}%)
-                    </div>
-                  )}
-                </a>
-              ))}
-            </div>
-            <div className="ot-highlight-note">
-              HIGHLIGHTED TEXT: Settings feed {newsAutoRefresh ? "AUTO" : "MANUAL"} refresh every {newsRefreshSec}s.
-            </div>
-          </section>
-
-          <section className="ot-panel ot-panel-performance ot-stagger-cell" style={{ ["--cell-delay" as string]: "0.35s" }}>
-            <header className="ot-panel-header">
-              <span className="ot-panel-header-title">30D PERFORMANCE</span>
-            </header>
-            <svg className="ot-performance-chart" viewBox="0 0 360 160" preserveAspectRatio="none" role="img" aria-label="30 day performance">
-              <defs>
-                <linearGradient id="otPerfGrad" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="rgba(255,149,0,0.12)" />
-                  <stop offset="100%" stopColor="rgba(255,149,0,0)" />
-                </linearGradient>
-              </defs>
-              <line x1="0" y1="92" x2="360" y2="92" stroke="#333333" strokeDasharray="4 4" />
-              <path d={perfAreaPath} fill="url(#otPerfGrad)" />
-              <path d={perfLinePath} fill="none" stroke="#FF9500" strokeWidth="1.5" className="ot-draw-line-long" />
-            </svg>
-            <div className="ot-performance-axis">
-              <span>ROLLING WINDOW</span>
-              <span>{formatInr(snapshot.equityValue)}</span>
-              <span>NAV SYNCED</span>
-            </div>
-          </section>
-
-          <section className="ot-panel ot-panel-command ot-stagger-cell" style={{ ["--cell-delay" as string]: "0.45s" }}>
-            <header className="ot-panel-header">
-              <span className="ot-panel-header-title">SYSTEM SNAPSHOT</span>
-            </header>
-            <div className="ot-command-actions ot-command-actions-single">
-              <button type="button" className="ot-action-button ot-action-green" onClick={() => navigate("/equity/sector-rotation")}>OPEN ROTATION</button>
-              <button type="button" className="ot-action-button ot-action-cyan" onClick={() => navigate("/equity/yield-curve")}>OPEN YIELD CURVE</button>
-              <button type="button" className="ot-action-button ot-action-amber" onClick={() => navigate("/equity/economics")}>OPEN ECONOMICS</button>
-              <button type="button" className="ot-action-button ot-action-cyan" onClick={() => navigate("/equity/launchpad")}>OPEN LAUNCHPAD</button>
-              <button type="button" className="ot-action-button ot-action-cyan" onClick={() => navigate("/equity/chart-workstation")}>OPEN WORKSTATION</button>
-              <button type="button" className="ot-action-button ot-action-green" onClick={() => navigate("/equity/screener")}>OPEN SCREENER</button>
-              <button type="button" className="ot-action-button ot-action-green" onClick={() => navigate("/equity/crypto")}>OPEN CRYPTO</button>
-              <button type="button" className="ot-action-button ot-action-amber" onClick={() => navigate("/equity/portfolio")}>OPEN PORTFOLIO</button>
-            </div>
-            <p className="ot-system-health ot-value-up">DATA RELAY ACTIVE: EQUITY, F&O, CRYPTO, CHARTS, SCREENER, SENTIMENT</p>
-          </section>
-
-          <section className="ot-panel ot-panel-nav ot-stagger-cell" style={{ ["--cell-delay" as string]: "0.55s" }}>
-            <header className="ot-panel-header">
-              <span className="ot-panel-header-title">NAVIGATION CARDS</span>
-            </header>
-            <div className="ot-nav-card-sections">
-              {NAV_CARD_SECTIONS.map((section) => (
-                <div key={section.title} className="ot-nav-section">
-                  <p className="ot-nav-section-title">{section.title}</p>
-                  <div className="ot-nav-card-grid">
-                    {section.cards.map((card) => (
-                      <button key={`${section.title}-${card.to}`} type="button" className="ot-nav-card" onClick={() => navigate(card.to)}>
-                        <span className="ot-nav-card-label">{card.label}</span>
-                        <span className="ot-nav-card-badge">{card.badge}</span>
-                      </button>
-                    ))}
+        {!initializing ? (
+          <main className="flex min-h-full flex-col gap-3 p-3 md:p-4" aria-label="Mission Control Dashboard">
+            <section className="rounded-sm border border-terminal-border bg-terminal-panel/80 p-3" aria-label="Home Header">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                <div className="space-y-2">
+                  <p className="ot-type-panel-title uppercase tracking-[0.18em] text-terminal-accent">Mission Control</p>
+                  <h1 className="text-2xl font-semibold uppercase tracking-[0.12em] text-terminal-text">Home Dashboard</h1>
+                  <p className="max-w-3xl text-sm text-terminal-muted">
+                    Bloomberg-dense market command surface with live pulse, portfolio intelligence, and fast launch paths into the terminal.
+                  </p>
+                  <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.12em] text-terminal-muted">
+                    <span className="rounded-sm border border-terminal-border px-2 py-1">
+                      Desk {(user?.email || "unknown").toUpperCase()}
+                    </span>
+                    <span className="rounded-sm border border-terminal-border px-2 py-1">
+                      Market {selectedMarket}
+                    </span>
+                    <span className="rounded-sm border border-terminal-border px-2 py-1">
+                      Currency {displayCurrency}
+                    </span>
+                    <span className="rounded-sm border border-terminal-border px-2 py-1">
+                      Refresh {newsAutoRefresh ? `${newsRefreshSec}s` : "Manual"}
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </section>
-        </main>
-      ) : null}
 
-      {initializing ? (
-        <div className="ot-loading-overlay" role="status" aria-live="polite">
-          <p>INITIALIZING TERMINAL...</p>
-          <div className="ot-loading-bar">
-            <span />
-          </div>
-        </div>
-      ) : null}
-    </div>
+                <div className="flex flex-col gap-3 xl:items-end">
+                  <LiveClockStrip />
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="rounded-sm border border-terminal-border px-3 py-1.5 text-[11px] uppercase tracking-[0.12em] text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"
+                      onClick={() => navigate("/equity/portfolio")}
+                    >
+                      Portfolio HQ
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-sm border border-terminal-border px-3 py-1.5 text-[11px] uppercase tracking-[0.12em] text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"
+                      onClick={() => navigate("/equity/launchpad")}
+                    >
+                      Launchpad
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-sm border border-terminal-border px-3 py-1.5 text-[11px] uppercase tracking-[0.12em] text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"
+                      onClick={() => navigate("/equity/news")}
+                    >
+                      Intel Wire
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <MarketHeatStrip
+                  ariaLabel="Market heat strip"
+                  items={heatItems}
+                  selectedItemId={selectedHeatId}
+                  formatValue={(value) => (typeof value === "number" ? formatPrice(value) : "--")}
+                  onSelect={(item) => setSelectedHeatId(item.id)}
+                />
+              </div>
+            </section>
+
+            <section className="grid gap-3 xl:grid-cols-[minmax(0,1.85fr)_minmax(0,1fr)]" aria-label="Portfolio HQ">
+              <div className="rounded-sm border border-terminal-border bg-terminal-panel/80 p-3">
+                <div className="flex flex-col gap-3 border-b border-terminal-border pb-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <h2 className="ot-type-panel-title uppercase tracking-[0.14em] text-terminal-accent">Portfolio HQ</h2>
+                    <p className="mt-1 text-sm text-terminal-muted">
+                      Equity valuation, derivatives posture, and performance telemetry anchored to the current home snapshot.
+                    </p>
+                  </div>
+                  <ProfileCompletionRing
+                    value={profileCompletion}
+                    missingFields={profileMissingFields}
+                    className="shrink-0"
+                  />
+                </div>
+
+                <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+                  <MetricCard
+                    label="Net Liquidation"
+                    value={formatInr(snapshot.equityValue)}
+                    tone={getMetricTone(snapshot.equityPnl)}
+                    delta={
+                      snapshot.equityPnl == null
+                        ? undefined
+                        : {
+                            label: `${formatSignedInr(snapshot.equityPnl)} (${formatPercent(equityPnlPct)})`,
+                            tone: getMetricTone(snapshot.equityPnl),
+                          }
+                    }
+                    details={[
+                      { label: "Holdings", value: String(snapshot.holdingsCount) },
+                      { label: "Watchlist", value: String(snapshot.watchlistCount), tone: "accent" },
+                      { label: "Backtests", value: String(snapshot.backtestPresetCount) },
+                      { label: "Sync", value: updatedLabel, tone: "neutral" },
+                    ]}
+                    sparklinePoints={performancePoints}
+                    sparklineAriaLabel="Net liquidation trend"
+                    footer={
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="rounded-sm border border-terminal-border px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"
+                          onClick={() => navigate("/equity/portfolio")}
+                        >
+                          Open Portfolio
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-sm border border-terminal-border px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"
+                          onClick={() => navigate("/backtesting")}
+                        >
+                          Run Backtests
+                        </button>
+                      </div>
+                    }
+                  />
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <MetricCard
+                      label="Market Focus"
+                      value={focusedMarket?.ltp && focusedMarket.ltp > 0 ? formatPrice(focusedMarket.ltp) : "--"}
+                      tone={getMetricTone(focusedMarket?.chg ?? null)}
+                      delta={
+                        focusedMarket
+                          ? {
+                              label:
+                                focusedMarket.ltp > 0
+                                  ? `${focusedMarket.chg >= 0 ? "+" : ""}${formatPrice(focusedMarket.chg)} (${formatPercent(focusedMarket.chgPct)})`
+                                  : "--",
+                              tone: getMetricTone(focusedMarket.chg),
+                            }
+                          : undefined
+                      }
+                      details={[
+                        { label: "Ticker", value: focusedMarket?.label || "--" },
+                        { label: "Desk", value: selectedMarket, tone: "accent" },
+                      ]}
+                    />
+
+                    <MetricCard
+                      label="F&O Regime"
+                      value={snapshot.fnoSignal}
+                      tone={getSignalTone(snapshot.fnoSignal)}
+                      details={[
+                        {
+                          label: "PCR",
+                          value: snapshot.fnoPcr != null ? snapshot.fnoPcr.toFixed(2) : "--",
+                          tone: getSignalTone(snapshot.fnoSignal),
+                        },
+                        {
+                          label: "Spot",
+                          value: snapshot.fnoSpot != null ? formatPrice(snapshot.fnoSpot) : "--",
+                        },
+                      ]}
+                    />
+
+                    <MetricCard
+                      label="Watchlist Radar"
+                      value={`${snapshot.watchlistCount} Symbols`}
+                      tone={snapshot.watchlistCount > 0 ? "accent" : "neutral"}
+                      delta={{
+                        label: `${snapshot.watchlistDerivativesCount} F&O linked`,
+                        tone: snapshot.watchlistDerivativesCount > 0 ? "up" : "neutral",
+                      }}
+                      details={[
+                        { label: "Derivatives", value: String(snapshot.watchlistDerivativesCount) },
+                        { label: "Relay", value: realtimeMode.toUpperCase() },
+                      ]}
+                    />
+
+                    <MetricCard
+                      label="Research Queue"
+                      value={`${newsLog.length} Headlines`}
+                      tone={leadHeadline?.sentiment?.label === "Bearish" ? "down" : leadHeadline ? "accent" : "neutral"}
+                      delta={{
+                        label: newsAutoRefresh ? `Auto refresh ${newsRefreshSec}s` : "Manual news sync",
+                        tone: newsAutoRefresh ? "accent" : "neutral",
+                      }}
+                      details={[
+                        { label: "Lead Source", value: leadHeadline?.source || "--" },
+                        { label: "Headlines", value: String(newsLog.length) },
+                      ]}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-sm border border-terminal-border bg-terminal-bg/40 p-3">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h3 className="ot-type-panel-title uppercase tracking-[0.14em] text-terminal-accent">30D Performance</h3>
+                      <p className="mt-1 text-xs text-terminal-muted">
+                        Portfolio trajectory normalized against the benchmark overlay from the portfolio analytics feed.
+                      </p>
+                    </div>
+                    <span className="rounded-sm border border-terminal-border px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-terminal-muted">
+                      Synced {updatedLabel}
+                    </span>
+                  </div>
+                  <PortfolioMiniChart
+                    points={performanceSeries}
+                    benchmarkPoints={benchmarkSeries}
+                    ariaLabel="Portfolio HQ chart"
+                    valueFormatter={(value) => formatInr(value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <section className="rounded-sm border border-terminal-border bg-terminal-panel/80 p-3" aria-label="System Health">
+                  <div className="mb-3">
+                    <h2 className="ot-type-panel-title uppercase tracking-[0.14em] text-terminal-accent">System Health</h2>
+                    <p className="mt-1 text-sm text-terminal-muted">
+                      Auth, relay mode, news cadence, and derivatives signal surfaced as a single mission-control rail.
+                    </p>
+                  </div>
+                  <SystemHealthBar ariaLabel="System health indicators" items={systemHealthItems} />
+                  <div className="mt-3 grid gap-2 text-xs text-terminal-muted sm:grid-cols-2">
+                    <div className="rounded-sm border border-terminal-border bg-terminal-bg/40 px-2 py-2">
+                      <span className="block text-[11px] uppercase tracking-[0.12em]">Focus Asset</span>
+                      <span className="mt-1 block text-sm text-terminal-text">{focusedMarket?.label || "--"}</span>
+                    </div>
+                    <div className="rounded-sm border border-terminal-border bg-terminal-bg/40 px-2 py-2">
+                      <span className="block text-[11px] uppercase tracking-[0.12em]">Desk Mode</span>
+                      <span className="mt-1 block text-sm text-terminal-text">
+                        {selectedMarket} / {displayCurrency}
+                      </span>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="rounded-sm border border-terminal-border bg-terminal-panel/80 p-3" aria-label="Intel Wire">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h2 className="ot-type-panel-title uppercase tracking-[0.14em] text-terminal-accent">Intel Wire</h2>
+                      <p className="mt-1 text-sm text-terminal-muted">
+                        Latest headlines from the existing news polling loop with sentiment carried through from the API payload.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-sm border border-terminal-border px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"
+                      onClick={() => navigate("/equity/news")}
+                    >
+                      Open News
+                    </button>
+                  </div>
+
+                  {newsLog.length > 0 ? (
+                    <ol className="space-y-2" role="list" aria-label="Latest headlines">
+                      {newsLog.slice(0, 5).map((entry) => (
+                        <li key={String(entry.id)} className="rounded-sm border border-terminal-border bg-terminal-bg/40 p-2">
+                          <a
+                            href={entry.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block focus-visible:outline-none focus-visible:text-terminal-accent hover:text-terminal-accent"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-[11px] uppercase tracking-[0.12em] text-terminal-muted">
+                                  {entry.source}
+                                  {entry.published_at
+                                    ? ` • ${new Date(entry.published_at).toLocaleTimeString("en-US", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                        hour12: false,
+                                      })}`
+                                    : ""}
+                                </p>
+                                <p className="mt-1 text-sm font-medium text-terminal-text">{entry.title}</p>
+                              </div>
+                              {entry.sentiment ? (
+                                <span className={`shrink-0 text-[11px] font-medium uppercase tracking-[0.12em] ${getSentimentClass(entry.sentiment.label)}`}>
+                                  {entry.sentiment.label} {Math.round(entry.sentiment.confidence * 100)}%
+                                </span>
+                              ) : null}
+                            </div>
+                          </a>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <div className="rounded-sm border border-terminal-border bg-terminal-bg/40 px-3 py-4 text-sm text-terminal-muted">
+                      News feed is online but no headlines have populated yet.
+                    </div>
+                  )}
+                </section>
+              </div>
+            </section>
+
+            <section className="rounded-sm border border-terminal-border bg-terminal-panel/80 p-3" aria-label="Launch Matrix">
+              <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="ot-type-panel-title uppercase tracking-[0.14em] text-terminal-accent">Launch Matrix</h2>
+                  <p className="mt-1 text-sm text-terminal-muted">
+                    Dense function-key style routing into equity, derivatives, research, and settings workspaces.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="rounded-sm border border-terminal-border px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"
+                    onClick={() => navigate("/equity/chart-workstation")}
+                  >
+                    Open Workstation
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-sm border border-terminal-border px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"
+                    onClick={() => navigate("/equity/screener")}
+                  >
+                    Open Screener
+                  </button>
+                </div>
+              </div>
+              <QuickNavGrid ariaLabel="Launch matrix" sections={launchSections} columnCount={4} />
+            </section>
+          </main>
+        ) : null}
+      </div>
+    </TerminalShell>
   );
 }
