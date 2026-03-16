@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { TerminalBadge, TerminalInput } from "../terminal";
 
 import {
+  CHART_WORKSTATION_COMMAND_SPECS,
   COMMAND_FUNCTIONS,
   SHORTCUT_SPECS,
+  dispatchChartWorkstationAction,
   executeParsedCommand,
   findShortcutConflicts,
   fuzzyScore,
   parseCommand,
+  type CommandExecutionResult,
   type ShortcutScope,
 } from "./commanding";
 
@@ -17,6 +20,8 @@ type PaletteItem = {
   label: string;
   description: string;
   command: string;
+  badge: "CMD" | "CHART";
+  run?: () => CommandExecutionResult;
 };
 
 function looksLikeTicker(input: string): boolean {
@@ -25,23 +30,34 @@ function looksLikeTicker(input: string): boolean {
 }
 
 export function CommandPalette() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const onChartWorkstation = location.pathname.includes("/equity/chart-workstation");
+
+  const visibleShortcutSpecs = useMemo(
+    () =>
+      SHORTCUT_SPECS.filter(
+        (spec) => onChartWorkstation || (spec.scope !== "chart-workstation" && spec.scope !== "chart-panel"),
+      ),
+    [onChartWorkstation],
+  );
 
   const shortcutGroups = useMemo(() => {
     const grouped = new Map<ShortcutScope, typeof SHORTCUT_SPECS>();
-    for (const spec of SHORTCUT_SPECS) {
+    for (const spec of visibleShortcutSpecs) {
       const rows = grouped.get(spec.scope);
       if (rows) rows.push(spec);
       else grouped.set(spec.scope, [spec]);
     }
     return grouped;
-  }, []);
+  }, [visibleShortcutSpecs]);
 
-  const shortcutConflicts = useMemo(() => findShortcutConflicts(SHORTCUT_SPECS), []);
+  const shortcutConflicts = useMemo(() => findShortcutConflicts(visibleShortcutSpecs), [visibleShortcutSpecs]);
 
   useEffect(() => {
     const onKeyDown = (ev: KeyboardEvent) => {
@@ -61,6 +77,7 @@ export function CommandPalette() {
         setHelpOpen(false);
         setQuery("");
         setSelected(0);
+        setFeedback(null);
         return;
       }
       if ((ev.ctrlKey || ev.metaKey) && ev.key === "/") {
@@ -68,6 +85,7 @@ export function CommandPalette() {
         ev.preventDefault();
         setOpen(true);
         setHelpOpen((v) => !v);
+        setFeedback(null);
         return;
       }
       if (ev.key === "Escape") {
@@ -87,23 +105,47 @@ export function CommandPalette() {
 
   const items = useMemo<PaletteItem[]>(() => {
     const q = query.trim();
-    const rows: Array<PaletteItem & { score: number }> = COMMAND_FUNCTIONS.map((fn) => ({
-      id: `fn-${fn.code}`,
-      label: fn.code,
-      description: fn.description,
-      command: String(fn.code),
-      score: q
-        ? Math.max(
-            fuzzyScore(fn.code, q),
-            fuzzyScore(fn.label, q),
-            fuzzyScore(fn.description, q),
-            ...(fn.aliases ?? []).map((a) => fuzzyScore(a, q)),
-          )
-        : 1,
-    }))
-      .filter((x) => x.score >= 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 10);
+    const rows: Array<PaletteItem & { score: number }> = [];
+
+    if (onChartWorkstation) {
+      rows.push(
+        ...CHART_WORKSTATION_COMMAND_SPECS.map((action) => ({
+          id: action.id,
+          label: action.title,
+          description: action.description,
+          command: action.command,
+          badge: "CHART" as const,
+          run: () => dispatchChartWorkstationAction(action.id),
+          score: q
+            ? Math.max(
+                fuzzyScore(action.title, q),
+                fuzzyScore(action.description, q),
+                fuzzyScore(action.command, q),
+                fuzzyScore(action.shortcut, q),
+                ...action.keywords.map((keyword) => fuzzyScore(keyword, q)),
+              )
+            : 1100,
+        })),
+      );
+    }
+
+    rows.push(
+      ...COMMAND_FUNCTIONS.map((fn) => ({
+        id: `fn-${fn.code}`,
+        label: fn.code,
+        description: fn.description,
+        command: String(fn.code),
+        badge: "CMD" as const,
+        score: q
+          ? Math.max(
+              fuzzyScore(fn.code, q),
+              fuzzyScore(fn.label, q),
+              fuzzyScore(fn.description, q),
+              ...(fn.aliases ?? []).map((a) => fuzzyScore(a, q)),
+            )
+          : 1,
+      })),
+    );
 
     if (q && looksLikeTicker(q)) {
       rows.unshift({
@@ -111,23 +153,35 @@ export function CommandPalette() {
         label: q.toUpperCase(),
         description: "Open market page",
         command: q.toUpperCase(),
+        badge: "CMD",
         score: 2000,
       });
     }
-    return rows.map(({ score: _score, ...rest }) => rest);
-  }, [query]);
+
+    return rows
+      .filter((item) => item.score >= 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 12)
+      .map(({ score: _score, ...rest }) => rest);
+  }, [onChartWorkstation, query]);
 
   useEffect(() => {
     if (!open) return;
     setSelected(0);
+    setFeedback(null);
   }, [open, query]);
 
-  const run = (command: string) => {
-    const result = executeParsedCommand(parseCommand(command), navigate);
+  const run = (item: PaletteItem) => {
+    const result = item.run
+      ? item.run()
+      : executeParsedCommand(parseCommand(item.command), navigate);
     if (result.ok) {
       setOpen(false);
       setQuery("");
+      setFeedback(null);
+      return;
     }
+    setFeedback(result.message || "Command could not be completed");
   };
 
   if (!open) return null;
@@ -156,7 +210,7 @@ export function CommandPalette() {
             } else if (e.key === "Enter") {
               e.preventDefault();
               const item = items[selected];
-              if (item) run(item.command);
+              if (item) run(item);
             } else if (e.key === "Escape") {
               e.preventDefault();
               setOpen(false);
@@ -176,9 +230,9 @@ export function CommandPalette() {
                 idx === selected ? "bg-terminal-accent/12" : "hover:bg-terminal-bg/70"
               }`}
               onMouseEnter={() => setSelected(idx)}
-              onClick={() => run(item.command)}
+              onClick={() => run(item)}
             >
-              <TerminalBadge variant="neutral" size="sm">CMD</TerminalBadge>
+              <TerminalBadge variant={item.badge === "CHART" ? "accent" : "neutral"} size="sm">{item.badge}</TerminalBadge>
               <span className="min-w-0">
                 <span className="block truncate text-sm text-terminal-text">{item.label}</span>
                 <span className="block truncate text-xs text-terminal-muted">{item.description}</span>
@@ -188,6 +242,11 @@ export function CommandPalette() {
           ))}
           {!items.length ? <div className="px-3 py-3 text-xs text-terminal-muted">No matches</div> : null}
         </div>
+        {feedback ? (
+          <div className="border-t border-terminal-border px-3 py-2 text-xs text-terminal-warn">
+            {feedback}
+          </div>
+        ) : null}
         <div className="flex items-center justify-between border-t border-terminal-border px-3 py-2 text-[10px] text-terminal-muted">
           <span>Enter: run | Esc: close | Ctrl/Cmd+/: shortcuts</span>
           {shortcutConflicts.length ? (
@@ -206,7 +265,7 @@ export function CommandPalette() {
             Shortcut Help
           </div>
           <div className="grid gap-2 p-3 text-xs">
-            {(["global", "command-bar", "chart-workstation"] as ShortcutScope[]).map((scope) => {
+            {(["global", "command-bar", "chart-workstation", "chart-panel"] as ShortcutScope[]).map((scope) => {
               const rows = shortcutGroups.get(scope) ?? [];
               if (!rows.length) return null;
               return (
@@ -228,6 +287,11 @@ export function CommandPalette() {
             {shortcutConflicts.length ? (
               <div className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-200">
                 Review conflicts: {shortcutConflicts.map((c) => c.combo).join(", ")}
+              </div>
+            ) : null}
+            {onChartWorkstation ? (
+              <div className="rounded border border-terminal-accent/30 bg-terminal-accent/10 px-2 py-1 text-terminal-text">
+                Chart pane shortcuts apply only when a chart pane has focus. Use `1-9` or click a pane first.
               </div>
             ) : null}
           </div>

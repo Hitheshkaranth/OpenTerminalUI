@@ -34,6 +34,7 @@ import { SharedChartToolbar } from "../shared/chart/ChartToolbar";
 import { IndicatorPanel } from "../shared/chart/IndicatorPanel";
 import { shouldDefaultExtendedHoursOn } from "../shared/chart/candlePresentation";
 import { chartPointsToBars } from "../shared/chart/chartUtils";
+import { normalizeIndicatorConfigs } from "../shared/chart/indicatorCatalog";
 import type { ChartKind, ChartTimeframe, IndicatorConfig } from "../shared/chart/types";
 import { quickAddToFirstPortfolio } from "../shared/portfolioQuickAdd";
 import { useSettingsStore } from "../store/settingsStore";
@@ -151,8 +152,7 @@ export function StockDetailPage() {
     try {
       const raw = localStorage.getItem(storageKey);
       if (!raw) return;
-      const parsed = JSON.parse(raw) as IndicatorConfig[];
-      if (Array.isArray(parsed)) setSelectedIndicators(parsed);
+      setSelectedIndicators(normalizeIndicatorConfigs(JSON.parse(raw)));
     } catch {
       // ignore bad local storage payloads
     }

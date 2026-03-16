@@ -36,6 +36,27 @@ def test_alert_create_returns_channel_status() -> None:
     assert payload["channel_status"]["webhook"]["enabled"] is True
 
 
+def test_alert_create_rejects_unconfigured_delivery_channels() -> None:
+    init_db()
+    client = TestClient(app)
+    headers = _auth_headers(client, "alert-channel-misconfig@example.com")
+
+    created = client.post(
+        "/api/alerts",
+        headers=headers,
+        json={
+            "symbol": "NSE:RELIANCE",
+            "condition_type": "price_above",
+            "parameters": {"threshold": 2500},
+            "channels": ["in_app", "webhook", "email"],
+        },
+    )
+
+    assert created.status_code == 400
+    assert "webhook" in created.json()["detail"]
+    assert "email" in created.json()["detail"]
+
+
 def test_alert_channel_status_endpoint_exists() -> None:
     init_db()
     client = TestClient(app)

@@ -996,6 +996,32 @@ export async function fetchAlerts(): Promise<AlertRule[]> {
   return data.alerts;
 }
 
+export async function fetchAlertsFiltered(opts?: { status?: string; symbol?: string }): Promise<AlertRule[]> {
+  const { data } = await api.get<{ alerts: AlertRule[] }>("/alerts", {
+    params: opts,
+  });
+  return data.alerts;
+}
+
+function extractApiErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const detail = error.response?.data?.detail;
+    if (typeof detail === "string" && detail.trim()) {
+      return detail.trim();
+    }
+    if (Array.isArray(detail) && detail.length) {
+      return detail.map((item) => (typeof item === "string" ? item : JSON.stringify(item))).join("; ");
+    }
+    if (typeof error.message === "string" && error.message.trim()) {
+      return error.message.trim();
+    }
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  return fallback;
+}
+
 export async function createAlert(payload: {
   symbol?: string;
   condition_type?: string;
@@ -1008,7 +1034,11 @@ export async function createAlert(payload: {
   note?: string;
   channels?: string[];
 }): Promise<void> {
-  await api.post("/alerts", payload);
+  try {
+    await api.post("/alerts", payload);
+  } catch (error) {
+    throw new Error(extractApiErrorMessage(error, "Failed to create alert"));
+  }
 }
 
 export async function updateAlert(alertId: string, payload: { status?: string; cooldown_seconds?: number; parameters?: Record<string, unknown>; channels?: string[] }): Promise<void> {

@@ -4,8 +4,10 @@ import {
   CUSTOM_SPLIT_TEMPLATE,
   makeDefaultLinkGroups,
   normalizeCompareSymbols,
+  normalizeWorkspaceLinkSettings,
   parseWorkspaceTemplateConfig,
   propagateLinkedSlots,
+  resolveCompareSlotIds,
 } from "../pages/ChartWorkstationPage";
 import type { ChartSlot } from "../store/chartWorkstationStore";
 
@@ -71,6 +73,32 @@ describe("chart workstation linking helpers", () => {
     expect(normalizeCompareSymbols([" msft ", "nvda", "MSFT", "AAPL", "qqq"], "AAPL")).toEqual(["MSFT", "NVDA", "QQQ"]);
   });
 
+  it("normalizes explicit link settings with legacy sync fallbacks", () => {
+    expect(normalizeWorkspaceLinkSettings(null, { syncCrosshair: false, syncTimeframe: false })).toEqual({
+      symbol: true,
+      interval: false,
+      crosshair: false,
+      replay: false,
+      dateRange: false,
+    });
+    expect(normalizeWorkspaceLinkSettings({ symbol: false, replay: true, dateRange: true })).toMatchObject({
+      symbol: false,
+      replay: true,
+      dateRange: true,
+      interval: true,
+      crosshair: true,
+    });
+  });
+
+  it("resolves compare placement across active, linked, and all panes", () => {
+    const slots = [slot("s1", "AAPL"), slot("s2", "MSFT"), slot("s3", "NVDA")];
+    const groups = { s1: "A", s2: "A", s3: "B" } as const;
+
+    expect(resolveCompareSlotIds(slots, "s1", groups, "active")).toEqual(["s1"]);
+    expect(resolveCompareSlotIds(slots, "s1", groups, "linked")).toEqual(["s1", "s2"]);
+    expect(resolveCompareSlotIds(slots, "s1", groups, "all")).toEqual(["s1", "s2", "s3"]);
+  });
+
   it("parses saved workstation template config and legacy panel templates", () => {
     const saved = parseWorkspaceTemplateConfig({
       slots: [
@@ -79,13 +107,21 @@ describe("chart workstation linking helpers", () => {
       ],
       gridTemplate: { cols: 2, rows: 1, arrangement: "grid" },
       syncCrosshair: false,
+      syncTimeframe: false,
+      linkSettings: { replay: true, dateRange: true },
       linkGroups: { placeholder: "off" },
       compareSymbols: ["NVDA", "QQQ"],
+      compareConfig: { mode: "price", placement: "linked" },
+      rangePresets: { placeholder: "1Y" },
     });
     expect(saved?.snapshot.slots).toHaveLength(2);
     expect(saved?.snapshot.gridTemplate.cols).toBe(2);
     expect(saved?.snapshot.syncCrosshair).toBe(false);
     expect(saved?.compareSymbols).toEqual(["NVDA", "QQQ"]);
+    expect(saved?.linkSettings.interval).toBe(false);
+    expect(saved?.linkSettings.replay).toBe(true);
+    expect(saved?.compareConfig).toEqual({ mode: "price", placement: "linked" });
+    expect(saved?.rangePresets[saved?.snapshot.slots[0]?.id ?? ""]).toBe("6M");
 
     const legacy = parseWorkspaceTemplateConfig({
       panels: [
@@ -98,5 +134,14 @@ describe("chart workstation linking helpers", () => {
     expect(legacy?.snapshot.gridTemplate.cols).toBe(2);
     expect(legacy?.snapshot.slots[0]?.ticker).toBe("TSLA");
     expect(legacy?.snapshot.slots[1]?.timeframe).toBe("1D");
+    expect(legacy?.compareConfig).toEqual({ mode: "normalized", placement: "active" });
+  });
+
+  it("defaults imported layouts without market metadata to the workstation market baseline", () => {
+    const parsed = parseWorkspaceTemplateConfig({
+      slots: [{ ticker: "INFY", timeframe: "1D", chartType: "candle" }],
+    });
+
+    expect(parsed?.snapshot.slots[0]?.market).toBe("IN");
   });
 });

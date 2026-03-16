@@ -9,9 +9,20 @@ interface Props {
   market: "IN" | "US";
   onChange: (ticker: string, market: "IN" | "US", companyName?: string | null) => void;
   className?: string;
+  inputClassName?: string;
+  placeholder?: string;
+  inputTestId?: string;
 }
 
-export function TickerDropdown({ value, market, onChange, className = "" }: Props) {
+export function TickerDropdown({
+  value,
+  market,
+  onChange,
+  className = "",
+  inputClassName = "",
+  placeholder = "Search...",
+  inputTestId,
+}: Props) {
   const [query, setQuery] = useState(value ?? "");
   const [results, setResults] = useState<SearchSymbolItem[]>([]);
   const [open, setOpen] = useState(false);
@@ -85,11 +96,11 @@ export function TickerDropdown({ value, market, onChange, className = "" }: Prop
     <div ref={containerRef} className={`ticker-dropdown ${className}`.trim()}>
       <TerminalCombobox
         className=""
-        inputClassName={`w-24 min-h-7 px-1 py-0.5 text-[11px] ${loading ? "cursor-wait" : ""}`.trim()}
+        inputClassName={`w-24 min-h-7 px-1 py-0.5 text-[11px] ${loading ? "cursor-wait" : ""} ${inputClassName}`.trim()}
         listClassName="ticker-dropdown-results"
         itemClassName=""
         value={query}
-        placeholder="Search..."
+        placeholder={placeholder}
         onChange={(nextValue) => {
           setQuery(nextValue);
           search(nextValue);
@@ -97,7 +108,7 @@ export function TickerDropdown({ value, market, onChange, className = "" }: Prop
         onFocus={() => query && setOpen(true)}
         onKeyDown={handleKey}
         loading={loading}
-        data-testid="ticker-search-input"
+        data-testid={inputTestId ?? "ticker-search-input"}
         open={open}
         items={results}
         selectedIndex={selectedIdx}

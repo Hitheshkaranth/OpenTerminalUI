@@ -15,7 +15,11 @@ const CHART_TYPES: ChartSlotType[] = ["candle", "line", "area"];
 
 interface Props {
   slot: ChartSlot;
+  isActive: boolean;
   isFullscreen: boolean;
+  panelIndex?: number;
+  visiblePanelCount?: number;
+  dense?: boolean;
   linkGroup: WorkspaceLinkGroup;
   onLinkGroupChange: (group: WorkspaceLinkGroup) => void;
   onTickerChange: (ticker: string, market: SlotMarket, companyName?: string | null) => void;
@@ -29,7 +33,11 @@ interface Props {
 
 export function ChartPanelHeader({
   slot,
+  isActive,
   isFullscreen,
+  panelIndex = 1,
+  visiblePanelCount = 1,
+  dense = false,
   linkGroup,
   onLinkGroupChange,
   onTickerChange,
@@ -72,92 +80,107 @@ export function ChartPanelHeader({
   }, [chartData]);
 
   return (
-    <div className="chart-panel-header flex items-center gap-2 border-b border-terminal-border bg-terminal-panel px-2 py-1" data-testid={`cw-panel-header-${slot.id}`}>
-      <TickerDropdown value={slot.ticker} market={slot.market} onChange={onTickerChange} />
+    <div
+      className="chart-panel-header flex flex-col gap-1.5 border-b border-terminal-border bg-terminal-panel px-2 py-1 md:flex-row md:items-center"
+      data-testid={`cw-panel-header-${slot.id}`}
+      data-density={dense ? "dense" : "comfortable"}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <TerminalBadge variant={isActive ? "accent" : "neutral"} size="sm" className="font-bold">
+          {`P${panelIndex}/${visiblePanelCount}`}
+        </TerminalBadge>
 
-      {slot.companyName && (
-        <span className="max-w-40 truncate text-[10px] text-terminal-muted" title={slot.companyName}>
-          {slot.companyName}
-        </span>
-      )}
+        <TickerDropdown
+          value={slot.ticker}
+          market={slot.market}
+          onChange={onTickerChange}
+          inputClassName={dense ? "w-24" : "w-28"}
+        />
 
-      <div className="h-4 w-px bg-terminal-border" />
+        {!dense && slot.companyName ? (
+          <span className="hidden max-w-40 truncate text-[10px] text-terminal-muted lg:inline" title={slot.companyName}>
+            {slot.companyName}
+          </span>
+        ) : null}
 
-      <TerminalBadge variant="neutral" size="sm" className="font-bold">
-        {slot.market}
-      </TerminalBadge>
+        <TerminalBadge variant="neutral" size="sm" className="font-bold">
+          {slot.market}
+        </TerminalBadge>
 
-      <TerminalDropdown
-        label={`L-${linkGroup === "off" ? "OFF" : linkGroup}`}
-        aria-label="Change link group"
-        size="sm"
-        variant="ghost"
-        items={[
-          { id: "off", label: "OFF", badge: linkGroup === "off" ? "ACTIVE" : undefined },
-          { id: "A", label: "A", badge: linkGroup === "A" ? "ACTIVE" : undefined },
-          { id: "B", label: "B", badge: linkGroup === "B" ? "ACTIVE" : undefined },
-          { id: "C", label: "C", badge: linkGroup === "C" ? "ACTIVE" : undefined },
-        ]}
-        onSelect={(id) => {
-          if (id === "off" || id === "A" || id === "B" || id === "C") {
-            onLinkGroupChange(id);
-          }
-        }}
-      />
+        <div className="ml-auto flex items-center gap-1 md:ml-0">
+          <TerminalBadge variant={isActive ? "accent" : "neutral"} size="sm">
+            {isActive ? "ACTIVE" : "READY"}
+          </TerminalBadge>
+        </div>
+      </div>
 
-      <div className="h-4 w-px bg-terminal-border" />
+      <div className="flex min-w-0 items-center gap-1 overflow-x-auto md:flex-1 md:justify-between md:overflow-visible">
+        <div className="flex min-w-0 items-center gap-1">
+          <TerminalDropdown
+            label={`L-${linkGroup === "off" ? "OFF" : linkGroup}`}
+            aria-label="Change link group"
+            size="sm"
+            variant="ghost"
+            items={[
+              { id: "off", label: "OFF", badge: linkGroup === "off" ? "ACTIVE" : undefined },
+              { id: "A", label: "A", badge: linkGroup === "A" ? "ACTIVE" : undefined },
+              { id: "B", label: "B", badge: linkGroup === "B" ? "ACTIVE" : undefined },
+              { id: "C", label: "C", badge: linkGroup === "C" ? "ACTIVE" : undefined },
+            ]}
+            onSelect={(id) => {
+              if (id === "off" || id === "A" || id === "B" || id === "C") {
+                onLinkGroupChange(id);
+              }
+            }}
+          />
 
-      <TerminalDropdown
-        label={slot.timeframe}
-        aria-label="Change timeframe"
-        size="sm"
-        variant="ghost"
-        items={TIMEFRAMES.map((tf) => ({
-          id: tf,
-          label: tf,
-          badge: tf === slot.timeframe ? "ACTIVE" : undefined,
-        }))}
-        onSelect={(id) => {
-          if (TIMEFRAMES.includes(id as ChartSlotTimeframe)) {
-            onTimeframeChange(id as ChartSlotTimeframe);
-          }
-        }}
-      />
+          <TerminalDropdown
+            label={slot.timeframe}
+            aria-label="Change timeframe"
+            size="sm"
+            variant="ghost"
+            items={TIMEFRAMES.map((tf) => ({
+              id: tf,
+              label: tf,
+              badge: tf === slot.timeframe ? "ACTIVE" : undefined,
+            }))}
+            onSelect={(id) => {
+              if (TIMEFRAMES.includes(id as ChartSlotTimeframe)) {
+                onTimeframeChange(id as ChartSlotTimeframe);
+              }
+            }}
+          />
 
-      <TerminalDropdown
-        label={slot.chartType.toUpperCase()}
-        aria-label="Change chart type"
-        size="sm"
-        variant="ghost"
-        items={CHART_TYPES.map((type) => ({
-          id: type,
-          label: type.toUpperCase(),
-          badge: type === slot.chartType ? "ACTIVE" : undefined,
-        }))}
-        onSelect={(id) => {
-          if (CHART_TYPES.includes(id as ChartSlotType)) {
-            onChartTypeChange(id as ChartSlotType);
-          }
-        }}
-      />
+          <TerminalDropdown
+            label={slot.chartType.toUpperCase()}
+            aria-label="Change chart type"
+            size="sm"
+            variant="ghost"
+            items={CHART_TYPES.map((type) => ({
+              id: type,
+              label: type.toUpperCase(),
+              badge: type === slot.chartType ? "ACTIVE" : undefined,
+            }))}
+            onSelect={(id) => {
+              if (CHART_TYPES.includes(id as ChartSlotType)) {
+                onChartTypeChange(id as ChartSlotType);
+              }
+            }}
+          />
 
-      <div className="h-4 w-px bg-terminal-border" />
+          {!dense ? (
+            <ExtendedHoursToggle
+              value={slot.extendedHours}
+              onChange={onETHChange}
+              market={slot.market}
+              disabled={isDailyPlus}
+            />
+          ) : null}
 
-      <ExtendedHoursToggle
-        value={slot.extendedHours}
-        onChange={onETHChange}
-        market={slot.market}
-        disabled={isDailyPlus}
-      />
+          {!dense && gap ? <GapBadge gap={gap} /> : null}
+        </div>
 
-      {gap && (
-        <>
-          <div className="h-4 w-px bg-terminal-border" />
-          <GapBadge gap={gap} />
-        </>
-      )}
-
-      <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1">
         <TerminalTooltip content={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
           <span>
             <TerminalButton
@@ -188,6 +211,7 @@ export function ChartPanelHeader({
             </TerminalButton>
           </span>
         </TerminalTooltip>
+        </div>
       </div>
     </div>
   );

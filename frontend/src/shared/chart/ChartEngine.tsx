@@ -17,10 +17,6 @@ import { terminalChartTheme } from "./chartTheme";
 import { useIndicators } from "./useIndicators";
 import { useRealtimeChart } from "./useRealtimeChart";
 import type { ChartEngineProps } from "./types";
-import {
-  buildEnhancedCandle,
-  buildEnhancedVolumeBar,
-} from "./candlePresentation";
 import { canApplyTailUpdate } from "./chartUtils";
 import {
   ALT_CHART_PARAMS_EVENT,
@@ -35,6 +31,13 @@ import {
 } from "./alternativeChartTransforms";
 import { terminalColors } from "../../theme/terminal";
 import { useChartSync } from "./ChartSyncContext";
+import {
+  COMPACT_SESSION_SHADE_PALETTE,
+  buildCorePriceSeriesPayload,
+  buildCorePriceSeriesUpdate,
+  hasVisibleSessionShading,
+} from "./rendererCore";
+import { createRafBatcher } from "./rafBatcher";
 
 type SeriesRef = {
   candles: ISeriesApi<"Candlestick", Time> | null;
@@ -46,30 +49,6 @@ type SeriesRef = {
   delivery: ISeriesApi<"Line", Time> | null;
   sessionShading: ISeriesApi<"Histogram", Time> | null;
 };
-
-function sessionShadeColor(session: string | undefined, extendedHours?: { showPreMarket?: boolean; showAfterHours?: boolean }): string {
-  const normalized = String(session || "rth");
-  if (normalized === "pre" || normalized === "pre_open") {
-    if (extendedHours && extendedHours.showPreMarket === false) return "transparent";
-    return "rgba(59, 143, 249, 0.16)";
-  }
-  if (normalized === "post" || normalized === "closing") {
-    if (extendedHours && extendedHours.showAfterHours === false) return "transparent";
-    return "rgba(155, 89, 182, 0.16)";
-  }
-  return "rgba(148, 163, 184, 0.045)";
-}
-
-function showSessionLegendForBars(
-  bars: Bar[],
-  extendedHours?: { enabled?: boolean; showPreMarket?: boolean; showAfterHours?: boolean },
-): boolean {
-  if (!bars.length) return false;
-  const hasTaggedSessions = bars.some((b) => (b as any).s && (b as any).s !== "rth");
-  if (!hasTaggedSessions) return false;
-  if (!extendedHours?.enabled) return true;
-  return Boolean(extendedHours.showPreMarket || extendedHours.showAfterHours);
-}
 
 export function ChartEngine({
   symbol,
@@ -108,6 +87,7 @@ export function ChartEngine({
   const backfillInFlightRef = useRef(false);
   const lastBackfillOldestRef = useRef<number | null>(null);
   const lastAutoViewportKeyRef = useRef<string | null>(null);
+  const lastRenderConfigKeyRef = useRef<string>("");
   const [chartApi, setChartApi] = useState<IChartApi | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [altParams, setAltParams] = useState<AlternativeChartParams>(DEFAULT_ALT_CHART_PARAMS);
@@ -126,7 +106,7 @@ export function ChartEngine({
     [bars],
   );
   const showSessionLegend = useMemo(
-    () => showSessionShading && showSessionLegendForBars(safeBars, extendedHours),
+    () => showSessionShading && hasVisibleSessionShading(safeBars, extendedHours),
     [safeBars, extendedHours, showSessionShading],
   );
 
@@ -329,14 +309,21 @@ export function ChartEngine({
     };
     chart.timeScale().subscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChange as never);
 
+    const resizeBatcher = createRafBatcher<{ width: number; height: number }>(({ width, height }) => {
+      chart.applyOptions({ width, height });
+    });
     const observer = new ResizeObserver(() => {
       if (!hostRef.current) return;
-      chart.applyOptions({ width: hostRef.current.clientWidth, height: hostRef.current.clientHeight || height });
+      resizeBatcher.schedule({
+        width: hostRef.current.clientWidth,
+        height: hostRef.current.clientHeight || height,
+      });
     });
     observer.observe(hostRef.current);
 
     return () => {
       observer.disconnect();
+      resizeBatcher.cancel();
       chart.unsubscribeCrosshairMove(onCrosshairMove as never);
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChange as never);
       chart.remove();
@@ -367,113 +354,43 @@ export function ChartEngine({
     const s = seriesRef.current;
     if (!s.candles || !s.line || !s.area || !s.baseline || !s.volume || !s.delivery || !s.sessionShading) return;
 
-    const isIncremental = canApplyTailUpdate(lastBarsRef.current, transformedBars);
-
-    const ethEnabled = extendedHours?.enabled;
-    const hasSessionMetadata = transformedBars.some((b) => (b as any).s && (b as any).s !== "rth");
-    const renderSessionShading = showSessionShading && (ethEnabled || hasSessionMetadata);
+    const renderSessionShading = showSessionShading && hasVisibleSessionShading(transformedBars, extendedHours);
+    const renderConfigKey = [
+      renderSessionShading ? "shade:1" : "shade:0",
+      extendedHours?.enabled ? "eth:1" : "eth:0",
+      extendedHours?.showPreMarket ? "pre:1" : "pre:0",
+      extendedHours?.showAfterHours ? "post:1" : "post:0",
+    ].join("|");
+    const isIncremental =
+      lastRenderConfigKeyRef.current === renderConfigKey &&
+      canApplyTailUpdate(lastBarsRef.current, transformedBars);
 
     if (isIncremental) {
-      const last = transformedBars[transformedBars.length - 1];
-      const candleTime = Number(last.time) as UTCTimestamp;
-      const candle = buildEnhancedCandle(
-        {
-          time: Number(last.time),
-          open: Number(last.open),
-          high: Number(last.high),
-          low: Number(last.low),
-          close: Number(last.close),
-          volume: Number(last.volume ?? 0),
-          session: (last as any).s,
-          isExtended: Boolean((last as any).ext),
-        },
-        transformedBars.length > 1 ? Number(transformedBars[transformedBars.length - 2].close) : null,
-        { up: terminalColors.candleUp, down: terminalColors.candleDown },
+      const updatePayload = buildCorePriceSeriesUpdate(transformedBars, {
         extendedHours,
-      );
-      s.candles.update(candle as any);
-      s.line.update({ time: candle.time, value: candle.close });
-      s.area.update({ time: candle.time, value: candle.close });
-      s.baseline.update({ time: candle.time, value: candle.close });
-      s.volume.update(
-        buildEnhancedVolumeBar(
-          {
-            time: Number(last.time),
-            open: Number(last.open),
-            high: Number(last.high),
-            low: Number(last.low),
-            close: Number(last.close),
-            volume: Number(last.volume ?? 0),
-            session: (last as any).s,
-            isExtended: Boolean((last as any).ext),
-          },
-          transformedBars.length > 1 ? Number(transformedBars[transformedBars.length - 2].close) : null,
-          { up: terminalColors.candleUp, down: terminalColors.candleDown },
-          extendedHours,
-        ),
-      );
-
-      if (renderSessionShading) {
-        const session = (last as any).s;
-        s.sessionShading.update({
-          time: candleTime,
-          value: 1000000000, // Large constant
-          color: sessionShadeColor(session, extendedHours),
-        });
-      } else {
-        s.sessionShading.update({ time: candleTime, value: 0, color: "transparent" });
+        showSessionShading: renderSessionShading,
+        shadePalette: COMPACT_SESSION_SHADE_PALETTE,
+      });
+      if (updatePayload) {
+        s.candles.update(updatePayload.candle as any);
+        s.line.update(updatePayload.closePoint);
+        s.area.update(updatePayload.closePoint);
+        s.baseline.update(updatePayload.closePoint);
+        s.volume.update(updatePayload.volumePoint);
+        s.sessionShading.update(updatePayload.sessionShadingPoint);
       }
     } else {
-      const candles = transformedBars.map((b, idx) =>
-        buildEnhancedCandle(
-          {
-            time: Number(b.time),
-            open: Number(b.open),
-            high: Number(b.high),
-            low: Number(b.low),
-            close: Number(b.close),
-            volume: Number(b.volume ?? 0),
-            session: (b as any).s,
-            isExtended: Boolean((b as any).ext),
-          },
-          idx > 0 ? Number(transformedBars[idx - 1].close) : null,
-          { up: terminalColors.candleUp, down: terminalColors.candleDown },
-          extendedHours,
-        ),
-      );
-      const closeLine = transformedBars.map((b) => ({ time: Number(b.time) as UTCTimestamp, value: Number(b.close) }));
-      const vol = transformedBars.map((b, idx) =>
-        buildEnhancedVolumeBar(
-          {
-            time: Number(b.time),
-            open: Number(b.open),
-            high: Number(b.high),
-            low: Number(b.low),
-            close: Number(b.close),
-            volume: Number(b.volume ?? 0),
-            session: (b as any).s,
-            isExtended: Boolean((b as any).ext),
-          },
-          idx > 0 ? Number(transformedBars[idx - 1].close) : null,
-          { up: terminalColors.candleUp, down: terminalColors.candleDown },
-          extendedHours,
-        ),
-      );
-      const shadings = transformedBars.map((b) => {
-        const color = renderSessionShading ? sessionShadeColor((b as any).s, extendedHours) : "transparent";
-        return {
-          time: Number(b.time) as UTCTimestamp,
-          value: 1000000000,
-          color,
-        };
+      const payload = buildCorePriceSeriesPayload(transformedBars, {
+        extendedHours,
+        showSessionShading: renderSessionShading,
+        shadePalette: COMPACT_SESSION_SHADE_PALETTE,
       });
-
-      s.candles.setData(candles as any);
-      s.line.setData(closeLine);
-      s.area.setData(closeLine);
-      s.baseline.setData(closeLine);
-      s.volume.setData(vol);
-      s.sessionShading.setData(shadings);
+      s.candles.setData(payload.candles as any);
+      s.line.setData(payload.closeLine);
+      s.area.setData(payload.closeLine);
+      s.baseline.setData(payload.closeLine);
+      s.volume.setData(payload.volume);
+      s.sessionShading.setData(payload.sessionShading);
     }
     if (transformedBars.length > 0) {
       s.baseline.applyOptions({
@@ -483,6 +400,7 @@ export function ChartEngine({
 
     const previousBarsLength = lastBarsRef.current.length;
     lastBarsRef.current = transformedBars;
+    lastRenderConfigKeyRef.current = renderConfigKey;
     s.volume.applyOptions({ visible: showVolume });
     s.delivery.setData(
       deliverySeries.map((row) => ({

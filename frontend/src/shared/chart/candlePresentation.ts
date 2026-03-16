@@ -22,17 +22,23 @@ type ColorSet = {
 };
 
 const TRANSPARENT = "rgba(0, 0, 0, 0)";
+const RGBA_CACHE = new Map<string, string>();
 
 function toRgba(hexColor: string, alpha: number): string {
   const raw = String(hexColor || "").trim();
   if (raw.startsWith("rgba(") || raw.startsWith("rgb(")) return raw;
+  const cacheKey = `${raw}|${alpha}`;
+  const cached = RGBA_CACHE.get(cacheKey);
+  if (cached) return cached;
   const normalized = raw.startsWith("#") ? raw.slice(1) : raw;
   if (normalized.length !== 6) return raw;
   const r = parseInt(normalized.slice(0, 2), 16);
   const g = parseInt(normalized.slice(2, 4), 16);
   const b = parseInt(normalized.slice(4, 6), 16);
   if (![r, g, b].every(Number.isFinite)) return raw;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  const value = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  RGBA_CACHE.set(cacheKey, value);
+  return value;
 }
 
 function sessionDistinctColor(session: string | undefined): string | null {

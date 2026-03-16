@@ -410,6 +410,7 @@ export type AlertTriggerEvent = {
   triggered_value?: number | null;
   triggered_at: string;
   source?: string;
+  context?: Record<string, unknown>;
   event_type?: string;
   payload?: Record<string, unknown>;
 };

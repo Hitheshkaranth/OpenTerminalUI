@@ -1,30 +1,54 @@
 import { useCallback, useEffect, useState, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { CrosshairSyncProvider } from "../contexts/CrosshairSyncContext";
 import { createChartTemplate, listChartTemplates } from "../api/client";
 import { useChartWorkstationStore } from "../store/chartWorkstationStore";
 import { ChartGridContainer } from "../components/chart-workstation/ChartGridContainer";
 import { ChartPanel } from "../components/chart-workstation/ChartPanel";
 import { AddChartPlaceholder } from "../components/chart-workstation/AddChartPlaceholder";
-import { LayoutSelector } from "../components/chart-workstation/LayoutSelector";
-import { TerminalBadge } from "../components/terminal/TerminalBadge";
-import { TerminalButton } from "../components/terminal/TerminalButton";
-import { TerminalInput } from "../components/terminal/TerminalInput";
+import { ChartShellToolbar } from "../components/chart-workstation/ChartShellToolbar";
+import {
+  CHART_WORKSTATION_ACTION_EVENT,
+  isShortcutEditableTarget,
+  isShortcutMenuTarget,
+  isShortcutWithinChartPanel,
+  type ChartWorkstationActionEventDetail,
+  type ChartWorkstationActionId,
+  type CommandExecutionResult,
+} from "../components/layout/commanding";
 import { TerminalToast, TerminalToastViewport } from "../components/terminal/TerminalToast";
-import { TerminalTooltip } from "../components/terminal/TerminalTooltip";
 import { useBatchChartData } from "../hooks/useBatchChartData";
 import { useWorkstationQuotes } from "../hooks/useWorkstationQuotes";
 import type { ChartSlot, ChartSlotTimeframe, ChartSlotType, SlotMarket } from "../store/chartWorkstationStore";
+import type { ReplayCommand } from "../shared/chart/replay";
+import { normalizeIndicatorConfigs } from "../shared/chart/indicatorCatalog";
 import type { IndicatorConfig } from "../shared/chart/types";
 import { shouldDefaultExtendedHoursOn } from "../shared/chart/candlePresentation";
 import { fetchChartData } from "../services/chartDataService";
 import type { ChartPoint } from "../types";
 import { useStockStore } from "../store/stockStore";
+import {
+  LEGACY_WORKSTATION_STORE_KEY,
+  WORKSTATION_BOUNDARY_SUMMARY,
+  WORKSTATION_SHARE_QUERY_PARAM,
+  WORKSTATION_SNAPSHOT_STORAGE_KEY,
+  buildWorkstationExportFilename,
+  buildWorkstationSnapshotPayload,
+  createWorkstationSnapshotRecord,
+  decodeWorkstationSharePayload,
+  downloadTextFile,
+  encodeWorkstationSharePayload,
+  isolateWorkstationLayoutConfig,
+  normalizeStoredWorkstationSnapshots,
+  type WorkstationSnapshotPayload,
+  type WorkstationSnapshotRecord,
+} from "../shared/chart/workstationPersistence";
 import "../components/chart-workstation/ChartWorkstation.css";
 
 const MAX_WORKSTATION_SLOTS = 9;
 const MAX_COMPARE_SYMBOLS = 3;
 const WORKSPACE_TABS_KEY = "ot:chart-workstation:tabs:v1";
+const WORKSPACE_DEFAULTS_KEY = "ot:chart-workstation:default:v1";
 const COMPARE_PALETTE = ["#FFB000", "#4EA1FF", "#7CFFB2"] as const;
 const TIMEFRAME_HOTKEY_MAP: Record<string, ChartSlotTimeframe> = {
   "1": "1m",
@@ -41,8 +65,27 @@ export const CUSTOM_SPLIT_TEMPLATE = {
   arrangement: "custom" as const,
   customAreas: `"a a b" "c d b"`,
 };
+export const WORKSPACE_RANGE_PRESETS = [
+  { id: "1D", label: "1D", rangeDays: 1 },
+  { id: "5D", label: "5D", rangeDays: 5 },
+  { id: "1W", label: "1W", rangeDays: 7 },
+  { id: "1M", label: "1M", rangeDays: 30 },
+  { id: "3M", label: "3M", rangeDays: 90 },
+  { id: "6M", label: "6M", rangeDays: 180 },
+  { id: "1Y", label: "1Y", rangeDays: 365 },
+  { id: "MAX", label: "MAX", rangeDays: 0 },
+] as const;
 
 export type WorkspaceLinkGroup = "off" | "A" | "B" | "C";
+export type WorkspaceLinkDimension = "symbol" | "interval" | "crosshair" | "replay" | "dateRange";
+export type WorkspaceComparePlacement = "active" | "linked" | "all";
+export type WorkspaceRangePresetId = (typeof WORKSPACE_RANGE_PRESETS)[number]["id"];
+export type WorkspaceLinkSettings = Record<WorkspaceLinkDimension, boolean>;
+
+type WorkspaceCompareConfig = {
+  mode: "normalized" | "price";
+  placement: WorkspaceComparePlacement;
+};
 
 type WorkspaceSnapshot = {
   slots: ChartSlot[];
@@ -55,12 +98,32 @@ type WorkspaceSnapshot = {
   syncCrosshair: boolean;
 };
 
+type WorkspaceState = {
+  snapshot: WorkspaceSnapshot;
+  linkGroups: Record<string, WorkspaceLinkGroup>;
+  linkSettings: WorkspaceLinkSettings;
+  compareSymbols: string[];
+  compareConfig: WorkspaceCompareConfig;
+  rangePresets: Record<string, WorkspaceRangePresetId>;
+};
+
 type WorkspaceTab = {
   id: string;
   name: string;
-  snapshot: WorkspaceSnapshot;
-  linkGroups: Record<string, WorkspaceLinkGroup>;
-  compareSymbols: string[];
+} & WorkspaceState;
+
+type WorkspaceDefaultConfig = {
+  name: string;
+} & WorkspaceState;
+
+type WorkspaceRangeCommand = {
+  presetId: WorkspaceRangePresetId;
+  revision: number;
+};
+
+type PanelCommand = {
+  id: "toggleIndicators" | "toggleDrawingTools" | "toggleVolumeProfile";
+  revision: number;
 };
 
 type WorkspaceTemplate = {
@@ -69,11 +132,8 @@ type WorkspaceTemplate = {
   layout_config: Record<string, unknown>;
 };
 
-type ParsedWorkspaceTemplate = {
-  snapshot: WorkspaceSnapshot;
-  linkGroups: Record<string, WorkspaceLinkGroup>;
-  compareSymbols: string[];
-};
+type ParsedWorkspaceTemplate = WorkspaceState;
+const DEFAULT_WORKSTATION_IMPORT_MARKET: SlotMarket = "IN";
 
 const DEFAULT_EXTENDED_HOURS = {
   enabled: false,
@@ -101,6 +161,18 @@ const TIMEFRAME_TO_INTERVAL: Record<ChartSlotTimeframe, string> = {
   "1W": "1wk",
   "1M": "1mo",
 };
+const DEFAULT_LINK_SETTINGS: WorkspaceLinkSettings = {
+  symbol: true,
+  interval: true,
+  crosshair: true,
+  replay: false,
+  dateRange: false,
+};
+const DEFAULT_COMPARE_CONFIG: WorkspaceCompareConfig = {
+  mode: "normalized",
+  placement: "active",
+};
+const DEFAULT_RANGE_PRESET: WorkspaceRangePresetId = "6M";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -112,6 +184,18 @@ function isTimeframe(value: unknown): value is ChartSlotTimeframe {
 
 function isChartType(value: unknown): value is ChartSlotType {
   return value === "candle" || value === "line" || value === "area";
+}
+
+function isCompareMode(value: unknown): value is WorkspaceCompareConfig["mode"] {
+  return value === "normalized" || value === "price";
+}
+
+function isComparePlacement(value: unknown): value is WorkspaceComparePlacement {
+  return value === "active" || value === "linked" || value === "all";
+}
+
+function isRangePresetId(value: unknown): value is WorkspaceRangePresetId {
+  return WORKSPACE_RANGE_PRESETS.some((preset) => preset.id === value);
 }
 
 function inferGridTemplate(slotCount: number): WorkspaceSnapshot["gridTemplate"] {
@@ -131,7 +215,7 @@ function buildTemplateSlot(slot: Partial<ChartSlot> | null | undefined): ChartSl
     market,
     timeframe: isTimeframe(slot?.timeframe) ? slot.timeframe : "1D",
     chartType: isChartType(slot?.chartType) ? slot.chartType : "candle",
-    indicators: Array.isArray(slot?.indicators) ? slot.indicators : [],
+    indicators: normalizeIndicatorConfigs(slot?.indicators),
     extendedHours: { ...DEFAULT_EXTENDED_HOURS, ...(slot?.extendedHours ?? {}), enabled: market === "US" && Boolean(slot?.extendedHours?.enabled) },
     preMarketLevels: { ...DEFAULT_PREMARKET_LEVELS, ...(slot?.preMarketLevels ?? {}) },
   };
@@ -151,22 +235,80 @@ export function normalizeCompareSymbols(input: Array<string | null | undefined>,
   return normalized;
 }
 
-function buildTemplatePayload(
-  snapshot: WorkspaceSnapshot,
-  linkGroups: Record<string, WorkspaceLinkGroup>,
-  compareSymbols: string[],
-): Record<string, unknown> {
+export function normalizeWorkspaceLinkSettings(
+  input: Record<string, unknown> | null | undefined,
+  legacy?: {
+    syncCrosshair?: boolean;
+    syncTimeframe?: boolean;
+  },
+): WorkspaceLinkSettings {
   return {
-    version: 2,
-    slots: snapshot.slots,
-    gridTemplate: snapshot.gridTemplate,
-    syncCrosshair: snapshot.syncCrosshair,
-    linkGroups,
-    compareSymbols,
+    symbol: typeof input?.symbol === "boolean" ? input.symbol : DEFAULT_LINK_SETTINGS.symbol,
+    interval: typeof input?.interval === "boolean" ? input.interval : typeof legacy?.syncTimeframe === "boolean" ? legacy.syncTimeframe : DEFAULT_LINK_SETTINGS.interval,
+    crosshair: typeof input?.crosshair === "boolean" ? input.crosshair : typeof legacy?.syncCrosshair === "boolean" ? legacy.syncCrosshair : DEFAULT_LINK_SETTINGS.crosshair,
+    replay: typeof input?.replay === "boolean" ? input.replay : DEFAULT_LINK_SETTINGS.replay,
+    dateRange: typeof input?.dateRange === "boolean" ? input.dateRange : DEFAULT_LINK_SETTINGS.dateRange,
   };
 }
 
-export function parseWorkspaceTemplateConfig(layoutConfig: Record<string, unknown>): ParsedWorkspaceTemplate | null {
+function normalizeWorkspaceCompareConfig(
+  input: Record<string, unknown> | null | undefined,
+  legacyMode?: unknown,
+  legacyPlacement?: unknown,
+): WorkspaceCompareConfig {
+  const mode = isCompareMode(input?.mode) ? input.mode : isCompareMode(legacyMode) ? legacyMode : DEFAULT_COMPARE_CONFIG.mode;
+  const placement = isComparePlacement(input?.placement)
+    ? input.placement
+    : isComparePlacement(legacyPlacement)
+      ? legacyPlacement
+      : DEFAULT_COMPARE_CONFIG.placement;
+  return { mode, placement };
+}
+
+function normalizeRangePresets(
+  slots: ChartSlot[],
+  input: Record<string, unknown> | null | undefined,
+): Record<string, WorkspaceRangePresetId> {
+  const next: Record<string, WorkspaceRangePresetId> = {};
+  slots.forEach((slot) => {
+    const raw = input?.[slot.id];
+    next[slot.id] = isRangePresetId(raw) ? raw : DEFAULT_RANGE_PRESET;
+  });
+  return next;
+}
+
+function getRangePreset(presetId: WorkspaceRangePresetId): { id: WorkspaceRangePresetId; label: string; rangeDays: number } {
+  return WORKSPACE_RANGE_PRESETS.find((preset) => preset.id === presetId) ?? WORKSPACE_RANGE_PRESETS.find((preset) => preset.id === DEFAULT_RANGE_PRESET)!;
+}
+
+function buildTemplatePayload(
+  snapshot: WorkspaceSnapshot,
+  linkGroups: Record<string, WorkspaceLinkGroup>,
+  linkSettings: WorkspaceLinkSettings,
+  compareSymbols: string[],
+  compareConfig: WorkspaceCompareConfig,
+  rangePresets: Record<string, WorkspaceRangePresetId>,
+): Record<string, unknown> {
+  return {
+    version: 3,
+    slots: snapshot.slots,
+    gridTemplate: snapshot.gridTemplate,
+    syncCrosshair: snapshot.syncCrosshair,
+    syncTimeframe: linkSettings.interval,
+    linkGroups,
+    linkSettings,
+    compareSymbols,
+    compareConfig,
+    compareMode: compareConfig.mode,
+    comparePlacement: compareConfig.placement,
+    rangePresets,
+  };
+}
+
+export function parseWorkspaceTemplateConfig(
+  layoutConfig: Record<string, unknown>,
+  fallbackMarket: SlotMarket = DEFAULT_WORKSTATION_IMPORT_MARKET,
+): ParsedWorkspaceTemplate | null {
   if (!isRecord(layoutConfig)) return null;
 
   const directSlots = Array.isArray(layoutConfig.slots) ? layoutConfig.slots : null;
@@ -184,14 +326,15 @@ export function parseWorkspaceTemplateConfig(layoutConfig: Record<string, unknow
           : null;
       const timeframe = isTimeframe(row.timeframe) ? row.timeframe : "1D";
       const chartType = isChartType(row.chartType) ? row.chartType : "candle";
-      const market = row.market === "US" ? "US" : row.market === "IN" ? "IN" : "US";
+      const market = row.market === "US" ? "US" : row.market === "IN" ? "IN" : fallbackMarket;
       return buildTemplateSlot({
+        id: typeof row.id === "string" ? row.id : undefined,
         ticker,
         companyName: typeof row.companyName === "string" ? row.companyName : null,
         timeframe,
         chartType,
         market,
-        indicators: Array.isArray(row.indicators) ? (row.indicators as IndicatorConfig[]) : [],
+        indicators: normalizeIndicatorConfigs(row.indicators),
         extendedHours: isRecord(row.extendedHours) ? row.extendedHours as unknown as ChartSlot["extendedHours"] : undefined,
         preMarketLevels: isRecord(row.preMarketLevels) ? row.preMarketLevels as unknown as ChartSlot["preMarketLevels"] : undefined,
       });
@@ -228,17 +371,43 @@ export function parseWorkspaceTemplateConfig(layoutConfig: Record<string, unknow
           : null,
     ),
     compareSymbols,
+    linkSettings: normalizeWorkspaceLinkSettings(
+      isRecord(layoutConfig.linkSettings)
+        ? layoutConfig.linkSettings
+        : isRecord(layoutConfig.linkMatrix)
+          ? layoutConfig.linkMatrix
+          : null,
+      {
+        syncCrosshair: typeof layoutConfig.syncCrosshair === "boolean" ? layoutConfig.syncCrosshair : undefined,
+        syncTimeframe: typeof layoutConfig.syncTimeframe === "boolean" ? layoutConfig.syncTimeframe : undefined,
+      },
+    ),
+    compareConfig: normalizeWorkspaceCompareConfig(
+      isRecord(layoutConfig.compareConfig)
+        ? layoutConfig.compareConfig
+        : isRecord(layoutConfig.compare)
+          ? layoutConfig.compare
+          : null,
+      layoutConfig.compareMode,
+      layoutConfig.comparePlacement,
+    ),
+    rangePresets: normalizeRangePresets(
+      slots,
+      isRecord(layoutConfig.rangePresets) ? layoutConfig.rangePresets : null,
+    ),
   };
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  const tag = target.tagName;
-  return target.isContentEditable || tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+  return isShortcutEditableTarget(target);
 }
 
 function isMenuTarget(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement && Boolean(target.closest('[role="menu"]'));
+  return isShortcutMenuTarget(target);
+}
+
+function isPanelTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && target.hasAttribute("data-slot-id");
 }
 
 function focusPanelBySlotId(slotId: string) {
@@ -324,7 +493,7 @@ function getLayoutCapacity(cols: number, rows: number) {
 function createWorkspaceSnapshot(
   slots: ChartSlot[],
   gridTemplate: WorkspaceSnapshot["gridTemplate"],
-  syncCrosshair: boolean,
+  crosshairLinked: boolean,
 ): WorkspaceSnapshot {
   return {
     slots: slots.map((slot) => ({
@@ -334,7 +503,7 @@ function createWorkspaceSnapshot(
       preMarketLevels: { ...slot.preMarketLevels },
     })),
     gridTemplate: { ...gridTemplate },
-    syncCrosshair,
+    syncCrosshair: crosshairLinked,
   };
 }
 
@@ -376,10 +545,55 @@ export function propagateLinkedSlots(
   });
 }
 
+function resolveLinkedSlotIds(
+  slots: ChartSlot[],
+  sourceSlotId: string | null,
+  groups: Record<string, WorkspaceLinkGroup>,
+  enabled: boolean,
+): string[] {
+  if (!sourceSlotId) return [];
+  if (!enabled) return [sourceSlotId];
+  const sourceGroup = groups[sourceSlotId] ?? "off";
+  if (sourceGroup === "off") return [sourceSlotId];
+  return slots
+    .filter((slot) => (groups[slot.id] ?? "off") === sourceGroup)
+    .map((slot) => slot.id);
+}
+
+export function resolveCompareSlotIds(
+  slots: ChartSlot[],
+  activeSlotId: string | null,
+  groups: Record<string, WorkspaceLinkGroup>,
+  placement: WorkspaceComparePlacement,
+): string[] {
+  if (!activeSlotId) return [];
+  if (placement === "all") return slots.map((slot) => slot.id);
+  if (placement === "linked") {
+    return resolveLinkedSlotIds(slots, activeSlotId, groups, true);
+  }
+  return [activeSlotId];
+}
+
+function readWorkspaceDefault(): WorkspaceDefaultConfig | null {
+  try {
+    const raw = localStorage.getItem(WORKSPACE_DEFAULTS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const normalized = parseWorkspaceTemplateConfig(parsed, DEFAULT_WORKSTATION_IMPORT_MARKET);
+    if (!normalized) return null;
+    return {
+      name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name.trim() : "Default",
+      ...normalized,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function readWorkspaceTabs(
   fallbackSlots: ChartSlot[],
   fallbackTemplate: WorkspaceSnapshot["gridTemplate"],
-  fallbackSyncCrosshair: boolean,
+  fallbackLinkSettings: WorkspaceLinkSettings,
 ): { tabs: WorkspaceTab[]; activeTabId: string } {
   try {
     const raw = localStorage.getItem(WORKSPACE_TABS_KEY);
@@ -390,7 +604,36 @@ function readWorkspaceTabs(
           .filter((tab) => tab && typeof tab.id === "string" && tab.snapshot?.slots?.length)
           .map((tab) => ({
             ...tab,
+            linkGroups: normalizeLinkGroups(tab.snapshot.slots, isRecord(tab.linkGroups) ? tab.linkGroups as Record<string, WorkspaceLinkGroup> : null),
+            linkSettings: normalizeWorkspaceLinkSettings(
+              isRecord((tab as unknown as Record<string, unknown>).linkSettings)
+                ? (tab as unknown as Record<string, unknown>).linkSettings as Record<string, unknown>
+                : isRecord((tab as unknown as Record<string, unknown>).linkMatrix)
+                  ? (tab as unknown as Record<string, unknown>).linkMatrix as Record<string, unknown>
+                  : null,
+              {
+                syncCrosshair: tab.snapshot.syncCrosshair,
+                syncTimeframe: typeof (tab as unknown as Record<string, unknown>).syncTimeframe === "boolean"
+                  ? (tab as unknown as Record<string, unknown>).syncTimeframe as boolean
+                  : fallbackLinkSettings.interval,
+              },
+            ),
             compareSymbols: normalizeCompareSymbols(Array.isArray(tab.compareSymbols) ? tab.compareSymbols : []),
+            compareConfig: normalizeWorkspaceCompareConfig(
+              isRecord((tab as unknown as Record<string, unknown>).compareConfig)
+                ? (tab as unknown as Record<string, unknown>).compareConfig as Record<string, unknown>
+                : isRecord((tab as unknown as Record<string, unknown>).compare)
+                  ? (tab as unknown as Record<string, unknown>).compare as Record<string, unknown>
+                  : null,
+              (tab as unknown as Record<string, unknown>).compareMode,
+              (tab as unknown as Record<string, unknown>).comparePlacement,
+            ),
+            rangePresets: normalizeRangePresets(
+              tab.snapshot.slots,
+              isRecord((tab as unknown as Record<string, unknown>).rangePresets)
+                ? (tab as unknown as Record<string, unknown>).rangePresets as Record<string, unknown>
+                : null,
+            ),
           }));
         if (validTabs.length) {
           const activeTabId = validTabs.some((tab) => tab.id === parsed.activeTabId)
@@ -403,15 +646,66 @@ function readWorkspaceTabs(
   } catch {
     // ignore invalid persisted payloads
   }
+  const savedDefault = readWorkspaceDefault();
   const id = `ws-${Date.now()}`;
+  if (savedDefault) {
+    const isolatedDefault = parseWorkspaceTemplateConfig(
+      isolateWorkstationLayoutConfig(
+        buildTemplatePayload(
+          savedDefault.snapshot,
+          savedDefault.linkGroups,
+          savedDefault.linkSettings,
+          savedDefault.compareSymbols,
+          savedDefault.compareConfig,
+          savedDefault.rangePresets,
+        ),
+      ),
+      DEFAULT_WORKSTATION_IMPORT_MARKET,
+    );
+    if (isolatedDefault) {
+      return {
+        tabs: [
+          {
+            id,
+            name: savedDefault.name,
+            snapshot: isolatedDefault.snapshot,
+            linkGroups: isolatedDefault.linkGroups,
+            linkSettings: isolatedDefault.linkSettings,
+            compareSymbols: isolatedDefault.compareSymbols,
+            compareConfig: isolatedDefault.compareConfig,
+            rangePresets: isolatedDefault.rangePresets,
+          },
+        ],
+        activeTabId: id,
+      };
+    }
+    return {
+      tabs: [
+        {
+          id,
+          name: savedDefault.name,
+          snapshot: savedDefault.snapshot,
+          linkGroups: savedDefault.linkGroups,
+          linkSettings: savedDefault.linkSettings,
+          compareSymbols: savedDefault.compareSymbols,
+          compareConfig: savedDefault.compareConfig,
+          rangePresets: savedDefault.rangePresets,
+        },
+      ],
+      activeTabId: id,
+    };
+  }
   return {
     tabs: [
       {
         id,
         name: "Main",
-        snapshot: createWorkspaceSnapshot(fallbackSlots, fallbackTemplate, fallbackSyncCrosshair),
+        snapshot: createWorkspaceSnapshot(fallbackSlots, fallbackTemplate, fallbackLinkSettings.crosshair),
         linkGroups: makeDefaultLinkGroups(fallbackSlots),
+        linkSettings: fallbackLinkSettings,
         compareSymbols: [],
+        compareConfig: DEFAULT_COMPARE_CONFIG,
+        rangePresets: normalizeRangePresets(fallbackSlots, null),
       },
     ],
     activeTabId: id,
@@ -419,6 +713,7 @@ function readWorkspaceTabs(
 }
 
 export function ChartWorkstationPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const setTicker = useStockStore((s) => s.setTicker);
   const [fullscreenSlotId, setFullscreenSlotId] = useState<string | null>(null);
@@ -429,8 +724,24 @@ export function ChartWorkstationPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [templateDraftName, setTemplateDraftName] = useState("");
   const [compareInput, setCompareInput] = useState("");
-  const [compareMode, setCompareMode] = useState<"normalized" | "price">("normalized");
-  const [compareSeries, setCompareSeries] = useState<Array<{ symbol: string; data: ChartPoint[]; color?: string }>>([]);
+  const [linkSettings, setLinkSettings] = useState<WorkspaceLinkSettings>(DEFAULT_LINK_SETTINGS);
+  const [compareConfig, setCompareConfig] = useState<WorkspaceCompareConfig>(DEFAULT_COMPARE_CONFIG);
+  const [compareSeriesBySlotId, setCompareSeriesBySlotId] = useState<Record<string, Array<{ symbol: string; data: ChartPoint[]; color?: string }>>>({});
+  const [rangePresets, setRangePresets] = useState<Record<string, WorkspaceRangePresetId>>({});
+  const [rangePresetRevisions, setRangePresetRevisions] = useState<Record<string, number>>({});
+  const [panelCommands, setPanelCommands] = useState<Record<string, PanelCommand | undefined>>({});
+  const [replayCommands, setReplayCommands] = useState<Record<string, ReplayCommand | undefined>>({});
+  const [replayDateDraft, setReplayDateDraft] = useState("");
+  const [hasSavedDefault, setHasSavedDefault] = useState(false);
+  const [workspaceSnapshots, setWorkspaceSnapshots] = useState<WorkstationSnapshotRecord[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      return normalizeStoredWorkstationSnapshots(JSON.parse(window.localStorage.getItem(WORKSTATION_SNAPSHOT_STORAGE_KEY) || "[]"));
+    } catch {
+      return [];
+    }
+  });
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState("");
   const {
     slots,
     activeSlotId,
@@ -455,37 +766,144 @@ export function ChartWorkstationPage() {
   const [workspaceReady, setWorkspaceReady] = useState(false);
 
   const initRef = useRef(false);
+  const importedShareRef = useRef("");
+  const activeWorkspaceTab = useMemo(
+    () => workspaceTabs.find((tab) => tab.id === activeWorkspaceTabId) ?? null,
+    [activeWorkspaceTabId, workspaceTabs],
+  );
+  const activeCompareSymbolsStored = activeWorkspaceTab?.compareSymbols ?? [];
+  const selectedWorkspaceSnapshot = useMemo(
+    () => workspaceSnapshots.find((row) => row.id === selectedSnapshotId) ?? null,
+    [selectedSnapshotId, workspaceSnapshots],
+  );
+  const activeWorkspaceLayoutConfig = useMemo(
+    () =>
+      buildTemplatePayload(
+        createWorkspaceSnapshot(slots, gridTemplate, linkSettings.crosshair),
+        normalizeLinkGroups(slots, slotLinkGroups),
+        linkSettings,
+        activeCompareSymbolsStored,
+        compareConfig,
+        normalizeRangePresets(slots, rangePresets),
+      ),
+    [activeCompareSymbolsStored, compareConfig, gridTemplate, linkSettings, rangePresets, slotLinkGroups, slots],
+  );
+  const activeWorkspacePayload = useMemo(
+    () => buildWorkstationSnapshotPayload(activeWorkspaceTab?.name ?? "Main", activeWorkspaceLayoutConfig),
+    [activeWorkspaceLayoutConfig, activeWorkspaceTab?.name],
+  );
+
+  const buildPayloadFromWorkspaceState = useCallback(
+    (name: string, state: WorkspaceState): WorkstationSnapshotPayload =>
+      buildWorkstationSnapshotPayload(
+        name,
+        buildTemplatePayload(
+          state.snapshot,
+          state.linkGroups,
+          state.linkSettings,
+          state.compareSymbols,
+          state.compareConfig,
+          state.rangePresets,
+        ),
+      ),
+    [],
+  );
+
+  const applyWorkspaceState = useCallback((nextState: WorkspaceState) => {
+    setSlotLinkGroups(normalizeLinkGroups(nextState.snapshot.slots, nextState.linkGroups));
+    setLinkSettings(nextState.linkSettings);
+    setCompareConfig(nextState.compareConfig);
+    setRangePresets(normalizeRangePresets(nextState.snapshot.slots, nextState.rangePresets));
+    setRangePresetRevisions({});
+    setReplayCommands({});
+    setReplayDateDraft("");
+    useChartWorkstationStore.setState({
+      slots: nextState.snapshot.slots,
+      gridTemplate: nextState.snapshot.gridTemplate,
+      syncCrosshair: nextState.linkSettings.crosshair,
+      syncTimeframe: nextState.linkSettings.interval,
+      activeSlotId: nextState.snapshot.slots[0]?.id ?? null,
+    });
+    setFullscreenSlotId(null);
+  }, []);
+
+  const materializeWorkspaceFromLayout = useCallback(
+    (
+      name: string,
+      layoutConfig: Record<string, unknown>,
+      openAsNewTab: boolean,
+    ): WorkspaceTab | null => {
+      const parsed = parseWorkspaceTemplateConfig(
+        isolateWorkstationLayoutConfig(layoutConfig),
+        DEFAULT_WORKSTATION_IMPORT_MARKET,
+      );
+      if (!parsed) return null;
+
+      const nextTabId = openAsNewTab ? `ws-${Date.now()}` : activeWorkspaceTabId ?? `ws-${Date.now()}`;
+      const nextTab: WorkspaceTab = {
+        id: nextTabId,
+        name: openAsNewTab ? name : (activeWorkspaceTab?.name || name),
+        snapshot: parsed.snapshot,
+        linkGroups: parsed.linkGroups,
+        linkSettings: parsed.linkSettings,
+        compareSymbols: parsed.compareSymbols,
+        compareConfig: parsed.compareConfig,
+        rangePresets: parsed.rangePresets,
+      };
+
+      setWorkspaceTabs((prev) => {
+        if (openAsNewTab) return [...prev, nextTab];
+        if (!prev.some((tab) => tab.id === nextTabId)) return [...prev, nextTab];
+        return prev.map((tab) => (tab.id === nextTabId ? nextTab : tab));
+      });
+      setActiveWorkspaceTabId(nextTabId);
+      applyWorkspaceState(nextTab);
+      return nextTab;
+    },
+    [activeWorkspaceTab?.name, activeWorkspaceTabId, applyWorkspaceState],
+  );
 
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
 
-    const persisted = readWorkspaceTabs(slots, gridTemplate, syncCrosshair);
+    try {
+      localStorage.removeItem(LEGACY_WORKSTATION_STORE_KEY);
+    } catch {
+      // ignore cleanup failures
+    }
+
+    const persisted = readWorkspaceTabs(
+      slots,
+      gridTemplate,
+      normalizeWorkspaceLinkSettings(null, {
+        syncCrosshair,
+        syncTimeframe,
+      }),
+    );
     setWorkspaceTabs(persisted.tabs);
     setActiveWorkspaceTabId(persisted.activeTabId);
+    setHasSavedDefault(Boolean(readWorkspaceDefault()));
 
     const active = persisted.tabs.find((tab) => tab.id === persisted.activeTabId) ?? persisted.tabs[0];
     if (active) {
-      setSlotLinkGroups(normalizeLinkGroups(active.snapshot.slots, active.linkGroups));
-
-      const newSlots = active.snapshot.slots;
-      const currentSlotsJSON = JSON.stringify(slots);
-      const newSlotsJSON = JSON.stringify(newSlots);
-      const gridChanged = JSON.stringify(gridTemplate) !== JSON.stringify(active.snapshot.gridTemplate);
-      const syncChanged = syncCrosshair !== active.snapshot.syncCrosshair;
-
-      if (currentSlotsJSON !== newSlotsJSON || gridChanged || syncChanged) {
-        useChartWorkstationStore.setState({
-          slots: newSlots,
-          gridTemplate: active.snapshot.gridTemplate,
-          syncCrosshair: active.snapshot.syncCrosshair,
-          activeSlotId: newSlots[0]?.id ?? null,
-        });
-      }
+      applyWorkspaceState(active);
     }
 
     setWorkspaceReady(true);
-  }, [gridTemplate, slots, syncCrosshair]);
+  }, [applyWorkspaceState, gridTemplate, slots, syncCrosshair, syncTimeframe]);
+
+  useEffect(() => {
+    setSelectedSnapshotId((prev) => (prev && workspaceSnapshots.some((row) => row.id === prev) ? prev : workspaceSnapshots[0]?.id ?? ""));
+  }, [workspaceSnapshots]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(WORKSTATION_SNAPSHOT_STORAGE_KEY, JSON.stringify(workspaceSnapshots));
+    } catch {
+      // ignore snapshot persistence failures
+    }
+  }, [workspaceSnapshots]);
 
   useEffect(() => {
     if (!workspaceReady || !activeWorkspaceTabId) return;
@@ -502,23 +920,39 @@ export function ChartWorkstationPage() {
       let changed = false;
       const next = prev.map((tab) => {
         if (tab.id !== activeWorkspaceTabId) return tab;
-        const newSnapshot = createWorkspaceSnapshot(slots, gridTemplate, syncCrosshair);
+        const newSnapshot = createWorkspaceSnapshot(slots, gridTemplate, linkSettings.crosshair);
         const newLinkGroups = normalizeLinkGroups(slots, slotLinkGroups);
+        const newRangePresets = normalizeRangePresets(slots, rangePresets);
         const snapshotSame = JSON.stringify(tab.snapshot) === JSON.stringify(newSnapshot);
         const linkGroupsSame = JSON.stringify(tab.linkGroups) === JSON.stringify(newLinkGroups);
+        const linkSettingsSame = JSON.stringify(tab.linkSettings) === JSON.stringify(linkSettings);
+        const compareConfigSame = JSON.stringify(tab.compareConfig) === JSON.stringify(compareConfig);
+        const rangePresetsSame = JSON.stringify(tab.rangePresets) === JSON.stringify(newRangePresets);
 
-        if (snapshotSame && linkGroupsSame) return tab;
+        if (snapshotSame && linkGroupsSame && linkSettingsSame && compareConfigSame && rangePresetsSame) return tab;
 
         changed = true;
         return {
           ...tab,
           snapshot: newSnapshot,
           linkGroups: newLinkGroups,
+          linkSettings,
+          compareConfig,
+          rangePresets: newRangePresets,
         };
       });
       return changed ? next : prev;
     });
-  }, [activeWorkspaceTabId, gridTemplate, slotLinkGroups, slots, syncCrosshair, workspaceReady]);
+  }, [activeWorkspaceTabId, compareConfig, gridTemplate, linkSettings, rangePresets, slotLinkGroups, slots, workspaceReady]);
+
+  useEffect(() => {
+    if (!workspaceReady || !activeWorkspaceTabId) return;
+    setRangePresets((prev) => {
+      const next = normalizeRangePresets(slots, prev);
+      if (JSON.stringify(prev) === JSON.stringify(next)) return prev;
+      return next;
+    });
+  }, [activeWorkspaceTabId, slots, workspaceReady]);
 
   useEffect(() => {
     if (!workspaceReady || !workspaceTabs.length || !activeWorkspaceTabId) return;
@@ -535,15 +969,56 @@ export function ChartWorkstationPage() {
     }
   }, [activeWorkspaceTabId, workspaceReady, workspaceTabs]);
 
+  useEffect(() => {
+    if (!workspaceReady) return;
+    const params = new URLSearchParams(location.search);
+    const shared = params.get(WORKSTATION_SHARE_QUERY_PARAM);
+    if (!shared || importedShareRef.current === shared) return;
+
+    importedShareRef.current = shared;
+    const payload = decodeWorkstationSharePayload(shared);
+    if (!payload) {
+      setLayoutNotice({
+        title: "Shared workspace invalid",
+        message: "The shared workstation payload could not be decoded.",
+        variant: "warning",
+      });
+    } else {
+      const nextTab = materializeWorkspaceFromLayout(payload.name, payload.layout_config, true);
+      setLayoutNotice({
+        title: nextTab ? "Shared workspace opened" : "Shared workspace invalid",
+        message: nextTab
+          ? `${payload.name} opened in a new tab. Drawings remain scoped to the receiving workspace.`
+          : "The shared workstation payload did not contain a usable layout.",
+        variant: nextTab ? "success" : "warning",
+      });
+    }
+
+    params.delete(WORKSTATION_SHARE_QUERY_PARAM);
+    navigate(
+      {
+        pathname: location.pathname,
+        search: params.toString() ? `?${params.toString()}` : "",
+      },
+      { replace: true },
+    );
+  }, [location.pathname, location.search, materializeWorkspaceFromLayout, navigate, workspaceReady]);
+
+  useEffect(() => {
+    if (!workspaceReady) return;
+    if (syncCrosshair !== linkSettings.crosshair) {
+      setSyncCrosshair(linkSettings.crosshair);
+    }
+    if (syncTimeframe !== linkSettings.interval) {
+      setSyncTimeframe(linkSettings.interval);
+    }
+  }, [linkSettings.crosshair, linkSettings.interval, setSyncCrosshair, setSyncTimeframe, syncCrosshair, syncTimeframe, workspaceReady]);
+
   const visibleCapacity = getLayoutCapacity(gridTemplate.cols || 1, gridTemplate.rows || 1);
   const visibleSlots = useMemo(() => slots.slice(0, visibleCapacity), [slots, visibleCapacity]);
   const hiddenSlotCount = Math.max(0, slots.length - visibleSlots.length);
   const canAddVisibleSlot =
     slots.length < MAX_WORKSTATION_SLOTS && visibleSlots.length < visibleCapacity;
-  const activeWorkspaceTab = useMemo(
-    () => workspaceTabs.find((tab) => tab.id === activeWorkspaceTabId) ?? null,
-    [activeWorkspaceTabId, workspaceTabs],
-  );
   const activeSlot = useMemo(
     () => slots.find((slot) => slot.id === activeSlotId) ?? visibleSlots[0] ?? null,
     [activeSlotId, slots, visibleSlots],
@@ -554,6 +1029,13 @@ export function ChartWorkstationPage() {
     [activeTicker, activeWorkspaceTab?.compareSymbols],
   );
   const activeLinkGroup = activeSlot ? (slotLinkGroups[activeSlot.id] ?? "off") : "off";
+  const compareTargetSlotIds = useMemo(
+    () => resolveCompareSlotIds(visibleSlots, activeSlotId, slotLinkGroups, compareConfig.placement),
+    [activeSlotId, compareConfig.placement, slotLinkGroups, visibleSlots],
+  );
+  const activeRangePreset = activeSlot ? (rangePresets[activeSlot.id] ?? DEFAULT_RANGE_PRESET) : DEFAULT_RANGE_PRESET;
+  const activePaneIndex = activeSlot ? visibleSlots.findIndex((slot) => slot.id === activeSlot.id) + 1 : 0;
+  const denseShell = visibleSlots.length >= 4 || hiddenSlotCount > 0 || gridTemplate.rows > 1;
   const linkedSymbolCount = useMemo(() => {
     if (!activeSlot || activeLinkGroup === "off") return activeSlot?.ticker ? 1 : 0;
     return slots.filter((slot) => (slotLinkGroups[slot.id] ?? "off") === activeLinkGroup && slot.ticker).length;
@@ -607,52 +1089,70 @@ export function ChartWorkstationPage() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!activeSlot?.ticker || !activeCompareSymbols.length) {
-      setCompareSeries([]);
+    if (!activeCompareSymbols.length || !compareTargetSlotIds.length) {
+      setCompareSeriesBySlotId({});
       return;
     }
 
-    const market = activeSlot.market === "IN" ? "NSE" : "NASDAQ";
-    const interval = TIMEFRAME_TO_INTERVAL[activeSlot.timeframe];
-    const extended = activeSlot.extendedHours.enabled && activeSlot.market === "US";
+    const targetSlots = visibleSlots.filter((slot) => compareTargetSlotIds.includes(slot.id) && slot.ticker);
+    if (!targetSlots.length) {
+      setCompareSeriesBySlotId({});
+      return;
+    }
 
     Promise.all(
-      activeCompareSymbols.map(async (symbol, idx) => {
-        const response = await fetchChartData(symbol, {
-          market,
-          interval,
-          period: "1y",
-          extended,
-        });
+      targetSlots.map(async (slot) => {
+        const market = slot.market === "IN" ? "NSE" : "NASDAQ";
+        const interval = TIMEFRAME_TO_INTERVAL[slot.timeframe];
+        const extended = slot.extendedHours.enabled && slot.market === "US";
+        const compareSymbols = activeCompareSymbols.filter((symbol) => symbol !== slot.ticker?.toUpperCase());
+        const rows = await Promise.all(
+          compareSymbols.map(async (symbol, idx) => {
+            const response = await fetchChartData(symbol, {
+              market,
+              interval,
+              period: "1y",
+              extended,
+            });
+            return {
+              symbol,
+              color: COMPARE_PALETTE[idx % COMPARE_PALETTE.length],
+              data: (response.data || []).map((bar) => ({
+                t: Math.floor(Number(bar.t) / 1000),
+                o: Number(bar.o),
+                h: Number(bar.h),
+                l: Number(bar.l),
+                c: Number(bar.c),
+                v: Number(bar.v),
+                s: bar.s,
+                ext: bar.ext,
+              })),
+            };
+          }),
+        );
         return {
-          symbol,
-          color: COMPARE_PALETTE[idx % COMPARE_PALETTE.length],
-          data: (response.data || []).map((bar) => ({
-            t: Math.floor(Number(bar.t) / 1000),
-            o: Number(bar.o),
-            h: Number(bar.h),
-            l: Number(bar.l),
-            c: Number(bar.c),
-            v: Number(bar.v),
-            s: bar.s,
-            ext: bar.ext,
-          })),
+          slotId: slot.id,
+          series: rows.filter((row) => row.data.length > 0),
         };
       }),
     )
       .then((rows) => {
         if (cancelled) return;
-        setCompareSeries(rows.filter((row) => row.data.length > 0));
+        const next: Record<string, Array<{ symbol: string; data: ChartPoint[]; color?: string }>> = {};
+        rows.forEach((row) => {
+          next[row.slotId] = row.series;
+        });
+        setCompareSeriesBySlotId(next);
       })
       .catch(() => {
         if (cancelled) return;
-        setCompareSeries([]);
+        setCompareSeriesBySlotId({});
       });
 
     return () => {
       cancelled = true;
     };
-  }, [activeCompareSymbols, activeSlot]);
+  }, [activeCompareSymbols, compareTargetSlotIds, visibleSlots]);
 
   const handleLayoutChange = useCallback(
     (nextTemplate: typeof gridTemplate) => {
@@ -705,6 +1205,7 @@ export function ChartWorkstationPage() {
     (slotId: string) =>
       (ticker: string, market: SlotMarket, companyName?: string | null) => {
         updateSlotTicker(slotId, ticker, market, companyName);
+        if (!linkSettings.symbol) return;
         const sourceGroup = slotLinkGroups[slotId] ?? "off";
         if (sourceGroup === "off") return;
         useChartWorkstationStore.setState((state) => ({
@@ -717,7 +1218,7 @@ export function ChartWorkstationPage() {
           })),
         }));
       },
-    [slotLinkGroups, updateSlotTicker],
+    [linkSettings.symbol, slotLinkGroups, updateSlotTicker],
   );
 
   const handleTimeframeChange = useCallback(
@@ -727,7 +1228,7 @@ export function ChartWorkstationPage() {
         const slot = slots.find((s) => s.id === slotId);
         const isUS = (slot?.market ?? "IN") === "US";
         updateSlotETH(slotId, { enabled: isUS && shouldDefaultExtendedHoursOn(tf) });
-        if (!syncTimeframe) return;
+        if (!linkSettings.interval) return;
         const sourceGroup = slotLinkGroups[slotId] ?? "off";
         if (sourceGroup === "off") return;
         useChartWorkstationStore.setState((state) => ({
@@ -744,7 +1245,7 @@ export function ChartWorkstationPage() {
           }),
         }));
       },
-    [slotLinkGroups, slots, syncTimeframe, updateSlotTimeframe, updateSlotETH],
+    [linkSettings.interval, slotLinkGroups, slots, updateSlotTimeframe, updateSlotETH],
   );
 
   const handleChartTypeChange = useCallback(
@@ -784,31 +1285,14 @@ export function ChartWorkstationPage() {
       const next = workspaceTabs.find((tab) => tab.id === tabId);
       if (!next) return;
       setActiveWorkspaceTabId(tabId);
-      const normalizedGroups = normalizeLinkGroups(next.snapshot.slots, next.linkGroups);
-      setSlotLinkGroups(normalizedGroups);
-      useChartWorkstationStore.setState({
-        slots: next.snapshot.slots,
-        gridTemplate: next.snapshot.gridTemplate,
-        syncCrosshair: next.snapshot.syncCrosshair,
-        activeSlotId: next.snapshot.slots[0]?.id ?? null,
-      });
-      setFullscreenSlotId(null);
+      applyWorkspaceState(next);
     },
-    [workspaceTabs],
+    [applyWorkspaceState, workspaceTabs],
   );
 
   const handleAddWorkspaceTab = useCallback(() => {
-    const id = `ws-${Date.now()}`;
-    const nextTab: WorkspaceTab = {
-      id,
-      name: `Workspace ${workspaceTabs.length + 1}`,
-      snapshot: createWorkspaceSnapshot(slots, gridTemplate, syncCrosshair),
-      linkGroups: normalizeLinkGroups(slots, slotLinkGroups),
-      compareSymbols: [],
-    };
-    setWorkspaceTabs((prev) => [...prev, nextTab]);
-    setActiveWorkspaceTabId(id);
-  }, [gridTemplate, slotLinkGroups, slots, syncCrosshair, workspaceTabs.length]);
+    materializeWorkspaceFromLayout(`Workspace ${workspaceTabs.length + 1}`, activeWorkspaceLayoutConfig, true);
+  }, [activeWorkspaceLayoutConfig, materializeWorkspaceFromLayout, workspaceTabs.length]);
 
   const handleRemoveWorkspaceTab = useCallback(
     (tabId: string) => {
@@ -834,8 +1318,8 @@ export function ChartWorkstationPage() {
   }, []);
 
   const applyTemplateToWorkspace = useCallback((template: WorkspaceTemplate, openAsNewTab: boolean) => {
-    const parsed = parseWorkspaceTemplateConfig(template.layout_config);
-    if (!parsed) {
+    const nextTab = materializeWorkspaceFromLayout(template.name, template.layout_config, openAsNewTab);
+    if (!nextTab) {
       setTemplateNotice({
         title: "Template skipped",
         message: "Selected template does not contain a usable workstation layout.",
@@ -844,34 +1328,12 @@ export function ChartWorkstationPage() {
       return;
     }
 
-    const nextTabId = openAsNewTab ? `ws-${Date.now()}` : activeWorkspaceTabId ?? `ws-${Date.now()}`;
-    const nextTab: WorkspaceTab = {
-      id: nextTabId,
-      name: openAsNewTab ? template.name : (activeWorkspaceTab?.name || template.name),
-      snapshot: parsed.snapshot,
-      linkGroups: parsed.linkGroups,
-      compareSymbols: parsed.compareSymbols,
-    };
-
-    setWorkspaceTabs((prev) => {
-      if (openAsNewTab) return [...prev, nextTab];
-      return prev.map((tab) => (tab.id === nextTabId ? nextTab : tab));
-    });
-    setActiveWorkspaceTabId(nextTabId);
-    setSlotLinkGroups(parsed.linkGroups);
-    useChartWorkstationStore.setState({
-      slots: parsed.snapshot.slots,
-      gridTemplate: parsed.snapshot.gridTemplate,
-      syncCrosshair: parsed.snapshot.syncCrosshair,
-      activeSlotId: parsed.snapshot.slots[0]?.id ?? null,
-    });
-    setFullscreenSlotId(null);
     setTemplateNotice({
       title: openAsNewTab ? "Template opened in new tab" : "Template applied",
-      message: `${template.name} loaded with ${parsed.snapshot.slots.length} pane(s).`,
+      message: `${template.name} loaded with ${nextTab.snapshot.slots.length} pane(s).`,
       variant: "success",
     });
-  }, [activeWorkspaceTab?.name, activeWorkspaceTabId]);
+  }, [materializeWorkspaceFromLayout]);
 
   const handleSaveCurrentTemplate = useCallback(async () => {
     const name = templateDraftName.trim();
@@ -887,11 +1349,7 @@ export function ChartWorkstationPage() {
     try {
       await createChartTemplate({
         name,
-        layout_config: buildTemplatePayload(
-          createWorkspaceSnapshot(slots, gridTemplate, syncCrosshair),
-          normalizeLinkGroups(slots, slotLinkGroups),
-          activeCompareSymbols,
-        ),
+        layout_config: activeWorkspaceLayoutConfig,
       });
       setTemplateDraftName("");
       await refreshTemplates();
@@ -907,7 +1365,7 @@ export function ChartWorkstationPage() {
         variant: "warning",
       });
     }
-  }, [activeCompareSymbols, gridTemplate, refreshTemplates, slotLinkGroups, slots, syncCrosshair, templateDraftName]);
+  }, [activeWorkspaceLayoutConfig, refreshTemplates, templateDraftName]);
 
   const handleAddCompareSymbol = useCallback(() => {
     const next = normalizeCompareSymbols([...activeCompareSymbols, compareInput], activeTicker);
@@ -919,28 +1377,290 @@ export function ChartWorkstationPage() {
     updateActiveTabCompareSymbols(activeCompareSymbols.filter((row) => row !== symbol));
   }, [activeCompareSymbols, updateActiveTabCompareSymbols]);
 
+  const handleApplySelectedTemplate = useCallback(() => {
+    const template = templates.find((row) => row.id === selectedTemplateId);
+    if (template) applyTemplateToWorkspace(template, false);
+  }, [applyTemplateToWorkspace, selectedTemplateId, templates]);
+
+  const handleOpenTemplateInNewTab = useCallback(() => {
+    const template = templates.find((row) => row.id === selectedTemplateId);
+    if (template) applyTemplateToWorkspace(template, true);
+  }, [applyTemplateToWorkspace, selectedTemplateId, templates]);
+
+  const handleSetLinkDimension = useCallback((dimension: WorkspaceLinkDimension, enabled: boolean) => {
+    setLinkSettings((prev) => ({ ...prev, [dimension]: enabled }));
+  }, []);
+
+  const handleSetComparePlacement = useCallback((placement: WorkspaceComparePlacement) => {
+    setCompareConfig((prev) => ({ ...prev, placement }));
+  }, []);
+
+  const handleSetCompareMode = useCallback((mode: WorkspaceCompareConfig["mode"]) => {
+    setCompareConfig((prev) => ({ ...prev, mode }));
+  }, []);
+
+  const reportMissingActivePane = useCallback((actionLabel: string): CommandExecutionResult => {
+    const message = `${actionLabel} requires an active chart pane. Click a pane or use 1-9 first.`;
+    setLayoutNotice({
+      title: "No active pane",
+      message,
+      variant: "warning",
+    });
+    return { ok: false, message };
+  }, []);
+
+  const reportMissingActiveSymbol = useCallback((actionLabel: string): CommandExecutionResult => {
+    const message = `${actionLabel} requires a symbol on the active chart pane. Load a symbol and retry.`;
+    setLayoutNotice({
+      title: "No active symbol",
+      message,
+      variant: "warning",
+    });
+    return { ok: false, message };
+  }, []);
+
+  const handleSetRangePreset = useCallback((presetId: WorkspaceRangePresetId) => {
+    const targetIds = resolveLinkedSlotIds(slots, activeSlotId, slotLinkGroups, linkSettings.dateRange);
+    if (!targetIds.length) return;
+    setRangePresets((prev) => {
+      const next = { ...normalizeRangePresets(slots, prev) };
+      targetIds.forEach((slotId) => {
+        next[slotId] = presetId;
+      });
+      return next;
+    });
+    setRangePresetRevisions((prev) => {
+      const next = { ...prev };
+      targetIds.forEach((slotId) => {
+        next[slotId] = (next[slotId] ?? 0) + 1;
+      });
+      return next;
+    });
+  }, [activeSlotId, linkSettings.dateRange, slotLinkGroups, slots]);
+
+  const dispatchPanelCommand = useCallback((commandId: PanelCommand["id"]): CommandExecutionResult => {
+    if (!activeSlotId) {
+      const actionLabel =
+        commandId === "toggleIndicators"
+          ? "Indicator toggle"
+          : commandId === "toggleDrawingTools"
+            ? "Drawing tools"
+            : "Volume profile";
+      return reportMissingActivePane(actionLabel);
+    }
+    setPanelCommands((prev) => ({
+      ...prev,
+      [activeSlotId]: {
+        id: commandId,
+        revision: (prev[activeSlotId]?.revision ?? 0) + 1,
+      },
+    }));
+    focusPanelBySlotId(activeSlotId);
+    return { ok: true };
+  }, [activeSlotId, reportMissingActivePane]);
+
+  const dispatchReplayCommand = useCallback((command: Omit<ReplayCommand, "revision">): CommandExecutionResult => {
+    const targetIds = resolveLinkedSlotIds(visibleSlots, activeSlotId, slotLinkGroups, linkSettings.replay);
+    if (!targetIds.length) {
+      return reportMissingActivePane("Replay controls");
+    }
+    setReplayCommands((prev) => {
+      const next = { ...prev };
+      targetIds.forEach((slotId) => {
+        next[slotId] = {
+          ...command,
+          revision: (next[slotId]?.revision ?? 0) + 1,
+        };
+      });
+      return next;
+    });
+    return { ok: true };
+  }, [activeSlotId, linkSettings.replay, reportMissingActivePane, slotLinkGroups, visibleSlots]);
+
+  const handleToggleReplay = useCallback(() => {
+    return dispatchReplayCommand({ type: "toggle" });
+  }, [dispatchReplayCommand]);
+
+  const handleReplayGoToDate = useCallback(() => {
+    const trimmed = replayDateDraft.trim();
+    if (!trimmed) return { ok: false, message: "Enter a replay date before applying it" };
+    return dispatchReplayCommand({ type: "goToDate", date: trimmed });
+  }, [dispatchReplayCommand, replayDateDraft]);
+
+  const handleToggleMaximize = useCallback(() => {
+    if (fullscreenSlotId) {
+      setFullscreenSlotId(null);
+      return { ok: true };
+    }
+    if (!activeSlotId) return reportMissingActivePane("Maximize");
+    setFullscreenSlotId(activeSlotId);
+    return { ok: true };
+  }, [activeSlotId, fullscreenSlotId, reportMissingActivePane]);
+
+  const handleSaveWorkspaceDefault = useCallback(() => {
+    try {
+      localStorage.setItem(
+        WORKSPACE_DEFAULTS_KEY,
+        JSON.stringify({
+          name: activeWorkspaceTab?.name ?? "Main",
+          ...activeWorkspaceLayoutConfig,
+        }),
+      );
+      setHasSavedDefault(true);
+      setLayoutNotice({
+        title: "Workspace default saved",
+        message: "Current layout, link matrix, compare scope, and range presets will seed new workspaces.",
+        variant: "success",
+      });
+      return { ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to persist workstation defaults.";
+      setLayoutNotice({
+        title: "Default save failed",
+        message,
+        variant: "warning",
+      });
+      return { ok: false, message };
+    }
+  }, [activeWorkspaceLayoutConfig, activeWorkspaceTab?.name]);
+
+  const handleRestoreWorkspaceDefault = useCallback(() => {
+    const savedDefault = readWorkspaceDefault();
+    if (!savedDefault) {
+      const message = "Save a workspace default before trying to restore it.";
+      setLayoutNotice({
+        title: "No saved default",
+        message,
+        variant: "warning",
+      });
+      return { ok: false, message };
+    }
+
+    const payload = buildPayloadFromWorkspaceState(savedDefault.name, savedDefault);
+    const nextTab = materializeWorkspaceFromLayout(savedDefault.name, payload.layout_config, false);
+    if (!nextTab) {
+      const message = "Saved workspace default did not contain a usable layout.";
+      setLayoutNotice({
+        title: "Default restore failed",
+        message,
+        variant: "warning",
+      });
+      return { ok: false, message };
+    }
+    setLayoutNotice({
+      title: "Workspace default restored",
+      message: "The active workspace now matches your saved default configuration with fresh pane scopes.",
+      variant: "success",
+    });
+    return { ok: true };
+  }, [buildPayloadFromWorkspaceState, materializeWorkspaceFromLayout]);
+
+  const handleSaveWorkspaceSnapshot = useCallback(() => {
+    const record = createWorkstationSnapshotRecord(activeWorkspacePayload.name, activeWorkspaceLayoutConfig);
+    setWorkspaceSnapshots((prev) => [record, ...prev].slice(0, 16));
+    setSelectedSnapshotId(record.id);
+    setLayoutNotice({
+      title: "Workspace snapshot saved",
+      message: `${record.name} saved. Snapshot payloads exclude pane-scoped drawings and chart surface toggles by design.`,
+      variant: "success",
+    });
+    return { ok: true };
+  }, [activeWorkspaceLayoutConfig, activeWorkspacePayload.name]);
+
+  const handleApplySelectedSnapshot = useCallback((openAsNewTab: boolean) => {
+    if (!selectedWorkspaceSnapshot) return { ok: false, message: "Select a snapshot first" };
+    const nextTab = materializeWorkspaceFromLayout(
+      selectedWorkspaceSnapshot.payload.name,
+      selectedWorkspaceSnapshot.payload.layout_config,
+      openAsNewTab,
+    );
+    if (!nextTab) {
+      const message = "Selected snapshot did not contain a usable workstation layout.";
+      setLayoutNotice({
+        title: "Snapshot restore failed",
+        message,
+        variant: "warning",
+      });
+      return { ok: false, message };
+    }
+    setLayoutNotice({
+      title: openAsNewTab ? "Snapshot opened in new tab" : "Snapshot restored",
+      message: `${selectedWorkspaceSnapshot.name} loaded with fresh pane scopes.`,
+      variant: "success",
+    });
+    return { ok: true };
+  }, [materializeWorkspaceFromLayout, selectedWorkspaceSnapshot]);
+
+  const handleCopyShareLink = useCallback(async () => {
+    if (typeof window === "undefined") return { ok: false, message: "Clipboard unavailable" };
+    const shareUrl = new URL(window.location.href);
+    shareUrl.searchParams.set(WORKSTATION_SHARE_QUERY_PARAM, encodeWorkstationSharePayload(activeWorkspacePayload));
+    try {
+      await navigator.clipboard.writeText(shareUrl.toString());
+      setLayoutNotice({
+        title: "Share link copied",
+        message: "The link includes layout, chart, and indicator state. Drawings remain workspace-scoped.",
+        variant: "success",
+      });
+      return { ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Clipboard access was not available.";
+      setLayoutNotice({
+        title: "Share link failed",
+        message,
+        variant: "warning",
+      });
+      return { ok: false, message };
+    }
+  }, [activeWorkspacePayload]);
+
+  const handleExportWorkspaceJson = useCallback(() => {
+    downloadTextFile(
+      buildWorkstationExportFilename(activeWorkspacePayload.name, "json"),
+      JSON.stringify(activeWorkspacePayload, null, 2),
+    );
+    setLayoutNotice({
+      title: "Workspace export ready",
+      message: "The exported JSON is deterministic for the current layout payload and excludes pane-scoped drawings.",
+      variant: "success",
+    });
+    return { ok: true };
+  }, [activeWorkspacePayload]);
+
+  const handleOpenAlerts = useCallback(() => {
+    if (!activeSlotId) return reportMissingActivePane("Alert center");
+    if (!activeTicker) return reportMissingActiveSymbol("Alert center");
+    setTicker(activeTicker);
+    navigate(`/equity/alerts?ticker=${encodeURIComponent(activeTicker)}`);
+    return { ok: true };
+  }, [activeSlotId, activeTicker, navigate, reportMissingActivePane, reportMissingActiveSymbol, setTicker]);
+
   const drillInto = useCallback((route: "security" | "news" | "screener" | "compare" | "portfolio") => {
-    if (!activeTicker) return;
+    if (!activeTicker) return reportMissingActiveSymbol("Navigation");
     setTicker(activeTicker);
     if (route === "security") {
       navigate(`/equity/security/${activeTicker}`);
-      return;
-    }
-    if (route === "news") {
+    } else if (route === "news") {
       navigate(`/equity/news?ticker=${encodeURIComponent(activeTicker)}`);
-      return;
-    }
-    if (route === "screener") {
+    } else if (route === "screener") {
       navigate(`/equity/screener?symbol=${encodeURIComponent(activeTicker)}`);
-      return;
-    }
-    if (route === "compare") {
+    } else if (route === "compare") {
       const compareSymbols = [activeTicker, ...activeCompareSymbols].join(",");
       navigate(`/equity/compare?symbols=${encodeURIComponent(compareSymbols)}`);
-      return;
+    } else {
+      navigate(`/equity/portfolio?ticker=${encodeURIComponent(activeTicker)}`);
     }
-    navigate(`/equity/portfolio?ticker=${encodeURIComponent(activeTicker)}`);
-  }, [activeCompareSymbols, activeTicker, navigate, setTicker]);
+    return { ok: true };
+  }, [activeCompareSymbols, activeTicker, navigate, reportMissingActiveSymbol, setTicker]);
+
+  const handleChartWorkstationAction = useCallback((actionId: ChartWorkstationActionId): CommandExecutionResult => {
+    if (actionId === "chart.toggleIndicators") return dispatchPanelCommand("toggleIndicators");
+    if (actionId === "chart.toggleDrawingTools") return dispatchPanelCommand("toggleDrawingTools");
+    if (actionId === "chart.toggleVolumeProfile") return dispatchPanelCommand("toggleVolumeProfile");
+    if (actionId === "chart.toggleReplay") return handleToggleReplay();
+    if (actionId === "chart.openAlerts") return handleOpenAlerts();
+    return { ok: false, message: "Unknown chart workstation action" };
+  }, [dispatchPanelCommand, handleOpenAlerts, handleToggleReplay]);
 
   useEffect(() => {
     if (fullscreenSlotId && !slots.some((slot) => slot.id === fullscreenSlotId)) {
@@ -963,11 +1683,29 @@ export function ChartWorkstationPage() {
   }, [activeSlotId, setActiveSlot, visibleSlots]);
 
   useEffect(() => {
+    const onChartAction = (event: Event) => {
+      const detail = (event as CustomEvent<ChartWorkstationActionEventDetail>).detail;
+      if (!detail?.id) return;
+      const result = handleChartWorkstationAction(detail.id);
+      detail.handled = true;
+      detail.ok = result.ok;
+      detail.message = result.message;
+    };
+
+    window.addEventListener(CHART_WORKSTATION_ACTION_EVENT, onChartAction as EventListener);
+    return () => window.removeEventListener(CHART_WORKSTATION_ACTION_EVENT, onChartAction as EventListener);
+  }, [handleChartWorkstationAction]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isEditableTarget(event.target)) return;
       if (isMenuTarget(event.target)) return;
+      const chartPaneFocused =
+        isShortcutWithinChartPanel(event.target) ||
+        isShortcutWithinChartPanel(document.activeElement);
 
       if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key === "Tab") {
+        if (!isPanelTarget(event.target)) return;
         if (!visibleSlots.length) return;
         event.preventDefault();
         const currentIndex = Math.max(0, visibleSlots.findIndex((slot) => slot.id === activeSlotId));
@@ -998,6 +1736,35 @@ export function ChartWorkstationPage() {
         if (tf) {
           event.preventDefault();
           handleTimeframeChange(activeSlotId)(tf);
+          return;
+        }
+      }
+
+      if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && chartPaneFocused) {
+        const key = event.key.toLowerCase();
+        if (key === "i") {
+          event.preventDefault();
+          dispatchPanelCommand("toggleIndicators");
+          return;
+        }
+        if (key === "d") {
+          event.preventDefault();
+          dispatchPanelCommand("toggleDrawingTools");
+          return;
+        }
+        if (key === "v") {
+          event.preventDefault();
+          dispatchPanelCommand("toggleVolumeProfile");
+          return;
+        }
+        if (key === "r") {
+          event.preventDefault();
+          handleToggleReplay();
+          return;
+        }
+        if (key === "a") {
+          event.preventDefault();
+          handleOpenAlerts();
           return;
         }
       }
@@ -1046,8 +1813,11 @@ export function ChartWorkstationPage() {
   }, [
     activeSlotId,
     canAddVisibleSlot,
+    dispatchPanelCommand,
     fullscreenSlotId,
     handleAddSlot,
+    handleOpenAlerts,
+    handleToggleReplay,
     handleTimeframeChange,
     removeSlot,
     setActiveSlot,
@@ -1057,359 +1827,100 @@ export function ChartWorkstationPage() {
 
 
   return (
-    <CrosshairSyncProvider enabled={syncCrosshair}>
+    <CrosshairSyncProvider enabled={linkSettings.crosshair}>
       <div className="chart-workstation flex h-full flex-col bg-terminal-canvas text-terminal-text" data-testid="chart-workstation">
         <div className="border-b border-terminal-border bg-terminal-panel px-3 py-3">
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] uppercase tracking-[0.22em] text-terminal-muted">Chart Workstation</span>
-                  <TerminalBadge variant="accent">Wave 2</TerminalBadge>
-                  <TerminalBadge variant="info">Template Rack</TerminalBadge>
-                  <TerminalBadge variant="neutral">Linked Compare</TerminalBadge>
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-1">
-                  {workspaceTabs.map((tab) => (
-                    <div key={tab.id} className="inline-flex items-center rounded border border-terminal-border bg-terminal-bg/50">
-                      <button
-                        type="button"
-                        className={`px-2 py-1 text-[10px] uppercase ${
-                          tab.id === activeWorkspaceTabId
-                            ? "bg-terminal-accent/15 text-terminal-accent"
-                            : "text-terminal-muted hover:text-terminal-text"
-                        }`}
-                        onClick={() => switchWorkspaceTab(tab.id)}
-                      >
-                        {tab.name}
-                      </button>
-                      {workspaceTabs.length > 1 ? (
-                        <button
-                          type="button"
-                          className="px-1 text-terminal-muted hover:text-terminal-neg"
-                          onClick={() => handleRemoveWorkspaceTab(tab.id)}
-                          aria-label={`Close ${tab.name}`}
-                        >
-                          x
-                        </button>
-                      ) : null}
-                    </div>
-                  ))}
-                  <TerminalButton
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="px-2 font-bold uppercase"
-                    onClick={handleAddWorkspaceTab}
-                  >
-                    + TAB
-                  </TerminalButton>
-                </div>
-              </div>
-
-              <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-                <TerminalBadge
-                  variant={
-                    quotesConnectionState === "connected"
-                      ? "success"
-                      : quotesConnectionState === "connecting"
-                        ? "info"
-                        : "danger"
-                  }
-                  size="sm"
-                  dot
-                  className="font-bold"
-                >
-                  DATA: {quotesConnectionState.toUpperCase()}
-                </TerminalBadge>
-
-                {batchLoadingAny ? (
-                  <TerminalBadge variant="live" size="sm" dot className="animate-pulse font-bold">
-                    LOADING CHARTS
-                  </TerminalBadge>
-                ) : null}
-
-                {!batchLoadingAny && chartBatchSource !== "idle" ? (
-                  <TerminalTooltip
-                    side="bottom"
-                    content={
-                      chartBatchSource === "batch"
-                        ? "Chart data loaded via high-performance batch endpoint."
-                        : "Chart data loaded via parallel fallback requests."
-                    }
-                  >
-                    <span>
-                      <TerminalBadge
-                        variant={chartBatchSource === "batch" ? "success" : "warn"}
-                        size="sm"
-                        className="font-bold"
-                      >
-                        SOURCE: {chartBatchSource.toUpperCase()}
-                      </TerminalBadge>
-                    </span>
-                  </TerminalTooltip>
-                ) : null}
-
-                <span className="text-[10px] font-bold uppercase text-terminal-muted">
-                  {visibleSlots.length}/{slots.length} panes
-                </span>
-
-                {hiddenSlotCount > 0 ? (
-                  <TerminalBadge variant="info" size="sm" dot className="font-bold">
-                    {hiddenSlotCount} hidden
-                  </TerminalBadge>
-                ) : null}
-
-                <LayoutSelector current={gridTemplate} onChange={handleLayoutChange} />
-
-                {canAddVisibleSlot ? (
-                  <TerminalButton
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="px-2 font-bold uppercase"
-                    onClick={handleAddSlot}
-                    data-testid="add-chart-btn"
-                  >
-                    + ADD PANE
-                  </TerminalButton>
-                ) : null}
-                <TerminalButton
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="px-2 font-bold uppercase"
-                  onClick={applyMultiTimeframePreset}
-                >
-                  4-TF PRESET
-                </TerminalButton>
-                <TerminalButton
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="px-2 font-bold uppercase"
-                  onClick={() => handleLayoutChange(CUSTOM_SPLIT_TEMPLATE)}
-                >
-                  CUSTOM SPLIT
-                </TerminalButton>
-              </div>
-            </div>
-
-            <div className="hidden gap-2 md:grid xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1fr)]">
-              <section className="rounded border border-terminal-border bg-terminal-bg/50 p-2 text-[11px]">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="ot-type-label text-terminal-muted">Template Rack</div>
-                  <TerminalBadge variant="neutral" size="sm">{templates.length}</TerminalBadge>
-                </div>
-                <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
-                  <TerminalInput
-                    as="select"
-                    size="sm"
-                    value={selectedTemplateId}
-                    onChange={(event) => setSelectedTemplateId(event.target.value)}
-                    disabled={templatesLoading || templates.length === 0}
-                  >
-                    <option value="">{templatesLoading ? "Loading templates..." : "Select workstation template"}</option>
-                    {templates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.name}
-                      </option>
-                    ))}
-                  </TerminalInput>
-                  <TerminalButton
-                    type="button"
-                    size="sm"
-                    variant="default"
-                    disabled={!selectedTemplateId}
-                    onClick={() => {
-                      const template = templates.find((row) => row.id === selectedTemplateId);
-                      if (template) applyTemplateToWorkspace(template, false);
-                    }}
-                  >
-                    Apply
-                  </TerminalButton>
-                  <TerminalButton
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    disabled={!selectedTemplateId}
-                    onClick={() => {
-                      const template = templates.find((row) => row.id === selectedTemplateId);
-                      if (template) applyTemplateToWorkspace(template, true);
-                    }}
-                  >
-                    New Tab
-                  </TerminalButton>
-                </div>
-                <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
-                  <TerminalInput
-                    size="sm"
-                    value={templateDraftName}
-                    placeholder="Save current workstation as template"
-                    onChange={(event) => setTemplateDraftName(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        void handleSaveCurrentTemplate();
-                      }
-                    }}
-                  />
-                  <TerminalButton type="button" size="sm" variant="accent" onClick={() => void handleSaveCurrentTemplate()}>
-                    Save Current
-                  </TerminalButton>
-                </div>
-              </section>
-
-              <section className="rounded border border-terminal-border bg-terminal-bg/50 p-2 text-[11px]">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="ot-type-label text-terminal-muted">Compare Overlay</div>
-                  <div className="inline-flex items-center gap-1">
-                    <TerminalButton
-                      type="button"
-                      size="sm"
-                      variant={compareMode === "normalized" ? "accent" : "ghost"}
-                      className="px-2"
-                      onClick={() => setCompareMode("normalized")}
-                    >
-                      %
-                    </TerminalButton>
-                    <TerminalButton
-                      type="button"
-                      size="sm"
-                      variant={compareMode === "price" ? "accent" : "ghost"}
-                      className="px-2"
-                      onClick={() => setCompareMode("price")}
-                    >
-                      PX
-                    </TerminalButton>
-                  </div>
-                </div>
-                <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
-                  <TerminalInput
-                    size="sm"
-                    value={compareInput}
-                    placeholder={activeTicker ? `Add compare symbol for ${activeTicker}` : "Select an active chart first"}
-                    disabled={!activeTicker || activeCompareSymbols.length >= MAX_COMPARE_SYMBOLS}
-                    onChange={(event) => setCompareInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        handleAddCompareSymbol();
-                      }
-                    }}
-                  />
-                  <TerminalButton
-                    type="button"
-                    size="sm"
-                    variant="default"
-                    disabled={!compareInput.trim() || !activeTicker || activeCompareSymbols.length >= MAX_COMPARE_SYMBOLS}
-                    onClick={handleAddCompareSymbol}
-                  >
-                    Add
-                  </TerminalButton>
-                </div>
-                <div className="mt-2 flex min-h-8 flex-wrap gap-1">
-                  {activeCompareSymbols.length ? activeCompareSymbols.map((symbol, idx) => (
-                    <button
-                      key={symbol}
-                      type="button"
-                      className="inline-flex items-center gap-1 rounded border border-terminal-border px-2 py-1 text-[10px] text-terminal-text"
-                      onClick={() => handleRemoveCompareSymbol(symbol)}
-                    >
-                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: COMPARE_PALETTE[idx % COMPARE_PALETTE.length] }} />
-                      {symbol}
-                      <span className="text-terminal-muted">x</span>
-                    </button>
-                  )) : (
-                    <div className="text-[10px] text-terminal-muted">Overlay up to three peers on the active panel.</div>
-                  )}
-                </div>
-              </section>
-
-              <section className="rounded border border-terminal-border bg-terminal-bg/50 p-2 text-[11px]">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="ot-type-label text-terminal-muted">Analyst Handoff</div>
-                  <TerminalBadge variant={activeTicker ? "accent" : "neutral"} size="sm">
-                    {activeTicker || "No focus"}
-                  </TerminalBadge>
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <TerminalButton type="button" size="sm" variant="default" disabled={!activeTicker} onClick={() => drillInto("security")}>
-                    Security
-                  </TerminalButton>
-                  <TerminalButton type="button" size="sm" variant="default" disabled={!activeTicker} onClick={() => drillInto("news")}>
-                    News
-                  </TerminalButton>
-                  <TerminalButton type="button" size="sm" variant="default" disabled={!activeTicker} onClick={() => drillInto("screener")}>
-                    Screener
-                  </TerminalButton>
-                  <TerminalButton type="button" size="sm" variant="default" disabled={!activeTicker} onClick={() => drillInto("compare")}>
-                    Compare
-                  </TerminalButton>
-                  <TerminalButton type="button" size="sm" variant="ghost" disabled={!activeTicker} onClick={() => drillInto("portfolio")}>
-                    Portfolio
-                  </TerminalButton>
-                </div>
-                <div className="mt-2 text-[10px] leading-4 text-terminal-muted">
-                  Push the active chart into research, news, screening, and portfolio review without losing workstation context.
-                </div>
-              </section>
-            </div>
-
-            <div className="hidden gap-2 md:grid md:grid-cols-2 xl:grid-cols-4">
-              <section className="rounded border border-terminal-border bg-terminal-bg/40 px-2 py-1.5 text-[10px]">
-                <div className="uppercase tracking-[0.18em] text-terminal-muted">Active Focus</div>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="text-sm text-terminal-text">{activeTicker || "--"}</span>
-                  {activeSlot ? <TerminalBadge size="sm" variant="neutral">{activeSlot.market}</TerminalBadge> : null}
-                </div>
-                <div className="mt-1 text-terminal-muted">
-                  {activeSlot ? `${activeSlot.timeframe} ${activeSlot.chartType.toUpperCase()} chart` : "Select a pane to inspect"}
-                </div>
-              </section>
-
-              <section className="rounded border border-terminal-border bg-terminal-bg/40 px-2 py-1.5 text-[10px]">
-                <div className="uppercase tracking-[0.18em] text-terminal-muted">Sync Controls</div>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  <TerminalButton
-                    type="button"
-                    size="sm"
-                    variant={syncCrosshair ? "accent" : "ghost"}
-                    className="px-2"
-                    onClick={() => setSyncCrosshair(!syncCrosshair)}
-                  >
-                    Crosshair {syncCrosshair ? "On" : "Off"}
-                  </TerminalButton>
-                  <TerminalButton
-                    type="button"
-                    size="sm"
-                    variant={syncTimeframe ? "accent" : "ghost"}
-                    className="px-2"
-                    onClick={() => setSyncTimeframe(!syncTimeframe)}
-                  >
-                    TF Link {syncTimeframe ? "On" : "Off"}
-                  </TerminalButton>
-                </div>
-                <div className="mt-1 text-terminal-muted">Link groups always propagate symbol changes. Timeframe propagation is now explicit.</div>
-              </section>
-
-              <section className="rounded border border-terminal-border bg-terminal-bg/40 px-2 py-1.5 text-[10px]">
-                <div className="uppercase tracking-[0.18em] text-terminal-muted">Link Map</div>
-                <div className="mt-1 text-terminal-text">
-                  {activeLinkGroup === "off" ? "Unlinked focus pane" : `Group ${activeLinkGroup} leader`}
-                </div>
-                <div className="mt-1 text-terminal-muted">
-                  {linkedSymbolCount} linked symbol{linkedSymbolCount === 1 ? "" : "s"} ready for synchronized rotation.
-                </div>
-              </section>
-
-              <section className="rounded border border-terminal-border bg-terminal-bg/40 px-2 py-1.5 text-[10px]">
-                <div className="uppercase tracking-[0.18em] text-terminal-muted">Keyboard</div>
-                <div className="mt-1 text-terminal-muted">`Tab` cycle panes, `1-9` focus pane, `Alt+1..7` change timeframe.</div>
-                <div className="mt-1 text-terminal-muted">`Ctrl/Cmd+Shift+N` add pane, `F` fullscreen, `Esc` clear focus.</div>
-              </section>
-            </div>
-          </div>
+          <ChartShellToolbar
+            dense={denseShell}
+            visiblePaneCount={visibleSlots.length}
+            totalPaneCount={slots.length}
+            hiddenPaneCount={hiddenSlotCount}
+            activePaneIndex={activePaneIndex}
+            activeSlot={activeSlot}
+            activeLinkGroup={activeLinkGroup}
+            linkedSymbolCount={linkedSymbolCount}
+            canAddVisibleSlot={canAddVisibleSlot}
+            compareInput={compareInput}
+            compareMode={compareConfig.mode}
+            comparePlacement={compareConfig.placement}
+            activeCompareSymbols={activeCompareSymbols}
+            activeRangePreset={activeRangePreset}
+            replayDateDraft={replayDateDraft}
+            linkSettings={linkSettings}
+            isMaximized={Boolean(fullscreenSlotId)}
+            hasSavedDefault={hasSavedDefault}
+            persistenceBoundaryNote={WORKSTATION_BOUNDARY_SUMMARY}
+            workspaceTabs={workspaceTabs.map((tab) => ({ id: tab.id, name: tab.name }))}
+            activeWorkspaceTabId={activeWorkspaceTabId}
+            templates={templates.map((template) => ({ id: template.id, name: template.name }))}
+            templatesLoading={templatesLoading}
+            selectedTemplateId={selectedTemplateId}
+            templateDraftName={templateDraftName}
+            snapshots={workspaceSnapshots.map((snapshot) => ({
+              id: snapshot.id,
+              label: `${snapshot.name} | ${new Date(snapshot.createdAt).toLocaleString()}`,
+            }))}
+            selectedSnapshotId={selectedSnapshotId}
+            quotesConnectionState={quotesConnectionState}
+            chartBatchSource={chartBatchSource}
+            batchLoadingAny={batchLoadingAny}
+            gridTemplate={gridTemplate}
+            onSwitchWorkspaceTab={switchWorkspaceTab}
+            onAddWorkspaceTab={handleAddWorkspaceTab}
+            onRemoveWorkspaceTab={handleRemoveWorkspaceTab}
+            onLayoutChange={handleLayoutChange}
+            onAddPane={handleAddSlot}
+            onApplyMultiTimeframePreset={applyMultiTimeframePreset}
+            onApplyCustomSplit={() => handleLayoutChange(CUSTOM_SPLIT_TEMPLATE)}
+            onTickerChange={(ticker, market, companyName) => {
+              if (!activeSlot) return;
+              handleTickerChange(activeSlot.id)(ticker, market, companyName);
+            }}
+            onTimeframeChange={(timeframe) => {
+              if (!activeSlot) return;
+              handleTimeframeChange(activeSlot.id)(timeframe);
+            }}
+            onChartTypeChange={(chartType) => {
+              if (!activeSlot) return;
+              handleChartTypeChange(activeSlot.id)(chartType);
+            }}
+            onLinkGroupChange={(group) => {
+              if (!activeSlot) return;
+              setSlotLinkGroups((prev) => ({ ...prev, [activeSlot.id]: group }));
+            }}
+            onSetCompareInput={(value) => setCompareInput(value)}
+            onSetCompareMode={handleSetCompareMode}
+            onSetComparePlacement={handleSetComparePlacement}
+            onAddCompareSymbol={handleAddCompareSymbol}
+            onRemoveCompareSymbol={handleRemoveCompareSymbol}
+            onOpenAlerts={handleOpenAlerts}
+            onToggleReplay={handleToggleReplay}
+            onReplayStepBack={() => dispatchReplayCommand({ type: "stepBack" })}
+            onReplayStepForward={() => dispatchReplayCommand({ type: "stepForward" })}
+            onReplayPrevSession={() => dispatchReplayCommand({ type: "prevSession" })}
+            onReplayNextSession={() => dispatchReplayCommand({ type: "nextSession" })}
+            onSetReplayDateDraft={setReplayDateDraft}
+            onCommitReplayDate={handleReplayGoToDate}
+            onSetLinkDimension={handleSetLinkDimension}
+            onSetRangePreset={handleSetRangePreset}
+            onToggleMaximize={handleToggleMaximize}
+            onSaveWorkspaceDefault={handleSaveWorkspaceDefault}
+            onRestoreWorkspaceDefault={handleRestoreWorkspaceDefault}
+            onSaveWorkspaceSnapshot={handleSaveWorkspaceSnapshot}
+            onSetSelectedSnapshotId={(value) => setSelectedSnapshotId(value)}
+            onApplySelectedSnapshot={() => handleApplySelectedSnapshot(false)}
+            onOpenSnapshotInNewTab={() => handleApplySelectedSnapshot(true)}
+            onCopyShareLink={() => {
+              void handleCopyShareLink();
+            }}
+            onExportWorkspaceJson={handleExportWorkspaceJson}
+            onSetSelectedTemplateId={(value) => setSelectedTemplateId(value)}
+            onApplySelectedTemplate={handleApplySelectedTemplate}
+            onOpenTemplateInNewTab={handleOpenTemplateInNewTab}
+            onSetTemplateDraftName={(value) => setTemplateDraftName(value)}
+            onSaveCurrentTemplate={handleSaveCurrentTemplate}
+            onDrillInto={drillInto}
+          />
         </div>
 
         {/* Grid Area */}
@@ -1421,12 +1932,16 @@ export function ChartWorkstationPage() {
                 slot={slot}
                 isActive={slot.id === activeSlotId}
                 isFullscreen={slot.id === fullscreenSlotId}
+                panelIndex={visibleSlots.findIndex((row) => row.id === slot.id) + 1}
+                visiblePanelCount={visibleSlots.length}
+                denseToolbar={denseShell}
                 onActivate={() => setActiveSlot(slot.id)}
                 onToggleFullscreen={() =>
                   setFullscreenSlotId((prev) => (prev === slot.id ? null : slot.id))
                 }
                 onRemove={() => removeSlot(slot.id)}
                 linkGroup={slotLinkGroups[slot.id] ?? "off"}
+                linkSettings={linkSettings}
                 onLinkGroupChange={(group) =>
                   setSlotLinkGroups((prev) => ({ ...prev, [slot.id]: group }))
                 }
@@ -1440,8 +1955,14 @@ export function ChartWorkstationPage() {
                 chartLoading={chartBatchBySlotId[slot.id]?.loading ?? false}
                 chartError={chartBatchBySlotId[slot.id]?.error ?? null}
                 liveQuote={quoteBySlotId[slot.id] ?? null}
-                comparisonSeries={slot.id === activeSlotId ? compareSeries : []}
-                comparisonMode={slot.id === activeSlotId ? compareMode : "normalized"}
+                comparisonSeries={compareSeriesBySlotId[slot.id] ?? []}
+                comparisonMode={compareConfig.mode}
+                panelCommand={panelCommands[slot.id]}
+                replayCommand={replayCommands[slot.id]}
+                viewRangeCommand={{
+                  presetId: rangePresets[slot.id] ?? DEFAULT_RANGE_PRESET,
+                  revision: rangePresetRevisions[slot.id] ?? 0,
+                }}
               />
             ))}
             {canAddVisibleSlot && (

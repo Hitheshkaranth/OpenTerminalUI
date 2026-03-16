@@ -141,6 +141,7 @@ class AlertEvaluatorService:
                 if not ok:
                     continue
                 now = _utcnow()
+                trigger_context = self._build_trigger_context(alert, tick, triggered_value)
                 alert.status = AlertStatus.TRIGGERED.value
                 alert.triggered_at = now
                 alert.last_triggered_value = triggered_value
@@ -151,12 +152,12 @@ class AlertEvaluatorService:
                         symbol=alert.symbol,
                         condition_type=alert.condition_type,
                         triggered_value=triggered_value,
-                        context=tick,
+                        context=trigger_context,
                         triggered_at=now,
                     )
                 )
                 db.commit()
-                await self._emit_alert_event(alert, triggered_value, now)
+                await self._emit_alert_event(alert, triggered_value, now, trigger_context)
                 await self._send_telegram_if_configured(alert, triggered_value, now)
             if self._hub is not None:
                 await process_scanner_tick(db, self._hub, tick)
@@ -324,10 +325,35 @@ class AlertEvaluatorService:
         except Exception:
             return False
 
-    async def _emit_alert_event(self, alert: AlertORM, triggered_value: float | None, now: datetime) -> None:
-        if not self._hub:
-            return
-        payload = {
+    @staticmethod
+    def _build_trigger_context(alert: AlertORM, tick: dict[str, Any], triggered_value: float | None) -> dict[str, Any]:
+        params = alert.parameters if isinstance(alert.parameters, dict) else {}
+        chart_context = params.get("chart_context")
+        context: dict[str, Any] = {
+            "tick": dict(tick),
+            "triggered_value": triggered_value,
+        }
+        if isinstance(chart_context, dict):
+            context["chart_context"] = chart_context
+            source = chart_context.get("source")
+            if isinstance(source, str) and source.strip():
+                context["source"] = source
+        if "threshold" in params:
+            context["threshold"] = params.get("threshold")
+        if "note" in params:
+            context["note"] = params.get("note")
+        return context
+
+    @staticmethod
+    def _build_event_payload(
+        alert: AlertORM,
+        triggered_value: float | None,
+        now: datetime,
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        context = context or AlertEvaluatorService._build_trigger_context(alert, {}, triggered_value)
+        chart_context = context.get("chart_context") if isinstance(context.get("chart_context"), dict) else None
+        payload: dict[str, Any] = {
             "type": "alert_triggered",
             "alert_id": alert.id,
             "symbol": alert.symbol,
@@ -335,6 +361,25 @@ class AlertEvaluatorService:
             "triggered_value": triggered_value,
             "timestamp": now.isoformat(),
         }
+        if chart_context:
+            source = context.get("source")
+            if isinstance(source, str) and source.strip():
+                payload["source"] = source
+            payload["payload"] = {
+                "chart_context": chart_context,
+            }
+        return payload
+
+    async def _emit_alert_event(
+        self,
+        alert: AlertORM,
+        triggered_value: float | None,
+        now: datetime,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        if not self._hub:
+            return
+        payload = self._build_event_payload(alert, triggered_value, now, context)
         await self._hub.broadcast_alert(payload)
         await self._hub.broadcast(alert.symbol, payload)
 

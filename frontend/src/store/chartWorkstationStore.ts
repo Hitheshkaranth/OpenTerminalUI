@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { normalizeIndicatorConfigs } from "../shared/chart/indicatorCatalog";
 import type { IndicatorConfig } from "../shared/chart/types";
 
 // Simple ID generator (avoids uuid dependency)
@@ -99,26 +99,7 @@ function makeSlot(): ChartSlot {
 }
 
 function normalizeIndicators(input: unknown): IndicatorConfig[] {
-  if (!Array.isArray(input)) return [];
-  return input
-    .map((row) => {
-      if (!row) return null;
-      if (typeof row === "string") {
-        return { id: row, params: {}, visible: true } satisfies IndicatorConfig;
-      }
-      if (typeof row !== "object") return null;
-      const r = row as Partial<IndicatorConfig> & Record<string, unknown>;
-      const id = typeof r.id === "string" ? r.id : "";
-      if (!id) return null;
-      return {
-        id,
-        params: r.params && typeof r.params === "object" ? (r.params as Record<string, unknown>) : {},
-        visible: typeof r.visible === "boolean" ? r.visible : true,
-        color: typeof r.color === "string" ? r.color : undefined,
-        lineWidth: typeof r.lineWidth === "number" ? r.lineWidth : undefined,
-      } satisfies IndicatorConfig;
-    })
-    .filter((row): row is IndicatorConfig => Boolean(row));
+  return normalizeIndicatorConfigs(input);
 }
 
 function normalizeSlot(slot: Partial<ChartSlot> | undefined): ChartSlot {
@@ -140,112 +121,84 @@ function normalizeSlot(slot: Partial<ChartSlot> | undefined): ChartSlot {
   };
 }
 
-export const useChartWorkstationStore = create<ChartWorkstationState>()(
-  persist(
-    (set) => ({
-      slots: [makeSlot()],
-      activeSlotId: null,
-      gridTemplate: { cols: 1, rows: 1, arrangement: "grid" },
-      syncCrosshair: true,
-      syncTimeframe: false,
+export const useChartWorkstationStore = create<ChartWorkstationState>()((set) => ({
+  slots: [makeSlot()],
+  activeSlotId: null,
+  gridTemplate: { cols: 1, rows: 1, arrangement: "grid" },
+  syncCrosshair: true,
+  syncTimeframe: false,
 
-      addSlot: () =>
-        set((s) => {
-          if (s.slots.length >= 6) return s;
-          const next = makeSlot();
-          return { slots: [...s.slots, next], activeSlotId: next.id };
-        }),
-
-      removeSlot: (id) =>
-        set((s) => {
-          if (s.slots.length <= 1) return s;
-          const slots = s.slots.filter((sl) => sl.id !== id);
-          const activeSlotId =
-            s.activeSlotId === id ? (slots[0]?.id ?? null) : s.activeSlotId;
-          return { slots, activeSlotId };
-        }),
-
-      updateSlotTicker: (id, ticker, market, companyName) =>
-        set((s) => ({
-          slots: s.slots.map((sl) =>
-            sl.id === id
-              ? {
-                  ...sl,
-                  ticker,
-                  companyName: typeof companyName === "string" ? (companyName.trim() || null) : (ticker ? sl.companyName ?? null : null),
-                  market,
-                  extendedHours: { ...sl.extendedHours, enabled: market === "US" },
-                }
-              : sl,
-          ),
-        })),
-
-      updateSlotTimeframe: (id, tf) =>
-        set((s) => ({
-          slots: s.slots.map((sl) =>
-            sl.id === id ? { ...sl, timeframe: tf } : sl,
-          ),
-        })),
-
-      updateSlotType: (id, type) =>
-        set((s) => ({
-          slots: s.slots.map((sl) =>
-            sl.id === id ? { ...sl, chartType: type } : sl,
-          ),
-        })),
-
-      updateSlotETH: (id, eth) =>
-        set((s) => ({
-          slots: s.slots.map((sl) =>
-            sl.id === id ? { ...sl, extendedHours: { ...sl.extendedHours, ...eth } } : sl,
-          ),
-        })),
-
-      updateSlotPMLevels: (id, levels) =>
-        set((s) => ({
-          slots: s.slots.map((sl) =>
-            sl.id === id ? { ...sl, preMarketLevels: { ...sl.preMarketLevels, ...levels } } : sl,
-          ),
-        })),
-
-      updateSlotIndicators: (id, indicators) =>
-        set((s) => ({
-          slots: s.slots.map((sl) =>
-            sl.id === id ? { ...sl, indicators: normalizeIndicators(indicators) } : sl,
-          ),
-        })),
-
-      setActiveSlot: (id) => set({ activeSlotId: id }),
-
-      setGridTemplate: (t) => set({ gridTemplate: t }),
-
-      setSyncCrosshair: (v) => set({ syncCrosshair: v }),
-
-      setSyncTimeframe: (v) => set({ syncTimeframe: v }),
+  addSlot: () =>
+    set((s) => {
+      if (s.slots.length >= 6) return s;
+      const next = makeSlot();
+      return { slots: [...s.slots, next], activeSlotId: next.id };
     }),
-    {
-      name: "ot_chart_workstation",
-      storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({
-        slots: s.slots,
-        gridTemplate: s.gridTemplate,
-        syncCrosshair: s.syncCrosshair,
-        syncTimeframe: s.syncTimeframe,
-      }),
-      merge: (persistedState, currentState) => {
-        const persisted = (persistedState as Partial<ChartWorkstationState>) ?? {};
-        const current = currentState as ChartWorkstationState;
-        return {
-          ...current,
-          ...persisted,
-          slots: Array.isArray(persisted.slots) && persisted.slots.length
-            ? persisted.slots.map((slot) => normalizeSlot(slot))
-            : current.slots,
-          gridTemplate: persisted.gridTemplate
-            ? { ...current.gridTemplate, ...persisted.gridTemplate }
-            : current.gridTemplate,
-        };
-      },
-    },
-  ),
-);
+
+  removeSlot: (id) =>
+    set((s) => {
+      if (s.slots.length <= 1) return s;
+      const slots = s.slots.filter((sl) => sl.id !== id);
+      const activeSlotId =
+        s.activeSlotId === id ? (slots[0]?.id ?? null) : s.activeSlotId;
+      return { slots, activeSlotId };
+    }),
+
+  updateSlotTicker: (id, ticker, market, companyName) =>
+    set((s) => ({
+      slots: s.slots.map((sl) =>
+        sl.id === id
+          ? {
+              ...sl,
+              ticker,
+              companyName: typeof companyName === "string" ? (companyName.trim() || null) : (ticker ? sl.companyName ?? null : null),
+              market,
+              extendedHours: { ...sl.extendedHours, enabled: market === "US" },
+            }
+          : sl,
+      ),
+    })),
+
+  updateSlotTimeframe: (id, tf) =>
+    set((s) => ({
+      slots: s.slots.map((sl) =>
+        sl.id === id ? { ...sl, timeframe: tf } : sl,
+      ),
+    })),
+
+  updateSlotType: (id, type) =>
+    set((s) => ({
+      slots: s.slots.map((sl) =>
+        sl.id === id ? { ...sl, chartType: type } : sl,
+      ),
+    })),
+
+  updateSlotETH: (id, eth) =>
+    set((s) => ({
+      slots: s.slots.map((sl) =>
+        sl.id === id ? { ...sl, extendedHours: { ...sl.extendedHours, ...eth } } : sl,
+      ),
+    })),
+
+  updateSlotPMLevels: (id, levels) =>
+    set((s) => ({
+      slots: s.slots.map((sl) =>
+        sl.id === id ? { ...sl, preMarketLevels: { ...sl.preMarketLevels, ...levels } } : sl,
+      ),
+    })),
+
+  updateSlotIndicators: (id, indicators) =>
+    set((s) => ({
+      slots: s.slots.map((sl) =>
+        sl.id === id ? { ...sl, indicators: normalizeIndicators(indicators) } : sl,
+      ),
+    })),
+
+  setActiveSlot: (id) => set({ activeSlotId: id }),
+
+  setGridTemplate: (t) => set({ gridTemplate: t }),
+
+  setSyncCrosshair: (v) => set({ syncCrosshair: v }),
+
+  setSyncTimeframe: (v) => set({ syncTimeframe: v }),
+}));

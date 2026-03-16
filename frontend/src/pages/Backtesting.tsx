@@ -35,6 +35,7 @@ import { WalkForwardTimeline } from "../components/backtesting/panels/WalkForwar
 import { MosaicWorkspace } from "../components/backtesting/workspace/MosaicWorkspace";
 import type { PanelRendererMap } from "../components/backtesting/workspace/PanelRegistry";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
+import { cloneIndicatorConfig, makeIndicatorInstanceId } from "../shared/chart/indicatorCatalog";
 import type { ChartKind, IndicatorConfig } from "../shared/chart/types";
 import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
@@ -148,31 +149,51 @@ const VIZ_TABS: { key: VizTab; label: string; icon: string }[] = [
 const CUSTOM_STRATEGY_VALUE = "custom";
 const KNOWN_MARKETS: BacktestMarket[] = ["NSE", "BSE", "NYSE", "NASDAQ", "AMEX"];
 
+function strategyIndicator(
+  id: string,
+  params: Record<string, unknown>,
+  color: string,
+  lineWidth: number,
+): IndicatorConfig {
+  return {
+    id,
+    instanceId: makeIndicatorInstanceId(id),
+    params,
+    visible: true,
+    color,
+    lineWidth,
+  };
+}
+
+function cloneStrategyIndicators(indicators: IndicatorConfig[]): IndicatorConfig[] {
+  return indicators.map((indicator) => cloneIndicatorConfig({ ...indicator, instanceId: makeIndicatorInstanceId(indicator.id) }));
+}
+
 const STRATEGY_INDICATORS: Record<string, IndicatorConfig[]> = {
   sma_crossover: [
-    { id: "sma", params: { period: 20 }, visible: true, color: terminalColors.positive, lineWidth: 2 },
-    { id: "rsi", params: { period: 14 }, visible: true, color: terminalColors.warning, lineWidth: 1 },
+    strategyIndicator("sma", { period: 20 }, terminalColors.positive, 2),
+    strategyIndicator("rsi", { period: 14 }, terminalColors.warning, 1),
   ],
   ema_crossover: [
-    { id: "ema", params: { period: 12 }, visible: true, color: terminalColors.info, lineWidth: 2 },
-    { id: "macd", params: { fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 }, visible: true, color: terminalColors.text, lineWidth: 1 },
+    strategyIndicator("ema", { period: 12 }, terminalColors.info, 2),
+    strategyIndicator("macd", { fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 }, terminalColors.text, 1),
   ],
   mean_reversion: [
-    { id: "bb", params: { period: 20, stdDev: 2 }, visible: true, color: terminalColors.accent, lineWidth: 1 },
-    { id: "rsi", params: { period: 14 }, visible: true, color: terminalColors.warning, lineWidth: 1 },
+    strategyIndicator("bb", { period: 20, stdDev: 2 }, terminalColors.accent, 1),
+    strategyIndicator("rsi", { period: 14 }, terminalColors.warning, 1),
   ],
   breakout_20: [
-    { id: "donchian", params: { period: 20 }, visible: true, color: terminalColors.candleUp, lineWidth: 1 },
-    { id: "atr", params: { period: 14 }, visible: true, color: terminalColors.candleDown, lineWidth: 1 },
+    strategyIndicator("donchian", { period: 20 }, terminalColors.candleUp, 1),
+    strategyIndicator("atr", { period: 14 }, terminalColors.candleDown, 1),
   ],
   premarket_orb_breakout: [
-    { id: "donchian", params: { period: 10 }, visible: true, color: terminalColors.warning, lineWidth: 1 },
-    { id: "atr", params: { period: 14 }, visible: true, color: terminalColors.info, lineWidth: 1 },
+    strategyIndicator("donchian", { period: 10 }, terminalColors.warning, 1),
+    strategyIndicator("atr", { period: 14 }, terminalColors.info, 1),
   ],
   pure_jump_markov_vol: [
-    { id: "atr", params: { period: 14 }, visible: true, color: terminalColors.warning, lineWidth: 1 },
-    { id: "sma", params: { period: 50 }, visible: true, color: terminalColors.info, lineWidth: 1 },
-    { id: "sma", params: { period: 200 }, visible: true, color: terminalColors.accent, lineWidth: 1 },
+    strategyIndicator("atr", { period: 14 }, terminalColors.warning, 1),
+    strategyIndicator("sma", { period: 50 }, terminalColors.info, 1),
+    strategyIndicator("sma", { period: 200 }, terminalColors.accent, 1),
   ],
 };
 
@@ -373,7 +394,7 @@ export function BacktestingPage() {
   const [showVolume, setShowVolume] = useState(true);
   const [showMarkers, setShowMarkers] = useState(true);
   const [showIndicators, setShowIndicators] = useState(true);
-  const [activeIndicators, setActiveIndicators] = useState<IndicatorConfig[]>(STRATEGY_INDICATORS.sma_crossover || []);
+  const [activeIndicators, setActiveIndicators] = useState<IndicatorConfig[]>(cloneStrategyIndicators(STRATEGY_INDICATORS.sma_crossover || []));
   const [activeTab, setActiveTab] = useState<VizTab>("chart");
   const [compareStrategies, setCompareStrategies] = useState<string[]>([]);
   const [compareResults, setCompareResults] = useState<Map<string, CompareState>>(new Map());
@@ -438,7 +459,7 @@ export function BacktestingPage() {
       setActiveIndicators([]);
       return;
     }
-    setActiveIndicators(STRATEGY_INDICATORS[strategyMode] || []);
+    setActiveIndicators(cloneStrategyIndicators(STRATEGY_INDICATORS[strategyMode] || []));
   }, [strategyMode]);
 
   const symbol = useMemo(() => asset.trim().toUpperCase(), [asset]);

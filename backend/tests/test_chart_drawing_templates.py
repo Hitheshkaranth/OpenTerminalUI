@@ -113,3 +113,48 @@ def test_chart_drawings_filter_update_delete_flow() -> None:
     assert listed_after_delete.status_code == 200
     remaining_ids = {str(row["id"]) for row in listed_after_delete.json().get("items", [])}
     assert second_id not in remaining_ids
+
+
+def test_chart_drawings_preserve_layer_and_style_metadata() -> None:
+    init_db()
+    client = TestClient(app)
+    headers = _auth_headers(client, "phase2-drawings-order@example.com")
+    symbol = "MSFT"
+
+    created = client.post(
+        f"/api/chart-drawings/{symbol}",
+        headers=headers,
+        json={
+            "tool_type": "rectangle",
+            "coordinates": {
+                "timeframe": "15m",
+                "workspace_id": "slot-layers",
+                "layer_order": 3,
+                "anchors": [
+                    {"time": 10, "price": 110},
+                    {"time": 20, "price": 100},
+                ],
+            },
+            "style": {
+                "color": "#55aa55",
+                "lineWidth": 2,
+                "lineStyle": "dashed",
+                "fillColor": "#55aa55",
+                "fillOpacity": 28,
+            },
+        },
+    )
+    assert created.status_code == 200
+    drawing_id = str(created.json()["id"])
+
+    listed = client.get(f"/api/chart-drawings/{symbol}?timeframe=15m&workspace_id=slot-layers", headers=headers)
+    assert listed.status_code == 200
+    row = next(item for item in listed.json().get("items", []) if str(item.get("id")) == drawing_id)
+    assert row["coordinates"]["layer_order"] == 3
+    assert row["style"] == {
+        "color": "#55aa55",
+        "lineWidth": 2,
+        "lineStyle": "dashed",
+        "fillColor": "#55aa55",
+        "fillOpacity": 28,
+    }

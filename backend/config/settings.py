@@ -20,7 +20,7 @@ class AppSettings(BaseModel):
             "http://127.0.0.1:5174",
         ]
     )
-    sqlite_url: str = "sqlite:///backend/openterminalui.db"
+    sqlite_url: str = "sqlite:///data/openterminalui.db"
     redis_url: str = "redis://localhost:6379/0"
     redis_quote_channels_ttl: int = 300
     redis_max_connections: int = 50
@@ -32,6 +32,19 @@ class AppSettings(BaseModel):
     ollama_base_url: str = "http://localhost:11434"
     price_cache_ttl_seconds: int = 60
     fundamentals_cache_ttl_seconds: int = 1800
+
+
+def _workspace_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _default_sqlite_path(base: Path | None = None) -> Path:
+    root = base or _workspace_root()
+    return (root / "data" / "openterminalui.db").resolve()
+
+
+def _default_sqlite_url(base: Path | None = None) -> str:
+    return f"sqlite:///{_default_sqlite_path(base).as_posix()}"
 
 
 def _default_cors_origins() -> list[str]:
@@ -60,10 +73,47 @@ def _env(name: str, legacy_name: str | None = None) -> str | None:
     return None
 
 
+def _sqlite_path_from_url(sqlite_url: str) -> Path | None:
+    if sqlite_url in {"sqlite://", "sqlite:///:memory:", "sqlite:///:memory"}:
+        return None
+    if sqlite_url.startswith("sqlite:////"):
+        raw = f"/{sqlite_url.removeprefix('sqlite:////')}"
+        return Path(raw).resolve()
+    if sqlite_url.startswith("sqlite:///"):
+        return Path(sqlite_url.removeprefix("sqlite:///")).resolve()
+    if sqlite_url.startswith("sqlite://"):
+        raw = sqlite_url.removeprefix("sqlite://")
+        if not raw or raw == ":memory:":
+            return None
+        return Path(raw).resolve()
+    return None
+
+
+def _normalize_sqlite_url(sqlite_url: str, base: Path | None = None) -> str:
+    root = base or _workspace_root()
+    if sqlite_url in {"sqlite://", "sqlite:///:memory:", "sqlite:///:memory"}:
+        return sqlite_url
+    if sqlite_url.startswith("sqlite:////data/"):
+        relative = sqlite_url.removeprefix("sqlite:////data/")
+        return f"sqlite:///{(root / 'data' / relative).resolve().as_posix()}"
+    if sqlite_url.startswith("sqlite:///"):
+        raw = sqlite_url.removeprefix("sqlite:///")
+        candidate = Path(raw)
+        if not candidate.is_absolute():
+            return f"sqlite:///{(root / candidate).resolve().as_posix()}"
+    if sqlite_url.startswith("sqlite://") and not sqlite_url.startswith("sqlite:///"):
+        raw = sqlite_url.removeprefix("sqlite://")
+        if raw and raw != ":memory:":
+            candidate = Path(raw)
+            if not candidate.is_absolute():
+                return f"sqlite:///{(root / candidate).resolve().as_posix()}"
+    return sqlite_url
+
+
 @lru_cache(maxsize=1)
 def get_settings() -> AppSettings:
-    base = Path(__file__).resolve().parents[2]
-    default_sqlite = f"sqlite:///{(base / 'backend' / 'openterminalui.db').resolve().as_posix()}"
+    base = _workspace_root()
+    default_sqlite = _default_sqlite_url(base)
     settings_path = base / "config" / "settings.yaml"
     legacy_path = base.parent / "config" / "settings.yaml"
     payload: dict[str, Any] = {}
@@ -76,7 +126,7 @@ def get_settings() -> AppSettings:
         _env("OPENTERMINALUI_CORS_ORIGINS")
         or _env("OPENSCREENS_CORS_ORIGINS", "TRADE_SCREENS_CORS_ORIGINS")
     )
-    return AppSettings(
+    settings = AppSettings(
         app_name=(
             _env("OPENTERMINALUI_APP_NAME")
             or _env("OPENSCREENS_APP_NAME", "TRADE_SCREENS_APP_NAME")
@@ -88,10 +138,11 @@ def get_settings() -> AppSettings:
             or app_cfg.get("version", "0.1.0")
         ),
         cors_origins=env_cors or app_cfg.get("cors_origins", _default_cors_origins()),
-        sqlite_url=(
+        sqlite_url=_normalize_sqlite_url(
             _env("OPENTERMINALUI_SQLITE_URL")
             or _env("OPENSCREENS_SQLITE_URL", "TRADE_SCREENS_SQLITE_URL")
-            or payload.get("sqlite_url", default_sqlite)
+            or payload.get("sqlite_url", default_sqlite),
+            base,
         ),
         redis_url=(
             _env("OPENTERMINALUI_REDIS_URL")
@@ -147,3 +198,7 @@ def get_settings() -> AppSettings:
             or str(cache_cfg.get("fundamentals_ttl_seconds", 1800))
         ),
     )
+    sqlite_path = _sqlite_path_from_url(settings.sqlite_url)
+    if sqlite_path is not None:
+        sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+    return settings

@@ -1,6 +1,13 @@
+/** @vitest-environment jsdom */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-import { executeParsedCommand, findShortcutConflicts, parseCommand } from "../components/layout/commanding";
+import {
+  CHART_WORKSTATION_ACTION_EVENT,
+  dispatchChartWorkstationAction,
+  executeParsedCommand,
+  findShortcutConflicts,
+  parseCommand,
+} from "../components/layout/commanding";
 import { useStockStore } from "../store/stockStore";
 
 describe("GO commanding", () => {
@@ -57,5 +64,35 @@ describe("GO commanding", () => {
     ]);
     expect(conflicts).toHaveLength(1);
     expect(conflicts[0]?.combo).toBe("ctrl+w");
+  });
+
+  it("dispatches chart workstation actions as window events", () => {
+    const listener = vi.fn();
+    window.addEventListener(CHART_WORKSTATION_ACTION_EVENT, listener as EventListener);
+
+    const result = dispatchChartWorkstationAction("chart.toggleIndicators");
+    expect(result.ok).toBe(false);
+    expect(result.message).toBe("Chart workstation is not ready");
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect((listener.mock.calls[0]?.[0] as CustomEvent<{ id: string }>).detail.id).toBe("chart.toggleIndicators");
+
+    window.removeEventListener(CHART_WORKSTATION_ACTION_EVENT, listener as EventListener);
+  });
+
+  it("returns action results supplied by the workstation listener", () => {
+    const listener = vi.fn((event: Event) => {
+      const detail = (event as CustomEvent<{ handled?: boolean; ok?: boolean; message?: string }>).detail;
+      detail.handled = true;
+      detail.ok = false;
+      detail.message = "Select a chart pane first.";
+    });
+    window.addEventListener(CHART_WORKSTATION_ACTION_EVENT, listener as EventListener);
+
+    expect(dispatchChartWorkstationAction("chart.toggleReplay")).toEqual({
+      ok: false,
+      message: "Select a chart pane first.",
+    });
+
+    window.removeEventListener(CHART_WORKSTATION_ACTION_EVENT, listener as EventListener);
   });
 });

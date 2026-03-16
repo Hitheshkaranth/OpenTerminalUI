@@ -8,10 +8,21 @@ export type ChartTimeframe = "1m" | "2m" | "5m" | "15m" | "30m" | "1h" | "4h" | 
 
 export type IndicatorConfig = {
   id: string;
+  instanceId: string;
   params: Record<string, unknown>;
   visible: boolean;
   color?: string;
   lineWidth?: number;
+};
+
+export type IndicatorPaneTarget = "auto" | "overlay" | "new" | "existing";
+
+export type IndicatorScaleBehavior = "shared" | "separate";
+
+export type IndicatorRouting = {
+  paneTarget: IndicatorPaneTarget;
+  paneId: string | null;
+  scaleBehavior: IndicatorScaleBehavior;
 };
 
 export type ChartEngineProps = {

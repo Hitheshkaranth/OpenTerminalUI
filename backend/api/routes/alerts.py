@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from backend.api.deps import get_db
@@ -67,6 +68,31 @@ def _channel_status(channels: list[str], parameters: dict[str, Any]) -> dict[str
     return status_map
 
 
+def _channel_configuration_errors(channels: list[str], parameters: dict[str, Any]) -> list[str]:
+    status_map = _channel_status(channels, parameters)
+    errors: list[str] = []
+    if status_map["webhook"]["enabled"] and not status_map["webhook"]["configured"]:
+        errors.append("webhook (set parameters.webhook_url)")
+    if status_map["email"]["enabled"] and not status_map["email"]["configured"]:
+        errors.append("email (set SMTP_HOST and parameters.email_to)")
+    if status_map["telegram"]["enabled"] and not status_map["telegram"]["configured"]:
+        errors.append("telegram (set parameters.telegram_bot_token and parameters.telegram_chat_id)")
+    return errors
+
+
+def _ensure_configured_channels(channels: list[str], parameters: dict[str, Any]) -> None:
+    errors = _channel_configuration_errors(channels, parameters)
+    if not errors:
+        return
+    raise HTTPException(
+        status_code=400,
+        detail=(
+            "Selected delivery channels are not configured: "
+            f"{', '.join(errors)}. Remove those channels or add the required channel settings."
+        ),
+    )
+
+
 def _legacy_to_v2(payload: AlertCreate) -> tuple[str, str, dict[str, Any]]:
     symbol = str(payload.symbol or payload.ticker or "").strip().upper()
     if not symbol:
@@ -99,6 +125,7 @@ def create_alert(
     symbol, condition_type, parameters = _legacy_to_v2(payload)
     channels = _normalize_channels(payload.channels, parameters)
     parameters["channels"] = channels
+    _ensure_configured_channels(channels, parameters)
     status = str(payload.status or AlertStatus.ACTIVE.value).strip().lower()
     if status not in {x.value for x in AlertStatus}:
         raise HTTPException(status_code=400, detail="Invalid status")
@@ -129,12 +156,23 @@ def create_alert(
 @router.get("/alerts")
 def list_alerts(
     status: str | None = Query(default=None),
+    symbol: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, list[dict[str, Any]]]:
     query = db.query(AlertORM).filter(AlertORM.user_id == current_user.id)
     if status:
         query = query.filter(AlertORM.status == status.strip().lower())
+    if symbol:
+        normalized = symbol.strip().upper()
+        suffix = normalized.split(":", 1)[-1]
+        query = query.filter(
+            or_(
+                AlertORM.symbol == normalized,
+                AlertORM.symbol == suffix,
+                AlertORM.symbol.like(f"%:{suffix}"),
+            )
+        )
     rows = query.order_by(AlertORM.created_at.desc()).all()
     alerts = []
     for row in rows:
@@ -209,11 +247,18 @@ def update_alert(
     row = db.query(AlertORM).filter(AlertORM.id == alert_id, AlertORM.user_id == current_user.id).first()
     if row is None:
         raise HTTPException(status_code=404, detail="Alert not found")
-    if payload.parameters is not None:
-        row.parameters = dict(payload.parameters)
     params = row.parameters if isinstance(row.parameters, dict) else {}
+    if payload.parameters is not None:
+        params = dict(payload.parameters)
     if payload.channels is not None:
         params["channels"] = _normalize_channels(payload.channels, params)
+    if payload.parameters is not None or payload.channels is not None:
+        should_validate_channels = payload.channels is not None or any(
+            key in params
+            for key in {"channels", "webhook_url", "email_to", "telegram_bot_token", "telegram_chat_id"}
+        )
+        if should_validate_channels:
+            _ensure_configured_channels(_normalize_channels(None, params), params)
         row.parameters = params
     if payload.cooldown_seconds is not None:
         row.cooldown_seconds = max(0, int(payload.cooldown_seconds))

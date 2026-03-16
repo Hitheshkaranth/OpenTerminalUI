@@ -25,7 +25,23 @@ def test_alert_crud_flow_is_deterministic() -> None:
         json={
             "symbol": "NSE:RELIANCE",
             "condition_type": "price_above",
-            "parameters": {"threshold": 2500, "webhook_url": "https://example.com/hook"},
+            "parameters": {
+                "threshold": 2500,
+                "webhook_url": "https://example.com/hook",
+                "chart_context": {
+                    "version": 1,
+                    "surface": "chart",
+                    "source": "drawing",
+                    "symbol": "NSE:RELIANCE",
+                    "market": "NSE",
+                    "timeframe": "1D",
+                    "panelId": "slot-1",
+                    "workspaceId": "slot-1",
+                    "sourceLabel": "Horizontal Line",
+                    "referencePrice": 2500,
+                    "referenceTime": 1700000000,
+                },
+            },
             "channels": ["in_app", "webhook"],
             "cooldown_seconds": 120,
         },
@@ -43,17 +59,22 @@ def test_alert_crud_flow_is_deterministic() -> None:
     assert match is not None
     assert match["symbol"] == "NSE:RELIANCE"
     assert match["cooldown_seconds"] == 120
+    assert match["parameters"]["chart_context"]["source"] == "drawing"
+
+    filtered = client.get("/api/alerts", headers=headers, params={"status": "active", "symbol": "RELIANCE"})
+    assert filtered.status_code == 200
+    assert [item["id"] for item in filtered.json()["alerts"]] == [alert_id]
 
     updated = client.patch(
         f"/api/alerts/{alert_id}",
         headers=headers,
-        json={"status": "paused", "cooldown_seconds": 30, "channels": ["in_app", "email"]},
+        json={"status": "paused", "cooldown_seconds": 30, "channels": ["in_app", "webhook"]},
     )
     assert updated.status_code == 200
     updated_payload = updated.json()
     assert updated_payload["status"] == "updated"
-    assert updated_payload["channels"] == ["in_app", "email"]
-    assert updated_payload["channel_status"]["email"]["enabled"] is True
+    assert updated_payload["channels"] == ["in_app", "webhook"]
+    assert updated_payload["channel_status"]["webhook"]["enabled"] is True
 
     deleted = client.delete(f"/api/alerts/{alert_id}", headers=headers)
     assert deleted.status_code == 200

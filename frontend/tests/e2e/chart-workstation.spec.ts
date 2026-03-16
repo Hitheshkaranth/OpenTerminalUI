@@ -90,7 +90,8 @@ test.describe("Multi-Chart Workstation E2E", () => {
     // 6. remove-chart button (data-testid starts with 'remove-chart-') reduces panel count
     const removeBtn = page.locator('[data-testid^="remove-chart-"]').first();
     await removeBtn.scrollIntoViewIfNeeded();
-    await removeBtn.click();
+    await removeBtn.focus();
+    await removeBtn.press("Enter");
     await expect(panels).toHaveCount(1);
 
   });

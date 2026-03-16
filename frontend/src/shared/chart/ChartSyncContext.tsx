@@ -1,4 +1,6 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useRef, useState, useEffect, type ReactNode } from "react";
+
+import { createRafBatcher } from "./rafBatcher";
 
 type SyncPayload = {
   sourceId: string;
@@ -15,10 +17,25 @@ const ChartSyncContext = createContext<SyncContextValue | null>(null);
 
 export function ChartSyncProvider({ children }: { children: ReactNode }) {
   const [event, setEvent] = useState<SyncPayload | null>(null);
+  const publishBatchRef = useRef<ReturnType<typeof createRafBatcher<SyncPayload>> | null>(null);
+
+  if (!publishBatchRef.current) {
+    publishBatchRef.current = createRafBatcher<SyncPayload>((next) => {
+      setEvent(next);
+    });
+  }
+
+  useEffect(
+    () => () => {
+      publishBatchRef.current?.cancel();
+    },
+    [],
+  );
+
   const value = useMemo<SyncContextValue>(
     () => ({
       event,
-      publish: (payload) => setEvent(payload),
+      publish: (payload) => publishBatchRef.current?.schedule(payload),
     }),
     [event],
   );

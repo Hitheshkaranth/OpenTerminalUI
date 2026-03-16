@@ -344,7 +344,7 @@ export type CommandSuggestion =
       command: string;
     };
 
-export type ShortcutScope = "global" | "chart-workstation" | "command-bar";
+export type ShortcutScope = "global" | "chart-workstation" | "chart-panel" | "command-bar";
 
 export type ShortcutSpec = {
   id: string;
@@ -357,6 +357,73 @@ export type ShortcutConflict = {
   combo: string;
   entries: ShortcutSpec[];
 };
+
+export type ChartWorkstationActionId =
+  | "chart.toggleIndicators"
+  | "chart.toggleDrawingTools"
+  | "chart.toggleVolumeProfile"
+  | "chart.toggleReplay"
+  | "chart.openAlerts";
+
+export type ChartWorkstationCommandSpec = {
+  id: ChartWorkstationActionId;
+  title: string;
+  description: string;
+  command: string;
+  shortcut: string;
+  keywords: string[];
+};
+
+export const CHART_WORKSTATION_ACTION_EVENT = "ot:chart-workstation:action";
+export type ChartWorkstationActionEventDetail = {
+  id: ChartWorkstationActionId;
+  handled?: boolean;
+  ok?: boolean;
+  message?: string;
+};
+
+export const CHART_WORKSTATION_COMMAND_SPECS: ChartWorkstationCommandSpec[] = [
+  {
+    id: "chart.toggleIndicators",
+    title: "Toggle Indicators",
+    description: "Open or close indicators for the focused chart pane",
+    command: "chart indicators",
+    shortcut: "I",
+    keywords: ["indicator", "study", "overlay", "panel"],
+  },
+  {
+    id: "chart.toggleDrawingTools",
+    title: "Toggle Drawing Tools",
+    description: "Open or close drawing tools for the focused chart pane",
+    command: "chart drawings",
+    shortcut: "D",
+    keywords: ["draw", "trendline", "objects", "annotations"],
+  },
+  {
+    id: "chart.toggleVolumeProfile",
+    title: "Toggle Volume Profile",
+    description: "Show or hide the volume profile overlay for the focused chart pane",
+    command: "chart volume profile",
+    shortcut: "V",
+    keywords: ["vpoc", "volume", "profile", "histogram"],
+  },
+  {
+    id: "chart.toggleReplay",
+    title: "Toggle Replay",
+    description: "Enable or disable replay controls for the focused chart pane",
+    command: "chart replay",
+    shortcut: "R",
+    keywords: ["bar replay", "replay", "backtest", "session"],
+  },
+  {
+    id: "chart.openAlerts",
+    title: "Open Alert Center",
+    description: "Open alert workflows for the focused chart symbol",
+    command: "chart alerts",
+    shortcut: "A",
+    keywords: ["alert", "price alert", "notifications", "trigger"],
+  },
+];
 
 export const SHORTCUT_SPECS: ShortcutSpec[] = [
   { id: "palette.toggle", combo: "Ctrl/Cmd+K", description: "Toggle command palette", scope: "global" },
@@ -374,7 +441,48 @@ export const SHORTCUT_SPECS: ShortcutSpec[] = [
   { id: "ws.fullscreen", combo: "F", description: "Toggle active panel fullscreen", scope: "chart-workstation" },
   { id: "ws.escape", combo: "Escape", description: "Exit fullscreen or clear active panel", scope: "chart-workstation" },
   { id: "ws.tf.hotkeys", combo: "Alt+1..7", description: "Set timeframe (1m,5m,15m,1h,1D,1W,1M)", scope: "chart-workstation" },
+  { id: "chart.indicators", combo: "I", description: "Toggle indicators for the focused chart pane", scope: "chart-panel" },
+  { id: "chart.drawings", combo: "D", description: "Toggle drawing tools for the focused chart pane", scope: "chart-panel" },
+  { id: "chart.volume-profile", combo: "V", description: "Toggle volume profile for the focused chart pane", scope: "chart-panel" },
+  { id: "chart.replay", combo: "R", description: "Toggle replay for the focused chart pane", scope: "chart-panel" },
+  { id: "chart.alerts", combo: "A", description: "Open alert center for the focused chart symbol", scope: "chart-panel" },
 ];
+
+export function isShortcutEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  return target.isContentEditable || tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
+export function isShortcutMenuTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && Boolean(target.closest('[role="menu"]'));
+}
+
+export function isShortcutWithinChartPanel(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && Boolean(target.closest("[data-slot-id]"));
+}
+
+export function dispatchChartWorkstationAction(actionId: ChartWorkstationActionId): CommandExecutionResult {
+  if (typeof window === "undefined") {
+    return { ok: false, message: "Chart workstation is unavailable" };
+  }
+  const detail: ChartWorkstationActionEventDetail = {
+    id: actionId,
+    handled: false,
+    ok: false,
+  };
+  window.dispatchEvent(
+    new CustomEvent<ChartWorkstationActionEventDetail>(CHART_WORKSTATION_ACTION_EVENT, {
+      detail,
+    }),
+  );
+  if (!detail.handled) {
+    return { ok: false, message: "Chart workstation is not ready" };
+  }
+  return detail.ok
+    ? { ok: true }
+    : { ok: false, message: detail.message || "Chart command could not be completed" };
+}
 
 function scopesOverlap(a: ShortcutScope, b: ShortcutScope): boolean {
   if (a === b) return true;
