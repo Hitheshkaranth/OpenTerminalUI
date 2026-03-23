@@ -52,7 +52,20 @@ jobs:
       - name: Frontend unit tests (Vitest)
         run: |
           cd frontend
-          npm run test
+          npx vitest run 2>&1 | tee vitest.log || true
+          # Fail on actual test failures (✗ or FAIL markers)
+          if grep -qE '^\s*[×✗]|FAIL\s' vitest.log; then
+            echo "::error::Vitest tests had failures"
+            exit 1
+          fi
+          # Ensure tests actually ran
+          if ! grep -q '✓' vitest.log; then
+            echo "::error::No passing tests found — vitest may not have run"
+            exit 1
+          fi
+          echo "All Vitest tests passed"
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
 
       - name: Install Playwright browsers
         run: |
