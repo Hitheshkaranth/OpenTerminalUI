@@ -17,6 +17,7 @@ import { ShareholdingChart } from "../components/analysis/ShareholdingChart";
 import { ShareholdingPanel } from "../components/ShareholdingPanel";
 import { ValuationPanel } from "../components/analysis/ValuationPanel";
 import { FuturesPanel } from "../components/market/FuturesPanel";
+import { OrderBookPanel } from "../components/market/OrderBookPanel";
 import { TerminalBadge } from "../components/terminal/TerminalBadge";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { CountryFlag } from "../components/common/CountryFlag";
@@ -40,7 +41,7 @@ import { quickAddToFirstPortfolio } from "../shared/portfolioQuickAdd";
 import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
 
-type TabId = "overview" | "financials" | "analysis" | "peers" | "valuation" | "shareholding" | "events" | "earnings";
+type TabId = "overview" | "market-depth" | "financials" | "analysis" | "peers" | "valuation" | "shareholding" | "events" | "earnings";
 
 const TIMEFRAME_TO_INTERVAL: Record<ChartTimeframe, { interval: string; range: string }> = {
   "1m": { interval: "1m", range: "5d" },
@@ -211,6 +212,24 @@ export function StockDetailPage() {
       setShareholdingTabLoaded(true);
     }
   }, [tab]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
+      const editing =
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select" ||
+        Boolean(target?.isContentEditable);
+      if (editing || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.key.toLowerCase() !== "b") return;
+      event.preventDefault();
+      setTab((prev) => (prev === "market-depth" ? "overview" : "market-depth"));
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const stockForOverview = useMemo(
     () => ({
@@ -528,13 +547,13 @@ export function StockDetailPage() {
 
       <div className="border-b border-terminal-border">
         <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-          {(["overview", "financials", "analysis", "peers", "valuation", "shareholding", "events", "earnings"] as TabId[]).map((t) => (
+          {(["overview", "market-depth", "financials", "analysis", "peers", "valuation", "shareholding", "events", "earnings"] as TabId[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors ${tab === t ? "border-terminal-accent text-terminal-accent" : "border-transparent text-terminal-muted hover:text-terminal-text"}`}
             >
-              {t.charAt(0).toUpperCase() + t.slice(1)}
+              {t === "market-depth" ? "Market Depth" : t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
         </nav>
@@ -559,6 +578,14 @@ export function StockDetailPage() {
               <FinancialTrend ticker={ticker} />
             </div>
           </div>
+        )}
+
+        {tab === "market-depth" && (
+          <TerminalPanel title="Market Depth" subtitle="Ladder, cumulative depth, and time & sales. Press B to toggle.">
+            <div className="h-[560px] min-h-[420px]">
+              <OrderBookPanel symbol={ticker} market={realtimeMarket} />
+            </div>
+          </TerminalPanel>
         )}
 
         {tab === "financials" && (

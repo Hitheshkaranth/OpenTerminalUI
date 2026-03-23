@@ -10,6 +10,8 @@ import {
   type ReactNode,
 } from "react";
 
+import type { LinkGroup } from "../../contexts/SymbolLinkContext";
+
 export type LaunchpadPanelType =
   | "chart"
   | "watchlist"
@@ -34,6 +36,8 @@ export type LaunchpadPanelConfig = {
   title: string;
   symbol?: string;
   linked?: boolean;
+  linkGroup?: LinkGroup;
+  poppedOut?: boolean;
   x: number;
   y: number;
   w: number;
@@ -59,9 +63,10 @@ type LaunchpadContextValue = {
   updatePanel: (panelId: string, patch: Partial<LaunchpadPanelConfig>) => void;
   updatePanelsLayout: (panels: Array<Pick<LaunchpadPanelConfig, "id" | "x" | "y" | "w" | "h">>) => void;
   closePanel: (panelId: string) => void;
+  setPanelPoppedOut: (panelId: string, poppedOut: boolean) => void;
   addPanel: (type: LaunchpadPanelType) => void;
   reorderPanels: (sourceId: string, targetId: string) => void;
-  emitSymbolChange: (symbol: string, sourcePanelId?: string) => void;
+  emitSymbolChange: (symbol: string, sourcePanelId?: string, linkGroupOverride?: LinkGroup) => void;
   symbolEventVersion: number;
   lastBroadcastSymbol: string | null;
   loadingLayouts: boolean;
@@ -71,8 +76,34 @@ const LaunchpadContext = createContext<LaunchpadContextValue | null>(null);
 const STORAGE_KEY = "ot:launchpad:layouts:v1";
 const ACTIVE_KEY = "ot:launchpad:active:v1";
 
+function isLinkGroup(value: unknown): value is LinkGroup {
+  return value === "none" || value === "red" || value === "blue" || value === "green" || value === "yellow";
+}
+
+function normalizePanelLinkGroup(panel: Pick<LaunchpadPanelConfig, "linkGroup" | "linked"> | null | undefined): LinkGroup {
+  if (isLinkGroup(panel?.linkGroup)) return panel.linkGroup;
+  return panel?.linked === false ? "none" : "red";
+}
+
+function normalizePanelConfig(panel: LaunchpadPanelConfig): LaunchpadPanelConfig {
+  const linkGroup = normalizePanelLinkGroup(panel);
+  return {
+    ...panel,
+    linkGroup,
+    linked: linkGroup !== "none",
+    poppedOut: Boolean(panel.poppedOut),
+  };
+}
+
+function normalizeLayoutPreset(layout: LaunchpadLayoutPreset): LaunchpadLayoutPreset {
+  return {
+    ...layout,
+    panels: Array.isArray(layout.panels) ? layout.panels.map((panel) => normalizePanelConfig(panel)) : [],
+  };
+}
+
 function makePanel(id: string, type: LaunchpadPanelType, title: string, x: number, y: number, w: number, h: number, symbol?: string): LaunchpadPanelConfig {
-  return { id, type, title, x, y, w, h, symbol, linked: true };
+  return normalizePanelConfig({ id, type, title, x, y, w, h, symbol, linked: true, linkGroup: "red", poppedOut: false });
 }
 
 function defaultPresets(): LaunchpadLayoutPreset[] {
@@ -116,7 +147,7 @@ function readLocalLayouts(): LaunchpadLayoutPreset[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultPresets();
     const parsed = JSON.parse(raw) as LaunchpadLayoutPreset[];
-    return Array.isArray(parsed) && parsed.length ? parsed : defaultPresets();
+    return Array.isArray(parsed) && parsed.length ? parsed.map((layout) => normalizeLayoutPreset(layout)) : defaultPresets();
   } catch {
     return defaultPresets();
   }
@@ -182,7 +213,7 @@ export function LaunchpadProvider({ children }: { children: ReactNode }) {
         const payload = (await res.json()) as { items?: LaunchpadLayoutPreset[] };
         if (cancelled) return;
         if (Array.isArray(payload?.items) && payload.items.length) {
-          const serverItems = payload.items;
+          const serverItems = payload.items.map((layout) => normalizeLayoutPreset(layout));
           startTransition(() => {
             setSavedLayouts(serverItems);
             if (!serverItems.some((l) => l.id === activeLayoutId)) setActiveLayoutId(serverItems[0].id);
@@ -262,7 +293,9 @@ export function LaunchpadProvider({ children }: { children: ReactNode }) {
       updatePanel: (panelId, patch) => {
         mutateActiveLayout((layout) => ({
           ...layout,
-          panels: layout.panels.map((panel) => (panel.id === panelId ? { ...panel, ...patch } : panel)),
+          panels: layout.panels.map((panel) =>
+            panel.id === panelId ? normalizePanelConfig({ ...panel, ...patch } as LaunchpadPanelConfig) : panel,
+          ),
         }));
       },
       updatePanelsLayout: (panels) => {
@@ -292,6 +325,14 @@ export function LaunchpadProvider({ children }: { children: ReactNode }) {
           panels: layout.panels.filter((panel) => panel.id !== panelId),
         }));
       },
+      setPanelPoppedOut: (panelId, poppedOut) => {
+        mutateActiveLayout((layout) => ({
+          ...layout,
+          panels: layout.panels.map((panel) =>
+            panel.id === panelId ? normalizePanelConfig({ ...panel, poppedOut } as LaunchpadPanelConfig) : panel,
+          ),
+        }));
+      },
       addPanel: (type) => {
         mutateActiveLayout((layout) => {
           const n = layout.panels.length;
@@ -315,14 +356,32 @@ export function LaunchpadProvider({ children }: { children: ReactNode }) {
           return { ...layout, panels: next };
         });
       },
-      emitSymbolChange: (symbol, sourcePanelId) => {
+      emitSymbolChange: (symbol, sourcePanelId, linkGroupOverride) => {
         const normalized = symbol.toUpperCase();
+        if (!normalized) return;
         mutateActiveLayout((layout) => ({
           ...layout,
           panels: layout.panels.map((panel) => {
-            if (!panel.linked) return panel;
-            if (sourcePanelId && panel.id === sourcePanelId) return panel;
-            return { ...panel, symbol: normalized };
+            const sourcePanel = sourcePanelId
+              ? layout.panels.find((candidate) => candidate.id === sourcePanelId) ?? null
+              : null;
+            const targetGroup = linkGroupOverride ?? (sourcePanel ? normalizePanelLinkGroup(sourcePanel) : null);
+            const panelGroup = normalizePanelLinkGroup(panel);
+
+            if (targetGroup == null) {
+              if (panelGroup === "none") return panel;
+              return normalizePanelConfig({ ...panel, symbol: normalized } as LaunchpadPanelConfig);
+            }
+
+            if (targetGroup === "none") {
+              if (sourcePanelId && panel.id === sourcePanelId) {
+                return normalizePanelConfig({ ...panel, symbol: normalized } as LaunchpadPanelConfig);
+              }
+              return panel;
+            }
+
+            if (panelGroup !== targetGroup) return panel;
+            return normalizePanelConfig({ ...panel, symbol: normalized } as LaunchpadPanelConfig);
           }),
         }));
         setLastBroadcastSymbol(normalized);

@@ -1,16 +1,10 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
-
-def _default_database_url() -> str:
-    root = Path(__file__).resolve().parents[2]
-    database_path = (root / "data" / "openterminal.db").resolve()
-    database_path.parent.mkdir(parents=True, exist_ok=True)
-    return f"sqlite+aiosqlite:///{database_path.as_posix()}"
+from backend.config.settings import get_settings
 
 
 def _ensure_sqlite_parent(url: str) -> None:
@@ -23,14 +17,29 @@ def _ensure_sqlite_parent(url: str) -> None:
         raw_path = url.removeprefix(prefix)
         if not raw_path or raw_path == ":memory:":
             return
-        Path(raw_path).resolve().parent.mkdir(parents=True, exist_ok=True)
+        # If it's a Windows path like C:/, resolve() handles it
+        import pathlib
+        pathlib.Path(raw_path).resolve().parent.mkdir(parents=True, exist_ok=True)
         return
 
 
 def get_database_url() -> str:
-    raw = os.getenv("DATABASE_URL", _default_database_url())
+    # Use DATABASE_URL if provided (e.g. for PostgreSQL in prod)
+    # Otherwise use settings.sqlite_url (which already handles OPENTERMINALUI_SQLITE_URL)
+    settings = get_settings()
+    raw = os.getenv("DATABASE_URL")
+    if not raw:
+        raw = settings.sqlite_url
+
     if raw.startswith("postgresql://"):
         return raw.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    # If it's a standard sqlite URL, convert to aiosqlite for async usage
+    if raw.startswith("sqlite:///") and not raw.startswith("sqlite+aiosqlite:///"):
+        raw = raw.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
+    elif raw.startswith("sqlite://") and not raw.startswith("sqlite+aiosqlite://") and not raw.startswith("sqlite:///"):
+        raw = raw.replace("sqlite://", "sqlite+aiosqlite://", 1)
+
     _ensure_sqlite_parent(raw)
     return raw
 

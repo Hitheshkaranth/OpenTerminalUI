@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { SymbolContextMenu, type SymbolContextMenuAction } from "../common/SymbolContextMenu";
+
 export type TerminalTableAlign = "left" | "right" | "center";
 export type TerminalTableDensity = "dense" | "compact" | "normal" | "comfortable";
 export type TerminalTableSortDirection = "asc" | "desc";
@@ -35,9 +37,17 @@ type Props<T> = {
   stickyHeader?: boolean;
   keyboardNavigation?: boolean;
   rowActions?: (row: T, index: number) => ReactNode;
+  contextMenuActions?: (row: T, index: number) => SymbolContextMenuAction[];
   getRowAriaLabel?: (row: T, index: number) => string;
   initialSort?: TerminalTableSortState;
 };
+
+type TableContextMenuState<T> = {
+  row: T;
+  index: number;
+  symbol: string;
+  anchor: { x: number; y: number };
+} | null;
 
 function alignClass(align?: TerminalTableAlign): string {
   if (align === "right") return "text-right";
@@ -67,6 +77,21 @@ function compareValues(a: unknown, b: unknown): number {
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
 }
 
+function resolveRowSymbol(row: unknown): string {
+  const record = row as Record<string, unknown> | null | undefined;
+  const candidates = [
+    record?.symbol,
+    record?.ticker,
+    record?.tradingsymbol,
+    record?.ws_symbol,
+    record?.code,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) return candidate.trim().toUpperCase();
+  }
+  return "";
+}
+
 export function TerminalTable<T>({
   columns,
   rows,
@@ -81,11 +106,13 @@ export function TerminalTable<T>({
   stickyHeader = true,
   keyboardNavigation = true,
   rowActions,
+  contextMenuActions,
   getRowAriaLabel,
   initialSort,
 }: Props<T>) {
   const [internalSelectedIndex, setInternalSelectedIndex] = useState<number>(selectedIndex ?? 0);
   const [sort, setSort] = useState<TerminalTableSortState | undefined>(initialSort);
+  const [contextMenu, setContextMenu] = useState<TableContextMenuState<T>>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -126,6 +153,22 @@ export function TerminalTable<T>({
     if (selectedIndex === undefined) setInternalSelectedIndex(index);
   };
 
+  const closeContextMenu = () => setContextMenu(null);
+
+  const openContextMenuForIndex = (row: T, originalIndex: number, anchor: { x: number; y: number }) => {
+    const symbol = resolveRowSymbol(row);
+    if (!symbol) return;
+    setSelection(originalIndex);
+    setContextMenu({ row, index: originalIndex, symbol, anchor });
+  };
+
+  const openContextMenuFromKeyboard = (row: T, originalIndex: number) => {
+    const element = containerRef.current?.querySelector<HTMLElement>(`[data-row-index="${originalIndex}"]`);
+    const rect = element?.getBoundingClientRect() ?? containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    openContextMenuForIndex(row, originalIndex, { x: rect.left + Math.min(rect.width / 2, 200), y: rect.bottom + 4 });
+  };
+
   const headerPadding = cellPaddingClass(density);
   const rowHeight = rowDensityClass(density);
   const dataCellPadding = cellPaddingClass(density);
@@ -158,6 +201,10 @@ export function TerminalTable<T>({
               } else if (event.key === "Enter" && onRowOpen) {
                 event.preventDefault();
                 if (effectiveSelectedIndex >= 0 && effectiveSelectedIndex < rows.length) onRowOpen(effectiveSelectedIndex);
+              } else if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+                event.preventDefault();
+                const selectedEntry = sortedRows[selectedSortedIndex];
+                if (selectedEntry) openContextMenuFromKeyboard(selectedEntry.row, selectedEntry.originalIndex);
               }
             }
           : undefined
@@ -224,10 +271,18 @@ export function TerminalTable<T>({
                 <tr
                   key={rowKey(row, originalIndex)}
                   role="row"
+                  data-row-index={originalIndex}
                   aria-selected={selected || undefined}
                   aria-label={getRowAriaLabel?.(row, originalIndex)}
                   onClick={() => setSelection(originalIndex)}
                   onDoubleClick={() => onRowOpen?.(originalIndex)}
+                  onContextMenu={(event) => {
+                    const symbol = resolveRowSymbol(row);
+                    if (!symbol) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openContextMenuForIndex(row, originalIndex, { x: event.clientX, y: event.clientY });
+                  }}
                   className={`border-b border-terminal-border/40 ${rowHeight} ${
                     selected ? "bg-terminal-accent/10 ring-1 ring-inset ring-terminal-accent/20" : "hover:bg-terminal-bg/70"
                   } ${sortedIndex % 2 === 1 ? "bg-terminal-bg/20" : ""}`}
@@ -253,6 +308,15 @@ export function TerminalTable<T>({
           )}
         </tbody>
       </table>
+      {contextMenu ? (
+        <SymbolContextMenu
+          open={Boolean(contextMenu)}
+          symbol={contextMenu.symbol}
+          anchor={contextMenu.anchor}
+          onClose={closeContextMenu}
+          customActions={contextMenuActions?.(contextMenu.row, contextMenu.index)}
+        />
+      ) : null}
     </div>
   );
 }

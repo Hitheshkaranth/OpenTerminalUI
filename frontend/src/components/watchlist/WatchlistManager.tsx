@@ -14,6 +14,7 @@ import { useDisplayCurrency } from "../../hooks/useDisplayCurrency";
 import { TerminalButton } from "../terminal/TerminalButton";
 import { TerminalInput } from "../terminal/TerminalInput";
 import { TerminalCombobox } from "../terminal/TerminalCombobox";
+import { SymbolContextMenu } from "../common/SymbolContextMenu";
 
 const PULL_THRESHOLD = 30;
 const RELEASE_THRESHOLD = 70;
@@ -35,6 +36,7 @@ export function WatchlistManager() {
   const [isTickerSearchOpen, setIsTickerSearchOpen] = useState(false);
   const [tickerResults, setTickerResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ symbol: string; x: number; y: number } | null>(null);
 
   // Pull-to-refresh state
   const [pullY, setPullY] = useState(0);
@@ -95,6 +97,8 @@ export function WatchlistManager() {
     mutationFn: ({ id, symbol }: { id: string, symbol: string }) => removeWatchlistSymbol(id, symbol),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["watchlists"] })
   });
+
+  const closeContextMenu = () => setContextMenu(null);
 
   // Search logic
   useEffect(() => {
@@ -311,7 +315,16 @@ export function WatchlistManager() {
                         const live = ticksByToken[`${selectedMarket}:${s}`];
                         const changePct = live?.change_pct || 0;
                         return (
-                          <tr key={s} className="hover:bg-terminal-accent/5 cursor-pointer" onClick={() => navigate(`/equity/stocks?ticker=${s}`)}>
+                          <tr
+                            key={s}
+                            className="hover:bg-terminal-accent/5 cursor-pointer"
+                            onClick={() => navigate(`/equity/stocks?ticker=${s}`)}
+                            onContextMenu={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              setContextMenu({ symbol: s, x: event.clientX, y: event.clientY });
+                            }}
+                          >
                             <td className="px-3 py-2 font-bold text-terminal-accent">{s}</td>
                             <td className="px-3 py-2 text-right text-terminal-text">{live?.ltp?.toFixed(2) || '--'}</td>
                             <td className={`px-3 py-2 text-right ${changePct >= 0 ? 'text-terminal-pos' : 'text-terminal-neg'}`}>
@@ -350,6 +363,26 @@ export function WatchlistManager() {
           </div>
         </div>
       </main>
+
+      {contextMenu && activeWl ? (
+        <SymbolContextMenu
+          open={Boolean(contextMenu)}
+          symbol={contextMenu.symbol}
+          anchor={{ x: contextMenu.x, y: contextMenu.y }}
+          onClose={closeContextMenu}
+          market={selectedMarket}
+          customActions={[
+            {
+              id: "watchlist-remove-symbol",
+              label: "Remove from Watchlist",
+              danger: true,
+              onAction: async (symbol) => {
+                await removeSymbolMut.mutateAsync({ id: activeWl.id, symbol });
+              },
+            },
+          ]}
+        />
+      ) : null}
     </div>
   );
 }

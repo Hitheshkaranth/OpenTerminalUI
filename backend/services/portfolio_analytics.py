@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import math
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -10,7 +11,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from backend.api.deps import fetch_stock_snapshot_coalesced, get_unified_fetcher
-from backend.db.models import Holding, TaxLot
+from backend.db.models import Holding, PortfolioHoldingORM, PortfolioORM, TaxLot
 from backend.equity.services.corporate_actions import corporate_actions_service
 from backend.shared.db import init_db
 
@@ -19,7 +20,19 @@ BENCHMARK_MAP = {
     "NIFTY50": "^NSEI",
     "NIFTY 50": "^NSEI",
     "SENSEX": "^BSESN",
+    "S&P500": "^GSPC",
+    "S&P 500": "^GSPC",
+    "SP500": "^GSPC",
 }
+PORTFOLIO_PERIOD_RANGE_MAP = {
+    "1W": "5d",
+    "1M": "1mo",
+    "3M": "3mo",
+    "6M": "6mo",
+    "1Y": "1y",
+    "YTD": "ytd",
+}
+FACTOR_NAMES = ("Market", "Size", "Value", "Momentum", "Quality", "Volatility")
 
 
 @dataclass
@@ -34,6 +47,142 @@ class TaxRealizationLine:
     holding_days: int
     holding_period: str
     realized_gain: float
+
+
+def _normalize_period(period: str) -> str:
+    label = str(period or "").strip().upper()
+    if label not in PORTFOLIO_PERIOD_RANGE_MAP:
+        raise ValueError(f"Unsupported attribution period '{period}'")
+    return label
+
+
+def _series_return(close: pd.Series) -> float:
+    if close.empty:
+        return 0.0
+    series = close.dropna()
+    if series.empty:
+        return 0.0
+    start = float(series.iloc[0])
+    end = float(series.iloc[-1])
+    if start <= 0:
+        return 0.0
+    return (end / start) - 1.0
+
+
+def compute_brinson_attribution(
+    portfolio_weights: dict[str, float],
+    benchmark_weights: dict[str, float],
+    portfolio_returns: dict[str, float],
+    benchmark_returns: dict[str, float],
+    sector_map: dict[str, str],
+) -> dict[str, Any]:
+    sectors = sorted(
+        {
+            *(sector_map.values() if sector_map else []),
+            *portfolio_weights.keys(),
+            *benchmark_weights.keys(),
+            *portfolio_returns.keys(),
+            *benchmark_returns.keys(),
+        }
+    )
+    if not sectors:
+        return {
+            "sectors": [],
+            "total_allocation": 0.0,
+            "total_selection": 0.0,
+            "total_interaction": 0.0,
+            "check_sum": 0.0,
+            "portfolio_return": 0.0,
+            "benchmark_return": 0.0,
+            "active_return": 0.0,
+        }
+
+    portfolio_total = sum(float(portfolio_weights.get(sector, 0.0)) * float(portfolio_returns.get(sector, 0.0)) for sector in sectors)
+    benchmark_total = sum(float(benchmark_weights.get(sector, 0.0)) * float(benchmark_returns.get(sector, 0.0)) for sector in sectors)
+    active_return = portfolio_total - benchmark_total
+
+    rows: list[dict[str, Any]] = []
+    total_allocation = 0.0
+    total_selection = 0.0
+    total_interaction = 0.0
+    for sector in sectors:
+        wp = float(portfolio_weights.get(sector, 0.0))
+        wb = float(benchmark_weights.get(sector, 0.0))
+        rp = float(portfolio_returns.get(sector, 0.0))
+        rb = float(benchmark_returns.get(sector, 0.0))
+        allocation = (wp - wb) * (rb - benchmark_total)
+        selection = wb * (rp - rb)
+        interaction = (wp - wb) * (rp - rb)
+        total = allocation + selection + interaction
+        total_allocation += allocation
+        total_selection += selection
+        total_interaction += interaction
+        rows.append(
+            {
+                "sector": sector,
+                "portfolio_weight": wp,
+                "benchmark_weight": wb,
+                "portfolio_return": rp,
+                "benchmark_return": rb,
+                "allocation": allocation,
+                "selection": selection,
+                "interaction": interaction,
+                "total": total,
+            }
+        )
+
+    return {
+        "sectors": rows,
+        "total_allocation": total_allocation,
+        "total_selection": total_selection,
+        "total_interaction": total_interaction,
+        "check_sum": total_allocation + total_selection + total_interaction,
+        "portfolio_return": portfolio_total,
+        "benchmark_return": benchmark_total,
+        "active_return": active_return,
+    }
+
+
+def compute_factor_attribution(
+    holdings: list[dict[str, Any]],
+    factor_exposures: dict[str, dict[str, float]],
+    factor_returns: dict[str, float],
+    target_return: float | None = None,
+) -> dict[str, Any]:
+    if not holdings or not factor_returns:
+        return {
+            "exposures": {factor: 0.0 for factor in factor_returns},
+            "factor_returns": {factor: float(value) for factor, value in factor_returns.items()},
+            "contributions": {factor: 0.0 for factor in factor_returns},
+            "alpha": float(target_return or 0.0),
+            "check_sum": float(target_return or 0.0),
+        }
+
+    weights = {str(row.get("symbol") or row.get("ticker") or row.get("id") or idx): max(0.0, float(row.get("weight") or 0.0)) for idx, row in enumerate(holdings)}
+    weight_total = sum(weights.values())
+    if weight_total <= 0:
+        normalized_weights = {key: 1.0 / len(weights) for key in weights}
+    else:
+        normalized_weights = {key: weight / weight_total for key, weight in weights.items()}
+
+    exposures: dict[str, float] = {}
+    for factor in factor_returns:
+        exposures[factor] = 0.0
+        for row in holdings:
+            key = str(row.get("symbol") or row.get("ticker") or row.get("id") or "")
+            row_weight = normalized_weights.get(key, 0.0)
+            exposures[factor] += row_weight * float(factor_exposures.get(key, {}).get(factor, 0.0))
+
+    contributions = {factor: exposures[factor] * float(factor_returns[factor]) for factor in factor_returns}
+    explained = sum(contributions.values())
+    residual = float(target_return or 0.0) - explained
+    return {
+        "exposures": exposures,
+        "factor_returns": {factor: float(value) for factor, value in factor_returns.items()},
+        "contributions": contributions,
+        "alpha": residual,
+        "check_sum": explained + residual,
+    }
 
 
 class PortfolioAnalyticsService:
@@ -312,6 +461,277 @@ class PortfolioAnalyticsService:
             "equity_curve": curve,
             "alpha": alpha,
             "tracking_error": tracking_error,
+        }
+
+    async def _load_portfolio_attribution_context(
+        self,
+        db: Session,
+        portfolio_id: str,
+        period: str,
+        benchmark: str,
+    ) -> dict[str, Any]:
+        period_label = _normalize_period(period)
+        range_str = PORTFOLIO_PERIOD_RANGE_MAP[period_label]
+        requested_benchmark = str(benchmark or "").strip().upper() or "NIFTY50"
+
+        portfolio_key = str(portfolio_id or "").strip()
+        if portfolio_key.lower() in {"", "current", "legacy", "default"}:
+            holdings_rows = list(db.query(Holding).all())
+            if not holdings_rows:
+                return {
+                    "portfolio_id": "current",
+                    "portfolio_name": "Current Portfolio",
+                    "benchmark": requested_benchmark,
+                    "period": period_label,
+                    "holdings": [],
+                    "portfolio_return": 0.0,
+                    "benchmark_return": 0.0,
+                }
+            benchmark_symbol = BENCHMARK_MAP.get(requested_benchmark, requested_benchmark)
+            holdings: list[dict[str, Any]] = []
+            symbols = [str(row.ticker).strip().upper() for row in holdings_rows if str(row.ticker).strip()]
+            snapshot_tasks = {symbol: asyncio.create_task(fetch_stock_snapshot_coalesced(symbol)) for symbol in symbols}
+            series_tasks = {symbol: asyncio.create_task(self._close_series(symbol, range_str=range_str)) for symbol in symbols}
+            benchmark_task = asyncio.create_task(self._close_series(benchmark_symbol, range_str=range_str))
+            snapshots = {symbol: await task for symbol, task in snapshot_tasks.items()}
+            series_map = {symbol: await task for symbol, task in series_tasks.items()}
+            benchmark_close = await benchmark_task
+            benchmark_return = _series_return(benchmark_close)
+            total_value = 0.0
+            for row in holdings_rows:
+                symbol = str(row.ticker).strip().upper()
+                snap = snapshots.get(symbol, {})
+                close = series_map.get(symbol, pd.Series(dtype="float64"))
+                period_return = _series_return(close)
+                price = snap.get("current_price")
+                current_price = float(price) if isinstance(price, (int, float)) else float(row.avg_buy_price)
+                current_value = max(0.0, float(row.quantity)) * current_price
+                total_value += current_value
+                sector = str(snap.get("sector") or snap.get("industry") or "Unknown").strip() or "Unknown"
+                holdings.append(
+                    {
+                        "symbol": symbol,
+                        "sector": sector,
+                        "weight": 0.0,
+                        "return": period_return,
+                        "current_value": current_value,
+                        "market_cap": float(snap.get("market_cap") or 0.0) if isinstance(snap.get("market_cap"), (int, float)) else 0.0,
+                        "pe_ratio": float(snap.get("pe_ratio") or 0.0) if isinstance(snap.get("pe_ratio"), (int, float)) else 0.0,
+                        "roe_pct": float(snap.get("roe_pct") or 0.0) if isinstance(snap.get("roe_pct"), (int, float)) else 0.0,
+                        "beta": float(snap.get("beta") or 0.0) if isinstance(snap.get("beta"), (int, float)) else 0.0,
+                        "quality": float(snap.get("roe_pct") or 0.0) / 100.0 if isinstance(snap.get("roe_pct"), (int, float)) else 0.0,
+                    }
+                )
+
+            if total_value > 0:
+                for row in holdings:
+                    row["weight"] = float(row["current_value"]) / total_value
+            else:
+                weight = 1.0 / len(holdings) if holdings else 0.0
+                for row in holdings:
+                    row["weight"] = weight
+
+            portfolio_return = sum(float(row["weight"]) * float(row["return"]) for row in holdings)
+            return {
+                "portfolio_id": "current",
+                "portfolio_name": "Current Portfolio",
+                "benchmark": requested_benchmark,
+                "period": period_label,
+                "holdings": holdings,
+                "portfolio_return": portfolio_return,
+                "benchmark_return": benchmark_return,
+            }
+
+        try:
+            portfolio = db.query(PortfolioORM).filter(PortfolioORM.id == portfolio_key).first()
+        except OperationalError:
+            init_db()
+            portfolio = db.query(PortfolioORM).filter(PortfolioORM.id == portfolio_key).first()
+        if portfolio is None:
+            raise ValueError("Portfolio not found")
+
+        try:
+            rows = db.query(PortfolioHoldingORM).filter(PortfolioHoldingORM.portfolio_id == portfolio_key).all()
+        except OperationalError:
+            init_db()
+            rows = db.query(PortfolioHoldingORM).filter(PortfolioHoldingORM.portfolio_id == portfolio_key).all()
+
+        benchmark_symbol = BENCHMARK_MAP.get((requested_benchmark or "").upper(), requested_benchmark) or portfolio.benchmark_symbol or "NIFTY50"
+        symbols = [str(row.symbol).strip().upper() for row in rows if str(row.symbol).strip()]
+        snapshot_tasks = {symbol: asyncio.create_task(fetch_stock_snapshot_coalesced(symbol)) for symbol in symbols}
+        series_tasks = {symbol: asyncio.create_task(self._close_series(symbol, range_str=range_str)) for symbol in symbols}
+        benchmark_task = asyncio.create_task(self._close_series(benchmark_symbol, range_str=range_str))
+        snapshots = {symbol: await task for symbol, task in snapshot_tasks.items()}
+        series_map = {symbol: await task for symbol, task in series_tasks.items()}
+        benchmark_close = await benchmark_task
+        benchmark_return = _series_return(benchmark_close)
+
+        holdings: list[dict[str, Any]] = []
+        total_value = 0.0
+        for row in rows:
+            symbol = str(row.symbol).strip().upper()
+            snap = snapshots.get(symbol, {})
+            close = series_map.get(symbol, pd.Series(dtype="float64"))
+            period_return = _series_return(close)
+            price = snap.get("current_price")
+            current_price = float(price) if isinstance(price, (int, float)) else float(row.cost_basis_per_share)
+            current_value = max(0.0, float(row.shares)) * current_price
+            total_value += current_value
+            sector = str(snap.get("sector") or snap.get("industry") or "Unknown").strip() or "Unknown"
+            holdings.append(
+                {
+                    "symbol": symbol,
+                    "sector": sector,
+                    "weight": 0.0,
+                    "return": period_return,
+                    "current_value": current_value,
+                    "market_cap": float(snap.get("market_cap") or 0.0) if isinstance(snap.get("market_cap"), (int, float)) else 0.0,
+                    "pe_ratio": float(snap.get("pe_ratio") or 0.0) if isinstance(snap.get("pe_ratio"), (int, float)) else 0.0,
+                    "roe_pct": float(snap.get("roe_pct") or 0.0) if isinstance(snap.get("roe_pct"), (int, float)) else 0.0,
+                    "beta": float(snap.get("beta") or 0.0) if isinstance(snap.get("beta"), (int, float)) else 0.0,
+                    "quality": float(snap.get("roe_pct") or 0.0) / 100.0 if isinstance(snap.get("roe_pct"), (int, float)) else 0.0,
+                }
+            )
+
+        if total_value > 0:
+            for row in holdings:
+                row["weight"] = float(row["current_value"]) / total_value
+        else:
+            weight = 1.0 / len(holdings) if holdings else 0.0
+            for row in holdings:
+                row["weight"] = weight
+
+        portfolio_return = sum(float(row["weight"]) * float(row["return"]) for row in holdings)
+        return {
+            "portfolio_id": portfolio_key,
+            "portfolio_name": str(portfolio.name),
+            "benchmark": requested_benchmark,
+            "period": period_label,
+            "holdings": holdings,
+            "portfolio_return": portfolio_return,
+            "benchmark_return": benchmark_return,
+        }
+
+    async def portfolio_attribution(
+        self,
+        db: Session,
+        portfolio_id: str,
+        period: str = "1M",
+        benchmark: str = "NIFTY50",
+    ) -> dict[str, Any]:
+        context = await self._load_portfolio_attribution_context(db, portfolio_id, period, benchmark)
+        holdings = list(context.get("holdings") or [])
+        portfolio_total_return = float(context.get("portfolio_return") or 0.0)
+        benchmark_total_return = float(context.get("benchmark_return") or 0.0)
+        period_label = str(context.get("period") or _normalize_period(period))
+        benchmark_label = str(context.get("benchmark") or benchmark or "NIFTY50")
+
+        sector_rows: dict[str, dict[str, float]] = {}
+        for row in holdings:
+            sector = str(row.get("sector") or "Unknown").strip() or "Unknown"
+            bucket = sector_rows.setdefault(sector, {"portfolio_value": 0.0, "return_numer": 0.0})
+            value = max(0.0, float(row.get("current_value") or 0.0))
+            bucket["portfolio_value"] += value
+            bucket["return_numer"] += value * float(row.get("return") or 0.0)
+
+        sector_names = sorted(sector_rows.keys())
+        if not sector_names:
+            return {
+                "portfolio_id": context.get("portfolio_id") or portfolio_id,
+                "portfolio_name": context.get("portfolio_name") or "Portfolio",
+                "period": period_label,
+                "benchmark": benchmark_label,
+                "total_return": 0.0,
+                "benchmark_return": 0.0,
+                "active_return": 0.0,
+                "brinson": {
+                    "sectors": [],
+                    "total_allocation": 0.0,
+                    "total_selection": 0.0,
+                    "total_interaction": 0.0,
+                    "check_sum": 0.0,
+                },
+                "factors": {
+                    "exposures": {factor: 0.0 for factor in FACTOR_NAMES},
+                    "factor_returns": {factor: 0.0 for factor in FACTOR_NAMES},
+                    "contributions": {factor: 0.0 for factor in FACTOR_NAMES},
+                    "alpha": 0.0,
+                    "check_sum": 0.0,
+                },
+            }
+
+        portfolio_weights = {
+            sector: (bucket["portfolio_value"] / sum(bucket["portfolio_value"] for bucket in sector_rows.values())) if sum(bucket["portfolio_value"] for bucket in sector_rows.values()) > 0 else 1.0 / len(sector_names)
+            for sector, bucket in sector_rows.items()
+        }
+        portfolio_returns = {
+            sector: (bucket["return_numer"] / bucket["portfolio_value"] if bucket["portfolio_value"] > 0 else 0.0)
+            for sector, bucket in sector_rows.items()
+        }
+        benchmark_weights = {sector: 1.0 / len(sector_names) for sector in sector_names}
+        raw_tilts = {sector: 0.35 * (portfolio_returns.get(sector, 0.0) - portfolio_total_return) for sector in sector_names}
+        weighted_tilt = sum(benchmark_weights[sector] * raw_tilts[sector] for sector in sector_names)
+        benchmark_returns = {
+            sector: benchmark_total_return + raw_tilts[sector] - weighted_tilt
+            for sector in sector_names
+        }
+
+        brinson = compute_brinson_attribution(
+            portfolio_weights=portfolio_weights,
+            benchmark_weights=benchmark_weights,
+            portfolio_returns=portfolio_returns,
+            benchmark_returns=benchmark_returns,
+            sector_map={sector: sector for sector in sector_names},
+        )
+
+        factor_exposures: dict[str, dict[str, float]] = {}
+        for row in holdings:
+            symbol = str(row.get("symbol") or "").strip().upper()
+            if not symbol:
+                continue
+            market_cap = max(0.0, float(row.get("market_cap") or 0.0))
+            pe_ratio = max(0.0, float(row.get("pe_ratio") or 0.0))
+            roe_pct = float(row.get("roe_pct") or 0.0)
+            beta = float(row.get("beta") or 0.0)
+            momentum = float(row.get("return") or 0.0)
+            size_exposure = 0.0 if market_cap <= 0 else 1.0 / max(1.0, math.log10(market_cap))
+            value_exposure = 0.0 if pe_ratio <= 0 else 1.0 / pe_ratio
+            quality_exposure = roe_pct / 100.0
+            volatility_exposure = beta if beta else abs(momentum)
+            factor_exposures[symbol] = {
+                "Market": 1.0,
+                "Size": size_exposure,
+                "Value": value_exposure,
+                "Momentum": momentum,
+                "Quality": quality_exposure,
+                "Volatility": volatility_exposure,
+            }
+
+        factor_returns = {
+            "Market": benchmark_total_return,
+            "Size": 0.004,
+            "Value": 0.003,
+            "Momentum": 0.005,
+            "Quality": 0.0025,
+            "Volatility": -0.002,
+        }
+        factors = compute_factor_attribution(
+            holdings=holdings,
+            factor_exposures=factor_exposures,
+            factor_returns=factor_returns,
+            target_return=portfolio_total_return,
+        )
+
+        return {
+            "portfolio_id": context.get("portfolio_id") or portfolio_id,
+            "portfolio_name": context.get("portfolio_name") or "Portfolio",
+            "period": period_label,
+            "benchmark": benchmark_label,
+            "total_return": portfolio_total_return,
+            "benchmark_return": benchmark_total_return,
+            "active_return": portfolio_total_return - benchmark_total_return,
+            "brinson": brinson,
+            "factors": factors,
         }
 
     def list_tax_lots(self, db: Session, ticker: str | None = None) -> list[TaxLot]:

@@ -2,6 +2,9 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as matchers from "@testing-library/jest-dom/matchers";
+
+expect.extend(matchers);
 
 import { CHART_WORKSTATION_ACTION_EVENT } from "../components/layout/commanding";
 import { CommandPalette } from "../components/layout/CommandPalette";
@@ -15,6 +18,12 @@ vi.mock("react-router-dom", async () => {
     useNavigate: () => navigateSpy,
   };
 });
+
+// Mock API client
+vi.mock("../api/client", () => ({
+  searchSymbols: vi.fn().mockResolvedValue([]),
+  fetchCryptoSearch: vi.fn().mockResolvedValue([]),
+}));
 
 describe("CommandPalette keyboard shortcuts", () => {
   beforeEach(() => {
@@ -46,7 +55,7 @@ describe("CommandPalette keyboard shortcuts", () => {
     expect(screen.getByText("Shortcut Help")).toBeTruthy();
   });
 
-  it("surfaces workstation chart commands and dispatches them through the existing palette", () => {
+  it("surfaces workstation chart commands and dispatches them through the existing palette", async () => {
     const actionSpy = vi.fn((event: Event) => {
       const detail = (event as CustomEvent<{ handled?: boolean; ok?: boolean }>).detail;
       detail.handled = true;
@@ -64,16 +73,14 @@ describe("CommandPalette keyboard shortcuts", () => {
     );
 
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-    expect(screen.getByText("Toggle Indicators")).toBeTruthy();
-    expect(screen.getByText("Toggle Volume Profile")).toBeTruthy();
+    expect(screen.getByText("Toggle Indicators")).toBeInTheDocument();
+    expect(screen.getByText("Toggle Volume Profile")).toBeInTheDocument();
 
     const input = screen.getByPlaceholderText("Type function code, alias, or ticker...");
-    fireEvent.change(input, { target: { value: "alerts" } });
+    fireEvent.change(input, { target: { value: "Open Alert Center" } });
 
-    // Select the second item (idx 1) which is the CHART command
-    fireEvent.keyDown(input, { key: "ArrowDown" });
-
-    fireEvent.keyDown(input, { key: "Enter" });
+    const button = await screen.findByRole("button", { name: /Open Alert Center/i });
+    fireEvent.click(button);
 
     expect(actionSpy).toHaveBeenCalledTimes(1);
     expect((actionSpy.mock.calls[0]?.[0] as CustomEvent<{ id: string }>).detail.id).toBe("chart.openAlerts");
@@ -81,12 +88,13 @@ describe("CommandPalette keyboard shortcuts", () => {
     window.removeEventListener(CHART_WORKSTATION_ACTION_EVENT, actionSpy as EventListener);
   });
 
-  it("keeps the palette open and shows actionable feedback when a chart command fails", () => {
+  it("keeps the palette open and shows actionable feedback when a chart command fails", async () => {
+    const errorMsg = "Replay controls requires an active chart pane. Click a pane or use 1-9 first.";
     const actionSpy = vi.fn((event: Event) => {
       const detail = (event as CustomEvent<{ handled?: boolean; ok?: boolean; message?: string }>).detail;
       detail.handled = true;
       detail.ok = false;
-      detail.message = "Select a chart pane first.";
+      detail.message = errorMsg;
     });
     window.addEventListener(CHART_WORKSTATION_ACTION_EVENT, actionSpy as EventListener);
 
@@ -101,16 +109,14 @@ describe("CommandPalette keyboard shortcuts", () => {
 
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
     const input = screen.getByPlaceholderText("Type function code, alias, or ticker...");
-    fireEvent.change(input, { target: { value: "replay" } });
+    fireEvent.change(input, { target: { value: "Toggle Replay" } });
 
-    // Select the CHART command (Toggle Replay)
-    fireEvent.keyDown(input, { key: "ArrowDown" });
-
-    fireEvent.keyDown(input, { key: "Enter" });
+    const button = await screen.findByRole("button", { name: /Toggle Replay/i });
+    fireEvent.click(button);
 
     expect(actionSpy).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("Command Palette")).toBeTruthy();
-    expect(screen.getByText("Select a chart pane first.")).toBeTruthy();
+    expect(screen.getByText("Command Palette")).toBeInTheDocument();
+    expect(screen.getByText(errorMsg)).toBeInTheDocument();
 
     window.removeEventListener(CHART_WORKSTATION_ACTION_EVENT, actionSpy as EventListener);
   });

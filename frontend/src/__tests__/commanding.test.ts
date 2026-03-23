@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import {
   CHART_WORKSTATION_ACTION_EVENT,
+  buildAssetDisambiguationOptions,
   dispatchChartWorkstationAction,
   executeParsedCommand,
   findShortcutConflicts,
@@ -33,6 +34,16 @@ describe("GO commanding", () => {
     }
   });
 
+  it("parses ticker + function + subfunction commands", () => {
+    const parsed = parseCommand("AAPL FA MARGINS");
+    expect(parsed.kind).toBe("ticker-function");
+    if (parsed.kind === "ticker-function") {
+      expect(parsed.ticker).toBe("AAPL");
+      expect(parsed.func).toBe("FA");
+      expect(parsed.modifiers).toEqual(["MARGINS"]);
+    }
+  });
+
   it("executes function-only route command", () => {
     const navigate = vi.fn();
     const result = executeParsedCommand(parseCommand("WL"), navigate as any);
@@ -45,6 +56,44 @@ describe("GO commanding", () => {
     const result = executeParsedCommand(parseCommand("AAPL"), navigate as any);
     expect(result.ok).toBe(true);
     expect(navigate).toHaveBeenCalledWith("/equity/stocks?ticker=AAPL");
+  });
+
+  it("routes financial subfunctions to the requested Security Hub subtab", () => {
+    const navigate = vi.fn();
+    const result = executeParsedCommand(parseCommand("AAPL FA MARGINS"), navigate as any);
+    expect(result.ok).toBe(true);
+    expect(navigate).toHaveBeenCalledWith("/equity/security/AAPL?tab=financials&subtab=margins#financials-margins");
+  });
+
+  it("supports the appendix command set without regressing routing", () => {
+    const navigate = vi.fn();
+    const cases = [
+      ["CMDTY GC1", "/equity/commodities?symbol=GC1"],
+      ["FX EURUSD", "/equity/forex?pair=EURUSD"],
+      ["ETFA SPY", "/equity/etf-analytics?ticker=SPY"],
+      ["BOND", "/equity/bonds"],
+      ["HOT", "/equity/hotlists"],
+      ["TCA AAPL", "/equity/portfolio?ticker=AAPL&view=tca"],
+      ["COMM AAPL", "/equity/news?ticker=AAPL&view=community"],
+      ["DEPTH AAPL", "/equity/chart-workstation?panel=depth&ticker=AAPL&symbol=AAPL"],
+    ] as const;
+
+    for (const [input, target] of cases) {
+      navigate.mockClear();
+      const result = executeParsedCommand(parseCommand(input), navigate as any);
+      expect(result.ok).toBe(true);
+      expect(navigate).toHaveBeenCalledWith(target);
+    }
+  });
+
+  it("builds asset disambiguation commands when multiple asset classes share a symbol", () => {
+    const options = buildAssetDisambiguationOptions("AAPL", [
+      { ticker: "AAPL", name: "Apple Inc.", exchange: "NASDAQ", country_code: "US" },
+      { ticker: "AAPL", name: "Apple ETF Tracker", exchange: "ETF", country_code: "US" },
+    ] as any);
+
+    expect(options).toHaveLength(2);
+    expect(options.map((option) => option.command)).toEqual(expect.arrayContaining(["AAPL", "ETFA AAPL"]));
   });
 
   it("executes natural language command to AI news route", () => {

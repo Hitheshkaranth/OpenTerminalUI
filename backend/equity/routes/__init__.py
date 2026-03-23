@@ -4,10 +4,10 @@ from fastapi import APIRouter
 
 from backend.api.routes import (
     admin, alerts, backtest, backtests, chart, crypto, data,
-    export, fundamentals, health, indicators,
+    commodities, depth, export, forex, fundamentals, health, hotlists, indicators,
     kite, news, paper, peers, plugins, portfolio, quotes,
     reports, screener, scripting, search, shareholding, stocks,
-    stream, valuation, options, audit, data_layer, governance,
+    stream, valuation, options, audit, data_layer, governance, patterns,
     user_layouts, portfolios,
     oms, ops, risk
 )
@@ -43,6 +43,11 @@ equity_router.include_router(admin.router, prefix="/api", tags=["admin"])
 equity_router.include_router(stream.router, prefix="/api", tags=["stream"])
 equity_router.include_router(indicators.router, prefix="/api", tags=["indicators"])
 equity_router.include_router(crypto.router, prefix="/api", tags=["crypto"])
+equity_router.include_router(commodities.router, prefix="/api", tags=["commodities"])
+equity_router.include_router(forex.router, prefix="/api", tags=["forex"])
+equity_router.include_router(hotlists.router, prefix="/api", tags=["hotlists"])
+equity_router.include_router(depth.router, prefix="/api", tags=["depth"])
+equity_router.include_router(patterns.router, tags=["patterns"])
 equity_router.include_router(paper.router, prefix="/api", tags=["paper"])
 equity_router.include_router(portfolios.router, prefix="/api", tags=["portfolios"])
 equity_router.include_router(scripting.router, prefix="/api", tags=["scripting"])

@@ -148,9 +148,13 @@ from backend.data_quality.routes import router as data_quality_router
 from backend.tca.routes import router as tca_router
 from backend.api.routes.ai import router as ai_router
 from backend.api.routes.analytics import router as analytics_router
+from backend.api.routes.bonds import router as bonds_router
+from backend.api.routes.commodities import router as commodities_router
 from backend.api.routes.economics import router as economics_router
 from backend.api.routes.fixed_income import router as fixed_income_router
+from backend.api.routes.forex import router as forex_router
 from backend.api.routes.insider import router as insider_router
+from backend.api.routes.etf import router as etf_router
 from backend.api.routes.watchlists import router as watchlists_router
 from backend.routers.chart_workstation import router as chart_workstation_router
 from backend.routers.charts import router as charts_router
@@ -158,11 +162,15 @@ from backend.routers.charts import router as charts_router
 app.include_router(equity_router)
 app.include_router(fno_router)
 app.include_router(fixed_income_router)
+app.include_router(bonds_router)
 app.include_router(economics_router)
+app.include_router(commodities_router, prefix="/api")
+app.include_router(forex_router, prefix="/api")
 app.include_router(ai_router)
 app.include_router(analytics_router)
 app.include_router(watchlists_router)
 app.include_router(insider_router)
+app.include_router(etf_router, prefix="/api")
 
 # Quant Feature Pack Routers (Swarm 0 Stubs)
 app.include_router(cockpit_router, prefix="/api")

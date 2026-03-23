@@ -437,5 +437,90 @@ class MutualFundService:
             out[code] = [{"date": d.isoformat(), "value": (n / base) * 100.0} for d, n in filtered]
         return out
 
+    async def get_category_rankings(self, category: str) -> list[dict[str, Any]]:
+        """Rank funds within a category based on various return periods."""
+        funds = await self.get_top_funds_by_category(category, limit=100)
+        rankings = []
+        for i, fund in enumerate(funds):
+            rankings.append({
+                "rank": i + 1,
+                "scheme_code": fund.scheme_code,
+                "scheme_name": fund.scheme_name,
+                "returns_1y": fund.returns_1y,
+                "returns_3y": fund.returns_3y,
+                "returns_5y": fund.returns_5y,
+            })
+        return rankings
+
+    async def get_rolling_returns(self, scheme_code: int, window_years: int = 3) -> list[dict[str, Any]]:
+        """Calculate rolling returns for a fund."""
+        nav_hist = await self.get_fund_nav_history(scheme_code)
+        if not nav_hist.nav_history:
+            return []
+
+        hist: list[tuple[date, float]] = []
+        for row in nav_hist.nav_history:
+            dt = date.fromisoformat(row["date"])
+            nav = row["nav"]
+            hist.append((dt, nav))
+        hist.sort(key=lambda x: x[0])
+
+        rolling = []
+        days_window = int(window_years * 365.25)
+
+        for i in range(len(hist)):
+            start_dt, start_nav = hist[i]
+            target_dt = start_dt + timedelta(days=days_window)
+
+            # Find closest NAV on or after target_dt
+            found_nav = None
+            for j in range(i + 1, len(hist)):
+                if hist[j][0] >= target_dt:
+                    # Use this or interp
+                    found_nav = hist[j][1]
+                    found_dt = hist[j][0]
+                    break
+
+            if found_nav:
+                ret = self._cagr(found_nav, start_nav, window_years)
+                if ret is not None:
+                    rolling.append({"date": found_dt.isoformat(), "return": ret})
+
+        # To keep response size sane
+        if len(rolling) > 200:
+            step = len(rolling) // 200
+            rolling = rolling[::step]
+
+        return rolling
+
+    def calculate_sip(self, monthly_amt: float, years: int, expected_return: float) -> dict[str, Any]:
+        """SIP Calculator implementation."""
+        months = years * 12
+        monthly_rate = (expected_return / 100) / 12
+
+        # Future Value of Annuity Formula: P * [((1 + r)^n - 1) / r] * (1 + r)
+        invested = monthly_amt * months
+        if monthly_rate > 0:
+            est_value = monthly_amt * (((1 + monthly_rate)**months - 1) / monthly_rate) * (1 + monthly_rate)
+        else:
+            est_value = invested
+
+        return {
+            "invested_amount": invested,
+            "estimated_value": est_value,
+            "total_gain": est_value - invested,
+            "gain_pct": ((est_value - invested) / invested * 100) if invested > 0 else 0
+        }
+
+    async def get_fund_overlap(self, codes: list[int]) -> dict[str, Any]:
+        """Stub for fund overlap. In a real system, this requires holding data."""
+        # Since we don't have full holdings data for all funds, we'll return a mock/placeholder
+        # based on category similarity or just a skeleton.
+        return {
+            "overlap_matrix": [[100 if i == j else 20 for j in range(len(codes))] for i in range(len(codes))],
+            "common_holdings": [],
+            "note": "Holdings data required for precise overlap."
+        }
+
 
 mutual_fund_service = MutualFundService()

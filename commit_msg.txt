@@ -1,0 +1,7 @@
+feat: implement multi-asset terminal, pro analytics, and advanced charting
+
+- Swarm 2: Multi-Asset Terminal (Commodities, Forex, ETF Analytics, Mutual Funds, Bonds, Hotlists)
+- Swarm 3: Pro Analytics (Market Depth L2, Brinson Attribution, Stress Testing, TCA, Custom Ratios)
+- Swarm 4: Advanced Charting (OpenScript IDE, Pattern Recognition, Footprint Charts, Anchored VWAP, ESG)
+- Added comprehensive backend testing and frontend vitest coverage
+- Fixed UI formatting issues for overlap analysis percentages

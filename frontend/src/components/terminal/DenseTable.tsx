@@ -3,11 +3,12 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ReactNode,
   type UIEvent,
 } from "react";
-import { Download, GripVertical, MoreHorizontal } from "lucide-react";
+import { Download, GripVertical, MoreHorizontal, Plus } from "lucide-react";
+
+import { SymbolContextMenu, type SymbolContextMenuAction } from "../common/SymbolContextMenu";
 
 export type DenseTableColumnType = "text" | "number" | "currency" | "percent" | "volume" | "large-number" | "sparkline";
 export type DenseTableSortDirection = "asc" | "desc" | "none";
@@ -55,6 +56,7 @@ type ContextMenuState<T> = {
   index: number;
   x: number;
   y: number;
+  symbol: string;
 } | null;
 
 type Props<T> = {
@@ -71,6 +73,7 @@ type Props<T> = {
   onAddToWatchlist?: (row: T, index: number) => void;
   onAddToPortfolio?: (row: T, index: number) => void;
   onViewDetails?: (row: T, index: number) => void;
+  contextMenuActions?: (row: T, index: number) => SymbolContextMenuAction[];
   csvFileName?: string;
   bufferRows?: number;
 };
@@ -117,6 +120,21 @@ function compareValues(a: unknown, b: unknown): number {
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
 }
 
+function resolveRowSymbol(row: unknown): string {
+  const record = row as Record<string, unknown> | null | undefined;
+  const candidates = [
+    record?.symbol,
+    record?.ticker,
+    record?.tradingsymbol,
+    record?.ws_symbol,
+    record?.code,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) return candidate.trim().toUpperCase();
+  }
+  return "";
+}
+
 function rowSelectionRange(anchor: number, current: number) {
   const [start, end] = anchor <= current ? [anchor, current] : [current, anchor];
   const out = new Set<number>();
@@ -138,6 +156,7 @@ export function DenseTable<T>({
   onAddToWatchlist,
   onAddToPortfolio,
   onViewDetails,
+  contextMenuActions,
   csvFileName = "dense-table-export.csv",
   bufferRows = 20,
 }: Props<T>) {
@@ -233,6 +252,12 @@ export function DenseTable<T>({
     });
     return arr.map(({ row, index }) => ({ row, index }));
   }, [columns, rows, sort]);
+
+  const selectedIndex = useMemo(() => {
+    if (selectionAnchor != null && selectedRows.has(selectionAnchor)) return selectionAnchor;
+    const first = selectedRows.values().next();
+    return first.done ? -1 : first.value;
+  }, [selectedRows, selectionAnchor]);
 
   const viewportHeight = Math.max(100, height - headerHeight);
   const visibleCount = Math.ceil(viewportHeight / rowHeight);
@@ -346,6 +371,30 @@ export function DenseTable<T>({
     return () => window.removeEventListener("click", onGlobal);
   }, []);
 
+  const openContextMenuForRow = (row: T, index: number, anchor: { x: number; y: number }) => {
+    const symbol = resolveRowSymbol(row);
+    if (!symbol) return;
+    setSelectedRows(new Set([index]));
+    setSelectionAnchor(index);
+    setContextMenu({ row, index, x: anchor.x, y: anchor.y, symbol });
+  };
+
+  const openContextMenuFromKeyboard = () => {
+    const originalIndex = selectedIndex >= 0 ? selectedIndex : sortedRows[0]?.index ?? -1;
+    if (originalIndex < 0) return;
+    const sortedIndex = sortedRows.findIndex((entry) => entry.index === originalIndex);
+    if (sortedIndex < 0) return;
+    const row = sortedRows[sortedIndex]?.row;
+    if (!row) return;
+    const rowEl = hostRef.current?.querySelector<HTMLElement>(`[data-row-index="${originalIndex}"]`);
+    const rowRect = rowEl?.getBoundingClientRect();
+    const hostRect = hostRef.current?.getBoundingClientRect();
+    if (!rowRect && !hostRect) return;
+    const x = rowRect ? rowRect.left + Math.min(rowRect.width / 2, 200) : (hostRect?.left ?? 0) + 40;
+    const y = rowRect ? rowRect.bottom + 4 : (hostRect?.top ?? 0) + headerHeight + (sortedIndex * rowHeight) - scrollTop + 4;
+    openContextMenuForRow(row, originalIndex, { x, y });
+  };
+
   const headerCells = (cols: DenseTableColumn<T>[]) =>
     cols.map((col) => {
       const width = (col as DenseTableColumn<T> & { width?: number }).width ?? 120;
@@ -457,7 +506,18 @@ export function DenseTable<T>({
       </div>
 
       <div className="relative" style={{ height }}>
-        <div className="absolute inset-0 overflow-auto" onScroll={(e: UIEvent<HTMLDivElement>) => setScrollTop(e.currentTarget.scrollTop)} ref={hostRef}>
+        <div
+          className="absolute inset-0 overflow-auto"
+          onScroll={(e: UIEvent<HTMLDivElement>) => setScrollTop(e.currentTarget.scrollTop)}
+          onKeyDown={(event) => {
+            if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+              event.preventDefault();
+              openContextMenuFromKeyboard();
+            }
+          }}
+          ref={hostRef}
+          tabIndex={0}
+        >
           <div style={{ minWidth: totalWidth }}>
             <div className="sticky top-0 z-20 flex border-b border-terminal-border">
               {frozenColumns.length ? (
@@ -499,6 +559,7 @@ export function DenseTable<T>({
                 <div
                   key={key}
                   role="row"
+                  data-row-index={originalIndex}
                   className={`relative flex h-[26px] border-b border-[#141b25] ${rowCls}`}
                   onClick={(e) => {
                     if (e.shiftKey && selectionAnchor != null) {
@@ -518,8 +579,11 @@ export function DenseTable<T>({
                     onRowClick?.(row, originalIndex);
                   }}
                   onContextMenu={(e) => {
+                    const symbol = resolveRowSymbol(row);
+                    if (!symbol) return;
                     e.preventDefault();
-                    setContextMenu({ row, index: originalIndex, x: e.clientX, y: e.clientY });
+                    e.stopPropagation();
+                    openContextMenuForRow(row, originalIndex, { x: e.clientX, y: e.clientY });
                   }}
                 >
                   {frozenColumns.length ? (
@@ -536,51 +600,63 @@ export function DenseTable<T>({
       </div>
 
       {contextMenu ? (
-        <div
-          className="fixed z-[120] w-48 rounded-sm border border-terminal-border bg-[#0F141B] p-1 shadow-2xl"
-          style={{ left: contextMenu.x, top: contextMenu.y } as CSSProperties}
-        >
-          <button
-            type="button"
-            className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-terminal-panel"
-            onClick={() => {
-              onRowOpenInChart?.(contextMenu.row, contextMenu.index);
-              setContextMenu(null);
-            }}
-          >
-            Load in Chart
-          </button>
-          <button
-            type="button"
-            className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-terminal-panel"
-            onClick={() => {
-              onAddToWatchlist?.(contextMenu.row, contextMenu.index);
-              setContextMenu(null);
-            }}
-          >
-            Add to Watchlist
-          </button>
-          <button
-            type="button"
-            className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-terminal-panel"
-            onClick={() => {
-              onAddToPortfolio?.(contextMenu.row, contextMenu.index);
-              setContextMenu(null);
-            }}
-          >
-            Add to Portfolio
-          </button>
-          <button
-            type="button"
-            className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-terminal-panel"
-            onClick={() => {
-              onViewDetails?.(contextMenu.row, contextMenu.index);
-              setContextMenu(null);
-            }}
-          >
-            View Details
-          </button>
-        </div>
+        <SymbolContextMenu
+          open={Boolean(contextMenu)}
+          symbol={contextMenu.symbol}
+          anchor={{ x: contextMenu.x, y: contextMenu.y }}
+          onClose={() => setContextMenu(null)}
+          customActions={[
+            ...(onRowOpenInChart
+              ? [
+                  {
+                    id: "dense-load-chart",
+                    label: "Load in Chart",
+                    icon: <Download className="h-3.5 w-3.5 rotate-90" />,
+                    onAction: async () => {
+                      onRowOpenInChart(contextMenu.row, contextMenu.index);
+                    },
+                  },
+                ]
+              : []),
+            ...(onAddToWatchlist
+              ? [
+                  {
+                    id: "dense-add-watchlist",
+                    label: "Add to Watchlist",
+                    icon: <Plus className="h-3.5 w-3.5" />,
+                    onAction: async () => {
+                      onAddToWatchlist(contextMenu.row, contextMenu.index);
+                    },
+                  },
+                ]
+              : []),
+            ...(onAddToPortfolio
+              ? [
+                  {
+                    id: "dense-add-portfolio",
+                    label: "Add to Portfolio",
+                    icon: <Plus className="h-3.5 w-3.5" />,
+                    onAction: async () => {
+                      onAddToPortfolio(contextMenu.row, contextMenu.index);
+                    },
+                  },
+                ]
+              : []),
+            ...(onViewDetails
+              ? [
+                  {
+                    id: "dense-view-details",
+                    label: "View Details",
+                    icon: <MoreHorizontal className="h-3.5 w-3.5" />,
+                    onAction: async () => {
+                      onViewDetails(contextMenu.row, contextMenu.index);
+                    },
+                  },
+                ]
+              : []),
+            ...(contextMenuActions ? contextMenuActions(contextMenu.row, contextMenu.index) : []),
+          ]}
+        />
       ) : null}
     </div>
   );

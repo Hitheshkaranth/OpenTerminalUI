@@ -3,9 +3,70 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import type { CountryCode, MarketCode } from "../types/markets";
 
-type DisplayCurrency = "INR" | "USD";
-type RealtimeMode = "polling" | "ws";
+export type DisplayCurrency = "INR" | "USD";
+export type RealtimeMode = "polling" | "ws";
 export type ThemeVariant = "terminal-noir" | "classic-bloomberg" | "light-desk" | "custom";
+export type RecentSecurityAssetClass = "equity" | "fno" | "crypto" | "commodity" | "forex" | "etf" | "mf";
+export type RecentSecurityMarket = "IN" | "US";
+
+export type RecentSecurity = {
+  symbol: string;
+  name: string;
+  assetClass: RecentSecurityAssetClass;
+  market: RecentSecurityMarket;
+  lastPrice?: number;
+  changePercent?: number;
+  visitedAt: number;
+};
+
+const MAX_RECENT_SECURITIES = 20;
+const RECENT_SECURITY_ASSET_CLASSES: RecentSecurityAssetClass[] = ["equity", "fno", "crypto", "commodity", "forex", "etf", "mf"];
+
+function isRecentSecurityAssetClass(value: unknown): value is RecentSecurityAssetClass {
+  return RECENT_SECURITY_ASSET_CLASSES.includes(value as RecentSecurityAssetClass);
+}
+
+function sanitizeRecentSecurity(item: unknown): RecentSecurity | null {
+  if (!item || typeof item !== "object") return null;
+  const row = item as Partial<RecentSecurity>;
+  const symbol = String(row.symbol ?? "").trim().toUpperCase();
+  if (!symbol) return null;
+
+  const name = String(row.name ?? symbol).trim() || symbol;
+  const assetClass = isRecentSecurityAssetClass(row.assetClass) ? row.assetClass : "equity";
+  const market: RecentSecurityMarket = row.market === "IN" ? "IN" : "US";
+  const visitedAt = Number.isFinite(Number(row.visitedAt)) ? Number(row.visitedAt) : Date.now();
+  const lastPrice = Number.isFinite(Number(row.lastPrice)) ? Number(row.lastPrice) : undefined;
+  const changePercent = Number.isFinite(Number(row.changePercent)) ? Number(row.changePercent) : undefined;
+
+  return {
+    symbol,
+    name,
+    assetClass,
+    market,
+    lastPrice,
+    changePercent,
+    visitedAt,
+  };
+}
+
+function sanitizeRecentSecurities(items: unknown): RecentSecurity[] {
+  if (!Array.isArray(items)) return [];
+
+  const deduped = new Map<string, RecentSecurity>();
+  for (const item of items) {
+    const row = sanitizeRecentSecurity(item);
+    if (!row) continue;
+    const previous = deduped.get(row.symbol);
+    if (!previous || row.visitedAt >= previous.visitedAt) {
+      deduped.set(row.symbol, row);
+    }
+  }
+
+  return [...deduped.values()]
+    .sort((a, b) => b.visitedAt - a.visitedAt)
+    .slice(0, MAX_RECENT_SECURITIES);
+}
 
 type SettingsState = {
   selectedCountry: CountryCode;
@@ -17,6 +78,7 @@ type SettingsState = {
   themeVariant: ThemeVariant;
   customAccentColor: string;
   hudOverlayEnabled: boolean;
+  recentSecurities: RecentSecurity[];
   setSelectedCountry: (country: CountryCode) => void;
   setSelectedMarket: (market: MarketCode) => void;
   setDisplayCurrency: (currency: DisplayCurrency) => void;
@@ -26,6 +88,8 @@ type SettingsState = {
   setThemeVariant: (theme: ThemeVariant) => void;
   setCustomAccentColor: (value: string) => void;
   setHudOverlayEnabled: (enabled: boolean) => void;
+  addRecentSecurity: (security: RecentSecurity) => void;
+  clearRecentSecurities: () => void;
 };
 
 const countryDefaults: Record<CountryCode, { market: MarketCode; currency: DisplayCurrency }> = {
@@ -56,6 +120,7 @@ export const useSettingsStore = create<SettingsState>()(
       themeVariant: "terminal-noir",
       customAccentColor: "#FF6B00",
       hudOverlayEnabled: false,
+      recentSecurities: [],
       setSelectedCountry: (country) => {
         const defaults = countryDefaults[country];
         set({
@@ -75,6 +140,19 @@ export const useSettingsStore = create<SettingsState>()(
           customAccentColor: /^#[0-9A-Fa-f]{6}$/.test(value) ? value.toUpperCase() : "#FF6B00",
         }),
       setHudOverlayEnabled: (enabled) => set({ hudOverlayEnabled: enabled }),
+      addRecentSecurity: (security) =>
+        set((state) => {
+          const next = sanitizeRecentSecurity(security);
+          if (!next) return {};
+
+          return {
+            recentSecurities: [next, ...state.recentSecurities.filter((item) => item.symbol !== next.symbol)].slice(
+              0,
+              MAX_RECENT_SECURITIES,
+            ),
+          };
+        }),
+      clearRecentSecurities: () => set({ recentSecurities: [] }),
     }),
     {
       name: "ui-settings",
@@ -106,6 +184,7 @@ export const useSettingsStore = create<SettingsState>()(
             typeof persisted.hudOverlayEnabled === "boolean"
               ? persisted.hudOverlayEnabled
               : current.hudOverlayEnabled,
+          recentSecurities: sanitizeRecentSecurities((persisted as Partial<SettingsState>).recentSecurities),
         };
       },
     },

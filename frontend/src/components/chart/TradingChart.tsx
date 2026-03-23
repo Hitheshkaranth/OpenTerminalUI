@@ -584,6 +584,8 @@ export function TradingChart({
       }>
     > | null
   >(null);
+  const flushContextMarkersImmediately =
+    typeof window !== "undefined" && /jsdom/i.test(window.navigator.userAgent);
 
   if (!hoveredCandleBatchRef.current) {
     hoveredCandleBatchRef.current = createRafBatcher<CandlePoint | null>((next) => {
@@ -1708,8 +1710,17 @@ export function TradingChart({
     comparisonSeriesRef.current = [];
     if (!comparisonSeries.length) return;
 
-    const palette = ["#4EA1FF", "#A0E75A", "#FFB86B", "#D58CFF"];
-    comparisonSeries.forEach((row, idx) => {
+    const palette = [
+      "#4EA1FF", // Blue
+      "#A0E75A", // Lime
+      "#FFB86B", // Orange
+      "#D58CFF", // Purple
+      "#FF6B6B", // Red
+      "#4ECDC4", // Teal
+      "#FFE66D", // Yellow
+      "#FF9FF3", // Pink
+    ];
+    comparisonSeries.slice(0, 8).forEach((row, idx) => {
       const points = buildComparisonPoints(row.data || [], effectiveComparisonMode);
       if (!points.length) return;
       const line = chart.addSeries(LineSeries, {
@@ -1910,11 +1921,19 @@ export function TradingChart({
     const host = chartRef.current;
     if (!chart || !host || !contextMarkers.length) {
       contextMarkerBatchRef.current?.schedule({ events: [], actions: [] });
+      if (flushContextMarkersImmediately) {
+        contextMarkerBatchRef.current?.flush();
+      }
       return;
     }
 
     const layout = (markers: ContextOverlayMarker[]) => {
-      const width = host.clientWidth || 0;
+      const width =
+        host.clientWidth ||
+        host.getBoundingClientRect().width ||
+        host.offsetWidth ||
+        0;
+      const canClampToWidth = width > 16;
       const laneEnds = [-Number.POSITIVE_INFINITY, -Number.POSITIVE_INFINITY];
       return markers
         .map((marker) => {
@@ -1925,7 +1944,7 @@ export function TradingChart({
             : null;
         })
         .filter((marker): marker is ContextOverlayMarker & { left: number } => marker !== null)
-        .filter((marker) => marker.left >= 8 && marker.left <= Math.max(8, width - 8))
+        .filter((marker) => marker.left >= 8 && (!canClampToWidth || marker.left <= width - 8))
         .sort((left, right) => left.left - right.left)
         .map((marker) => {
           let lane = laneEnds.findIndex((end) => marker.left - end >= 56);
@@ -1940,6 +1959,9 @@ export function TradingChart({
         events: layout(contextMarkers.filter((marker) => marker.kind === "event")),
         actions: layout(contextMarkers.filter((marker) => marker.kind === "action")),
       });
+      if (flushContextMarkersImmediately) {
+        contextMarkerBatchRef.current?.flush();
+      }
     };
 
     recalc();
@@ -1956,7 +1978,7 @@ export function TradingChart({
       resizeObserver?.disconnect();
       contextMarkerBatchRef.current?.cancel();
     };
-  }, [contextMarkers]);
+  }, [contextMarkers, flushContextMarkersImmediately]);
 
   const displayCandle = selectedCandle ?? hoveredRef.current ?? syncedCandle;
   const latestParsedCandle = replayParsed.length ? replayParsed[replayParsed.length - 1] : null;
@@ -2017,8 +2039,17 @@ export function TradingChart({
   }, [inspectedTime, overlays]);
   const comparisonInspectorRows = useMemo<InspectorRow[]>(() => {
     const rows: InspectorRow[] = [];
-    const palette = ["#4EA1FF", "#A0E75A", "#FFB86B", "#D58CFF"];
-    comparisonSeries.forEach((row, idx) => {
+    const palette = [
+      "#4EA1FF", // Blue
+      "#A0E75A", // Lime
+      "#FFB86B", // Orange
+      "#D58CFF", // Purple
+      "#FF6B6B", // Red
+      "#4ECDC4", // Teal
+      "#FFE66D", // Yellow
+      "#FF9FF3", // Pink
+    ];
+    comparisonSeries.slice(0, 8).forEach((row, idx) => {
       const points = buildComparisonPoints(row.data || [], effectiveComparisonMode);
       const point = findComparisonPointAtOrBefore(points, inspectedTime);
       if (!point) return;

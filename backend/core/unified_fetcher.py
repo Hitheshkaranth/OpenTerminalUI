@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from backend.core.finnhub_client import FinnhubClient
@@ -11,6 +12,8 @@ from backend.core.kite_client import KiteClient
 from backend.core.nse_client import NSEClient
 from backend.core.yahoo_client import YahooClient
 from backend.shared.market_classifier import market_classifier
+from backend.services.orderbook_service import service as orderbook_service
+from backend.api.schemas.market_data import MarketDepth, DepthLevel
 
 logger = logging.getLogger(__name__)
 
@@ -431,3 +434,78 @@ class UnifiedFetcher:
     async def fetch_analyst_consensus(self, ticker: str) -> Dict[str, Any]:
         # Finnhub is good for this
         return await self.finnhub.get_recommendation_trends(ticker.strip().upper())
+
+    async def fetch_depth(self, ticker: str, levels: int = 10) -> MarketDepth:
+        symbol = ticker.strip().upper()
+        cls = await market_classifier.classify(symbol)
+        kite_token = self.kite.resolve_access_token()
+
+        # 1. Kite (Real-time depth for India)
+        if cls.country_code == "IN" and self.kite.api_key and kite_token:
+            try:
+                instrument = f"NSE:{symbol}"
+                data = await self.kite.get_quote(kite_token, [instrument])
+                qmap = data.get("data") if isinstance(data, dict) else None
+                if isinstance(qmap, dict) and isinstance(qmap.get(instrument), dict):
+                    kq = qmap[instrument]
+                    depth = kq.get("depth", {})
+                    bids = [
+                        DepthLevel(price=_to_float(d.get("price")) or 0.0, size=int(d.get("quantity") or 0), orders=int(d.get("orders") or 0))
+                        for d in depth.get("buy", [])
+                    ]
+                    asks = [
+                        DepthLevel(price=_to_float(d.get("price")) or 0.0, size=int(d.get("quantity") or 0), orders=int(d.get("orders") or 0))
+                        for d in depth.get("sell", [])
+                    ]
+                    if bids or asks:
+                        return MarketDepth(
+                            symbol=symbol,
+                            market="IN",
+                            as_of=datetime.now(timezone.utc),
+                            bids=bids[:levels],
+                            asks=asks[:levels],
+                            total_bid_quantity=sum(b.size for b in bids),
+                            total_ask_quantity=sum(a.size for a in asks),
+                        )
+            except Exception as e:
+                logger.debug(f"Kite depth failed for {symbol}: {e}")
+
+        # 2. NSE (Snapshot depth)
+        if cls.country_code == "IN":
+            try:
+                data = await self.nse.get_quote_equity(symbol)
+                # NSE depth is often in 'marketDeptOrderBook' -> 'bid' / 'ask'
+                if data and "marketDeptOrderBook" in data:
+                    md = data["marketDeptOrderBook"]
+                    bids = [
+                        DepthLevel(price=_to_float(d.get("price")) or 0.0, size=int(d.get("quantity") or 0))
+                        for d in md.get("bid", [])
+                    ]
+                    asks = [
+                        DepthLevel(price=_to_float(d.get("price")) or 0.0, size=int(d.get("quantity") or 0))
+                        for d in md.get("ask", [])
+                    ]
+                    if bids or asks:
+                         return MarketDepth(
+                            symbol=symbol,
+                            market="IN",
+                            as_of=datetime.now(timezone.utc),
+                            bids=bids[:levels],
+                            asks=asks[:levels],
+                            total_bid_quantity=sum(b.size for b in bids),
+                            total_ask_quantity=sum(a.size for a in asks),
+                        )
+            except Exception as e:
+                logger.debug(f"NSE depth failed for {symbol}: {e}")
+
+        # 3. Fallback to Synthetic
+        snap = orderbook_service.get_snapshot(symbol, market_hint=cls.country_code, levels=levels)
+        return MarketDepth(
+            symbol=symbol,
+            market=snap.market,
+            as_of=snap.as_of,
+            bids=[DepthLevel(price=b.price, size=b.size, orders=b.orders) for b in snap.bids],
+            asks=[DepthLevel(price=a.price, size=a.size, orders=a.orders) for a in snap.asks],
+            total_bid_quantity=snap.total_bid_quantity,
+            total_ask_quantity=snap.total_ask_quantity,
+        )

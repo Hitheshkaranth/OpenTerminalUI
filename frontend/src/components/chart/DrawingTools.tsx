@@ -7,6 +7,11 @@ type Props = {
   onModeChange: (mode: DrawMode) => void;
   onClear: () => void;
   pendingTrendPoint?: boolean;
+  selectedDrawing?: {
+    id: string;
+    tool: { type: DrawingToolType; label: string };
+  } | null;
+  onRequestCreateAlert?: (drawingId: string) => void;
 };
 
 const TOOL_LABELS: Record<DrawingToolType, string> = {
@@ -15,6 +20,7 @@ const TOOL_LABELS: Record<DrawingToolType, string> = {
   hline: "H-Line",
   vline: "V-Line",
   rectangle: "Box",
+  anchored_vwap: "Anchored VWAP",
 };
 
 const TOOL_HINTS: Record<DrawingToolType, string> = {
@@ -23,9 +29,17 @@ const TOOL_HINTS: Record<DrawingToolType, string> = {
   hline: "Click chart to place a horizontal level",
   vline: "Click chart to place a vertical marker",
   rectangle: "Click two corners to draw a range box",
+  anchored_vwap: "Click a bar to anchor the VWAP line",
 };
 
-export function DrawingTools({ mode, onModeChange, onClear, pendingTrendPoint = false }: Props) {
+export function DrawingTools({
+  mode,
+  onModeChange,
+  onClear,
+  pendingTrendPoint = false,
+  selectedDrawing = null,
+  onRequestCreateAlert,
+}: Props) {
   const tools = [
     { id: "none" as const, label: "Cursor", family: "cursor" },
     ...listDrawingTools().map((tool) => ({
@@ -72,6 +86,15 @@ export function DrawingTools({ mode, onModeChange, onClear, pendingTrendPoint = 
       >
         Clear Drawings
       </button>
+      {selectedDrawing && onRequestCreateAlert ? (
+        <button
+          type="button"
+          onClick={() => onRequestCreateAlert(selectedDrawing.id)}
+          className="mt-2 w-full rounded border border-terminal-border px-2 py-1 text-xs text-terminal-accent hover:border-terminal-accent"
+        >
+          Create Alert for Selected Drawing
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -104,6 +104,9 @@ test.describe("Terminal shell + GO bar", () => {
     const routes = [
       "/equity/dashboard",
       "/equity/stocks",
+      "/equity/commodities",
+      "/equity/forex",
+      "/equity/hotlists",
       "/equity/portfolio",
       "/equity/risk",
       "/equity/ops",

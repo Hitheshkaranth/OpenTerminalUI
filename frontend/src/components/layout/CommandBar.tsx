@@ -3,11 +3,23 @@ import { Search, History, Command as CommandIcon, Loader2, Sparkles, X, ArrowRig
 import Fuse from "fuse.js";
 import { useNavigate } from "react-router-dom";
 
-import { fetchCryptoSearch, searchSymbols, aiQuery, type SearchSymbolItem } from "../../api/client";
+import {
+  aiQuery,
+  fetchChart,
+  fetchCryptoCandles,
+  fetchCryptoCoinDetail,
+  fetchCryptoSearch,
+  fetchQuotesBatch,
+  searchSymbols,
+  type SearchSymbolItem,
+} from "../../api/client";
+import { SparklineCell } from "../home/SparklineCell";
+import { inferRecentSecurityAssetClass, inferRecentSecurityMarket, useRecentSecurities } from "../../hooks/useRecentSecurities";
 import {
   COMMAND_FUNCTIONS,
+  buildAssetDisambiguationOptions,
+  buildTickerCommandHints,
   parseCommand,
-  executeParsedCommand,
   type CommandExecutionResult,
   type CommandSuggestion,
 } from "./commanding";
@@ -24,6 +36,15 @@ const INSTRUMENT_CACHE_KEY = "ot:gobar:instrument-cache:v1";
 const MAX_HISTORY = 20;
 
 type VisualState = "idle" | "success" | "error";
+type PreviewState = {
+  symbol: string;
+  name: string;
+  marketLabel: string;
+  assetClassLabel: string;
+  price: number | null;
+  changePercent: number | null;
+  sparkline: number[];
+};
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -53,10 +74,64 @@ function dedupeTickers(items: SearchSymbolItem[]): SearchSymbolItem[] {
   });
 }
 
+function isCryptoSymbol(symbol: string, exchange?: string) {
+  return /-USD$/i.test(symbol) || String(exchange ?? "").trim().toUpperCase().includes("CRYPTO");
+}
+
+function looksLikeTickerToken(token?: string) {
+  return Boolean(token) && /^[A-Z0-9.\-]{1,20}$/i.test(String(token).trim());
+}
+
+function formatPreviewPrice(value: number | null) {
+  if (value == null || !Number.isFinite(value)) return "--";
+  return value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatPreviewChange(value: number | null) {
+  if (value == null || !Number.isFinite(value)) return "--";
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(2)}%`;
+}
+
+function formatAssetClassLabel(value: string) {
+  return value.toUpperCase();
+}
+
+function findSymbolMetadata(
+  symbol: string,
+  searchUniverse: SearchSymbolItem[],
+  recentSecurities: Array<{ symbol: string; name: string; market: "IN" | "US" }>,
+) {
+  const match = searchUniverse.find((item) => String(item.ticker || "").trim().toUpperCase() === symbol);
+  if (match) {
+    return {
+      name: match.name,
+      exchange: match.exchange,
+      countryCode: match.country_code,
+    };
+  }
+
+  const recent = recentSecurities.find((item) => item.symbol === symbol);
+  if (recent) {
+    return {
+      name: recent.name,
+      exchange: undefined,
+      countryCode: recent.market,
+    };
+  }
+
+  return {
+    name: symbol,
+    exchange: undefined,
+    countryCode: undefined,
+  };
+}
+
 export function CommandBar({ onExecute }: Props) {
   const navigate = useNavigate();
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
   const activeTicker = useStockStore((s) => s.ticker);
+  const { recentSecurities, addRecent } = useRecentSecurities();
 
   const [value, setValue] = useState("");
   const [focused, setFocused] = useState(false);
@@ -71,15 +146,18 @@ export function CommandBar({ onExecute }: Props) {
   const [flashState, setFlashState] = useState<VisualState>("idle");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [history, setHistory] = useState<string[]>(() => (typeof window !== "undefined" ? readJson<string[]>(HISTORY_KEY, []) : []));
-  const [historyCursor, setHistoryCursor] = useState<number | null>(null);
   const [reverseSearchOpen, setReverseSearchOpen] = useState(false);
   const [remoteTickers, setRemoteTickers] = useState<SearchSymbolItem[]>([]);
   const [searchingTickers, setSearchingTickers] = useState(false);
+  const [preview, setPreview] = useState<PreviewState | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [instrumentCache, setInstrumentCache] = useState<SearchSymbolItem[]>(() => (typeof window !== "undefined" ? readJson<SearchSymbolItem[]>(INSTRUMENT_CACHE_KEY, []) : []));
   const [isOpen, setIsOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const searchReqRef = useRef(0);
+  const previewReqRef = useRef(0);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectedIndexRef = useRef(0);
 
   useEffect(() => {
     writeJson(HISTORY_KEY, history.slice(0, MAX_HISTORY));
@@ -172,9 +250,113 @@ export function CommandBar({ onExecute }: Props) {
     return () => clearTimeout(timer);
   }, [selectedMarket, value]);
 
+  const searchUniverse = useMemo(() => dedupeTickers([...remoteTickers, ...instrumentCache]).slice(0, 80), [instrumentCache, remoteTickers]);
+
+  const previewTarget = useMemo(() => {
+    const query = value.trim();
+    if (!query || reverseSearchOpen) return null;
+
+    const parsed = parseCommand(query);
+    const bestSearchMatch = remoteTickers[0];
+    const symbol =
+      bestSearchMatch && !query.includes(" ")
+        ? String(bestSearchMatch.ticker || "").trim().toUpperCase()
+        : parsed.kind === "ticker" || parsed.kind === "ticker-function"
+          ? parsed.ticker
+          : parsed.kind === "function" && looksLikeTickerToken(parsed.modifiers[0])
+            ? parsed.modifiers[0]
+          : "";
+
+    if (!symbol) return null;
+
+    const metadata = findSymbolMetadata(symbol, searchUniverse, recentSecurities);
+
+    return {
+      symbol,
+      name: metadata.name || symbol,
+      exchange: metadata.exchange,
+      countryCode: metadata.countryCode,
+      market: selectedMarket,
+      isCrypto: isCryptoSymbol(symbol, metadata.exchange),
+    };
+  }, [recentSecurities, remoteTickers, reverseSearchOpen, searchUniverse, selectedMarket, value]);
+
+  useEffect(() => {
+    if (!focused || !previewTarget) {
+      previewReqRef.current += 1;
+      setPreview(null);
+      setPreviewLoading(false);
+      return;
+    }
+
+    const requestId = ++previewReqRef.current;
+    setPreviewLoading(false);
+    const timer = setTimeout(() => {
+      setPreviewLoading(true);
+      void (async () => {
+        try {
+          if (previewTarget.isCrypto) {
+            const [detail, candles] = await Promise.all([
+              fetchCryptoCoinDetail(previewTarget.symbol),
+              fetchCryptoCandles(previewTarget.symbol, "1d", "5d"),
+            ]);
+            if (requestId !== previewReqRef.current) return;
+
+            setPreview({
+              symbol: previewTarget.symbol,
+              name: detail.name || previewTarget.name || previewTarget.symbol,
+              marketLabel: "CRYPTO",
+              assetClassLabel: formatAssetClassLabel("crypto"),
+              price: typeof detail.price === "number" ? detail.price : null,
+              changePercent: typeof detail.change_24h === "number" ? detail.change_24h : null,
+              sparkline:
+                candles.data?.map((point) => Number(point.c)).filter((point) => Number.isFinite(point)).slice(-5) ??
+                detail.sparkline.slice(-5),
+            });
+            return;
+          }
+
+          const [quotesResponse, chartResponse] = await Promise.all([
+            fetchQuotesBatch([previewTarget.symbol], previewTarget.market),
+            fetchChart(previewTarget.symbol, "1d", "5d", previewTarget.market),
+          ]);
+          if (requestId !== previewReqRef.current) return;
+
+          const quote = quotesResponse.quotes[0];
+          setPreview({
+            symbol: previewTarget.symbol,
+            name: previewTarget.name || previewTarget.symbol,
+            marketLabel: previewTarget.market,
+            assetClassLabel: formatAssetClassLabel(
+              inferRecentSecurityAssetClass(previewTarget.symbol, previewTarget.exchange),
+            ),
+            price: typeof quote?.last === "number" ? quote.last : null,
+            changePercent: typeof quote?.changePct === "number" ? quote.changePct : null,
+            sparkline: (chartResponse.data || [])
+              .map((point) => Number(point.c))
+              .filter((point) => Number.isFinite(point))
+              .slice(-5),
+          });
+        } catch {
+          if (requestId === previewReqRef.current) {
+            setPreview(null);
+          }
+        } finally {
+          if (requestId === previewReqRef.current) {
+            setPreviewLoading(false);
+          }
+        }
+      })();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [focused, previewTarget]);
+
   const suggestions = useMemo<CommandSuggestion[]>(() => {
     const q = value.trim();
     const items: Array<CommandSuggestion & { score: number }> = [];
+    const disambiguationOptions = q ? buildAssetDisambiguationOptions(q, searchUniverse) : [];
+    const tickerHints = q ? buildTickerCommandHints(q) : [];
 
     if (reverseSearchOpen) {
       if (q) {
@@ -206,6 +388,46 @@ export function CommandBar({ onExecute }: Props) {
         });
       }
       return items.sort((a, b) => b.score - a.score).slice(0, 20);
+    }
+
+    if (!q) {
+      recentSecurities.slice(0, 6).forEach((security, idx) => {
+        items.push({
+          kind: "ticker",
+          key: `recent-security:${security.symbol}`,
+          title: security.symbol,
+          subtitle: [`Recent security`, security.name, security.market, formatAssetClassLabel(security.assetClass)]
+            .filter(Boolean)
+            .join(" - "),
+          command: security.symbol,
+          price: security.lastPrice ?? null,
+          score: 600 - idx,
+        });
+      });
+    }
+
+    if (q) {
+      disambiguationOptions.forEach((option, idx) => {
+        items.push({
+          kind: "disambiguation",
+          key: option.key,
+          title: option.symbol,
+          subtitle: option.description,
+          command: option.command,
+          score: 1200 - idx,
+        });
+      });
+
+      tickerHints.forEach((hint, idx) => {
+        items.push({
+          kind: "hint",
+          key: hint.key,
+          title: hint.title,
+          subtitle: hint.subtitle,
+          command: hint.command,
+          score: 960 - idx,
+        });
+      });
     }
 
     if (q) {
@@ -278,7 +500,8 @@ export function CommandBar({ onExecute }: Props) {
       });
     }
 
-    const tickerPool = dedupeTickers([...remoteTickers, ...instrumentCache]).slice(0, 80);
+    const recentSymbols = new Set(recentSecurities.map((security) => security.symbol));
+    const tickerPool = q ? searchUniverse : searchUniverse.filter((item) => !recentSymbols.has(String(item.ticker || "").toUpperCase()));
     if (q) {
       const tickerFuse = new Fuse(
         tickerPool.map((item) => ({
@@ -330,17 +553,40 @@ export function CommandBar({ onExecute }: Props) {
       .sort((a, b) => b.score - a.score)
       .slice(0, 12)
       .map(({ score: _score, ...rest }) => rest);
-  }, [history, instrumentCache, remoteTickers, reverseSearchOpen, value]);
+  }, [history, recentSecurities, reverseSearchOpen, searchUniverse, value]);
 
   useEffect(() => {
     setSelectedIndex(0);
+    selectedIndexRef.current = 0;
   }, [value, reverseSearchOpen]);
 
   const commitHistory = (cmd: string) => {
     const normalized = cmd.trim();
     if (!normalized) return;
     setHistory((prev) => [normalized, ...prev.filter((v) => v !== normalized)].slice(0, MAX_HISTORY));
-    setHistoryCursor(null);
+  };
+
+  const commitRecentSecurity = (command: string) => {
+    const parsed = parseCommand(command);
+    if (parsed.kind !== "ticker" && parsed.kind !== "ticker-function") return;
+
+    const symbol = parsed.ticker;
+    const metadata = findSymbolMetadata(symbol, searchUniverse, recentSecurities);
+
+    const previewPrice = preview?.symbol === symbol ? preview.price ?? undefined : undefined;
+    const previewChange = preview?.symbol === symbol ? preview.changePercent ?? undefined : undefined;
+
+    addRecent(
+      symbol,
+      metadata.name || preview?.name || symbol,
+      inferRecentSecurityAssetClass(symbol, metadata.exchange),
+      inferRecentSecurityMarket(
+        metadata.countryCode,
+        metadata.exchange || selectedMarket,
+      ),
+      previewPrice,
+      previewChange,
+    );
   };
 
   const triggerFlash = (next: VisualState) => {
@@ -383,6 +629,7 @@ export function CommandBar({ onExecute }: Props) {
     if (parsed.kind === "natural-language" && command.includes(" ")) {
       void handleAiQuery(command);
       setValue("");
+      setPreview(null);
       commitHistory(command);
       return;
     }
@@ -395,7 +642,9 @@ export function CommandBar({ onExecute }: Props) {
       const result = await onExecute(command);
       if (result.ok) {
         commitHistory(command);
+        commitRecentSecurity(command);
         setValue("");
+        setPreview(null);
         triggerFlash("success");
       } else {
         triggerFlash("error");
@@ -407,7 +656,7 @@ export function CommandBar({ onExecute }: Props) {
     }
   };
 
-  const activeSuggestion = suggestions[selectedIndex];
+  const getActiveSuggestion = () => suggestions[selectedIndexRef.current];
 
   return (
     <div className="relative z-40 border-b border-terminal-border bg-[#0D1117]/95 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-[#0D1117]/88">
@@ -430,42 +679,46 @@ export function CommandBar({ onExecute }: Props) {
           onFocus={() => {
             setFocused(true);
             setIsOpen(true);
+            setSelectedIndex(0);
+            selectedIndexRef.current = 0;
           }}
           onBlur={() => {
             setFocused(false);
-            setTimeout(() => setIsOpen(false), 100);
+            setTimeout(() => {
+              setIsOpen(false);
+              setPreview(null);
+            }, 100);
           }}
           onChange={(e) => {
             setValue(e.target.value);
             setIsOpen(true);
-            setHistoryCursor(null);
           }}
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") {
               e.preventDefault();
               setIsOpen(true);
-              setSelectedIndex((idx) => (suggestions.length ? (idx + 1) % suggestions.length : 0));
+              setSelectedIndex((idx) => {
+                const next = suggestions.length ? (idx + 1) % suggestions.length : 0;
+                selectedIndexRef.current = next;
+                return next;
+              });
               return;
             }
             if (e.key === "ArrowUp") {
-              if (!value.trim()) {
-                e.preventDefault();
-                setHistoryCursor((prev) => {
-                  const next = prev == null ? 0 : Math.min(prev + 1, history.length - 1);
-                  const cmd = history[next];
-                  if (cmd) setValue(cmd);
-                  return history.length ? next : null;
-                });
-                return;
-              }
               e.preventDefault();
-              setSelectedIndex((idx) => (suggestions.length ? (idx - 1 + suggestions.length) % suggestions.length : 0));
+              setIsOpen(true);
+              setSelectedIndex((idx) => {
+                const next = suggestions.length ? (idx - 1 + suggestions.length) % suggestions.length : 0;
+                selectedIndexRef.current = next;
+                return next;
+              });
               return;
             }
             if (e.key === "Enter") {
               e.preventDefault();
-              if (isOpen && activeSuggestion) {
-                void submitCommand(activeSuggestion.command);
+              const currentSuggestion = getActiveSuggestion();
+              if (isOpen && currentSuggestion) {
+                void submitCommand(currentSuggestion.command);
               } else {
                 void submitCommand();
               }
@@ -475,6 +728,7 @@ export function CommandBar({ onExecute }: Props) {
               e.preventDefault();
               setIsOpen(false);
               setReverseSearchOpen(false);
+              setPreview(null);
               (e.target as HTMLInputElement).blur();
             }
           }}
@@ -494,6 +748,52 @@ export function CommandBar({ onExecute }: Props) {
           GO
         </button>
       </div>
+
+      {focused && (previewLoading || preview) && value.trim() ? (
+        <div className="pointer-events-none absolute right-3 top-[calc(100%+4px)] z-[55] w-[280px] overflow-hidden rounded-sm border border-terminal-border bg-[#0F141B]/98 shadow-2xl">
+          <div className="flex items-center justify-between border-b border-terminal-border px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-terminal-muted">
+            <span>Security Preview</span>
+            {preview ? <span>{preview.marketLabel}</span> : null}
+          </div>
+          <div className="space-y-3 p-3">
+            {previewLoading && !preview ? (
+              <div className="flex items-center gap-2 text-xs text-terminal-muted">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-terminal-accent" />
+                Loading preview...
+              </div>
+            ) : preview ? (
+              <>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="ot-type-data text-sm text-terminal-text">{preview.symbol}</div>
+                    <div className="truncate text-[11px] text-terminal-muted">{preview.name}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="ot-type-data text-sm text-terminal-text">{formatPreviewPrice(preview.price)}</div>
+                    <div className={preview.changePercent != null && preview.changePercent < 0 ? "text-[11px] text-terminal-neg" : "text-[11px] text-terminal-pos"}>
+                      {formatPreviewChange(preview.changePercent)}
+                    </div>
+                  </div>
+                </div>
+                <SparklineCell
+                  points={preview.sparkline}
+                  width={254}
+                  height={42}
+                  ariaLabel={`${preview.symbol} preview sparkline`}
+                  emptyLabel="No sparkline data"
+                  className="ot-sparkline"
+                />
+                <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-terminal-muted">
+                  <span>{preview.assetClassLabel}</span>
+                  <span>5D Trend</span>
+                </div>
+              </>
+            ) : (
+              <div className="text-xs text-terminal-muted">No preview available for the current query.</div>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {/* AI Response Panel */}
       {aiOpen && (
@@ -606,21 +906,27 @@ export function CommandBar({ onExecute }: Props) {
                   className={`inline-flex h-5 items-center rounded-sm border px-1.5 text-[10px] ot-type-label ${
                     item.kind === "function"
                       ? "border-[#FF6B00]/40 text-[#FF6B00]"
+                      : item.kind === "hint"
+                        ? "border-violet-500/35 text-violet-300"
+                        : item.kind === "disambiguation"
+                          ? "border-amber-500/35 text-amber-300"
                       : item.kind === "recent"
                         ? "border-terminal-border text-terminal-muted"
                         : "border-sky-500/30 text-sky-400"
                   }`}
                 >
-                  {item.kind === "function" ? "FN" : item.kind === "recent" ? "HIST" : "SYM"}
+                  {item.kind === "function" ? "FN" : item.kind === "hint" ? "FUNC" : item.kind === "disambiguation" ? "ASSET" : item.kind === "recent" ? "HIST" : "SYM"}
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate ot-type-data text-xs text-terminal-text">{item.title}</span>
+                <span className="block truncate ot-type-data text-xs text-terminal-text">{item.title}</span>
                   <span className="block truncate text-[11px] text-terminal-muted">{item.subtitle}</span>
                 </span>
                 {"price" in item && item.price != null ? (
                   <span className="ot-type-data text-xs text-terminal-muted">{item.price.toFixed(2)}</span>
-                ) : (
+                ) : item.kind === "function" || item.kind === "hint" || item.kind === "disambiguation" || item.kind === "recent" ? (
                   <span className="ot-type-data text-xs text-terminal-muted">{item.command}</span>
+                ) : (
+                  <span aria-hidden className="ot-type-data text-xs text-terminal-muted" />
                 )}
               </button>
             ))}

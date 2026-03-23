@@ -19,3 +19,12 @@ export function formatNumber(value: number): string {
   if (!Number.isFinite(value)) return "-";
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
 }
+
+export function formatCurrency(value: number, currency: CurrencyCode = "USD"): string {
+  return formatMoney(value, currency);
+}
+
+export function formatPercent(value: number): string {
+  if (!Number.isFinite(value)) return "-";
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+}

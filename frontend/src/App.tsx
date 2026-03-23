@@ -17,6 +17,9 @@ const ForgotAccessPage = lazy(() => import("./pages/Auth/ForgotAccessPage").then
 
 const StockDetailPage = lazy(() => import("./pages/StockDetail").then((m) => ({ default: m.StockDetailPage })));
 const SecurityHubPage = lazy(() => import("./pages/SecurityHub").then((m) => ({ default: m.SecurityHubPage })));
+const CommoditiesPage = lazy(() => import("./pages/Commodities").then((m) => ({ default: m.CommoditiesPage })));
+const ForexPage = lazy(() => import("./pages/Forex").then((m) => ({ default: m.ForexPage })));
+const HotlistsPage = lazy(() => import("./pages/Hotlists").then((m) => ({ default: m.HotlistsPage })));
 const AboutPage = lazy(() => import("./pages/About").then((m) => ({ default: m.AboutPage })));
 const DashboardPage = lazy(() => import("./pages/Dashboard").then((m) => ({ default: m.DashboardPage })));
 const ScreenerPage = lazy(() => import("./pages/Screener").then((m) => ({ default: m.ScreenerPage })));
@@ -38,6 +41,9 @@ const YieldCurveDashboard = lazy(() => import("./pages/fixed-income/YieldCurveDa
 const EconomicTerminal = lazy(() => import("./pages/economics/EconomicTerminal").then((m) => ({ default: m.EconomicTerminal })));
 const SectorRotationPage = lazy(() => import("./pages/SectorRotation").then((m) => ({ default: m.SectorRotationPage })));
 const CryptoWorkspacePage = lazy(() => import("./pages/CryptoWorkspace").then((m) => ({ default: m.CryptoWorkspacePage })));
+const BondsPage = lazy(() => import("./pages/equity/bonds/Bonds").then((m) => ({ default: m.BondsPage })));
+const ETFAnalyticsPage = lazy(() => import("./pages/ETFAnalytics").then((m) => ({ default: m.ETFAnalyticsPage })));
+const MutualFundsPage = lazy(() => import("./pages/MutualFunds").then((m) => ({ default: m.MutualFundsPage })));
 
 const OptionChainPage = lazy(() => import("./fno/pages/OptionChainPage").then((m) => ({ default: m.OptionChainPage })));
 const GreeksPage = lazy(() => import("./fno/pages/GreeksPage").then((m) => ({ default: m.GreeksPage })));
@@ -93,6 +99,9 @@ function App() {
             <Route path="stocks" element={<StockDetailPage />} />
             <Route path="security" element={<SecurityHubPage />} />
             <Route path="security/:ticker" element={<SecurityHubPage />} />
+            <Route path="commodities" element={<CommoditiesPage />} />
+            <Route path="forex" element={<ForexPage />} />
+            <Route path="hotlists" element={<HotlistsPage />} />
             <Route path="stocks/about" element={<AboutPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="screener" element={<ScreenerPage />} />
@@ -101,7 +110,8 @@ function App() {
             <Route path="portfolio/lab/portfolios/:id" element={<PortfolioLabDetailPage />} />
             <Route path="portfolio/lab/runs/:runId" element={<PortfolioLabRunReportPage />} />
             <Route path="portfolio/lab/blends" element={<PortfolioLabBlendsPage />} />
-            <Route path="mutual-funds" element={<Navigate to="/equity/portfolio?mode=mutual_funds" replace />} />
+            <Route path="mutual-funds" element={<MutualFundsPage />} />
+            <Route path="bonds" element={<BondsPage />} />
             <Route path="watchlist" element={<WatchlistPage />} />
             <Route path="news" element={<NewsPage />} />
             <Route path="alerts" element={<AlertsPage />} />
@@ -119,6 +129,7 @@ function App() {
             <Route path="economics" element={<EconomicTerminal />} />
             <Route path="sector-rotation" element={<SectorRotationPage />} />
             <Route path="crypto" element={<CryptoWorkspacePage />} />
+            <Route path="etf-analytics" element={<ETFAnalyticsPage />} />
             <Route path="cockpit" element={<CockpitDashboard />} />
           </Route>
 
@@ -159,6 +170,9 @@ function App() {
 
           <Route path="/stocks" element={<Navigate to="/equity/stocks" replace />} />
           <Route path="/security" element={<Navigate to="/equity/security" replace />} />
+          <Route path="/commodities" element={<Navigate to="/equity/commodities" replace />} />
+          <Route path="/forex" element={<Navigate to="/equity/forex" replace />} />
+          <Route path="/hotlists" element={<Navigate to="/equity/hotlists" replace />} />
           <Route path="/stocks/about" element={<Navigate to="/equity/stocks/about" replace />} />
           <Route path="/dashboard" element={<Navigate to="/equity/dashboard" replace />} />
           <Route path="/screener" element={<Navigate to="/equity/screener" replace />} />

@@ -1,12 +1,29 @@
 export const DRAWING_SCHEMA_VERSION = 3;
 export const DRAWING_HANDLE_FALLBACK_X = 12;
 
-export type DrawingToolType = "trendline" | "ray" | "hline" | "vline" | "rectangle";
+export type DrawingToolType = "trendline" | "ray" | "hline" | "vline" | "rectangle" | "anchored_vwap";
 export type DrawingToolFamily = "line" | "level" | "marker" | "range";
-export type DrawingAnchorRole = "start" | "end" | "level" | "marker";
+export type DrawingAnchorRole = "start" | "end" | "level" | "marker" | "anchor";
 export type DrawingSource = "local" | "remote";
 export type DrawingLineStyle = "solid" | "dashed";
 export type DrawingLayerMove = "front" | "forward" | "backward" | "back";
+export type DrawingAlertCondition = "cross_above" | "cross_below" | "cross_any";
+
+export type DrawingAlertConfig = {
+  enabled: boolean;
+  condition: DrawingAlertCondition;
+  message?: string;
+  notifyOnce: boolean;
+};
+
+export type AnchoredVwapConfig = {
+  anchorBarIndex?: number | null;
+  anchorTimestamp?: number | null;
+  showBands: boolean;
+  bandMultipliers: number[];
+  color: string;
+  lineWidth: 1 | 2 | 3 | 4;
+};
 
 export type DrawingPoint = {
   time: number;
@@ -46,6 +63,8 @@ export type NormalizedChartDrawing = {
   tool: DrawingToolMeta;
   anchors: DrawingAnchor[];
   style: DrawingStyle;
+  alert?: DrawingAlertConfig | null;
+  anchoredVwap?: AnchoredVwapConfig | null;
   visible: boolean;
   locked: boolean;
   order: number;
@@ -116,6 +135,14 @@ const DRAWING_TOOL_REGISTRY: Record<DrawingToolType, DrawingToolMeta> = {
     maxAnchors: 2,
     shape: "ray",
   },
+  anchored_vwap: {
+    type: "anchored_vwap",
+    family: "line",
+    label: "Anchored VWAP",
+    minAnchors: 1,
+    maxAnchors: 1,
+    shape: "ray",
+  },
   hline: {
     type: "hline",
     family: "level",
@@ -157,6 +184,7 @@ function getToolMeta(toolType: unknown): DrawingToolMeta | null {
   if (
     normalized === "trendline" ||
     normalized === "ray" ||
+    normalized === "anchored_vwap" ||
     normalized === "hline" ||
     normalized === "vline" ||
     normalized === "rectangle"
@@ -191,6 +219,50 @@ function clampFillOpacity(value: unknown, fallback: number): number {
 
 function normalizeLineStyle(value: unknown, fallback: DrawingLineStyle): DrawingLineStyle {
   return value === "dashed" || value === "solid" ? value : fallback;
+}
+
+function normalizeAlertCondition(value: unknown): DrawingAlertCondition {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (normalized === "cross_above" || normalized === "cross_below" || normalized === "cross_any") {
+    return normalized;
+  }
+  return "cross_any";
+}
+
+function normalizeDrawingAlert(raw: unknown): DrawingAlertConfig | null {
+  if (!raw || typeof raw !== "object") return null;
+  const input = raw as Record<string, unknown>;
+  const enabled = input.enabled !== false;
+  const condition = normalizeAlertCondition(input.condition);
+  const message = typeof input.message === "string" && input.message.trim() ? input.message.trim() : undefined;
+  return {
+    enabled,
+    condition,
+    message,
+    notifyOnce: Boolean(input.notifyOnce ?? input.notify_once ?? false),
+  };
+}
+
+function normalizeBandMultipliers(raw: unknown): number[] {
+  const values = Array.isArray(raw) ? raw : [];
+  const out = values
+    .map((item) => Number(item))
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .slice(0, 4);
+  return out.length ? out : [1, 2];
+}
+
+function normalizeAnchoredVwapConfig(raw: unknown): AnchoredVwapConfig | null {
+  if (!raw || typeof raw !== "object") return null;
+  const input = raw as Record<string, unknown>;
+  return {
+    anchorBarIndex: Number.isFinite(Number(input.anchorBarIndex)) ? Number(input.anchorBarIndex) : null,
+    anchorTimestamp: Number.isFinite(Number(input.anchorTimestamp)) ? Number(input.anchorTimestamp) : null,
+    showBands: input.showBands !== false,
+    bandMultipliers: normalizeBandMultipliers(input.bandMultipliers ?? input.bands),
+    color: typeof input.color === "string" && input.color.trim() ? input.color.trim() : "#7ea6e0",
+    lineWidth: clampLineWidth(input.lineWidth, 2),
+  };
 }
 
 function defaultDrawingStyle(toolType: DrawingToolType): DrawingStyle {
@@ -230,6 +302,15 @@ function defaultDrawingStyle(toolType: DrawingToolType): DrawingStyle {
       fillOpacity: 0,
     };
   }
+  if (toolType === "anchored_vwap") {
+    return {
+      color: "#7ea6e0",
+      lineWidth: 2,
+      lineStyle: "solid",
+      fillColor: null,
+      fillOpacity: 0,
+    };
+  }
   return {
     color: "#ffd166",
     lineWidth: 2,
@@ -254,6 +335,14 @@ function normalizeDrawingStyle(toolType: DrawingToolType, raw: unknown): Drawing
     fillColor,
     fillOpacity: clampFillOpacity(input.fillOpacity, base.fillOpacity),
   };
+}
+
+function normalizeDrawingAlertConfig(raw: unknown): DrawingAlertConfig | null {
+  return normalizeDrawingAlert(raw);
+}
+
+function normalizeAnchoredVwap(raw: unknown): AnchoredVwapConfig | null {
+  return normalizeAnchoredVwapConfig(raw);
 }
 
 function normalizeNumber(value: unknown): number | null {
@@ -309,6 +398,12 @@ function resolveOrderedTwoPointAnchors(anchors: DrawingAnchor[], minTimeGap = 60
 }
 
 function normalizeToolAnchors(toolType: DrawingToolType, anchors: DrawingAnchor[]): DrawingAnchor[] {
+  if (toolType === "anchored_vwap") {
+    const anchor = anchors.find((item) => Number.isFinite(item.time) && Number.isFinite(item.price));
+    if (!anchor) return [];
+    return [{ ...anchor, key: "anchor", role: "anchor" }];
+  }
+
   if (toolType === "hline") {
     const anchor = anchors.find((item) => Number.isFinite(item.time) && Number.isFinite(item.price));
     if (!anchor) return [];
@@ -325,6 +420,13 @@ function normalizeToolAnchors(toolType: DrawingToolType, anchors: DrawingAnchor[
 }
 
 function buildLegacyAnchors(toolType: DrawingToolType, raw: Record<string, unknown>): DrawingAnchor[] {
+  if (toolType === "anchored_vwap") {
+    const time = normalizeNumber(raw.anchor_time ?? raw.time ?? raw.anchor_timestamp);
+    if (time === null) return [];
+    const price = normalizeNumber(raw.anchor_price ?? raw.price ?? raw.anchor);
+    return [{ key: "anchor", role: "anchor", time, price: price ?? 0 }];
+  }
+
   if (toolType === "hline") {
     const price = normalizeNumber(raw.price);
     if (price === null) return [];
@@ -406,6 +508,8 @@ function buildNormalizedDrawing(args: {
   toolType: DrawingToolType;
   anchors: DrawingAnchor[];
   style?: unknown;
+  alert?: unknown;
+  anchoredVwap?: unknown;
   visible?: unknown;
   locked?: unknown;
   order?: unknown;
@@ -426,6 +530,8 @@ function buildNormalizedDrawing(args: {
     tool,
     anchors: normalizedAnchors,
     style: normalizeDrawingStyle(args.toolType, args.style),
+    alert: normalizeDrawingAlertConfig(args.alert),
+    anchoredVwap: normalizeAnchoredVwap(args.anchoredVwap),
     visible: args.visible !== false,
     locked: Boolean(args.locked),
     order: normalizeLayerOrder(args.order, Date.now()),
@@ -455,6 +561,8 @@ function normalizeUnknownDrawing(item: unknown, scope?: Partial<DrawingScope>): 
       toolType: tool.type,
       anchors: normalizeAnchors(tool.type, raw),
       style: raw.style,
+      alert: raw.alert,
+      anchoredVwap: raw.anchoredVwap ?? raw.anchored_vwap,
       visible: raw.visible,
       locked: raw.locked,
       order: raw.order ?? meta.order,
@@ -478,6 +586,8 @@ function normalizeUnknownDrawing(item: unknown, scope?: Partial<DrawingScope>): 
     toolType: tool.type,
     anchors: buildLegacyAnchors(tool.type, raw),
     style: raw.style,
+    alert: raw.alert,
+    anchoredVwap: raw.anchoredVwap ?? raw.anchored_vwap,
     order: raw.order,
     meta: {
       ...normalizeScope(scope),
@@ -522,6 +632,8 @@ export function normalizeRemoteDrawingRecord(
     toolType: tool.type,
     anchors: normalizeAnchors(tool.type, coordinates),
     style: record.style,
+    alert: coordinates.alert,
+    anchoredVwap: coordinates.anchoredVwap ?? coordinates.anchored_vwap,
     visible: coordinates.visible,
     locked: coordinates.locked,
     order: coordinates.layer_order ?? coordinates.z_index,
@@ -542,6 +654,9 @@ export function normalizeRemoteDrawingRecord(
 }
 
 function createInitialAnchors(toolType: DrawingToolType, points: DrawingPoint[]): DrawingAnchor[] {
+  if (toolType === "anchored_vwap") {
+    return points.slice(0, 1).map((point) => ({ key: "anchor", role: "anchor" as const, ...point }));
+  }
   if (toolType === "hline") {
     return points.slice(0, 1).map((point) => ({ key: "level", role: "level" as const, ...point }));
   }
@@ -559,7 +674,7 @@ export function createDrawing(
   toolType: DrawingToolType,
   points: DrawingPoint[],
   scope?: Partial<DrawingScope>,
-  overrides?: Partial<Pick<NormalizedChartDrawing, "id" | "locked" | "visible" | "order">> & {
+  overrides?: Partial<Pick<NormalizedChartDrawing, "id" | "locked" | "visible" | "order" | "alert" | "anchoredVwap">> & {
     style?: Partial<DrawingStyle>;
   },
 ): NormalizedChartDrawing | null {
@@ -572,6 +687,8 @@ export function createDrawing(
       ...defaultDrawingStyle(tool.type),
       ...(overrides?.style || {}),
     },
+    alert: overrides?.alert,
+    anchoredVwap: overrides?.anchoredVwap,
     visible: overrides?.visible,
     locked: overrides?.locked,
     order: overrides?.order,
@@ -628,6 +745,8 @@ export function serializeDrawingCollection(drawings: NormalizedChartDrawing[]): 
       price: anchor.price,
     })),
     style: { ...drawing.style },
+    alert: drawing.alert ? { ...drawing.alert } : null,
+    anchoredVwap: drawing.anchoredVwap ? { ...drawing.anchoredVwap } : null,
     visible: drawing.visible,
     locked: drawing.locked,
     order: drawing.order,
@@ -665,10 +784,21 @@ export function buildRemoteDrawingPayload(drawing: NormalizedChartDrawing): Draw
     const anchor = drawing.anchors[0];
     coordinates.time = anchor?.time ?? null;
     coordinates.anchor_price = anchor?.price ?? 0;
+  } else if (drawing.tool.type === "anchored_vwap") {
+    const anchor = drawing.anchors[0];
+    coordinates.anchor_time = anchor?.time ?? 0;
+    coordinates.anchor_price = anchor?.price ?? 0;
   } else {
     const [p1, p2] = resolveOrderedTwoPointAnchors(drawing.anchors);
     coordinates.p1 = p1 ? { time: p1.time, price: p1.price } : null;
     coordinates.p2 = p2 ? { time: p2.time, price: p2.price } : null;
+  }
+
+  if (drawing.alert) {
+    coordinates.alert = { ...drawing.alert };
+  }
+  if (drawing.anchoredVwap) {
+    coordinates.anchored_vwap = { ...drawing.anchoredVwap };
   }
 
   return {
@@ -851,6 +981,26 @@ export function getDrawingHandles(
     return [];
   }
 
+  if (drawing.tool.type === "anchored_vwap") {
+    const anchor = drawing.anchors[0];
+    const projectedLeft = anchor ? projector.timeToX(anchor.time) : null;
+    const projectedTop = anchor ? projector.priceToY(anchor.price) : null;
+    if (anchor && typeof projectedTop === "number" && Number.isFinite(projectedTop)) {
+      return [
+        {
+          id: `${drawing.id}-${anchor.key}`,
+          anchorKey: anchor.key,
+          left:
+            typeof projectedLeft === "number" && Number.isFinite(projectedLeft)
+              ? projectedLeft
+              : projector.fallbackX ?? DRAWING_HANDLE_FALLBACK_X,
+          top: projectedTop,
+        },
+      ];
+    }
+    return [];
+  }
+
   return drawing.anchors
     .map((anchor) => {
       const left = projector.timeToX(anchor.time);
@@ -958,20 +1108,36 @@ export function findDrawingHit(
       }
     }
 
-    if (drawing.tool.type === "hline") {
-      const y = projector.priceToY(drawing.anchors[0]?.price ?? NaN);
-      if (typeof y !== "number" || !Number.isFinite(y)) continue;
-      const distance = Math.abs(point.y - y);
+  if (drawing.tool.type === "hline") {
+    const y = projector.priceToY(drawing.anchors[0]?.price ?? NaN);
+    if (typeof y !== "number" || !Number.isFinite(y)) continue;
+    const distance = Math.abs(point.y - y);
       if (distance > thresholdPx) continue;
       if (!bestHit || distance <= bestHit.distance) {
         bestHit = {
           drawingId: drawing.id,
           target: "body",
           distance,
-        };
-      }
-      continue;
+      };
     }
+    continue;
+  }
+
+  if (drawing.tool.type === "anchored_vwap") {
+    const x = projector.timeToX(drawing.anchors[0]?.time ?? NaN);
+    const y = projector.priceToY(drawing.anchors[0]?.price ?? NaN);
+    if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const distance = Math.hypot(point.x - x, point.y - y);
+    if (distance > thresholdPx) continue;
+    if (!bestHit || distance <= bestHit.distance) {
+      bestHit = {
+        drawingId: drawing.id,
+        target: "body",
+        distance,
+      };
+    }
+    continue;
+  }
 
     if (drawing.tool.type === "vline") {
       const x = projector.timeToX(drawing.anchors[0]?.time ?? NaN);
@@ -1043,6 +1209,13 @@ export function applyDrawingHandleDrag(
     return {
       ...drawing,
       anchors: [{ key: "marker", role: "marker", time: snapped.time, price: snapped.price }],
+    };
+  }
+
+  if (drawing.tool.type === "anchored_vwap") {
+    return {
+      ...drawing,
+      anchors: [{ key: "anchor", role: "anchor", time: snapped.time, price: snapped.price }],
     };
   }
 

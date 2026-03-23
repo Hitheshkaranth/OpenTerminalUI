@@ -798,6 +798,73 @@ export type MutualFundDetailsResponse = {
   performance: MutualFundPerformance;
 };
 
+export type MutualFundRanking = {
+  scheme_code: number;
+  scheme_name: string;
+  category: string;
+  returns_1y: number;
+  returns_3y: number;
+  returns_5y: number;
+  rank: number;
+};
+
+export type RollingReturnPoint = {
+  date: string;
+  return_pct: number;
+};
+
+export type RollingReturnsResponse = {
+  scheme_code: number;
+  window_years: number;
+  returns: RollingReturnPoint[];
+};
+
+export type SipCalcResponse = {
+  monthly_amount: number;
+  years: number;
+  expected_return: number;
+  total_investment: number;
+  estimated_returns: number;
+  total_value: number;
+};
+
+export type FundOverlapItem = {
+  scheme_name: string;
+  overlap_pct: number;
+  common_stocks: string[];
+};
+
+export type FundOverlapResponse = {
+  funds: string[];
+  overlap_matrix: Record<string, Record<string, number>>;
+  common_holdings: Record<string, string[]>;
+};
+
+export type BondScreenerItem = {
+  isin: string;
+  issuer_name: string;
+  rating: string;
+  coupon_rate: number;
+  maturity_date: string;
+  ltp: number;
+  yield: number;
+  issuer_type: string;
+};
+
+export type CreditSpreadPoint = {
+  date: string;
+  ig_spread: number;
+  hy_spread: number;
+};
+
+export type RatingsMigrationItem = {
+  date: string;
+  issuer_name: string;
+  old_rating: string;
+  new_rating: string;
+  direction: "upgrade" | "downgrade";
+};
+
 export type MutualFundCompareResponse = {
   period: string;
   funds: MutualFundPerformance[];

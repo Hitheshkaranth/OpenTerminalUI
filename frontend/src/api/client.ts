@@ -55,6 +55,13 @@ import type {
   MutualFundDetailsResponse,
   MutualFundNavHistoryResponse,
   MutualFundPerformance,
+  MutualFundRanking,
+  RollingReturnsResponse,
+  SipCalcResponse,
+  FundOverlapResponse,
+  BondScreenerItem,
+  CreditSpreadPoint,
+  RatingsMigrationItem,
   PortfolioMutualFundsResponse,
   CorporateEvent,
   EarningsDate,
@@ -954,6 +961,43 @@ export async function fetchTopMutualFunds(category: string, sortBy = "returns_1y
     params: { sort_by: sortBy, limit },
   });
   return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchMutualFundRankings(category: string): Promise<MutualFundRanking[]> {
+  const { data } = await api.get<{ items: MutualFundRanking[] }>("/mutual-funds/rankings", { params: { category } });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchMutualFundRollingReturns(schemeCode: number, window = 3): Promise<RollingReturnsResponse> {
+  const { data } = await api.get<RollingReturnsResponse>(`/mutual-funds/${schemeCode}/rolling-returns`, { params: { window } });
+  return data;
+}
+
+export async function calculateMutualFundSip(monthlyAmount: number, years: number, expectedReturn: number): Promise<SipCalcResponse> {
+  const { data } = await api.get<SipCalcResponse>("/mutual-funds/sip-calc", {
+    params: { monthly_amount: monthlyAmount, years, expected_return: expectedReturn },
+  });
+  return data;
+}
+
+export async function fetchMutualFundOverlap(codes: number[]): Promise<FundOverlapResponse> {
+  const { data } = await api.get<FundOverlapResponse>("/mutual-funds/overlap", { params: { codes: codes.join(",") } });
+  return data;
+}
+
+export async function fetchBondScreener(rating?: string, issuerType?: string): Promise<BondScreenerItem[]> {
+  const { data } = await api.get<BondScreenerItem[]>("/bonds/screener", { params: { rating, issuer_type: issuerType } });
+  return data;
+}
+
+export async function fetchCreditSpreads(): Promise<{ history: CreditSpreadPoint[] }> {
+  const { data } = await api.get<{ history: CreditSpreadPoint[] }>("/bonds/credit-spreads");
+  return data;
+}
+
+export async function fetchBondRatingsMigration(): Promise<RatingsMigrationItem[]> {
+  const { data } = await api.get<RatingsMigrationItem[]>("/bonds/ratings-migration");
+  return data;
 }
 
 export async function addMutualFundHolding(payload: {

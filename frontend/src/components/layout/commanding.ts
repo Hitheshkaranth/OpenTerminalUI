@@ -1,14 +1,18 @@
 import type { NavigateFunction } from "react-router-dom";
 
+import type { SearchSymbolItem } from "../../api/client";
+import { inferRecentSecurityAssetClass } from "../../hooks/useRecentSecurities";
 import { useStockStore } from "../../store/stockStore";
 
 export type CommandFunctionCode =
   | "DESK"
   | "DES"
   | "GP"
+  | "CH"
   | "FA"
   | "NEWS"
   | "OPT"
+  | "ALERT"
   | "EST"
   | "PEER"
   | "OWN"
@@ -26,7 +30,17 @@ export type CommandFunctionCode =
   | "ECOF"
   | "FRED"
   | "RRG"
-  | "CRYP";
+  | "CRYP"
+  | "CMDTY"
+  | "FX"
+  | "ETFA"
+  | "BOND"
+  | "HOT"
+  | "TCA"
+  | "COMM"
+  | "DEPTH";
+
+export type CommandFinancialSubFunctionCode = "INCOME" | "BALANCE" | "CASHFLOW" | "MARGINS" | "RATIOS";
 
 export type ParsedCommand =
   | {
@@ -53,6 +67,24 @@ export type ParsedCommand =
       query: string;
     };
 
+export type CommandAssetDisambiguationOption = {
+  key: string;
+  symbol: string;
+  name: string;
+  assetClass: string;
+  exchange?: string;
+  countryCode?: string;
+  command: string;
+  description: string;
+};
+
+export type CommandTickerHint = {
+  key: string;
+  title: string;
+  subtitle: string;
+  command: string;
+};
+
 export type CommandExecutionResult = {
   ok: boolean;
   target?: string;
@@ -71,9 +103,11 @@ export const COMMAND_FUNCTIONS: CommandFunctionSpec[] = [
   { code: "DESK", label: "Analyst Desk", description: "Open the cockpit analyst workspace", aliases: ["COCKPIT", "MONITOR"] },
   { code: "DES", label: "Description / Security Hub", description: "Open security hub overview", securityScoped: true, aliases: ["SECURITY", "HUB"] },
   { code: "GP", label: "Graph Price", description: "Open chart tab", securityScoped: true, aliases: ["CHART"] },
+  { code: "CH", label: "Chart Workstation", description: "Open chart workstation with active symbol", securityScoped: true, aliases: ["WORKSTATION"] },
   { code: "FA", label: "Financial Analysis", description: "Open financials tab", securityScoped: true, aliases: ["FIN", "FUNDAMENTALS"] },
   { code: "NEWS", label: "News", description: "Open news (global or ticker-specific)", aliases: ["N"] },
   { code: "OPT", label: "Options", description: "Open options / F&O view", securityScoped: true, aliases: ["OPTIONS"] },
+  { code: "ALERT", label: "Alerts", description: "Open symbol alert workflows", securityScoped: true, aliases: ["ALERTS", "AL"] },
   { code: "EST", label: "Estimates", description: "Open analyst estimates tab", securityScoped: true, aliases: ["ESTIMATES"] },
   { code: "PEER", label: "Peers", description: "Open peers comparison tab", securityScoped: true, aliases: ["PEERS"] },
   { code: "OWN", label: "Ownership", description: "Open ownership tab", securityScoped: true, aliases: ["OWNERSHIP"] },
@@ -92,11 +126,57 @@ export const COMMAND_FUNCTIONS: CommandFunctionSpec[] = [
   { code: "FRED", label: "FRED Series", description: "Chart a FRED economic series", aliases: ["SERIES"] },
   { code: "RRG", label: "Sector Rotation Map", description: "Relative Rotation Graph (RRG)", aliases: ["SROT", "SECTOR"] },
   { code: "CRYP", label: "Crypto Workspace", description: "Open dedicated crypto workspace", aliases: ["CRYPTO"] },
+  { code: "CMDTY", label: "Commodities", description: "Open commodity market view", aliases: ["COMMODITY", "GOLD", "OIL"] },
+  { code: "FX", label: "Forex", description: "Open FX market view", aliases: ["FOREX", "CURRENCY"] },
+  { code: "ETFA", label: "ETF Analytics", description: "Open ETF market view", aliases: ["ETF"] },
+  { code: "BOND", label: "Bonds", description: "Open bond and yield views", aliases: ["CREDIT", "FIXED"] },
+  { code: "HOT", label: "Hotlists", description: "Open movers and hotlists", aliases: ["MOVERS", "GAINERS", "LOSERS", "HOTLISTS"] },
+  { code: "TCA", label: "Transaction Costs", description: "Open TCA workflow", aliases: ["COST", "SLIPPAGE"] },
+  { code: "COMM", label: "Community", description: "Open community and idea flow", aliases: ["IDEAS", "SOCIAL"] },
+  { code: "DEPTH", label: "Market Depth", description: "Open market depth workflow", aliases: ["DOM", "L2", "BOOK"] },
 ];
 
 const FUNCTION_LOOKUP = new Map<string, CommandFunctionCode>(
   COMMAND_FUNCTIONS.flatMap((fn) => [fn.code, ...(fn.aliases ?? [])].map((key) => [key.toUpperCase(), fn.code] as const)),
 );
+
+const FINANCIAL_SUB_FUNCTION_LOOKUP = new Map<string, CommandFinancialSubFunctionCode>([
+  ["INCOME", "INCOME"],
+  ["IS", "INCOME"],
+  ["BALANCE", "BALANCE"],
+  ["BS", "BALANCE"],
+  ["CASHFLOW", "CASHFLOW"],
+  ["CF", "CASHFLOW"],
+  ["MARGINS", "MARGINS"],
+  ["RATIOS", "RATIOS"],
+]);
+
+const TICKER_FUNCTION_HINTS: Array<{
+  func: CommandFunctionCode;
+  title: string;
+  subtitle: string;
+}> = [
+  { func: "DES", title: "Overview", subtitle: "Open the security overview" },
+  { func: "FA", title: "Financials", subtitle: "Open financial statements and ratios" },
+  { func: "CH", title: "Chart Workstation", subtitle: "Load the symbol into chart workstation" },
+  { func: "NEWS", title: "News", subtitle: "Open ticker-specific news" },
+  { func: "OPT", title: "Option Chain", subtitle: "Open options and derivatives" },
+  { func: "EST", title: "Estimates", subtitle: "Open analyst estimates" },
+  { func: "PEER", title: "Peers", subtitle: "Open peer comparison" },
+  { func: "ALERT", title: "Alerts", subtitle: "Create or review alerts for the symbol" },
+  { func: "COMP", title: "Compare", subtitle: "Send the symbol into split compare" },
+];
+
+const FINANCIAL_SUB_FUNCTION_HINTS: Array<{
+  subFunction: CommandFinancialSubFunctionCode;
+  subtitle: string;
+}> = [
+  { subFunction: "INCOME", subtitle: "Income statement focus" },
+  { subFunction: "BALANCE", subtitle: "Balance sheet focus" },
+  { subFunction: "CASHFLOW", subtitle: "Cash flow focus" },
+  { subFunction: "MARGINS", subtitle: "Margins and profitability focus" },
+  { subFunction: "RATIOS", subtitle: "Ratio analysis focus" },
+];
 
 function normalizeToken(value: string): string {
   return value.trim().toUpperCase();
@@ -104,6 +184,10 @@ function normalizeToken(value: string): string {
 
 function looksLikeTicker(token: string): boolean {
   return /^[A-Z0-9.\-]{1,20}$/.test(token);
+}
+
+function isKnownFunctionToken(token: string): boolean {
+  return FUNCTION_LOOKUP.has(normalizeToken(token));
 }
 
 export function parseCommand(input: string): ParsedCommand {
@@ -118,9 +202,12 @@ export function parseCommand(input: string): ParsedCommand {
   }
 
   if (tokens.length === 1) {
+    if (COMMAND_FUNCTIONS.some((fn) => fn.code === tokens[0])) {
+      return { kind: "function", raw, func: tokens[0] as CommandFunctionCode, modifiers: [] };
+    }
+    if (looksLikeTicker(tokens[0])) return { kind: "ticker", raw, ticker: tokens[0] };
     const fn = FUNCTION_LOOKUP.get(tokens[0]);
     if (fn) return { kind: "function", raw, func: fn, modifiers: [] };
-    if (looksLikeTicker(tokens[0])) return { kind: "ticker", raw, ticker: tokens[0] };
     return { kind: "natural-language", raw, query: raw };
   }
 
@@ -129,41 +216,99 @@ export function parseCommand(input: string): ParsedCommand {
     return { kind: "function", raw, func: firstAsFn, modifiers: tokens.slice(1) };
   }
 
-  const lastToken = tokens[tokens.length - 1];
-  const lastAsFn = FUNCTION_LOOKUP.get(lastToken);
-
-  if (lastAsFn && tokens.length > 1) {
-    const previousTokens = tokens.slice(0, tokens.length - 1);
-    if (previousTokens.every(looksLikeTicker)) {
-      if (previousTokens.length > 1) {
-        return { kind: "function", raw, func: lastAsFn, modifiers: previousTokens };
-      }
-      return { kind: "ticker-function", raw, ticker: previousTokens[0], func: lastAsFn, modifiers: [] };
-    }
-  }
-
-  const secondAsFn = FUNCTION_LOOKUP.get(tokens[1]);
-  if (looksLikeTicker(tokens[0]) && secondAsFn) {
-    return { kind: "ticker-function", raw, ticker: tokens[0], func: secondAsFn, modifiers: tokens.slice(2) };
-  }
-
   if (looksLikeTicker(tokens[0])) {
+    const secondAsFn = FUNCTION_LOOKUP.get(tokens[1]);
+    if (secondAsFn) {
+      return { kind: "ticker-function", raw, ticker: tokens[0], func: secondAsFn, modifiers: tokens.slice(2) };
+    }
+
+    const lastToken = tokens[tokens.length - 1];
+    const lastAsFn = FUNCTION_LOOKUP.get(lastToken);
+    if (lastAsFn) {
+      const previousTokens = tokens.slice(0, tokens.length - 1);
+      if (previousTokens.every(looksLikeTicker)) {
+        if (previousTokens.length > 1) {
+          return { kind: "function", raw, func: lastAsFn, modifiers: previousTokens };
+        }
+        return { kind: "ticker-function", raw, ticker: previousTokens[0], func: lastAsFn, modifiers: [] };
+      }
+    }
+
     return { kind: "ticker", raw, ticker: tokens[0] };
   }
 
   return { kind: "natural-language", raw, query: raw };
 }
 
+function normalizeFinancialSubFunction(token?: string): string | undefined {
+  if (!token) return undefined;
+  const normalized = normalizeToken(token);
+  const subFunction = FINANCIAL_SUB_FUNCTION_LOOKUP.get(normalized);
+  return subFunction ? subFunction.toLowerCase() : undefined;
+}
+
 function navigateToSecurityHub(navigate: NavigateFunction, ticker: string, tab: string = "overview", modifiers: string[] = []) {
-  let url = `/equity/security/${encodeURIComponent(ticker)}?tab=${encodeURIComponent(tab)}`;
+  const params = new URLSearchParams();
+  params.set("tab", tab);
   if (tab === "chart" && modifiers.length > 0) {
-    url += `&compare=${encodeURIComponent(modifiers.join(","))}`;
+    params.set("compare", modifiers.join(","));
+  }
+  if (tab === "financials") {
+    const subtab = normalizeFinancialSubFunction(modifiers[0]);
+    if (subtab) {
+      params.set("subtab", subtab);
+    }
+  }
+  let url = `/equity/security/${encodeURIComponent(ticker)}?${params.toString()}`;
+  if (tab === "financials") {
+    const subtab = normalizeFinancialSubFunction(modifiers[0]);
+    if (subtab) {
+      url += `#financials-${encodeURIComponent(subtab)}`;
+    }
   }
   navigate(url);
 }
 
 function navigateToMarketStock(navigate: NavigateFunction, ticker: string) {
   navigate(`/equity/stocks?ticker=${encodeURIComponent(ticker)}`);
+}
+
+function navigateToAssetClassView(
+  navigate: NavigateFunction,
+  assetClass: "commodity" | "forex" | "etf",
+  ticker?: string,
+) {
+  if (assetClass === "commodity") {
+    const params = new URLSearchParams();
+    if (ticker) {
+      params.set("symbol", ticker);
+    }
+    navigate(`/equity/commodities${params.toString() ? `?${params.toString()}` : ""}`);
+    return;
+  }
+  if (assetClass === "forex") {
+    const params = new URLSearchParams();
+    if (ticker) {
+      params.set("pair", ticker);
+    }
+    navigate(`/equity/forex${params.toString() ? `?${params.toString()}` : ""}`);
+    return;
+  }
+  const params = new URLSearchParams();
+  params.set("assetClass", assetClass);
+  if (ticker) {
+    params.set("ticker", ticker);
+  }
+  navigate(`/equity/stocks?${params.toString()}`);
+}
+
+function navigateToChartWorkstation(navigate: NavigateFunction, ticker?: string) {
+  const params = new URLSearchParams();
+  if (ticker) {
+    params.set("ticker", ticker);
+    params.set("symbol", ticker);
+  }
+  navigate(`/equity/chart-workstation${params.toString() ? `?${params.toString()}` : ""}`);
 }
 
 function applyTicker(ticker: string) {
@@ -190,6 +335,8 @@ function securityFuncToTab(func: CommandFunctionCode): string {
       return "ownership";
     case "OPT":
       return "chart";
+    case "ALERT":
+      return "overview";
     default:
       return "overview";
   }
@@ -214,11 +361,24 @@ export function executeParsedCommand(parsed: ParsedCommand, navigate: NavigateFu
       navigate(`/equity/cockpit?ticker=${encodeURIComponent(parsed.ticker)}`);
       return { ok: true, target: "/equity/cockpit" };
     }
+    if (parsed.func === "CH") {
+      navigateToChartWorkstation(navigate, parsed.ticker);
+      return { ok: true, target: "/equity/chart-workstation" };
+    }
     if (parsed.func === "OPT") {
       navigate(`/fno?symbol=${encodeURIComponent(parsed.ticker)}`);
       return { ok: true, target: "/fno" };
     }
-    navigateToSecurityHub(navigate, parsed.ticker, securityFuncToTab(parsed.func));
+    if (parsed.func === "ALERT") {
+      navigate(`/equity/alerts?ticker=${encodeURIComponent(parsed.ticker)}`);
+      return { ok: true, target: "/equity/alerts" };
+    }
+    if (parsed.func === "COMP") {
+      const right = parsed.modifiers[0] && looksLikeTicker(parsed.modifiers[0]) ? parsed.modifiers[0] : "MSFT";
+      navigate(`/equity/compare?left=${encodeURIComponent(parsed.ticker)}&right=${encodeURIComponent(right)}`);
+      return { ok: true, target: "/equity/compare" };
+    }
+    navigateToSecurityHub(navigate, parsed.ticker, securityFuncToTab(parsed.func), parsed.modifiers);
     return { ok: true, target: `/equity/security/${parsed.ticker}` };
   }
 
@@ -236,6 +396,47 @@ export function executeParsedCommand(parsed: ParsedCommand, navigate: NavigateFu
       case "EQS":
         navigate("/equity/screener");
         return { ok: true, target: "/equity/screener" };
+      case "CMDTY":
+        if (mod0 && looksLikeTicker(mod0)) {
+          applyTicker(mod0);
+        }
+        navigateToAssetClassView(navigate, "commodity", mod0 && looksLikeTicker(mod0) ? mod0 : undefined);
+        return { ok: true, target: "/equity/commodities" };
+      case "FX":
+        if (mod0 && looksLikeTicker(mod0)) {
+          applyTicker(mod0);
+        }
+        navigateToAssetClassView(navigate, "forex", mod0 && looksLikeTicker(mod0) ? mod0 : undefined);
+        return { ok: true, target: "/equity/forex" };
+      case "ETFA":
+        if (mod0 && looksLikeTicker(mod0)) {
+          applyTicker(mod0);
+          navigate(`/equity/etf-analytics?ticker=${encodeURIComponent(mod0)}`);
+          return { ok: true, target: "/equity/etf-analytics" };
+        }
+        navigate("/equity/etf-analytics");
+        return { ok: true, target: "/equity/etf-analytics" };
+      case "BOND":
+        navigate("/equity/bonds");
+        return { ok: true, target: "/equity/bonds" };
+      case "HOT":
+        navigate("/equity/hotlists");
+        return { ok: true, target: "/equity/hotlists" };
+      case "TCA":
+        navigate(mod0 && looksLikeTicker(mod0) ? `/equity/portfolio?ticker=${encodeURIComponent(mod0)}&view=tca` : "/equity/portfolio?view=tca");
+        return { ok: true, target: "/equity/portfolio" };
+      case "COMM":
+        if (mod0 && looksLikeTicker(mod0)) {
+          applyTicker(mod0);
+        }
+        navigate(mod0 && looksLikeTicker(mod0) ? `/equity/news?ticker=${encodeURIComponent(mod0)}&view=community` : "/equity/news?view=community");
+        return { ok: true, target: "/equity/news" };
+      case "DEPTH":
+        if (mod0 && looksLikeTicker(mod0)) {
+          applyTicker(mod0);
+        }
+        navigate(`/equity/chart-workstation${mod0 && looksLikeTicker(mod0) ? `?panel=depth&ticker=${encodeURIComponent(mod0)}&symbol=${encodeURIComponent(mod0)}` : "?panel=depth"}`);
+        return { ok: true, target: "/equity/chart-workstation" };
       case "PORT":
         navigate("/equity/portfolio");
         return { ok: true, target: "/equity/portfolio" };
@@ -296,16 +497,26 @@ export function executeParsedCommand(parsed: ParsedCommand, navigate: NavigateFu
       }
       case "DES":
       case "GP":
+      case "CH":
       case "FA":
       case "OPT":
+      case "ALERT":
       case "EST":
       case "PEER":
       case "OWN":
         if (mod0 && looksLikeTicker(mod0)) {
           applyTicker(mod0);
+          if (parsed.func === "CH") {
+            navigateToChartWorkstation(navigate, mod0);
+            return { ok: true, target: "/equity/chart-workstation" };
+          }
           if (parsed.func === "OPT") {
             navigate(`/fno?symbol=${encodeURIComponent(mod0)}`);
             return { ok: true, target: "/fno" };
+          }
+          if (parsed.func === "ALERT") {
+            navigate(`/equity/alerts?ticker=${encodeURIComponent(mod0)}`);
+            return { ok: true, target: "/equity/alerts" };
           }
           const otherModifiers = parsed.modifiers.slice(1);
           navigateToSecurityHub(navigate, mod0, securityFuncToTab(parsed.func), otherModifiers);
@@ -335,6 +546,20 @@ export type CommandSuggestion =
       subtitle: string;
       command: string;
       price?: number | null;
+    }
+  | {
+      kind: "hint";
+      key: string;
+      title: string;
+      subtitle: string;
+      command: string;
+    }
+  | {
+      kind: "disambiguation";
+      key: string;
+      title: string;
+      subtitle: string;
+      command: string;
     }
   | {
       kind: "recent";
@@ -534,4 +759,119 @@ export function fuzzyScore(haystack: string, needle: string): number {
     cursor = idx + 1;
   }
   return score;
+}
+
+export function buildTickerCommandHints(input: string): CommandTickerHint[] {
+  const tokens = input
+    .trim()
+    .split(/\s+/)
+    .map(normalizeToken)
+    .filter(Boolean);
+  if (!tokens.length || !looksLikeTicker(tokens[0])) {
+    return [];
+  }
+
+  if (tokens.length === 1 && isKnownFunctionToken(tokens[0])) {
+    return [];
+  }
+
+  const [ticker, secondToken = "", thirdToken = ""] = tokens;
+  const secondTokenNormalized = normalizeToken(secondToken);
+  const parsedFunction = FUNCTION_LOOKUP.get(secondTokenNormalized);
+
+  if (!secondTokenNormalized) {
+    return TICKER_FUNCTION_HINTS.map((hint) => ({
+      key: `hint:${ticker}:${hint.func}`,
+      title: `${ticker} ${hint.func}`,
+      subtitle: hint.subtitle,
+      command: `${ticker} ${hint.func}`,
+    }));
+  }
+
+  if (parsedFunction === "FA" || secondTokenNormalized === "FA") {
+    return FINANCIAL_SUB_FUNCTION_HINTS.filter(({ subFunction, subtitle }) =>
+      !thirdToken || fuzzyScore(`${subFunction} ${subtitle}`, thirdToken) >= 0,
+    ).map((hint) => ({
+      key: `hint:${ticker}:FA:${hint.subFunction}`,
+      title: `${ticker} FA ${hint.subFunction}`,
+      subtitle: hint.subtitle,
+      command: `${ticker} FA ${hint.subFunction}`,
+    }));
+  }
+
+  return TICKER_FUNCTION_HINTS.filter(({ func, title, subtitle }) => {
+    if (!secondTokenNormalized) return true;
+    const fn = COMMAND_FUNCTIONS.find((item) => item.code === func);
+    return (
+      func.startsWith(secondTokenNormalized) ||
+      fuzzyScore(title, secondTokenNormalized) >= 0 ||
+      fuzzyScore(subtitle, secondTokenNormalized) >= 0 ||
+      Boolean(fn?.aliases?.some((alias) => alias.startsWith(secondTokenNormalized)))
+    );
+  }).map((hint) => ({
+    key: `hint:${ticker}:${hint.func}`,
+    title: `${ticker} ${hint.func}`,
+    subtitle: hint.subtitle,
+    command: `${ticker} ${hint.func}`,
+  }));
+}
+
+export function buildAssetDisambiguationOptions(
+  input: string,
+  candidates: SearchSymbolItem[],
+): CommandAssetDisambiguationOption[] {
+  const tokens = input
+    .trim()
+    .split(/\s+/)
+    .map(normalizeToken)
+    .filter(Boolean);
+  if (!tokens.length || !looksLikeTicker(tokens[0])) {
+    return [];
+  }
+
+  const symbol = tokens[0];
+  const matching = candidates.filter((item) => normalizeToken(String(item.ticker || "")) === symbol);
+  if (!matching.length) {
+    return [];
+  }
+  const grouped = new Map<string, CommandAssetDisambiguationOption>();
+
+  for (const item of matching) {
+    const assetClass = inferRecentSecurityAssetClass(symbol, item.exchange);
+    const groupKey = `${assetClass}|${normalizeToken(String(item.exchange || ""))}|${normalizeToken(String(item.country_code || ""))}`;
+    if (grouped.has(groupKey)) {
+      continue;
+    }
+
+    let command = symbol;
+    if (assetClass === "commodity") {
+      command = `CMDTY ${symbol}`;
+    } else if (assetClass === "forex") {
+      command = `FX ${symbol}`;
+    } else if (assetClass === "etf") {
+      command = `ETFA ${symbol}`;
+    }
+
+    const description = [
+      assetClass.toUpperCase(),
+      item.exchange ? String(item.exchange).toUpperCase() : null,
+      item.country_code ? String(item.country_code).toUpperCase() : null,
+      item.name || null,
+    ]
+      .filter(Boolean)
+      .join(" • ");
+
+    grouped.set(groupKey, {
+      key: `asset:${symbol}:${groupKey}`,
+      symbol,
+      name: item.name || symbol,
+      assetClass,
+      exchange: item.exchange,
+      countryCode: item.country_code,
+      command,
+      description,
+    });
+  }
+
+  return grouped.size > 1 ? Array.from(grouped.values()) : [];
 }

@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CrosshairSyncProvider } from "../contexts/CrosshairSyncContext";
@@ -7,6 +8,7 @@ import { ChartGridContainer } from "../components/chart-workstation/ChartGridCon
 import { ChartPanel } from "../components/chart-workstation/ChartPanel";
 import { AddChartPlaceholder } from "../components/chart-workstation/AddChartPlaceholder";
 import { ChartShellToolbar } from "../components/chart-workstation/ChartShellToolbar";
+import { PanelBody, PanelFrame, PanelHeader } from "../components/layout/PanelChrome";
 import {
   CHART_WORKSTATION_ACTION_EVENT,
   isShortcutEditableTarget,
@@ -17,6 +19,16 @@ import {
   type CommandExecutionResult,
 } from "../components/layout/commanding";
 import { TerminalToast, TerminalToastViewport } from "../components/terminal/TerminalToast";
+import { SparklineCell } from "../components/home/SparklineCell";
+import {
+  DEFAULT_OPENSCRIPT_TEMPLATE,
+  type OpenScriptCompileError,
+  type OpenScriptCompileResult,
+  type OpenScriptOutput,
+  type OpenScriptRunResult,
+  ScriptEditor,
+} from "../components/chart/ScriptEditor";
+import { ScriptLibrary, type OpenScriptLibraryItem } from "../components/chart/ScriptLibrary";
 import { useBatchChartData } from "../hooks/useBatchChartData";
 import { useWorkstationQuotes } from "../hooks/useWorkstationQuotes";
 import type { ChartSlot, ChartSlotTimeframe, ChartSlotType, SlotMarket } from "../store/chartWorkstationStore";
@@ -173,6 +185,73 @@ const DEFAULT_COMPARE_CONFIG: WorkspaceCompareConfig = {
   placement: "active",
 };
 const DEFAULT_RANGE_PRESET: WorkspaceRangePresetId = "6M";
+const SCRIPT_PANEL_STORAGE_KEY = "ot:chart-workstation:openscript-panel:v1";
+const SCRIPT_PANEL_SIZE_KEY = "ot:chart-workstation:openscript-panel-size:v1";
+const SCRIPT_API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "") || "/api";
+
+function scriptApiUrl(path: string): string {
+  return `${SCRIPT_API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+async function requestScriptJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(scriptApiUrl(path), {
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
+    ...init,
+  });
+  const raw = await response.text();
+  let body: any = null;
+  if (raw) {
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      body = raw;
+    }
+  }
+  if (!response.ok) {
+    const message =
+      (body && typeof body === "object" && typeof body.detail === "string" && body.detail) ||
+      (body && typeof body === "object" && typeof body.message === "string" && body.message) ||
+      (typeof body === "string" && body) ||
+      response.statusText ||
+      "Script request failed";
+    throw new Error(message);
+  }
+  return body as T;
+}
+
+function normalizeScriptRecord(value: unknown): OpenScriptLibraryItem | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  const id = typeof row.id === "string" ? row.id : "";
+  const name = typeof row.name === "string" ? row.name : "";
+  const source = typeof row.source === "string" ? row.source : "";
+  if (!id || !name || !source) return null;
+  return {
+    id,
+    name,
+    description: typeof row.description === "string" ? row.description : "",
+    source,
+    is_public: typeof row.is_public === "boolean" ? row.is_public : false,
+    created_at: typeof row.created_at === "string" ? row.created_at : undefined,
+    updated_at: typeof row.updated_at === "string" ? row.updated_at : undefined,
+  };
+}
+
+function toScriptOutputs(outputs: Array<Record<string, unknown>> | OpenScriptOutput[] | undefined): OpenScriptOutput[] {
+  if (!Array.isArray(outputs)) return [];
+  return outputs.map((row) => ({
+    kind: String(row.kind || "plot"),
+    title: typeof row.title === "string" ? row.title : null,
+    color: typeof row.color === "string" ? row.color : null,
+    linewidth: typeof row.linewidth === "number" ? row.linewidth : null,
+    message: typeof row.message === "string" ? row.message : null,
+    series: Array.isArray(row.series) ? row.series.map((value) => value as number | string | boolean | null) : [],
+    metadata: row.metadata && typeof row.metadata === "object" ? (row.metadata as Record<string, unknown>) : {},
+  }));
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -764,6 +843,38 @@ export function ChartWorkstationPage() {
   const [activeWorkspaceTabId, setActiveWorkspaceTabId] = useState<string | null>(null);
   const [slotLinkGroups, setSlotLinkGroups] = useState<Record<string, WorkspaceLinkGroup>>({});
   const [workspaceReady, setWorkspaceReady] = useState(false);
+  const [scriptPanelOpen, setScriptPanelOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(SCRIPT_PANEL_STORAGE_KEY) === "open";
+  });
+  const [scriptPanelSize, setScriptPanelSize] = useState(() => {
+    if (typeof window === "undefined") return { width: 780, height: 560 };
+    try {
+      const raw = window.localStorage.getItem(SCRIPT_PANEL_SIZE_KEY);
+      if (!raw) return { width: 780, height: 560 };
+      const parsed = JSON.parse(raw) as Partial<{ width: number; height: number }>;
+      return {
+        width: typeof parsed.width === "number" ? Math.max(520, Math.min(1200, parsed.width)) : 780,
+        height: typeof parsed.height === "number" ? Math.max(420, Math.min(900, parsed.height)) : 560,
+      };
+    } catch {
+      return { width: 780, height: 560 };
+    }
+  });
+  const [scriptScripts, setScriptScripts] = useState<OpenScriptLibraryItem[]>([]);
+  const [scriptLoading, setScriptLoading] = useState(false);
+  const [scriptBusy, setScriptBusy] = useState(false);
+  const [scriptSelectedId, setScriptSelectedId] = useState<string | null>(null);
+  const [scriptTitle, setScriptTitle] = useState("My Custom Indicator");
+  const [scriptDescription, setScriptDescription] = useState("");
+  const [scriptSource, setScriptSource] = useState(DEFAULT_OPENSCRIPT_TEMPLATE);
+  const [scriptPublic, setScriptPublic] = useState(false);
+  const [scriptDirty, setScriptDirty] = useState(false);
+  const [scriptCompileResult, setScriptCompileResult] = useState<OpenScriptCompileResult | null>(null);
+  const [scriptRunResult, setScriptRunResult] = useState<OpenScriptRunResult | null>(null);
+  const [scriptOverlayOutputs, setScriptOverlayOutputs] = useState<OpenScriptOutput[]>([]);
+  const scriptPanelRef = useRef<HTMLDivElement | null>(null);
+  const activeChartRowsRef = useRef<ChartPoint[]>([]);
 
   const initRef = useRef(false);
   const importedShareRef = useRef("");
@@ -809,6 +920,212 @@ export function ChartWorkstationPage() {
     [],
   );
 
+  const refreshScripts = useCallback(async () => {
+    setScriptLoading(true);
+    try {
+      const rows = await requestScriptJson<unknown[]>("/scripting/scripts", { method: "GET" });
+      const normalized = Array.isArray(rows)
+        ? rows.map((row) => normalizeScriptRecord(row)).filter((row): row is OpenScriptLibraryItem => Boolean(row))
+        : [];
+      setScriptScripts(normalized);
+      setScriptSelectedId((current) => (current && normalized.some((row) => row.id === current) ? current : normalized[0]?.id ?? null));
+    } catch {
+      setScriptScripts([]);
+      setScriptSelectedId((current) => current);
+    } finally {
+      setScriptLoading(false);
+    }
+  }, []);
+
+  const applyScriptRecord = useCallback((record: OpenScriptLibraryItem | null) => {
+    if (!record) {
+      setScriptSelectedId(null);
+      setScriptTitle("My Custom Indicator");
+      setScriptDescription("");
+      setScriptSource(DEFAULT_OPENSCRIPT_TEMPLATE);
+      setScriptPublic(false);
+      setScriptCompileResult(null);
+      setScriptRunResult(null);
+      setScriptOverlayOutputs([]);
+      setScriptDirty(false);
+      return;
+    }
+    setScriptSelectedId(record.id);
+    setScriptTitle(record.name);
+    setScriptDescription(record.description);
+    setScriptSource(record.source);
+    setScriptPublic(record.is_public);
+    setScriptCompileResult(null);
+    setScriptRunResult(null);
+    setScriptOverlayOutputs([]);
+    setScriptDirty(false);
+  }, []);
+
+  const previewCurrentScript = useCallback(
+    async (scriptId: string, source: string, name: string, description: string, isPublic: boolean, saveAs: boolean) => {
+      setScriptBusy(true);
+      try {
+        const compile = await requestScriptJson<OpenScriptCompileResult>("/scripting/compile", {
+          method: "POST",
+          body: JSON.stringify({ source }),
+        });
+        setScriptCompileResult(compile);
+        if (!compile.success) {
+          setScriptRunResult(null);
+          setScriptOverlayOutputs([]);
+          return false;
+        }
+
+        const payload = {
+          name: name.trim() || "Untitled OpenScript",
+          description,
+          source,
+          is_public: isPublic,
+        };
+        const saved = saveAs || !scriptId
+          ? await requestScriptJson<OpenScriptLibraryItem>("/scripting/scripts", {
+              method: "POST",
+              body: JSON.stringify(payload),
+            })
+          : await requestScriptJson<OpenScriptLibraryItem>(`/scripting/scripts/${encodeURIComponent(scriptId)}`, {
+              method: "PUT",
+              body: JSON.stringify(payload),
+            });
+
+        await refreshScripts();
+        setScriptSelectedId(saved.id);
+        setScriptTitle(saved.name);
+        setScriptDescription(saved.description);
+        setScriptPublic(saved.is_public);
+        setScriptDirty(false);
+
+        const run = await requestScriptJson<OpenScriptRunResult>(`/scripting/scripts/${encodeURIComponent(saved.id)}/run`, {
+          method: "POST",
+          body: JSON.stringify({
+            ohlcv: activeChartRowsRef.current.map((row) => ({
+              time: row.t,
+              open: row.o,
+              high: row.h,
+              low: row.l,
+              close: row.c,
+              volume: row.v,
+            })),
+          }),
+        });
+        setScriptRunResult(run);
+        setScriptOverlayOutputs(toScriptOutputs(run.outputs));
+        return true;
+      } catch (error) {
+        setScriptRunResult(null);
+        setScriptOverlayOutputs([]);
+        setLayoutNotice({
+          title: "OpenScript failed",
+          message: error instanceof Error ? error.message : "Unable to compile or run the script.",
+          variant: "warning",
+        });
+        return false;
+      } finally {
+        setScriptBusy(false);
+      }
+    },
+    [activeChartRowsRef, refreshScripts],
+  );
+
+  const saveScript = useCallback(() => {
+    void previewCurrentScript(
+      scriptSelectedId ?? "",
+      scriptSource,
+      scriptTitle,
+      scriptDescription,
+      scriptPublic,
+      false,
+    );
+  }, [previewCurrentScript, scriptDescription, scriptPublic, scriptSelectedId, scriptSource, scriptTitle]);
+
+  const saveScriptAs = useCallback(() => {
+    void previewCurrentScript(
+      "",
+      scriptSource,
+      `${scriptTitle} Copy`,
+      scriptDescription,
+      scriptPublic,
+      true,
+    );
+  }, [previewCurrentScript, scriptDescription, scriptPublic, scriptSource, scriptTitle]);
+
+  const runScript = useCallback(() => {
+    void previewCurrentScript(
+      scriptSelectedId ?? "",
+      scriptSource,
+      scriptTitle,
+      scriptDescription,
+      scriptPublic,
+      false,
+    );
+  }, [previewCurrentScript, scriptDescription, scriptPublic, scriptSelectedId, scriptSource, scriptTitle]);
+
+  const rerunSelectedScript = useCallback(async () => {
+    if (!scriptSelectedId || scriptDirty) return;
+    try {
+      const run = await requestScriptJson<OpenScriptRunResult>(`/scripting/scripts/${encodeURIComponent(scriptSelectedId)}/run`, {
+        method: "POST",
+        body: JSON.stringify({
+          ohlcv: activeChartRowsRef.current.map((row) => ({
+            time: row.t,
+            open: row.o,
+            high: row.h,
+            low: row.l,
+            close: row.c,
+            volume: row.v,
+          })),
+        }),
+      });
+        setScriptRunResult(run);
+        setScriptOverlayOutputs(toScriptOutputs(run.outputs));
+      } catch {
+        // ignore rerun failures while data is still settling
+      }
+  }, [activeChartRowsRef, scriptDirty, scriptSelectedId]);
+
+  const deleteScript = useCallback(async () => {
+    if (!scriptSelectedId) {
+      applyScriptRecord(null);
+      return;
+    }
+    setScriptBusy(true);
+    try {
+      await requestScriptJson<{ deleted: boolean; id: string }>(`/scripting/scripts/${encodeURIComponent(scriptSelectedId)}`, {
+        method: "DELETE",
+      });
+      await refreshScripts();
+      applyScriptRecord(null);
+    } catch (error) {
+      setLayoutNotice({
+        title: "Delete failed",
+        message: error instanceof Error ? error.message : "Unable to delete the script.",
+        variant: "warning",
+      });
+    } finally {
+      setScriptBusy(false);
+    }
+  }, [applyScriptRecord, refreshScripts, scriptSelectedId]);
+
+  const selectScript = useCallback(
+    (scriptId: string) => {
+      const record = scriptScripts.find((row) => row.id === scriptId) ?? null;
+      applyScriptRecord(record);
+    },
+    [applyScriptRecord, scriptScripts],
+  );
+
+  const newScript = useCallback(() => {
+    applyScriptRecord(null);
+  }, [applyScriptRecord]);
+
+  const toggleScriptPanel = useCallback(() => {
+    setScriptPanelOpen((value) => !value);
+  }, []);
+
   const applyWorkspaceState = useCallback((nextState: WorkspaceState) => {
     setSlotLinkGroups(normalizeLinkGroups(nextState.snapshot.slots, nextState.linkGroups));
     setLinkSettings(nextState.linkSettings);
@@ -832,9 +1149,13 @@ export function ChartWorkstationPage() {
       name: string,
       layoutConfig: Record<string, unknown>,
       openAsNewTab: boolean,
+      options?: {
+        isolateSlotIds?: boolean;
+      },
     ): WorkspaceTab | null => {
+      const isolateSlotIds = options?.isolateSlotIds ?? true;
       const parsed = parseWorkspaceTemplateConfig(
-        isolateWorkstationLayoutConfig(layoutConfig),
+        isolateSlotIds ? isolateWorkstationLayoutConfig(layoutConfig) : layoutConfig,
         DEFAULT_WORKSTATION_IMPORT_MARKET,
       );
       if (!parsed) return null;
@@ -1043,6 +1364,16 @@ export function ChartWorkstationPage() {
 
   const { bySlotId: chartBatchBySlotId, loadingAny: batchLoadingAny, source: chartBatchSource } = useBatchChartData(visibleSlots);
   const { connectionState: quotesConnectionState, quoteBySlotId } = useWorkstationQuotes(visibleSlots);
+  const activeChartResponse = activeSlot ? chartBatchBySlotId[activeSlot.id]?.data ?? null : null;
+  const activeChartRows = activeChartResponse?.data ?? [];
+  const activeScriptRecord = useMemo(
+    () => scriptScripts.find((row) => row.id === scriptSelectedId) ?? null,
+    [scriptScripts, scriptSelectedId],
+  );
+
+  useEffect(() => {
+    activeChartRowsRef.current = activeChartRows;
+  }, [activeChartRows]);
 
   useEffect(() => {
     if (!layoutNotice) return;
@@ -1077,6 +1408,44 @@ export function ChartWorkstationPage() {
   useEffect(() => {
     void refreshTemplates();
   }, [refreshTemplates]);
+
+  useEffect(() => {
+    void refreshScripts();
+  }, [refreshScripts]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(SCRIPT_PANEL_STORAGE_KEY, scriptPanelOpen ? "open" : "closed");
+  }, [scriptPanelOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(SCRIPT_PANEL_SIZE_KEY, JSON.stringify(scriptPanelSize));
+  }, [scriptPanelSize]);
+
+  useEffect(() => {
+    if (!scriptPanelOpen || typeof ResizeObserver === "undefined") return;
+    const el = scriptPanelRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const nextWidth = Math.max(520, Math.min(1200, Math.round(entry.contentRect.width)));
+      const nextHeight = Math.max(420, Math.min(900, Math.round(entry.contentRect.height)));
+      setScriptPanelSize((current) =>
+        current.width === nextWidth && current.height === nextHeight
+          ? current
+          : { width: nextWidth, height: nextHeight },
+      );
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [scriptPanelOpen]);
+
+  useEffect(() => {
+    if (!scriptPanelOpen || scriptDirty || !scriptSelectedId) return;
+    void rerunSelectedScript();
+  }, [activeChartRows, rerunSelectedScript, scriptDirty, scriptPanelOpen, scriptSelectedId]);
 
   const updateActiveTabCompareSymbols = useCallback((symbols: string[]) => {
     if (!activeWorkspaceTabId) return;
@@ -1537,7 +1906,9 @@ export function ChartWorkstationPage() {
     }
 
     const payload = buildPayloadFromWorkspaceState(savedDefault.name, savedDefault);
-    const nextTab = materializeWorkspaceFromLayout(savedDefault.name, payload.layout_config, false);
+    const nextTab = materializeWorkspaceFromLayout(savedDefault.name, payload.layout_config, false, {
+      isolateSlotIds: false,
+    });
     if (!nextTab) {
       const message = "Saved workspace default did not contain a usable layout.";
       setLayoutNotice({
@@ -1769,6 +2140,12 @@ export function ChartWorkstationPage() {
         }
       }
 
+      if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        toggleScriptPanel();
+        return;
+      }
+
       if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "f") {
         if (!activeSlotId) return;
         event.preventDefault();
@@ -1820,10 +2197,20 @@ export function ChartWorkstationPage() {
     handleToggleReplay,
     handleTimeframeChange,
     removeSlot,
+    toggleScriptPanel,
     setActiveSlot,
     slots,
     visibleSlots,
   ]);
+
+  const scriptOverlayTarget =
+    typeof document !== "undefined" && activeSlotId
+      ? document.querySelector<HTMLElement>(`.chart-panel[data-slot-id="${activeSlotId}"] .chart-panel-body`)
+      : null;
+  const scriptOverlaySeries = useMemo(
+    () => scriptOverlayOutputs.find((item) => item.series.some((value) => typeof value === "number" && Number.isFinite(value)))?.series ?? [],
+    [scriptOverlayOutputs],
+  );
 
 
   return (
@@ -1921,6 +2308,15 @@ export function ChartWorkstationPage() {
             onSaveCurrentTemplate={handleSaveCurrentTemplate}
             onDrillInto={drillInto}
           />
+          <div className="mt-2 flex items-center justify-end">
+            <button
+              type="button"
+              className="rounded border border-terminal-border px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"
+              onClick={toggleScriptPanel}
+            >
+              {scriptPanelOpen ? "Hide OpenScript" : "Open OpenScript"}
+            </button>
+          </div>
         </div>
 
         {/* Grid Area */}
@@ -1970,6 +2366,131 @@ export function ChartWorkstationPage() {
             )}
           </ChartGridContainer>
         </div>
+
+        {scriptOverlayTarget && scriptOverlayOutputs.length ? createPortal(
+          <div className="pointer-events-none absolute left-2 top-2 z-20 max-w-[min(22rem,calc(100%-1rem))] rounded border border-terminal-accent/50 bg-terminal-panel/95 px-2 py-2 text-[10px] shadow-xl backdrop-blur">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold uppercase tracking-[0.18em] text-terminal-accent">OpenScript</span>
+              <span className="text-terminal-muted">{scriptRunResult?.row_count ?? 0} rows</span>
+            </div>
+            <div className="mt-1 truncate text-terminal-text">{scriptRunResult?.script_name ?? scriptTitle}</div>
+            <div className="mt-1 text-terminal-muted">{scriptOverlayOutputs.length} output(s)</div>
+            {scriptOverlaySeries.length ? (
+              <div className="mt-2">
+                <SparklineCell
+                  points={scriptOverlaySeries as number[]}
+                  width={210}
+                  height={44}
+                  color="var(--ot-color-accent-primary)"
+                  areaColor="var(--ot-color-feedback-info-soft)"
+                  className="rounded border border-terminal-border/60 bg-terminal-bg/50"
+                  ariaLabel="OpenScript preview"
+                />
+              </div>
+            ) : null}
+            <div className="mt-2 space-y-1">
+              {scriptOverlayOutputs.slice(0, 3).map((output, index) => (
+                <div key={`${output.kind}-${index}`} className="rounded border border-terminal-border/70 bg-terminal-bg/40 px-2 py-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-terminal-text">{output.title || output.kind.toUpperCase()}</span>
+                    <span className="text-terminal-muted">{output.kind}</span>
+                  </div>
+                  <div className="truncate text-terminal-muted">
+                    {output.message || `${output.series.length} row(s)`}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>,
+          scriptOverlayTarget,
+        ) : null}
+
+        {scriptPanelOpen ? (
+          <div
+            ref={scriptPanelRef}
+            className="absolute bottom-4 right-4 z-40 resize overflow-hidden rounded border border-terminal-border bg-terminal-panel shadow-2xl"
+            style={{
+              width: `${scriptPanelSize.width}px`,
+              height: `${scriptPanelSize.height}px`,
+              minWidth: "520px",
+              minHeight: "420px",
+              maxWidth: "96vw",
+              maxHeight: "85vh",
+            }}
+          >
+            <PanelFrame as="div" className="flex h-full min-h-0 flex-col bg-terminal-panel">
+              <PanelHeader
+                title="OpenScript IDE"
+                subtitle={activeSlot?.ticker ? `${activeSlot.ticker} · ${activeSlot.market}` : "Attach to an active chart to preview outputs"}
+                actions={
+                  <button
+                    type="button"
+                    className="rounded border border-terminal-border px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"
+                    onClick={() => setScriptPanelOpen(false)}
+                  >
+                    Close
+                  </button>
+                }
+              />
+              <PanelBody className="flex min-h-0 flex-1 p-0">
+                <div className="min-h-0 w-[280px] shrink-0 border-r border-terminal-border">
+                  <ScriptLibrary
+                    scripts={scriptScripts}
+                    selectedScriptId={scriptSelectedId}
+                    loading={scriptLoading}
+                    onSelectScript={selectScript}
+                    onNewScript={newScript}
+                    onSave={saveScript}
+                    onSaveAs={saveScriptAs}
+                    onDelete={() => {
+                      void deleteScript();
+                    }}
+                    onTogglePublic={() => {
+                      setScriptPublic((value) => !value);
+                      setScriptDirty(true);
+                    }}
+                  />
+                </div>
+                <div className="min-h-0 min-w-0 flex-1">
+                  <ScriptEditor
+                    chartSymbol={activeSlot?.ticker ?? ""}
+                    chartMarket={activeSlot?.market ?? ""}
+                    source={scriptSource}
+                    title={scriptTitle}
+                    description={scriptDescription}
+                    isPublic={scriptPublic}
+                    selectedScriptId={scriptSelectedId}
+                    dirty={scriptDirty}
+                    saving={scriptBusy}
+                    running={scriptBusy}
+                    compileResult={scriptCompileResult}
+                    runResult={scriptRunResult}
+                    onSourceChange={(value) => {
+                      setScriptSource(value);
+                      setScriptDirty(true);
+                    }}
+                    onTitleChange={(value) => {
+                      setScriptTitle(value);
+                      setScriptDirty(true);
+                    }}
+                    onDescriptionChange={(value) => {
+                      setScriptDescription(value);
+                      setScriptDirty(true);
+                    }}
+                    onPublicChange={(value) => {
+                      setScriptPublic(value);
+                      setScriptDirty(true);
+                    }}
+                    onSave={saveScript}
+                    onRun={runScript}
+                    onClose={() => setScriptPanelOpen(false)}
+                    onIndicatorOutput={setScriptOverlayOutputs}
+                  />
+                </div>
+              </PanelBody>
+            </PanelFrame>
+          </div>
+        ) : null}
 
         <TerminalToastViewport className="top-14">
           {layoutNotice ? (

@@ -17,6 +17,7 @@ from backend.auth.deps import get_current_user
 from backend.core.models import ChartResponse, IndicatorPoint, IndicatorResponse, OhlcvPoint
 from backend.core.technicals import compute_indicator
 from backend.models import ChartDrawing, ChartTemplate, User
+from backend.services.footprint_aggregator import FootprintAggregator, serialize_footprint_candle
 from backend.services.volume_profile_service import compute_volume_profile, parse_period_to_days
 
 try:
@@ -41,6 +42,18 @@ _SUPPORTED_CHART_INTERVALS = {
     "1wk",
     "1mo",
     "3mo",
+}
+
+_SUPPORTED_FOOTPRINT_INTERVALS = {
+    "1m",
+    "2m",
+    "5m",
+    "15m",
+    "30m",
+    "60m",
+    "1h",
+    "4h",
+    "1d",
 }
 
 
@@ -145,6 +158,108 @@ async def get_volume_profile(
             "cache_hit": False,
             "bars_count": result.bars_count,
             "total_volume": result.total_volume,
+            "compute_ms": round((perf_counter() - started) * 1000.0, 3),
+        },
+    }
+    await cache_instance.set(key, payload, ttl=120)
+    return payload
+
+
+def _bars_to_footprint_ticks(bars: list[Any]) -> list[dict[str, Any]]:
+    ticks: list[dict[str, Any]] = []
+    for bar in bars:
+        timestamp = int((bar.timestamp if bar.timestamp.tzinfo else bar.timestamp.replace(tzinfo=timezone.utc)).timestamp())
+        open_price = float(bar.open)
+        high_price = float(bar.high)
+        low_price = float(bar.low)
+        close_price = float(bar.close)
+        volume = max(0.0, float(bar.volume))
+        if volume <= 0:
+            continue
+        if high_price < low_price:
+            high_price, low_price = low_price, high_price
+        is_buy = close_price >= open_price
+        side = "buy" if is_buy else "sell"
+        allocations = [
+            (open_price, 0.20),
+            (high_price, 0.25),
+            (low_price, 0.25),
+            (close_price, 0.30),
+        ]
+        for price, fraction in allocations:
+            ticks.append(
+                {
+                    "ts": timestamp,
+                    "price": price,
+                    "size": volume * fraction,
+                    "side": side,
+                }
+            )
+    return ticks
+
+
+@router.get("/charts/{symbol}/footprint")
+async def get_footprint(
+    symbol: str,
+    timeframe: str = Query(default="5m"),
+    bars: int = Query(default=50, ge=1, le=500),
+    market: str = Query(default="NSE"),
+    price_granularity: float = Query(default=0.5, gt=0.0),
+) -> Dict[str, Any]:
+    timeframe = _coerce_query_str(timeframe, "5m").lower()
+    market = _coerce_query_str(market, "NSE").upper()
+    bars = _coerce_query_int(bars, 50)
+    if not math.isfinite(price_granularity) or price_granularity <= 0:
+        raise HTTPException(status_code=400, detail="price_granularity must be greater than 0")
+    if timeframe not in _SUPPORTED_FOOTPRINT_INTERVALS:
+        allowed = ", ".join(sorted(_SUPPORTED_FOOTPRINT_INTERVALS))
+        raise HTTPException(status_code=400, detail=f"Unsupported timeframe '{timeframe}'. Allowed: {allowed}")
+
+    key = cache_instance.build_key(
+        "footprint",
+        symbol.upper(),
+        {"timeframe": timeframe, "bars": bars, "market": market, "price_granularity": price_granularity},
+    )
+    started = perf_counter()
+    cached = await cache_instance.get(key)
+    if cached:
+        payload = dict(cached)
+        payload["meta"] = {
+            **dict(payload.get("meta") or {}),
+            "cache_hit": True,
+            "compute_ms": round((perf_counter() - started) * 1000.0, 3),
+        }
+        return payload
+
+    provider = await get_chart_provider()
+    raw_bars = await provider.get_ohlcv(
+        symbol.strip().upper(),
+        interval=timeframe,
+        period=f"{max(1, bars)}d",
+        start=None,
+        end=None,
+        market_hint=market,
+    )
+    selected_bars = raw_bars[-bars:] if len(raw_bars) > bars else raw_bars
+    aggregator = FootprintAggregator()
+    ticks = _bars_to_footprint_ticks(selected_bars)
+    candles = aggregator.aggregate(ticks, timeframe, price_granularity)
+    total_ask = sum(candle.total_ask_volume for candle in candles)
+    total_bid = sum(candle.total_bid_volume for candle in candles)
+
+    payload = {
+        "symbol": symbol.upper(),
+        "timeframe": timeframe,
+        "bars": bars,
+        "market": market,
+        "price_granularity": price_granularity,
+        "candles": [serialize_footprint_candle(candle) for candle in candles],
+        "meta": {
+            "cache_hit": False,
+            "bars_count": len(selected_bars),
+            "candles_count": len(candles),
+            "total_ask_volume": total_ask,
+            "total_bid_volume": total_bid,
             "compute_ms": round((perf_counter() - started) * 1000.0, 3),
         },
     }

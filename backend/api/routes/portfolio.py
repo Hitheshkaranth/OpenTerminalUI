@@ -147,6 +147,27 @@ async def get_benchmark_overlay(
     return await portfolio_analytics_service.benchmark_overlay(holdings, benchmark=benchmark)
 
 
+@router.get("/portfolio/{portfolio_id}/attribution")
+async def get_portfolio_attribution(
+    portfolio_id: str,
+    period: str = Query(default="1M"),
+    benchmark: str = Query(default="NIFTY50"),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    try:
+        return await portfolio_analytics_service.portfolio_attribution(
+            db=db,
+            portfolio_id=portfolio_id,
+            period=period,
+            benchmark=benchmark,
+        )
+    except ValueError as exc:
+        message = str(exc)
+        if "not found" in message.lower():
+            raise HTTPException(status_code=404, detail=message)
+        raise HTTPException(status_code=400, detail=message)
+
+
 @router.post("/portfolio/holdings")
 def add_holding(payload: HoldingCreate, db: Session = Depends(get_db)) -> dict[str, object]:
     row = Holding(

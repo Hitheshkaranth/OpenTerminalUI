@@ -29,6 +29,12 @@ import {
   transformRenkoBars,
   type AlternativeChartParams,
 } from "./alternativeChartTransforms";
+import {
+  buildFootprintFromBars,
+  normalizeFootprintCandles,
+  renderFootprintCanvas,
+  type FootprintCandleLike,
+} from "./footprintRenderer";
 import { terminalColors } from "../../theme/terminal";
 import { useChartSync } from "./ChartSyncContext";
 import {
@@ -49,6 +55,20 @@ type SeriesRef = {
   delivery: ISeriesApi<"Line", Time> | null;
   sessionShading: ISeriesApi<"Histogram", Time> | null;
 };
+
+function deriveFootprintGranularity(bars: readonly Bar[]): number {
+  if (!bars.length) return 0.5;
+  let minPrice = Number.POSITIVE_INFINITY;
+  let maxPrice = Number.NEGATIVE_INFINITY;
+  for (const bar of bars) {
+    minPrice = Math.min(minPrice, Number(bar.low));
+    maxPrice = Math.max(maxPrice, Number(bar.high));
+  }
+  const range = maxPrice - minPrice;
+  if (!Number.isFinite(range) || range <= 0) return 0.5;
+  const granularity = range / Math.max(12, Math.min(40, bars.length * 2));
+  return Math.max(0.01, Math.min(5, Math.round(granularity * 100) / 100));
+}
 
 export function ChartEngine({
   symbol,
@@ -79,6 +99,10 @@ export function ChartEngine({
     candles: null, line: null, area: null, baseline: null,
     volume: null, oi: null, delivery: null, sessionShading: null
   });
+  const footprintCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const footprintRenderRef = useRef<(() => void) | null>(null);
+  const footprintCandlesRef = useRef<FootprintCandleLike[]>([]);
+  const isFootprintModeRef = useRef<boolean>(false);
   const byTimeRef = useRef<Map<number, Bar>>(new Map());
   const crosshairCbRef = useRef<ChartEngineProps["onCrosshairOHLC"]>(onCrosshairOHLC);
   const backfillCbRef = useRef<ChartEngineProps["onRequestBackfill"]>(onRequestBackfill);
@@ -91,8 +115,14 @@ export function ChartEngine({
   const [chartApi, setChartApi] = useState<IChartApi | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [altParams, setAltParams] = useState<AlternativeChartParams>(DEFAULT_ALT_CHART_PARAMS);
+  const [footprintCandles, setFootprintCandles] = useState<FootprintCandleLike[]>([]);
   const { event: syncEvent, publish } = useChartSync();
   const { bars, liveTick, realtimeMeta } = useRealtimeChart(market, symbol, timeframe, historicalData, enableRealtime);
+  const chartTypeId = String(chartType);
+  const isFootprintMode = chartTypeId === "footprint";
+  useEffect(() => {
+    isFootprintModeRef.current = isFootprintMode;
+  }, [isFootprintMode]);
   const safeBars = useMemo(
     () =>
       bars.filter(
@@ -106,8 +136,8 @@ export function ChartEngine({
     [bars],
   );
   const showSessionLegend = useMemo(
-    () => showSessionShading && hasVisibleSessionShading(safeBars, extendedHours),
-    [safeBars, extendedHours, showSessionShading],
+    () => showSessionShading && !isFootprintMode && hasVisibleSessionShading(safeBars, extendedHours),
+    [safeBars, extendedHours, showSessionShading, isFootprintMode],
   );
 
   useEffect(() => {
@@ -128,14 +158,14 @@ export function ChartEngine({
   }, []);
 
   const transformedBars = useMemo(() => {
-    if (chartType === "renko") return transformRenkoBars(safeBars, altParams.renkoBrickSize);
-    if (chartType === "kagi") return transformKagiBars(safeBars, altParams.kagiReversal);
-    if (chartType === "point_figure") {
+    if (chartTypeId === "renko") return transformRenkoBars(safeBars, altParams.renkoBrickSize);
+    if (chartTypeId === "kagi") return transformKagiBars(safeBars, altParams.kagiReversal);
+    if (chartTypeId === "point_figure") {
       return transformPointFigureBars(safeBars, altParams.pointFigureBoxSize, altParams.pointFigureReversalBoxes);
     }
-    if (chartType === "line_break") return transformLineBreakBars(safeBars, altParams.lineBreakCount);
+    if (chartTypeId === "line_break") return transformLineBreakBars(safeBars, altParams.lineBreakCount);
     return safeBars;
-  }, [altParams.kagiReversal, altParams.lineBreakCount, altParams.pointFigureBoxSize, altParams.pointFigureReversalBoxes, altParams.renkoBrickSize, chartType, safeBars]);
+  }, [altParams.kagiReversal, altParams.lineBreakCount, altParams.pointFigureBoxSize, altParams.pointFigureReversalBoxes, altParams.renkoBrickSize, chartTypeId, safeBars]);
 
   const byTime = useMemo(() => {
     const map = new Map<number, Bar>();
@@ -169,6 +199,48 @@ export function ChartEngine({
   }, [onRealtimeMeta, realtimeMeta]);
 
   useEffect(() => {
+    footprintCandlesRef.current = footprintCandles;
+    footprintRenderRef.current?.();
+  }, [footprintCandles]);
+
+  useEffect(() => {
+    if (!isFootprintMode) {
+      setFootprintCandles([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const granularity = deriveFootprintGranularity(safeBars);
+    const barsParam = Math.max(25, Math.min(200, safeBars.length || 50));
+    const url = new URL(`/api/charts/${encodeURIComponent(symbol)}/footprint`, window.location.origin);
+    url.searchParams.set("timeframe", timeframe);
+    url.searchParams.set("bars", String(barsParam));
+    url.searchParams.set("market", market);
+    url.searchParams.set("price_granularity", String(granularity));
+
+    void fetch(url.toString(), { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return (await response.json()) as { candles?: unknown };
+      })
+      .then((payload) => {
+        const normalized = normalizeFootprintCandles(payload?.candles);
+        setFootprintCandles(normalized.length ? normalized : buildFootprintFromBars(safeBars, granularity));
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setFootprintCandles(buildFootprintFromBars(safeBars, granularity));
+        }
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [isFootprintMode, market, safeBars.length, symbol, timeframe]);
+
+  useEffect(() => {
     if (!hostRef.current || chartRef.current) return;
     const chart = createChart(hostRef.current, {
       ...terminalChartTheme,
@@ -185,24 +257,25 @@ export function ChartEngine({
         wickUpColor: terminalColors.candleUp,
         wickDownColor: terminalColors.candleDown,
         visible:
-          chartType === "candle" ||
-          chartType === "renko" ||
-          chartType === "kagi" ||
-          chartType === "point_figure" ||
-          chartType === "line_break",
+          !isFootprintMode &&
+          (chartTypeId === "candle" ||
+            chartTypeId === "renko" ||
+            chartTypeId === "kagi" ||
+            chartTypeId === "point_figure" ||
+            chartTypeId === "line_break"),
       },
       0,
     );
-    const line = chart.addSeries(LineSeries, { color: terminalColors.accent, lineWidth: 2, visible: chartType === "line" }, 0);
+    const line = chart.addSeries(LineSeries, { color: terminalColors.accent, lineWidth: 2, visible: chartTypeId === "line" }, 0);
     const area = chart.addSeries(
       AreaSeries,
-      { lineColor: terminalColors.accent, topColor: terminalColors.accentAreaTop, bottomColor: terminalColors.accentAreaBottom, visible: chartType === "area" },
+      { lineColor: terminalColors.accent, topColor: terminalColors.accentAreaTop, bottomColor: terminalColors.accentAreaBottom, visible: chartTypeId === "area" },
       0,
     );
     const baseline = chart.addSeries(
       BaselineSeries,
       {
-        visible: chartType === "baseline",
+        visible: chartTypeId === "baseline",
         topLineColor: terminalColors.candleUp,
         bottomLineColor: terminalColors.candleDown,
         topFillColor1: terminalColors.candleUpFillStrong,
@@ -217,7 +290,7 @@ export function ChartEngine({
       {
         priceFormat: { type: "volume" },
         color: terminalColors.candleUpAlpha80,
-        visible: showVolume,
+        visible: showVolume && !isFootprintMode,
       },
       1,
     );
@@ -226,7 +299,7 @@ export function ChartEngine({
       {
         color: terminalColors.info,
         lineWidth: 2,
-        visible: showDeliveryOverlay,
+        visible: showDeliveryOverlay && !isFootprintMode,
         priceScaleId: "delivery-scale",
       },
       0,
@@ -238,7 +311,7 @@ export function ChartEngine({
 
     const sessionShading = chart.addSeries(HistogramSeries, {
       priceScaleId: "",
-      visible: true,
+      visible: !isFootprintMode,
       lastValueVisible: false,
       priceLineVisible: false,
     });
@@ -269,9 +342,37 @@ export function ChartEngine({
       });
     }
 
-    seriesRef.current = { candles, line, area, baseline, volume, oi, delivery, sessionShading };
+      seriesRef.current = { candles, line, area, baseline, volume, oi, delivery, sessionShading };
     chartRef.current = chart;
     setChartApi(chart);
+
+    const renderFootprintOverlay = () => {
+      const canvas = footprintCanvasRef.current;
+      const candleSeries = seriesRef.current.candles;
+      const activeFootprint = footprintCandlesRef.current;
+      if (!canvas || !candleSeries || !activeFootprint.length || !isFootprintModeRef.current) {
+        if (canvas) {
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, rect.width, rect.height);
+          }
+        }
+        return;
+      }
+      renderFootprintCanvas(
+        canvas,
+        activeFootprint,
+        {
+          timeToX: (time) => chart.timeScale().timeToCoordinate(time as UTCTimestamp),
+          priceToY: (price) => candleSeries.priceToCoordinate(price),
+        },
+        { candleWidth: 20 },
+      );
+    };
+    footprintRenderRef.current = renderFootprintOverlay;
 
     const onCrosshairMove = (param: { time?: Time }) => {
       const t = typeof param.time === "number" ? Number(param.time) : null;
@@ -307,7 +408,13 @@ export function ChartEngine({
         backfillInFlightRef.current = false;
       });
     };
-    chart.timeScale().subscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChange as never);
+    const onVisibleLogicalRangeChangeWithFootprint = (logicalRange: { from: number; to: number } | null) => {
+      onVisibleLogicalRangeChange(logicalRange);
+      if (isFootprintMode) {
+        footprintRenderRef.current?.();
+      }
+    };
+    chart.timeScale().subscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChangeWithFootprint as never);
 
     const resizeBatcher = createRafBatcher<{ width: number; height: number }>(({ width, height }) => {
       chart.applyOptions({ width, height });
@@ -318,35 +425,40 @@ export function ChartEngine({
         width: hostRef.current.clientWidth,
         height: hostRef.current.clientHeight || height,
       });
+      footprintRenderRef.current?.();
     });
     observer.observe(hostRef.current);
+
+    renderFootprintOverlay();
 
     return () => {
       observer.disconnect();
       resizeBatcher.cancel();
       chart.unsubscribeCrosshairMove(onCrosshairMove as never);
-      chart.timeScale().unsubscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChange as never);
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChangeWithFootprint as never);
       chart.remove();
       chartRef.current = null;
       setChartApi(null);
+      footprintRenderRef.current = null;
     };
-  }, [height, symbolIsFnO]);
+  }, [height, symbolIsFnO, chartTypeId, isFootprintMode]);
 
   useEffect(() => {
     const s = seriesRef.current;
     if (!s.candles || !s.line || !s.area || !s.baseline) return;
     s.candles.applyOptions({
       visible:
-        chartType === "candle" ||
-        chartType === "renko" ||
-        chartType === "kagi" ||
-        chartType === "point_figure" ||
-        chartType === "line_break",
+        !isFootprintMode &&
+        (chartTypeId === "candle" ||
+          chartTypeId === "renko" ||
+          chartTypeId === "kagi" ||
+          chartTypeId === "point_figure" ||
+          chartTypeId === "line_break"),
     });
-    s.line.applyOptions({ visible: chartType === "line" });
-    s.area.applyOptions({ visible: chartType === "area" });
-    s.baseline.applyOptions({ visible: chartType === "baseline" });
-  }, [chartType]);
+    s.line.applyOptions({ visible: chartTypeId === "line" });
+    s.area.applyOptions({ visible: chartTypeId === "area" });
+    s.baseline.applyOptions({ visible: chartTypeId === "baseline" });
+  }, [chartTypeId, isFootprintMode]);
 
   const lastBarsRef = useRef<Bar[]>([]);
 
@@ -401,14 +513,15 @@ export function ChartEngine({
     const previousBarsLength = lastBarsRef.current.length;
     lastBarsRef.current = transformedBars;
     lastRenderConfigKeyRef.current = renderConfigKey;
-    s.volume.applyOptions({ visible: showVolume });
+    s.volume.applyOptions({ visible: showVolume && !isFootprintMode });
     s.delivery.setData(
       deliverySeries.map((row) => ({
         time: Number(row.time) as UTCTimestamp,
         value: Number(row.value),
       })),
     );
-    s.delivery.applyOptions({ visible: showDeliveryOverlay });
+    s.delivery.applyOptions({ visible: showDeliveryOverlay && !isFootprintMode });
+    s.sessionShading.applyOptions({ visible: showSessionShading && !isFootprintMode });
     s.oi?.setData(
       transformedBars.map((b) => ({
         time: Number(b.time) as UTCTimestamp,
@@ -450,7 +563,7 @@ export function ChartEngine({
         lastAutoViewportKeyRef.current = viewportKey;
       }
     }
-  }, [transformedBars, showVolume, deliverySeries, showDeliveryOverlay, extendedHours, timeframe, showSessionShading]);
+  }, [transformedBars, showVolume, deliverySeries, showDeliveryOverlay, extendedHours, timeframe, showSessionShading, isFootprintMode]);
 
   useIndicators(chartApi, transformedBars, activeIndicators);
 
@@ -483,6 +596,11 @@ export function ChartEngine({
       }}
     >
       <div ref={hostRef} className="h-full w-full" />
+      <canvas
+        ref={footprintCanvasRef}
+        className={`pointer-events-none absolute inset-0 z-[3] ${isFootprintMode ? "block" : "hidden"}`}
+        aria-hidden="true"
+      />
       {showSessionLegend && (
         <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[10px] text-terminal-text">
           <span className="inline-flex items-center gap-1">

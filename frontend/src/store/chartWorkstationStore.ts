@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { LinkGroup } from "../contexts/SymbolLinkContext";
 import { normalizeIndicatorConfigs } from "../shared/chart/indicatorCatalog";
 import type { IndicatorConfig } from "../shared/chart/types";
 
@@ -38,6 +39,7 @@ export interface ChartSlot {
   indicators: IndicatorConfig[];
   extendedHours: ExtendedHoursConfig;
   preMarketLevels: PreMarketLevelConfig;
+  linkGroup?: LinkGroup;
 }
 
 export interface GridTemplate {
@@ -61,6 +63,7 @@ interface ChartWorkstationState {
   updateSlotETH: (id: string, eth: Partial<ExtendedHoursConfig>) => void;
   updateSlotPMLevels: (id: string, levels: Partial<PreMarketLevelConfig>) => void;
   updateSlotIndicators: (id: string, indicators: IndicatorConfig[]) => void;
+  updateSlotLinkGroup: (id: string, linkGroup: LinkGroup) => void;
   setActiveSlot: (id: string | null) => void;
   setGridTemplate: (t: GridTemplate) => void;
   setSyncCrosshair: (v: boolean) => void;
@@ -84,6 +87,10 @@ const DEFAULT_PM_LEVELS: PreMarketLevelConfig = {
   daysToShow: 1,
 };
 
+function normalizeLinkGroup(value: unknown): LinkGroup {
+  return value === "red" || value === "blue" || value === "green" || value === "yellow" ? value : "none";
+}
+
 function makeSlot(): ChartSlot {
   return {
     id: makeId(),
@@ -95,6 +102,7 @@ function makeSlot(): ChartSlot {
     indicators: [],
     extendedHours: { ...DEFAULT_ETH },
     preMarketLevels: { ...DEFAULT_PM_LEVELS },
+    linkGroup: "none",
   };
 }
 
@@ -118,6 +126,7 @@ function normalizeSlot(slot: Partial<ChartSlot> | undefined): ChartSlot {
     indicators: normalizeIndicators((slot as any)?.indicators),
     extendedHours: { ...DEFAULT_ETH, ...(slot?.extendedHours ?? {}) },
     preMarketLevels: { ...DEFAULT_PM_LEVELS, ...(slot?.preMarketLevels ?? {}) },
+    linkGroup: normalizeLinkGroup((slot as any)?.linkGroup),
   };
 }
 
@@ -191,6 +200,13 @@ export const useChartWorkstationStore = create<ChartWorkstationState>()((set) =>
     set((s) => ({
       slots: s.slots.map((sl) =>
         sl.id === id ? { ...sl, indicators: normalizeIndicators(indicators) } : sl,
+      ),
+    })),
+
+  updateSlotLinkGroup: (id, linkGroup) =>
+    set((s) => ({
+      slots: s.slots.map((sl) =>
+        sl.id === id ? { ...sl, linkGroup } : sl,
       ),
     })),
 

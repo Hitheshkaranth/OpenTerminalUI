@@ -29,6 +29,131 @@ def _safe_float(value: Any) -> float | None:
         return None
 
 
+class DrawingCrossCondition:
+    def _normalize_drawing(self, params: dict[str, Any]) -> dict[str, Any] | None:
+        drawing = params.get("drawing")
+        if not isinstance(drawing, dict):
+            chart_context = params.get("chart_context")
+            if isinstance(chart_context, dict):
+                drawing = chart_context.get("drawing")
+        if not isinstance(drawing, dict):
+            return None
+        return drawing
+
+    @staticmethod
+    def _normalize_side(value: Any) -> str:
+        text = str(value or "").strip().lower()
+        if text in {"cross_above", "above", "up", "bullish"}:
+            return "cross_above"
+        if text in {"cross_below", "below", "down", "bearish"}:
+            return "cross_below"
+        return "cross_any"
+
+    @staticmethod
+    def _anchor_list(drawing: dict[str, Any]) -> list[dict[str, Any]]:
+        anchors = drawing.get("anchors")
+        if isinstance(anchors, list):
+            return [anchor for anchor in anchors if isinstance(anchor, dict)]
+        return []
+
+    @staticmethod
+    def _extract_tool_type(drawing: dict[str, Any]) -> str:
+        tool = drawing.get("tool")
+        if isinstance(tool, dict):
+            tool_type = str(tool.get("type") or "").strip().lower()
+            if tool_type:
+                return tool_type
+        return str(drawing.get("toolType") or drawing.get("tool_type") or "").strip().lower()
+
+    def _resolve_level(self, drawing: dict[str, Any], tick: dict[str, Any]) -> float | None:
+        tool_type = self._extract_tool_type(drawing)
+        alert = drawing.get("alert") if isinstance(drawing.get("alert"), dict) else {}
+        alert_level_raw = None
+        if isinstance(alert, dict):
+            alert_level_raw = alert.get("price") or alert.get("threshold") or alert.get("level")
+        alert_level = _safe_float(alert_level_raw)
+        if alert_level is not None:
+            return alert_level
+
+        threshold = _safe_float(tick.get("threshold"))
+        if threshold is not None:
+            return threshold
+
+        if tool_type in {"hline", "horizontal_line"}:
+            anchor = self._anchor_list(drawing)[:1]
+            if anchor:
+                return _safe_float(anchor[0].get("price"))
+            return _safe_float(drawing.get("price"))
+
+        if tool_type in {"anchored_vwap"}:
+            anchor = self._anchor_list(drawing)[:1]
+            if anchor:
+                return _safe_float(anchor[0].get("price"))
+            return _safe_float(drawing.get("anchor_price"))
+
+        if tool_type in {"trendline", "ray"}:
+            anchors = self._anchor_list(drawing)
+            if len(anchors) < 2:
+                return None
+            first, second = anchors[0], anchors[1]
+            start_time = _safe_float(first.get("time"))
+            end_time = _safe_float(second.get("time"))
+            start_price = _safe_float(first.get("price"))
+            end_price = _safe_float(second.get("price"))
+            if None in (start_time, end_time, start_price, end_price) or start_time == end_time:
+                return None
+            reference_time = _safe_float(tick.get("timestamp"))
+            if reference_time is None:
+                reference_time = _safe_float(tick.get("ts"))
+            if reference_time is None:
+                reference_time = _safe_float(tick.get("time"))
+            if reference_time is None:
+                reference_time = end_time if tool_type == "trendline" else max(start_time, end_time)
+            if tool_type == "trendline":
+                reference_time = max(min(reference_time, max(start_time, end_time)), min(start_time, end_time))
+            else:
+                reference_time = max(reference_time, start_time)
+            slope = (end_price - start_price) / (end_time - start_time)
+            return start_price + slope * (reference_time - start_time)
+
+        return _safe_float(drawing.get("price"))
+
+    def evaluate(
+        self,
+        tick: dict[str, Any],
+        params: dict[str, Any],
+        previous_price: float | None = None,
+    ) -> tuple[bool, float | None]:
+        drawing = self._normalize_drawing(params)
+        if not drawing:
+            return False, None
+
+        current_price = _safe_float(tick.get("ltp"))
+        if current_price is None:
+            return False, None
+        if previous_price is None:
+            previous_price = _safe_float(tick.get("previous_ltp"))
+
+        level = self._resolve_level(drawing, tick)
+        if level is None:
+            return False, None
+
+        alert_config = drawing.get("alert") if isinstance(drawing.get("alert"), dict) else {}
+        condition = params.get("condition") or params.get("cross")
+        if condition is None and isinstance(alert_config, dict):
+            condition = alert_config.get("condition")
+        side = self._normalize_side(condition)
+        if side == "cross_above":
+            return bool(previous_price is not None and previous_price <= level < current_price), level
+        if side == "cross_below":
+            return bool(previous_price is not None and previous_price >= level > current_price), level
+        if previous_price is None:
+            return False, level
+        crossed_up = previous_price <= level < current_price
+        crossed_down = previous_price >= level > current_price
+        return crossed_up or crossed_down, level
+
+
 _ALLOWED_AST_NODES = (
     ast.Expression,
     ast.BoolOp,
@@ -214,6 +339,10 @@ class AlertEvaluatorService:
                 "change_pct": change_pct,
             }
             return self._eval_custom(expr, ctx), ltp
+        if ctype == "drawing_cross":
+            history = list(self._price_cache[alert.symbol])
+            previous_price = history[-2] if len(history) >= 2 else None
+            return DrawingCrossCondition().evaluate(tick, params, previous_price)
         return False, None
 
     def _evaluate_indicator_crossover(self, symbol: str, params: dict[str, Any]) -> bool:

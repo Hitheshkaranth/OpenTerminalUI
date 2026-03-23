@@ -5,11 +5,15 @@ import {
   Plus,
   Settings,
   X,
-  ExternalLink,
   GripVertical,
   LayoutGrid,
 } from "lucide-react";
 
+import {
+  setGroupSymbol,
+  subscribeSymbolLinkMessages,
+  type LinkGroup,
+} from "../../contexts/SymbolLinkContext";
 import { PanelBody, PanelFrame, PanelHeader } from "./PanelChrome";
 import { type LaunchpadPanelType, useLaunchpad } from "./LaunchpadContext";
 import { LaunchpadGrid } from "./LaunchpadGrid";
@@ -60,6 +64,19 @@ function typeIconLabel(type: LaunchpadPanelType) {
   }
 }
 
+function resolvePanelLinkGroup(panel: { linkGroup?: LinkGroup; linked?: boolean }): LinkGroup {
+  if (
+    panel.linkGroup === "none" ||
+    panel.linkGroup === "red" ||
+    panel.linkGroup === "blue" ||
+    panel.linkGroup === "green" ||
+    panel.linkGroup === "yellow"
+  ) {
+    return panel.linkGroup;
+  }
+  return panel.linked === false ? "none" : "red";
+}
+
 function VisibilityMount({
   panelId,
   focused,
@@ -107,6 +124,7 @@ export function LaunchpadWorkspace() {
     updatePanel,
     updatePanelsLayout,
     reorderPanels,
+    setPanelPoppedOut,
     panelRegistry,
     emitSymbolChange,
     lastBroadcastSymbol,
@@ -140,6 +158,18 @@ export function LaunchpadWorkspace() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [panels]);
+
+  useEffect(() => {
+    return subscribeSymbolLinkMessages((message) => {
+      if (message.type === "panel-return" && message.panelId) {
+        setPanelPoppedOut(message.panelId, false);
+        return;
+      }
+      if (message.type === "symbol-change" && message.linkGroup !== "none" && message.symbol) {
+        emitSymbolChange(message.symbol, undefined, message.linkGroup);
+      }
+    });
+  }, [emitSymbolChange, setPanelPoppedOut]);
 
   if (!activeLayout) {
     return (
@@ -254,6 +284,7 @@ export function LaunchpadWorkspace() {
           onLayoutChange={(panels) => updatePanelsLayout(panels)}
           renderPanel={(panel) => {
             const PanelView = panelRegistry[panel.type];
+            const panelLinkGroup = resolvePanelLinkGroup(panel);
             return (
               <PanelFrame
                 key={panel.id}
@@ -305,7 +336,10 @@ export function LaunchpadWorkspace() {
                             updatePanel(panel.id, { symbol });
                             setTicker(symbol);
                             void loadTicker();
-                            if (panel.linked) emitSymbolChange(symbol, panel.id);
+                            if (panelLinkGroup !== "none") {
+                              setGroupSymbol(panelLinkGroup, symbol, panel.id);
+                              emitSymbolChange(symbol, panel.id, panelLinkGroup);
+                            }
                           }
                         }}
                         placeholder="SYMBOL"
@@ -314,36 +348,35 @@ export function LaunchpadWorkspace() {
                       />
                     </div>
                   }
+                  linkGroup={panelLinkGroup}
+                  onLinkGroupChange={(group) => {
+                    updatePanel(panel.id, { linkGroup: group, linked: group !== "none" });
+                    if (group !== "none" && panel.symbol) {
+                      setGroupSymbol(group, panel.symbol, panel.id);
+                      emitSymbolChange(panel.symbol, panel.id, group);
+                    }
+                  }}
+                  onPopout={() => setPanelPoppedOut(panel.id, true)}
                   actions={
                     <div className="inline-flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => updatePanel(panel.id, { linked: !panel.linked })}
-                        className={`rounded p-1 ${panel.linked ? "text-terminal-accent" : "text-terminal-muted hover:text-terminal-text"}`}
-                        title={panel.linked ? "Linked panel" : "Unlinked panel"}
-                        aria-label={panel.linked ? "Disable panel link" : "Enable panel link"}
+                        onClick={() => {
+                          const nextGroup = panelLinkGroup === "none" ? "red" : "none";
+                          updatePanel(panel.id, { linkGroup: nextGroup, linked: nextGroup !== "none" });
+                          if (nextGroup !== "none" && panel.symbol) {
+                            setGroupSymbol(nextGroup, panel.symbol, panel.id);
+                            emitSymbolChange(panel.symbol, panel.id, nextGroup);
+                          }
+                        }}
+                        className={`rounded p-1 ${panelLinkGroup !== "none" ? "text-terminal-accent" : "text-terminal-muted hover:text-terminal-text"}`}
+                        title={panelLinkGroup !== "none" ? "Linked panel" : "Unlinked panel"}
+                        aria-label={panelLinkGroup !== "none" ? "Disable panel link" : "Enable panel link"}
                       >
-                        {panel.linked ? <Link2 className="h-3.5 w-3.5" /> : <Unlink2 className="h-3.5 w-3.5" />}
+                        {panelLinkGroup !== "none" ? <Link2 className="h-3.5 w-3.5" /> : <Unlink2 className="h-3.5 w-3.5" />}
                       </button>
                       <button type="button" className="rounded p-1 text-terminal-muted hover:text-terminal-text" aria-label="Panel settings">
                         <Settings className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded p-1 text-terminal-muted hover:text-terminal-text"
-                        aria-label="Detach panel"
-                        onClick={() => {
-                          const params = new URLSearchParams({
-                            id: panel.id,
-                            type: panel.type,
-                            title: panel.title,
-                            symbol: panel.symbol || "",
-                            linked: panel.linked ? "1" : "0",
-                          });
-                          window.open(`/equity/launchpad/popout?${params.toString()}`, `_blank`, "noopener,noreferrer,width=1280,height=760");
-                        }}
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
                       </button>
                       <button type="button" onClick={() => closePanel(panel.id)} className="rounded p-1 text-terminal-muted hover:text-rose-400" aria-label="Close panel">
                         <X className="h-3.5 w-3.5" />
@@ -351,11 +384,29 @@ export function LaunchpadWorkspace() {
                     </div>
                   }
                 />
-                <Suspense fallback={<PanelBody>Loading panel...</PanelBody>}>
-                  <VisibilityMount panelId={panel.id} focused={focusedPanelId === panel.id}>
-                    <PanelView panel={panel} />
-                  </VisibilityMount>
-                </Suspense>
+                {panel.poppedOut ? (
+                  <PanelBody className="flex min-h-[160px] flex-col items-center justify-center gap-3 text-center">
+                    <div>
+                      <div className="ot-type-panel-title text-terminal-accent">Panel In External Window</div>
+                      <div className="mt-1 text-xs text-terminal-muted">
+                        This panel is detached. Close the popout to restore it here, or recall it manually.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-sm border border-terminal-border px-3 py-1 text-xs text-terminal-text hover:border-terminal-accent hover:text-terminal-accent"
+                      onClick={() => setPanelPoppedOut(panel.id, false)}
+                    >
+                      Recall Panel
+                    </button>
+                  </PanelBody>
+                ) : (
+                  <Suspense fallback={<PanelBody>Loading panel...</PanelBody>}>
+                    <VisibilityMount panelId={panel.id} focused={focusedPanelId === panel.id}>
+                      <PanelView panel={panel} />
+                    </VisibilityMount>
+                  </Suspense>
+                )}
               </PanelFrame>
             );
           }}

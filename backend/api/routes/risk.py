@@ -10,8 +10,9 @@ from sqlalchemy.orm import Session
 from backend.api.deps import get_db, get_unified_fetcher
 from backend.api.routes.chart import _parse_yahoo_chart
 from backend.auth.deps import get_current_user
-from backend.models import BacktestRun, Holding, User
+from backend.models import BacktestRun, Holding, PortfolioDefinition, User
 from backend.risk_engine.engine import DEFAULT_SCENARIOS, compute_portfolio_risk
+from backend.services.stress_test_service import stress_test_service
 
 router = APIRouter()
 
@@ -22,6 +23,17 @@ class RiskPortfolioRequest(BaseModel):
     confidence: float = Field(default=0.95, ge=0.8, le=0.999)
     lookback_days: int = Field(default=252, ge=30, le=2000)
     portfolio_value: float = Field(default=1_000_000, gt=0)
+
+
+class StressTestRequest(BaseModel):
+    portfolio_id: str = Field(default="current", min_length=1)
+    scenario: str = Field(default="2008_gfc", min_length=1)
+    custom_params: dict[str, float] = Field(default_factory=dict)
+
+
+class StressReplayRequest(BaseModel):
+    portfolio_id: str = Field(default="current", min_length=1)
+    scenario: str = Field(default="2008_gfc", min_length=1)
 
 
 def _returns_from_close(close_series: pd.Series) -> pd.Series:
@@ -104,3 +116,49 @@ def risk_backtest(
 @router.get("/risk/scenarios")
 def risk_scenarios(_: User = Depends(get_current_user)) -> dict[str, Any]:
     return {"items": DEFAULT_SCENARIOS}
+
+
+@router.get("/risk/stress-test/scenarios")
+def stress_test_scenarios(_: User = Depends(get_current_user)) -> dict[str, Any]:
+    return {"items": stress_test_service.list_scenarios()}
+
+
+def _validate_portfolio_id(db: Session, portfolio_id: str) -> None:
+    normalized = portfolio_id.strip().lower()
+    if normalized in {"", "current", "portfolio", "default"}:
+        return
+    exists = db.query(PortfolioDefinition).filter(PortfolioDefinition.id == portfolio_id).first()
+    if exists is None:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
+
+@router.post("/risk/stress-test")
+def risk_stress_test(
+    payload: StressTestRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    _validate_portfolio_id(db, payload.portfolio_id)
+    try:
+        result = stress_test_service.run_stress_test(db, payload.portfolio_id, payload.scenario, payload.custom_params)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Scenario not found")
+    return result.to_payload()
+
+
+@router.post("/risk/stress-test/replay")
+def risk_stress_test_replay(
+    payload: StressReplayRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    _validate_portfolio_id(db, payload.portfolio_id)
+    try:
+        result = stress_test_service.run_historical_replay(db, payload.portfolio_id, payload.scenario)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Scenario not found")
+    return result.to_payload()

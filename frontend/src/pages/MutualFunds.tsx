@@ -2,16 +2,20 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 
 import { addMutualFundHolding } from "../api/client";
+import { CategoryRankings } from "../components/mutualFunds/CategoryRankings";
+import { FundOverlap } from "../components/mutualFunds/FundOverlap";
 import { MutualFundCompare } from "../components/mutualFunds/MutualFundCompare";
 import { MutualFundDetail } from "../components/mutualFunds/MutualFundDetail";
 import { MutualFundPortfolioSection } from "../components/mutualFunds/MutualFundPortfolioSection";
 import { MutualFundSearch } from "../components/mutualFunds/MutualFundSearch";
+import { RollingReturns } from "../components/mutualFunds/RollingReturns";
+import { SIPCalculator } from "../components/mutualFunds/SIPCalculator";
 import { TopFundsPanel } from "../components/mutualFunds/TopFundsPanel";
 import { TerminalButton } from "../components/terminal/TerminalButton";
 import { TerminalInput } from "../components/terminal/TerminalInput";
 import type { MutualFund } from "../types";
 
-type Section = "search" | "top" | "compare" | "holdings";
+type Section = "search" | "top" | "compare" | "holdings" | "rankings" | "rolling" | "sip" | "overlap";
 
 export function MutualFundsPage() {
   const location = useLocation();
@@ -37,8 +41,9 @@ export function MutualFundsPage() {
 
   useEffect(() => {
     const hash = (location.hash || "").replace("#", "").trim().toLowerCase();
-    if (hash === "search" || hash === "top" || hash === "compare" || hash === "holdings") {
-      setSection(hash);
+    const validSections: Section[] = ["search", "top", "compare", "holdings", "rankings", "rolling", "sip", "overlap"];
+    if (validSections.includes(hash as Section)) {
+      setSection(hash as Section);
     }
   }, [location.hash]);
 
@@ -110,10 +115,26 @@ export function MutualFundsPage() {
       </div>
 
       <div className="flex flex-wrap gap-1">
-        <button className={`rounded border px-2 py-1 text-xs ${section === "search" ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted"}`} onClick={() => setSection("search")}>Search</button>
-        <button className={`rounded border px-2 py-1 text-xs ${section === "top" ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted"}`} onClick={() => setSection("top")}>Top Funds</button>
-        <button className={`rounded border px-2 py-1 text-xs ${section === "compare" ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted"}`} onClick={() => setSection("compare")}>Compare</button>
-        <button className={`rounded border px-2 py-1 text-xs ${section === "holdings" ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted"}`} onClick={() => setSection("holdings")}>My Holdings</button>
+        {[
+          { id: "search", label: "Search" },
+          { id: "top", label: "Top Funds" },
+          { id: "compare", label: "Compare" },
+          { id: "holdings", label: "My Holdings" },
+          { id: "rankings", label: "Category Rankings" },
+          { id: "rolling", label: "Rolling Returns" },
+          { id: "sip", label: "SIP Calculator" },
+          { id: "overlap", label: "Fund Overlap" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            className={`rounded border px-2 py-1 text-xs ${
+              section === tab.id ? "border-terminal-accent text-terminal-accent" : "border-terminal-border text-terminal-muted"
+            }`}
+            onClick={() => setSection(tab.id as Section)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {section === "search" && (
@@ -135,6 +156,11 @@ export function MutualFundsPage() {
       )}
 
       {section === "holdings" && <MutualFundPortfolioSection refreshToken={refreshToken} />}
+
+      {section === "rankings" && <CategoryRankings />}
+      {section === "rolling" && <RollingReturns />}
+      {section === "sip" && <SIPCalculator />}
+      {section === "overlap" && <FundOverlap />}
     </div>
   );
 }

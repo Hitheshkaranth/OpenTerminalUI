@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { fetchCryptoSearch, searchSymbols, type SearchSymbolItem } from "../../api/client";
+import { useNavigationHistory } from "../../hooks/useNavigationHistory";
+import { useSettingsStore } from "../../store/settingsStore";
 import { TerminalBadge, TerminalInput } from "../terminal";
 
 import {
   CHART_WORKSTATION_COMMAND_SPECS,
   COMMAND_FUNCTIONS,
+  buildAssetDisambiguationOptions,
+  buildTickerCommandHints,
   SHORTCUT_SPECS,
   dispatchChartWorkstationAction,
   executeParsedCommand,
@@ -20,7 +25,7 @@ type PaletteItem = {
   label: string;
   description: string;
   command: string;
-  badge: "CMD" | "CHART";
+  badge: "CMD" | "CHART" | "FUNC" | "ASSET" | "NAV";
   run?: () => CommandExecutionResult;
 };
 
@@ -29,15 +34,34 @@ function looksLikeTicker(input: string): boolean {
   return /^[A-Z0-9.\-]{1,20}$/.test(token);
 }
 
+function dedupeSearchMatches(items: SearchSymbolItem[]): SearchSymbolItem[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = `${String(item.ticker || "").toUpperCase()}|${String(item.exchange || "").toUpperCase()}|${String(item.name || "").toUpperCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export function CommandPalette() {
   const location = useLocation();
   const navigate = useNavigate();
+  const selectedMarket = useSettingsStore((state) => state.selectedMarket);
+  const { recentPages } = useNavigationHistory();
   const [open, setOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [searchMatches, setSearchMatches] = useState<SearchSymbolItem[]>([]);
   const onChartWorkstation = location.pathname.includes("/equity/chart-workstation");
+
+  const isFunctionToken = (token: string) =>
+    COMMAND_FUNCTIONS.some((fn) => {
+      const normalized = token.trim().toUpperCase();
+      return fn.code === normalized || (fn.aliases ?? []).some((alias) => alias === normalized);
+    });
 
   const visibleShortcutSpecs = useMemo(
     () =>
@@ -103,9 +127,83 @@ export function CommandPalette() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [helpOpen, open]);
 
+  useEffect(() => {
+    const firstToken = query.trim().split(/\s+/)[0] ?? "";
+    if (!firstToken || !looksLikeTicker(firstToken) || isFunctionToken(firstToken)) {
+      setSearchMatches([]);
+      return;
+    }
+
+    let active = true;
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const [equities, crypto] = await Promise.all([
+            searchSymbols(firstToken, selectedMarket),
+            fetchCryptoSearch(firstToken),
+          ]);
+          if (!active) return;
+          setSearchMatches(dedupeSearchMatches([...(equities || []), ...(crypto || [])]));
+        } catch {
+          if (active) {
+            setSearchMatches([]);
+          }
+        }
+      })();
+    }, 180);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [query, selectedMarket]);
+
   const items = useMemo<PaletteItem[]>(() => {
     const q = query.trim();
     const rows: Array<PaletteItem & { score: number }> = [];
+    const disambiguationItems = buildAssetDisambiguationOptions(q, searchMatches);
+    const tickerHints = buildTickerCommandHints(q);
+    const recentPageItems = recentPages
+      .map((page, idx) => ({
+        id: `nav-${page.path}`,
+        label: page.label,
+        description: page.breadcrumbs.join(" > "),
+        command: page.path,
+        badge: "NAV" as const,
+        run: () => {
+          navigate(page.path);
+          return { ok: true, target: page.path };
+        },
+        score: q
+          ? Math.max(fuzzyScore(page.label, q), fuzzyScore(page.path, q), fuzzyScore(page.breadcrumbs.join(" "), q))
+          : 1700 - idx,
+      }))
+      .filter((item) => item.score >= 0)
+      .slice(0, 10);
+
+    rows.push(...recentPageItems);
+
+    rows.push(
+      ...disambiguationItems.map((item, idx) => ({
+        id: item.key,
+        label: item.symbol,
+        description: item.description,
+        command: item.command,
+        badge: "ASSET" as const,
+        score: 2100 - idx,
+      })),
+    );
+
+    rows.push(
+      ...tickerHints.map((hint, idx) => ({
+        id: hint.key,
+        label: hint.title,
+        description: hint.subtitle,
+        command: hint.command,
+        badge: "FUNC" as const,
+        score: 1800 - idx,
+      })),
+    );
 
     if (onChartWorkstation) {
       rows.push(
@@ -124,7 +222,7 @@ export function CommandPalette() {
                 fuzzyScore(action.shortcut, q),
                 ...action.keywords.map((keyword) => fuzzyScore(keyword, q)),
               )
-            : 1100,
+            : 900,
         })),
       );
     }
@@ -147,7 +245,7 @@ export function CommandPalette() {
       })),
     );
 
-    if (q && looksLikeTicker(q)) {
+    if (q && looksLikeTicker(q) && !disambiguationItems.length) {
       rows.unshift({
         id: `ticker-${q.toUpperCase()}`,
         label: q.toUpperCase(),
@@ -163,7 +261,7 @@ export function CommandPalette() {
       .sort((a, b) => b.score - a.score)
       .slice(0, 12)
       .map(({ score: _score, ...rest }) => rest);
-  }, [onChartWorkstation, query]);
+  }, [navigate, onChartWorkstation, query, recentPages, searchMatches]);
 
   useEffect(() => {
     if (!open) return;
@@ -232,7 +330,7 @@ export function CommandPalette() {
               onMouseEnter={() => setSelected(idx)}
               onClick={() => run(item)}
             >
-              <TerminalBadge variant={item.badge === "CHART" ? "accent" : "neutral"} size="sm">{item.badge}</TerminalBadge>
+              <TerminalBadge variant={item.badge === "CHART" || item.badge === "FUNC" ? "accent" : "neutral"} size="sm">{item.badge}</TerminalBadge>
               <span className="min-w-0">
                 <span className="block truncate text-sm text-terminal-text">{item.label}</span>
                 <span className="block truncate text-xs text-terminal-muted">{item.description}</span>

@@ -2,6 +2,9 @@ from __future__ import annotations
 
 __all__ = [
     "admin",
+    "commodities",
+    "depth",
+    "forex",
     "stocks",
     "chart",
     "screener",
@@ -26,7 +29,9 @@ __all__ = [
     "futures",
     "indicators",
     "stream",
+    "hotlists",
     "kite",
+    "patterns",
     "shareholding",
     "health",
     "scripting",
@@ -38,4 +43,6 @@ __all__ = [
     "governance",
     "ops",
     "user_layouts",
+    "bonds",
+    "etf",
 ]

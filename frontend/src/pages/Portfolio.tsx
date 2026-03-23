@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Area, AreaChart, Brush, CartesianGrid, Legend, Line, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
@@ -28,6 +28,7 @@ import { DividendTracker } from "../components/portfolio/DividendTracker";
 import { PortfolioManager } from "../components/portfolio/PortfolioManager";
 import { RiskMetricsPanel } from "../components/portfolio/RiskMetricsPanel";
 import { TaxLotManager } from "../components/portfolio/TaxLotManager";
+import { SymbolContextMenu } from "../components/common/SymbolContextMenu";
 import { EarningsCalendar } from "../components/EarningsCalendar";
 import { EarningsDateBadge } from "../components/EarningsDateBadge";
 import { MutualFundPortfolioSection } from "../components/mutualFunds/MutualFundPortfolioSection";
@@ -49,6 +50,8 @@ import type {
 import { MOMENTUM_ROTATION_BASKET } from "../utils/constants";
 import { formatInr } from "../utils/formatters";
 
+const AttributionPanel = lazy(() => import("../components/portfolio/AttributionPanel"));
+
 type MonthSlot = {
   key: string;
   label: string;
@@ -64,6 +67,8 @@ type PortfolioTrendPoint = {
   pct: number | null;
   investments: Array<{ ticker: string; date: string }>;
 };
+
+type PortfolioHoldingRow = PortfolioResponse["items"][number];
 
 const EMPTY_PORTFOLIO: PortfolioResponse = {
   items: [],
@@ -195,6 +200,7 @@ export function PortfolioPage() {
   const [portfolioMode, setPortfolioMode] = useState<"equity" | "mutual_funds">(
     () => (searchParams.get("mode") === "mutual_funds" ? "mutual_funds" : "equity"),
   );
+  const [portfolioSection, setPortfolioSection] = useState<"overview" | "attribution">("overview");
   const [mfSchemeCode, setMfSchemeCode] = useState("");
   const [mfSchemeName, setMfSchemeName] = useState("");
   const [mfFundHouse, setMfFundHouse] = useState("");
@@ -225,6 +231,7 @@ export function PortfolioPage() {
   const [benchmarkOverlay, setBenchmarkOverlay] = useState<PortfolioBenchmarkOverlay | null>(null);
   const [tickerSuggestions, setTickerSuggestions] = useState<SearchSymbolItem[]>([]);
   const [isTickerSuggestionsOpen, setIsTickerSuggestionsOpen] = useState(false);
+  const [holdingContextMenu, setHoldingContextMenu] = useState<{ row: PortfolioHoldingRow; x: number; y: number } | null>(null);
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
   const searchRequestRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -232,6 +239,7 @@ export function PortfolioPage() {
     () => Array.from(new Set((data?.items ?? []).map((x) => x.ticker).filter(Boolean))),
     [data?.items],
   );
+  const attributionPortfolioId = searchParams.get("portfolioId")?.trim() || "current";
   const { data: portfolioEarnings = [] } = usePortfolioEarnings(portfolioSymbols, 60);
   const nextEarningsMap = useMemo(
     () =>
@@ -446,6 +454,7 @@ export function PortfolioPage() {
   const returnMax = returnValues.length ? Math.max(...returnValues) : 5;
   const returnSpread = Math.max(1, returnMax - returnMin);
   const returnDomain: [number, number] = [returnMin - returnSpread * 0.18, returnMax + returnSpread * 0.18];
+  const closeHoldingContextMenu = () => setHoldingContextMenu(null);
 
   useEffect(() => {
     void load();
@@ -690,7 +699,35 @@ export function PortfolioPage() {
             Open Portfolio Lab
           </Link>
         </div>
+        <div className="mt-3 flex flex-wrap gap-1">
+          <button
+            className={`rounded border px-2 py-1 text-xs ${
+              portfolioSection === "overview"
+                ? "border-terminal-accent text-terminal-accent"
+                : "border-terminal-border text-terminal-muted hover:text-terminal-text"
+            }`}
+            onClick={() => setPortfolioSection("overview")}
+          >
+            Overview
+          </button>
+          <button
+            className={`rounded border px-2 py-1 text-xs ${
+              portfolioSection === "attribution"
+                ? "border-terminal-accent text-terminal-accent"
+                : "border-terminal-border text-terminal-muted hover:text-terminal-text"
+            }`}
+            onClick={() => setPortfolioSection("attribution")}
+          >
+            Attribution
+          </button>
+        </div>
       </div>
+      {portfolioSection === "attribution" ? (
+        <Suspense fallback={<div className="rounded border border-terminal-border bg-terminal-panel p-3 text-xs text-terminal-muted">Loading attribution panel...</div>}>
+          <AttributionPanel portfolioId={attributionPortfolioId} />
+        </Suspense>
+      ) : (
+        <>
       <div className="rounded border border-terminal-border bg-terminal-panel p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="text-sm font-semibold uppercase tracking-wide text-terminal-accent">Add Holding</div>
@@ -1124,7 +1161,14 @@ export function PortfolioPage() {
                     const contribClass =
                       pnlContribPct == null ? "text-terminal-muted" : pnlContribPct >= 0 ? "text-terminal-pos" : "text-terminal-neg";
                     return (
-                      <tr key={row.id} className="border-b border-terminal-border/50">
+                      <tr
+                        key={row.id}
+                        className="border-b border-terminal-border/50"
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          setHoldingContextMenu({ row, x: event.clientX, y: event.clientY });
+                        }}
+                      >
                         <td className="px-2 py-1">
                           <CountryFlag countryCode={row.country_code} flagEmoji={row.flag_emoji} />
                         </td>
@@ -1214,7 +1258,30 @@ export function PortfolioPage() {
         </>
       )}
 
+      {holdingContextMenu ? (
+        <SymbolContextMenu
+          open={Boolean(holdingContextMenu)}
+          symbol={holdingContextMenu.row.ticker}
+          anchor={{ x: holdingContextMenu.x, y: holdingContextMenu.y }}
+          onClose={closeHoldingContextMenu}
+          customActions={[
+            {
+              id: "portfolio-delete-holding",
+              label: "Delete Holding",
+              danger: true,
+              onAction: async () => {
+                await deleteHolding(holdingContextMenu.row.id);
+                closeHoldingContextMenu();
+                await load();
+              },
+            },
+          ]}
+        />
+      ) : null}
+
       <BacktestResults initialTickers={(data?.items ?? []).map((row) => row.ticker)} />
+        </>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Cell, PieChart, Pie, Legend
+  Cell, PieChart, Pie
 } from 'recharts';
 
 import {
@@ -9,13 +9,14 @@ import {
 } from "../api/quantClient";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { useStockStore } from "../store/stockStore";
-import { TerminalBadge } from "../components/terminal/TerminalBadge";
 import { TerminalButton } from "../components/terminal/TerminalButton";
+import { StressTestPanel } from "../components/risk/StressTestPanel";
 
 const COLORS = ['#26A65B', '#E84142', '#F39C12', '#5B8FF9', '#9B59B6', '#E67E22', '#1ABC9C'];
 
 export function RiskDashboardPage() {
   const storeTicker = useStockStore((s) => s.ticker);
+  const [tab, setTab] = useState<"overview" | "stress">("overview");
   const [mode, setMode] = useState<"portfolio" | "ticker">("portfolio");
   const [summary, setSummary] = useState<any>(null);
   const [exposures, setExposures] = useState<any>(null);
@@ -48,8 +49,10 @@ export function RiskDashboardPage() {
   }
 
   useEffect(() => {
-    void load();
-  }, [activeTicker]);
+    if (tab === "overview") {
+      void load();
+    }
+  }, [activeTicker, tab]);
 
   const pcaData = exposures?.pca_factors?.map((f: any) => ({
     name: f.factor,
@@ -68,30 +71,51 @@ export function RiskDashboardPage() {
           <div className="text-[10px] text-terminal-muted uppercase">Multi-factor risk attribution & attribution analytics</div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded border border-terminal-border p-0.5 bg-terminal-bg">
             <button
-              className={`px-3 py-1 text-[10px] font-bold rounded-sm transition-colors ${mode === "portfolio" ? "bg-terminal-accent text-terminal-bg" : "text-terminal-muted hover:text-terminal-text"}`}
-              onClick={() => setMode("portfolio")}
+              className={`px-3 py-1 text-[10px] font-bold rounded-sm transition-colors ${tab === "overview" ? "bg-terminal-accent text-terminal-bg" : "text-terminal-muted hover:text-terminal-text"}`}
+              onClick={() => setTab("overview")}
             >
-              PORTFOLIO
+              OVERVIEW
             </button>
             <button
-              className={`px-3 py-1 text-[10px] font-bold rounded-sm transition-colors ${mode === "ticker" ? "bg-terminal-accent text-terminal-bg" : "text-terminal-muted hover:text-terminal-text"}`}
-              onClick={() => setMode("ticker")}
+              className={`px-3 py-1 text-[10px] font-bold rounded-sm transition-colors ${tab === "stress" ? "bg-terminal-accent text-terminal-bg" : "text-terminal-muted hover:text-terminal-text"}`}
+              onClick={() => setTab("stress")}
             >
-              TICKER: {storeTicker}
+              STRESS TEST
             </button>
           </div>
 
-          <TerminalButton size="sm" onClick={() => void load()} disabled={loading}>
-            {loading ? "SYNCING..." : "RELOAD ANALYTICS"}
-          </TerminalButton>
+          {tab === "overview" ? (
+            <div className="flex rounded border border-terminal-border p-0.5 bg-terminal-bg">
+              <button
+                className={`px-3 py-1 text-[10px] font-bold rounded-sm transition-colors ${mode === "portfolio" ? "bg-terminal-accent text-terminal-bg" : "text-terminal-muted hover:text-terminal-text"}`}
+                onClick={() => setMode("portfolio")}
+              >
+                PORTFOLIO
+              </button>
+              <button
+                className={`px-3 py-1 text-[10px] font-bold rounded-sm transition-colors ${mode === "ticker" ? "bg-terminal-accent text-terminal-bg" : "text-terminal-muted hover:text-terminal-text"}`}
+                onClick={() => setMode("ticker")}
+              >
+                TICKER: {storeTicker}
+              </button>
+            </div>
+          ) : null}
+
+          {tab === "overview" ? (
+            <TerminalButton size="sm" onClick={() => void load()} disabled={loading}>
+              {loading ? "SYNCING..." : "RELOAD ANALYTICS"}
+            </TerminalButton>
+          ) : null}
         </div>
       </div>
 
-      {error && <div className="rounded border border-terminal-neg bg-terminal-neg/10 p-2 text-xs text-terminal-neg">{error}</div>}
+      {error && tab === "overview" && <div className="rounded border border-terminal-neg bg-terminal-neg/10 p-2 text-xs text-terminal-neg">{error}</div>}
 
+      {tab === "overview" ? (
+        <>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <TerminalPanel title="STATISTICAL RISK METRICS" subtitle={mode === "ticker" ? `Analysis for ${storeTicker} + Peers` : "Total Portfolio Attribution"}>
           <div className="space-y-4 p-1 text-xs">
@@ -210,6 +234,10 @@ export function RiskDashboardPage() {
           </table>
         </div>
       </TerminalPanel>
+        </>
+      ) : (
+        <StressTestPanel />
+      )}
     </div>
   );
 }

@@ -105,6 +105,35 @@ async def get_fund_nav_history(scheme_code: int) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.get("/rankings")
+async def get_category_rankings(category: str = Query(...)) -> dict[str, Any]:
+    rankings = await mutual_fund_service.get_category_rankings(category)
+    return {"items": rankings}
+
+
+@router.get("/{scheme_code}/rolling-returns")
+async def get_rolling_returns(scheme_code: int, window: int = 3) -> dict[str, Any]:
+    returns = await mutual_fund_service.get_rolling_returns(scheme_code, window_years=window)
+    return {"items": returns}
+
+
+@router.get("/sip-calc")
+def calculate_sip(
+    monthly_amount: float = Query(..., gt=0),
+    years: int = Query(..., gt=0),
+    expected_return: float = Query(..., gt=0)
+) -> dict[str, Any]:
+    return mutual_fund_service.calculate_sip(monthly_amount, years, expected_return)
+
+
+@router.get("/overlap")
+async def get_fund_overlap(codes: str = Query(...)) -> dict[str, Any]:
+    scheme_codes = [int(c) for c in codes.split(",") if c.strip().isdigit()]
+    if not scheme_codes:
+        raise HTTPException(status_code=400, detail="Provide valid 'codes' as comma separated integers.")
+    return await mutual_fund_service.get_fund_overlap(scheme_codes)
+
+
 def _to_portfolio_payload(row: PortfolioMutualFundHolding, current_nav: float) -> PortfolioMutualFund:
     invested = float(row.units) * float(row.avg_nav)
     current_value = float(row.units) * float(current_nav)

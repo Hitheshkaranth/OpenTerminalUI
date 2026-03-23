@@ -21,6 +21,7 @@ import { useQuotesStore, useQuotesStream } from "../../realtime/useQuotesStream"
 import type { AlertRule, WatchlistItem } from "../../types";
 import type { LaunchpadPanelConfig } from "./LaunchpadContext";
 import { TradingChart } from "../chart/TradingChart";
+import { OrderBookPanel } from "../market/OrderBookPanel";
 import { HeatmapView } from "../watchlist/HeatmapView";
 import { SectorRotationMap } from "../analysis/SectorRotationMap";
 import { OptionChainTable } from "../../fno/components/OptionChainTable";
@@ -289,10 +290,23 @@ export function LaunchpadChartPanel({ panel }: PanelProps) {
   const symbol = (panel.symbol || "RELIANCE").toUpperCase();
   const history = useStockHistory(symbol, "3mo", "1d");
   const data = history.data?.data ?? [];
+  const linkGroup =
+    panel.linkGroup === "red" || panel.linkGroup === "blue" || panel.linkGroup === "green" || panel.linkGroup === "yellow"
+      ? panel.linkGroup
+      : panel.linked === false
+        ? "none"
+        : "red";
   return (
     <div className="h-full p-1">
       <div className="h-[calc(100%-4px)] rounded border border-terminal-border bg-terminal-bg p-1">
-        <TradingChart ticker={symbol} data={data} mode="candles" timeframe="1D" panelId={panel.id} crosshairSyncGroupId={panel.linked ? "launchpad-linked" : `solo-${panel.id}`} />
+        <TradingChart
+          ticker={symbol}
+          data={data}
+          mode="candles"
+          timeframe="1D"
+          panelId={panel.id}
+          crosshairSyncGroupId={linkGroup === "none" ? `solo-${panel.id}` : `launchpad-linked-${linkGroup}`}
+        />
       </div>
     </div>
   );
@@ -384,29 +398,10 @@ export function LaunchpadNewsFeedPanel({ panel }: PanelProps) {
 
 export function LaunchpadOrderBookPanel({ panel }: PanelProps) {
   const symbol = (panel.symbol || "RELIANCE").toUpperCase();
-  const stock = useStock(symbol);
-  const last = Number(stock.data?.current_price || 0);
-  const levels = useMemo(() => {
-    if (!Number.isFinite(last) || last <= 0) return [] as Array<{ side: "BID" | "ASK"; px: number; qty: number }>;
-    const rows: Array<{ side: "BID" | "ASK"; px: number; qty: number }> = [];
-    for (let i = 5; i >= 1; i -= 1) rows.push({ side: "BID", px: last - i * 0.25, qty: 1000 + i * 120 });
-    for (let i = 1; i <= 5; i += 1) rows.push({ side: "ASK", px: last + i * 0.25, qty: 1100 + i * 110 });
-    return rows;
-  }, [last]);
+  const selectedMarket = useSettingsStore((state) => state.selectedMarket);
   return (
-    <div className="h-full overflow-auto p-2">
-      <div className="grid grid-cols-3 gap-1 text-[10px] uppercase text-terminal-muted">
-        <div>Side</div><div className="text-right">Price</div><div className="text-right">Qty</div>
-      </div>
-      <div className="mt-1 space-y-1">
-        {levels.map((row, idx) => (
-          <div key={`${row.side}-${idx}`} className="grid grid-cols-3 rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs">
-            <div className={row.side === "BID" ? "text-terminal-pos" : "text-terminal-neg"}>{row.side}</div>
-            <div className="text-right ot-type-data text-terminal-text">{row.px.toFixed(2)}</div>
-            <div className="text-right ot-type-data text-terminal-muted">{row.qty.toLocaleString()}</div>
-          </div>
-        ))}
-      </div>
+    <div className="h-full p-2">
+      <OrderBookPanel symbol={symbol} market={selectedMarket} compact className="h-full" />
     </div>
   );
 }

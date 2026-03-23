@@ -238,6 +238,46 @@ class PeerResponse(BaseModel):
     metrics: list[PeerMetric]
 
 
+class ETFHolding(BaseModel):
+    symbol: str
+    name: str
+    weight: float
+    shares: float | None = None
+    value: float | None = None
+
+
+class ETFScreenerResponse(BaseModel):
+    ticker: str
+    name: str
+    exchange: str
+    category: str | None = None
+    expense_ratio: float | None = None
+    aum: float | None = None
+    ytd_return: float | None = None
+    three_year_return: float | None = None
+
+
+class ETFHoldingsResponse(BaseModel):
+    ticker: str
+    holdings: list[ETFHolding]
+
+
+class ETFOverlapResponse(BaseModel):
+    tickers: list[str]
+    overlap_pct: float
+    common_holdings: list[ETFHolding]
+
+
+class ETFFlowPoint(BaseModel):
+    date: str
+    net_flow: float
+
+
+class ETFFlowResponse(BaseModel):
+    ticker: str
+    flows: list[ETFFlowPoint]
+
+
 class ErrorPayload(BaseModel):
     error: str
     detail: str
