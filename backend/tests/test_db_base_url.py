@@ -11,12 +11,14 @@ def test_get_database_url_syncs_with_settings(monkeypatch) -> None:
     monkeypatch.delenv("DATABASE_URL", raising=False)
 
     import sys
+    import tempfile
+    tmp = tempfile.gettempdir().replace("\\", "/")
     if sys.platform.startswith("win"):
-        test_url = "sqlite:///C:/test/test.db"
-        expected_url = "sqlite+aiosqlite:///C:/test/test.db"
+        test_url = f"sqlite:///{tmp}/otui_test/test.db"
+        expected_url = f"sqlite+aiosqlite:///{tmp}/otui_test/test.db"
     else:
-        test_url = "sqlite:////test/test.db"
-        expected_url = "sqlite+aiosqlite:////test/test.db"
+        test_url = f"sqlite:///{tmp}/otui_test/test.db"
+        expected_url = f"sqlite+aiosqlite:///{tmp}/otui_test/test.db"
 
     monkeypatch.setenv("OPENTERMINALUI_SQLITE_URL", test_url)
     get_settings.cache_clear()
