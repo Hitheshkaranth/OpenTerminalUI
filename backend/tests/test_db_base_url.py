@@ -9,11 +9,20 @@ from backend.config.settings import get_settings
 
 def test_get_database_url_syncs_with_settings(monkeypatch) -> None:
     monkeypatch.delenv("DATABASE_URL", raising=False)
-    monkeypatch.setenv("OPENTERMINALUI_SQLITE_URL", "sqlite:///C:/test/test.db")
+
+    import sys
+    if sys.platform.startswith("win"):
+        test_url = "sqlite:///C:/test/test.db"
+        expected_url = "sqlite+aiosqlite:///C:/test/test.db"
+    else:
+        test_url = "sqlite:////test/test.db"
+        expected_url = "sqlite+aiosqlite:////test/test.db"
+
+    monkeypatch.setenv("OPENTERMINALUI_SQLITE_URL", test_url)
     get_settings.cache_clear()
 
     url = get_database_url()
-    assert url == "sqlite+aiosqlite:///C:/test/test.db"
+    assert url == expected_url
 
 
 def test_get_database_url_respects_database_url_env(monkeypatch) -> None:
