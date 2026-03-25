@@ -53,7 +53,7 @@ export function WatchlistManager() {
 
   const activeWl = useMemo(() => {
     const nameParam = searchParams.get("name");
-    const safeWatchlists = watchlists || [];
+    const safeWatchlists = Array.isArray(watchlists) ? watchlists : [];
     if (nameParam && safeWatchlists.length > 0) {
       const found = safeWatchlists.find(w => w.name.toLowerCase() === nameParam.toLowerCase());
       if (found) return found;

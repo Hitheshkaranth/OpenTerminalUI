@@ -1726,8 +1726,10 @@ export async function aiQuery(query: string, context: Record<string, any>): Prom
 }
 
 export async function fetchWatchlists(): Promise<Watchlist[]> {
-  const { data } = await api.get<Watchlist[]>("/watchlists");
-  return data;
+  const { data } = await api.get<Watchlist[] | { watchlists?: Watchlist[] }>("/watchlists");
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === "object" && Array.isArray((data as any).watchlists)) return (data as any).watchlists;
+  return [];
 }
 
 export async function createWatchlist(name: string): Promise<Watchlist> {

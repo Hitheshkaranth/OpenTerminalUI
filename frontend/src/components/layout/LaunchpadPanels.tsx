@@ -173,9 +173,10 @@ export function LaunchpadWatchlistHeatmapPanel({ panel }: PanelProps) {
     queryFn: fetchWatchlists
   });
 
-  const activeWl = useMemo(() =>
-    (watchlists || []).find(w => w.id === activeWlId) || watchlists?.[0]
-  , [watchlists, activeWlId]);
+  const activeWl = useMemo(() => {
+    const safe = Array.isArray(watchlists) ? watchlists : [];
+    return safe.find(w => w.id === activeWlId) || safe[0];
+  }, [watchlists, activeWlId]);
 
   useEffect(() => {
     if (activeWl && !activeWlId) setActiveWlId(activeWl.id);

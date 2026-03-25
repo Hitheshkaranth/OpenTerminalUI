@@ -61,7 +61,8 @@ export function MarketStatusBar(_props: { tickerOverride?: string | null } = {})
         : null;
     const cpuHint = Math.min(99, Math.max(1, Math.round(lagMs / 5) + 1));
     return { heapMb, heapPct, cpuHint };
-  }, [lagMs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lagMs, now]);
 
   const marketPayload = (marketStatus ?? {}) as {
     marketState?: Array<{ marketStatus?: string }>;
