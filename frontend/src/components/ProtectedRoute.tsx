@@ -8,7 +8,13 @@ export function ProtectedRoute({ children, requiredRole }: { children: ReactElem
   const location = useLocation();
 
   if (isInitializing) {
-    return null;
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center p-4">
+        <div className="rounded-sm border border-terminal-border bg-terminal-panel px-4 py-3 text-xs text-terminal-muted">
+          Restoring workspace...
+        </div>
+      </div>
+    );
   }
 
   if (!isAuthenticated) {

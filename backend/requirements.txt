@@ -22,6 +22,7 @@ bcrypt==4.0.1
 alembic
 aiosqlite
 asyncpg
+psycopg[binary]
 pytest-cov
 pytest-asyncio
 openpyxl

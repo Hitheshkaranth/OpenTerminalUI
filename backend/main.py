@@ -6,15 +6,6 @@ import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-# Load .env file from backend directory before anything reads os.getenv
-_env_file = Path(__file__).resolve().parent / ".env"
-if _env_file.exists():
-    for _line in _env_file.read_text(encoding="utf-8").splitlines():
-        _line = _line.strip()
-        if _line and not _line.startswith("#") and "=" in _line:
-            _key, _, _val = _line.partition("=")
-            os.environ.setdefault(_key.strip(), _val.strip())
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -22,6 +13,7 @@ from fastapi.responses import FileResponse
 from backend.api.deps import shutdown_unified_fetcher
 from backend.alerts import get_alert_evaluator_service
 from backend.auth.middleware import AuthMiddleware
+from backend.adapters.registry import get_adapter_registry
 from backend.bg_services.instruments_loader import get_instruments_loader
 from backend.bg_services.news_ingestor import get_news_ingestor
 from backend.bg_services.pcr_snapshot import get_pcr_snapshot_service
@@ -31,10 +23,15 @@ from backend.fno.routes import fno_router
 from backend.services.prefetch_worker import get_prefetch_worker
 from backend.services.us_tick_stream import get_us_tick_stream_service
 from backend.paper_trading import get_paper_engine
+from backend.core.service_status import service_status_registry
+from backend.config.env import load_local_env
+from backend.config.security import validate_runtime_secrets
 from backend.config.settings import get_settings
 from backend.shared.cache import cache as cache_instance
 from backend.shared.db import init_db
 from backend.shared.ws_manager import get_marketdata_hub
+
+load_local_env()
 
 if sys.platform.startswith("win"):
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -74,7 +71,10 @@ def _install_windows_loop_exception_filter() -> None:
 
 async def _app_startup() -> None:
     _install_windows_loop_exception_filter()
+    validate_runtime_secrets()
+    service_status_registry.mark_ok("secrets", required=True)
     init_db()
+    service_status_registry.mark_ok("database", required=True)
 
     global _prefetch_worker, _instruments_loader, _news_ingestor, _pcr_snapshot_service, _scanner_alert_scheduler
     from backend.api.deps import get_unified_fetcher
@@ -85,37 +85,86 @@ async def _app_startup() -> None:
     _pcr_snapshot_service = get_pcr_snapshot_service()
     _scanner_alert_scheduler = get_scanner_alert_scheduler_service()
 
-    if _prefetch_enabled:
-        await _prefetch_worker.start()
-    if _instruments_loader:
-        await _instruments_loader.start()
-    if _news_ingestor:
-        await _news_ingestor.start()
-    if _pcr_snapshot_service:
-        await _pcr_snapshot_service.start()
+    async def _start_optional(name: str, starter, detail: str | None = None) -> bool:
+        try:
+            await starter()
+            service_status_registry.mark_ok(name, required=False, detail=detail)
+            return True
+        except Exception as exc:
+            service_status_registry.mark_degraded(name, required=False, detail=str(exc))
+            return False
 
-    await get_marketdata_hub().start()
-    get_alert_evaluator_service().start(get_marketdata_hub())
-    get_paper_engine().start(get_marketdata_hub())
-    if _scanner_alert_scheduler:
-        await _scanner_alert_scheduler.start(get_marketdata_hub(), interval_seconds=900)
+    if _prefetch_enabled:
+        await _start_optional("prefetch_worker", _prefetch_worker.start, detail="enabled")
+    else:
+        service_status_registry.mark_stopped("prefetch_worker", required=False, detail="disabled")
+
+    if _instruments_loader:
+        await _start_optional("instruments_loader", _instruments_loader.start)
+    else:
+        service_status_registry.mark_stopped("instruments_loader", required=False, detail="not_initialized")
+
+    if _news_ingestor:
+        await _start_optional("news_ingestor", _news_ingestor.start)
+    else:
+        service_status_registry.mark_stopped("news_ingestor", required=False, detail="not_initialized")
+
+    if _pcr_snapshot_service:
+        await _start_optional("pcr_snapshot_service", _pcr_snapshot_service.start)
+    else:
+        service_status_registry.mark_stopped("pcr_snapshot_service", required=False, detail="not_initialized")
+
+    hub = get_marketdata_hub()
+    marketdata_ok = await _start_optional("marketdata_hub", hub.start)
+
+    if marketdata_ok:
+        try:
+            get_alert_evaluator_service().start(hub)
+            service_status_registry.mark_ok("alert_evaluator", required=False)
+        except Exception as exc:
+            service_status_registry.mark_degraded("alert_evaluator", required=False, detail=str(exc))
+
+        try:
+            get_paper_engine().start(hub)
+            service_status_registry.mark_ok("paper_engine", required=False)
+        except Exception as exc:
+            service_status_registry.mark_degraded("paper_engine", required=False, detail=str(exc))
+
+        if _scanner_alert_scheduler:
+            await _start_optional(
+                "scanner_alert_scheduler",
+                lambda: _scanner_alert_scheduler.start(hub, interval_seconds=900),
+            )
+        else:
+            service_status_registry.mark_stopped("scanner_alert_scheduler", required=False, detail="not_initialized")
+    else:
+        service_status_registry.mark_stopped("alert_evaluator", required=False, detail="marketdata_hub_unavailable")
+        service_status_registry.mark_stopped("paper_engine", required=False, detail="marketdata_hub_unavailable")
+        service_status_registry.mark_stopped("scanner_alert_scheduler", required=False, detail="marketdata_hub_unavailable")
 
 
 async def _app_shutdown() -> None:
-    await get_us_tick_stream_service().shutdown()
-    await get_marketdata_hub().shutdown()
-    await get_alert_evaluator_service().shutdown()
-    await get_paper_engine().shutdown()
+    async def _stop_optional(name: str, stopper, detail: str | None = None) -> None:
+        try:
+            await stopper()
+            service_status_registry.mark_stopped(name, required=False, detail=detail)
+        except Exception as exc:
+            service_status_registry.mark_degraded(name, required=False, detail=str(exc))
+
+    await _stop_optional("us_tick_stream", get_us_tick_stream_service().shutdown)
+    await _stop_optional("marketdata_hub", get_marketdata_hub().shutdown)
+    await _stop_optional("alert_evaluator", get_alert_evaluator_service().shutdown)
+    await _stop_optional("paper_engine", get_paper_engine().shutdown)
     if _scanner_alert_scheduler:
-        await _scanner_alert_scheduler.stop()
+        await _stop_optional("scanner_alert_scheduler", _scanner_alert_scheduler.stop)
     if _pcr_snapshot_service:
-        await _pcr_snapshot_service.stop()
+        await _stop_optional("pcr_snapshot_service", _pcr_snapshot_service.stop)
     if _news_ingestor:
-        await _news_ingestor.stop()
+        await _stop_optional("news_ingestor", _news_ingestor.stop)
     if _instruments_loader:
-        await _instruments_loader.stop()
+        await _stop_optional("instruments_loader", _instruments_loader.stop)
     if _prefetch_enabled and _prefetch_worker:
-        await _prefetch_worker.stop()
+        await _stop_optional("prefetch_worker", _prefetch_worker.stop)
     await shutdown_unified_fetcher()
 
 
@@ -214,14 +263,17 @@ async def healthz() -> dict[str, object]:
     except Exception:
         sqlite_status = "disabled"
 
+    service_snapshot = service_status_registry.snapshot()
     return {
-        "status": "ok",
+        "status": service_status_registry.overall_status(),
         "cache": {
             "mem": "ok",
             "redis": redis_status,
             "sqlite": sqlite_status,
         },
         "quote_bus": bus_status,
+        "adapter_registry": get_adapter_registry().health_snapshot(),
+        "services": service_snapshot,
     }
 
 

@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
+from backend.adapters.base import OHLCV, QuoteResponse
+from backend.adapters.registry import get_adapter_registry
 from backend.core.finnhub_client import FinnhubClient
 from backend.core.fmp_client import FMPClient
 from backend.core.kite_client import KiteClient
@@ -17,6 +19,21 @@ from backend.api.schemas.market_data import MarketDepth, DepthLevel
 
 logger = logging.getLogger(__name__)
 
+_RANGE_TO_DAYS = {
+    "1d": 1,
+    "5d": 5,
+    "7d": 7,
+    "1mo": 31,
+    "3mo": 92,
+    "6mo": 183,
+    "1y": 366,
+    "2y": 731,
+    "5y": 3653,
+    "10y": 3653,
+    "max": 3653,
+}
+
+
 def _to_float(value: Any) -> Optional[float]:
     if value in (None, "", "NA", "N/A", "-"):
         return None
@@ -27,6 +44,92 @@ def _to_float(value: Any) -> Optional[float]:
         return out
     except (TypeError, ValueError):
         return None
+
+
+def _is_yahoo_native_symbol(symbol: str) -> bool:
+    return symbol.startswith("^") or symbol.endswith("=F") or symbol.endswith("=X")
+
+
+def _range_to_dates(range_str: str) -> tuple[date, date]:
+    normalized = str(range_str or "1y").strip().lower() or "1y"
+    end = datetime.now(timezone.utc).date()
+    if normalized == "ytd":
+        return date(end.year, 1, 1), end
+    days = _RANGE_TO_DAYS.get(normalized, 366)
+    return end - timedelta(days=days), end
+
+
+def _chart_payload_from_rows(rows: list[OHLCV]) -> dict[str, Any]:
+    ordered = sorted(rows, key=lambda row: int(row.t))
+    return {
+        "chart": {
+            "result": [
+                {
+                    "timestamp": [int(row.t) for row in ordered],
+                    "indicators": {
+                        "quote": [
+                            {
+                                "open": [float(row.o) for row in ordered],
+                                "high": [float(row.h) for row in ordered],
+                                "low": [float(row.l) for row in ordered],
+                                "close": [float(row.c) for row in ordered],
+                                "volume": [float(row.v) for row in ordered],
+                            }
+                        ]
+                    },
+                }
+            ],
+            "error": None,
+        }
+    }
+
+
+def _quote_payload_from_adapter(quote: QuoteResponse) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "symbol": quote.symbol,
+        "price": quote.price,
+        "last_price": quote.price,
+        "regularMarketPrice": quote.price,
+        "c": quote.price,
+        "change": quote.change,
+        "regularMarketChange": quote.change,
+        "d": quote.change,
+        "change_pct": quote.change_pct,
+        "regularMarketChangePercent": quote.change_pct,
+        "dp": quote.change_pct,
+        "currency": quote.currency,
+    }
+    if quote.ts:
+        payload["ts"] = quote.ts
+    return payload
+
+
+def _extract_quote_price(payload: dict[str, Any]) -> tuple[float | None, float | None, str]:
+    if not isinstance(payload, dict):
+        return None, None, "unavailable"
+    if payload.get("last_price") is not None:
+        return _to_float(payload.get("last_price")), _to_float(payload.get("change_pct")), "adapter"
+    if payload.get("priceInfo") is not None:
+        return _to_float(((payload.get("priceInfo") or {}).get("lastPrice"))), _to_float(((payload.get("priceInfo") or {}).get("pChange"))), "nse"
+    if payload.get("regularMarketPrice") is not None:
+        return _to_float(payload.get("regularMarketPrice")), _to_float(payload.get("regularMarketChangePercent")), "yahoo"
+    if payload.get("price") is not None:
+        return _to_float(payload.get("price")), _to_float(payload.get("change_pct")), "fmp"
+    if payload.get("c") is not None:
+        return _to_float(payload.get("c")), _to_float(payload.get("dp")), "finnhub"
+    return None, None, "unavailable"
+
+
+async def _adapter_exchange_and_symbol(symbol: str) -> tuple[str, str]:
+    normalized = symbol.strip().upper()
+    if normalized.startswith("CRYPTO:"):
+        return "CRYPTO", normalized
+    if "-USD" in normalized or normalized.endswith("USD"):
+        return "CRYPTO", normalized if normalized.startswith("CRYPTO:") else f"CRYPTO:{normalized}"
+    if _is_yahoo_native_symbol(normalized):
+        return "", normalized
+    classification = await market_classifier.classify(normalized)
+    return classification.exchange or "NSE", normalized
 
 @dataclass
 class UnifiedFetcher:
@@ -68,36 +171,27 @@ class UnifiedFetcher:
             return False
         return any(k.startswith("annual") or k.startswith("quarterly") for k in y_fund.keys())
 
-    # --- PRIORITY MATRIX: TIME SERIES -> NSE -> Yahoo -> FMP ---
     async def fetch_history(self, ticker: str, range_str: str = "1y", interval: str = "1d") -> Dict[str, Any]:
         symbol = ticker.strip().upper()
+        exchange, adapter_symbol = await _adapter_exchange_and_symbol(symbol)
 
-        # 1. Try NSE (if appropriate range/interval)
-        try:
-            # NSE historical is a bit tricky with ranges, but let's try if it's a simple range
-            # Actually NSE client implementation takes from_date/to_date
-            # For simplicity in this "unified" view, we might default to Yahoo for history
-            # as it handles "1y", "1d" strings natively and is very reliable for history.
-            # But per "Priority Matrix", strictly it should be NSE first.
-            # Let's ski NSE for generic "1y" history for now unless we calculate dates,
-            # relying on Yahoo as primary for history is often safer for "1y" style requests.
-            # However, user asked for NSE -> Yahoo -> FMP.
-            # I will prioritize Yahoo for History because it's standard, but NSE for Quote.
-            # actually, let's implement the Priority Matrix strictly where feasible.
-            pass
-        except Exception:
-            pass
+        if exchange:
+            start_date, end_date = _range_to_dates(range_str)
+            try:
+                rows = await get_adapter_registry().invoke(exchange, "get_history", adapter_symbol, interval, start_date, end_date)
+                if isinstance(rows, list) and rows:
+                    return _chart_payload_from_rows(rows)
+            except Exception as e:
+                logger.debug("Adapter history failed for %s via %s: %s", symbol, exchange, e)
 
-        # Use Yahoo as Primary for History (much better API for intervals/ranges)
         try:
             yahoo_sym = await market_classifier.yfinance_symbol(symbol)
             data = await self.yahoo.get_chart(yahoo_sym, range_str, interval)
             if data and "chart" in data:
-                 return data
+                return data
         except Exception as e:
             logger.warning(f"Yahoo history failed for {symbol}: {e}")
 
-        # Fallback to FMP
         try:
             fmp_data = await self.fmp.get_historical_price_full(symbol)
             if fmp_data:
@@ -107,13 +201,21 @@ class UnifiedFetcher:
 
         return {}
 
-    # --- PRIORITY MATRIX: QUOTE -> Kite -> NSE -> Yahoo -> FMP ---
     async def fetch_quote(self, ticker: str) -> Dict[str, Any]:
         symbol = ticker.strip().upper()
+        exchange, adapter_symbol = await _adapter_exchange_and_symbol(symbol)
+
+        if exchange:
+            try:
+                quote = await get_adapter_registry().invoke(exchange, "get_quote", adapter_symbol)
+                if isinstance(quote, QuoteResponse):
+                    return _quote_payload_from_adapter(quote)
+            except Exception as e:
+                logger.debug("Adapter quote failed for %s via %s: %s", symbol, exchange, e)
+
         cls = await market_classifier.classify(symbol)
         kite_token = self.kite.resolve_access_token()
 
-        # 1. Kite
         if cls.country_code == "IN" and self.kite.api_key and kite_token:
             try:
                 instrument = f"NSE:{symbol}"
@@ -133,7 +235,6 @@ class UnifiedFetcher:
             except Exception as e:
                  logger.debug(f"NSE quote failed for {symbol}: {e}")
 
-        # 3. Yahoo
         try:
             yahoo_sym = await market_classifier.yfinance_symbol(symbol)
             data = await self.yahoo.get_quotes([yahoo_sym])
@@ -142,7 +243,6 @@ class UnifiedFetcher:
         except Exception as e:
              logger.debug(f"Yahoo quote failed for {symbol}: {e}")
 
-        # 4. FMP
         try:
             data = await self.fmp.get_quote(symbol)
             if data:
@@ -157,10 +257,8 @@ class UnifiedFetcher:
         symbol = ticker.strip().upper()
         cls = await market_classifier.classify(symbol)
         ysym = await market_classifier.yfinance_symbol(symbol)
-        kite_instrument = f"NSE:{symbol}"
-        kite_token = self.kite.resolve_access_token()
-
-        has_kite = self._has_kite_live() and cls.country_code == "IN"
+        quote_payload = await self.fetch_quote(symbol)
+        price, change_pct, price_source = _extract_quote_price(quote_payload)
 
         # Launch parallel requests
         nse_task = self.nse.get_quote_equity(symbol) if cls.country_code == "IN" else asyncio.sleep(0, result={})
@@ -169,21 +267,15 @@ class UnifiedFetcher:
             ysym, ["financialData", "summaryDetail", "defaultKeyStatistics", "assetProfile"]
         )
         yahoo_quotes_task = self.yahoo.get_quotes([ysym])
-        # If Kite is live, avoid FMP/Finnhub fallback calls to reduce 403 spam.
-        fmp_task = asyncio.sleep(0, result={}) if has_kite else self.fmp.get_quote(symbol)
-        finnhub_task = asyncio.sleep(0, result={}) if has_kite else self.finnhub.get_company_profile(symbol)
-        kite_quote_task = (
-            self.kite.get_quote(kite_token, [kite_instrument])
-            if has_kite
-            else asyncio.sleep(0, result={})
-        )
+        fmp_task = self.fmp.get_quote(symbol)
+        finnhub_task = self.finnhub.get_company_profile(symbol)
 
         results = await asyncio.gather(
-            nse_task, nse_trade_task, yahoo_summary_task, yahoo_quotes_task, fmp_task, finnhub_task, kite_quote_task,
+            nse_task, nse_trade_task, yahoo_summary_task, yahoo_quotes_task, fmp_task, finnhub_task,
             return_exceptions=True,
         )
 
-        nse_q, nse_t, yahoo_summary, yahoo_quotes, fmp_q, finnhub_p, kite_quote = results
+        nse_q, nse_t, yahoo_summary, yahoo_quotes, fmp_q, finnhub_p = results
 
         # Helpers
         def _get_val(obj, *keys):
@@ -209,11 +301,6 @@ class UnifiedFetcher:
         yq = yq_rows[0] if yq_rows and isinstance(yq_rows[0], dict) else {}
         fq = fmp_q if isinstance(fmp_q, dict) else {}
         fp = finnhub_p if isinstance(finnhub_p, dict) else {}
-        kq = kite_quote if isinstance(kite_quote, dict) else {}
-        kmap = kq.get("data") if isinstance(kq.get("data"), dict) else {}
-        kinst = kmap.get(kite_instrument) if isinstance(kmap, dict) else {}
-        kinst = kinst if isinstance(kinst, dict) else {}
-        kite_price = _to_float(kinst.get("last_price"))
 
         # Yahoo quoteSummary modules
         fd = ys.get("financialData", {})   # ROE, ROA, margins, growth
@@ -222,11 +309,8 @@ class UnifiedFetcher:
         ap = ys.get("assetProfile", {})    # sector, industry
 
         # --- Synthesize fundamental fields ---
-        price = kite_price or \
-                _to_float(_get_val(nq, "priceInfo", "lastPrice")) or \
-                _yraw(fd, "currentPrice") or \
-                _to_float(fq.get("price"))
-        change_pct = _to_float(kinst.get("net_change")) or _to_float(_get_val(nq, "priceInfo", "pChange"))
+        price = price or _to_float(_get_val(nq, "priceInfo", "lastPrice")) or _yraw(fd, "currentPrice") or _to_float(fq.get("price"))
+        change_pct = change_pct or _to_float(_get_val(nq, "priceInfo", "pChange"))
 
         pe = _to_float(_get_val(nq, "metadata", "pdSymbolPe")) or \
              _yraw(sd, "trailingPE") or \
@@ -266,7 +350,6 @@ class UnifiedFetcher:
         div_yield = _yraw(sd, "dividendYield") or _yraw(sd, "trailingAnnualDividendYield")
         beta = _yraw(sd, "beta") or _to_float(fp.get("beta"))
 
-        source = "kite" if kite_price is not None else "fallback"
         return {
             "ticker": symbol,
             "company_name": company_name,
@@ -302,8 +385,8 @@ class UnifiedFetcher:
                 "yahoo": bool(ys),
                 "fmp": bool(fq),
                 "finnhub": bool(fp),
-                "kite": bool(kinst),
-                "price_source": source,
+                "kite": price_source in {"adapter", "nse"} and cls.country_code == "IN",
+                "price_source": price_source,
             },
         }
 
@@ -434,6 +517,39 @@ class UnifiedFetcher:
     async def fetch_analyst_consensus(self, ticker: str) -> Dict[str, Any]:
         # Finnhub is good for this
         return await self.finnhub.get_recommendation_trends(ticker.strip().upper())
+
+    async def search_news(self, query: str, limit: int = 30) -> list[dict[str, Any]]:
+        q = str(query or "").strip()
+        if not q:
+            return []
+        try:
+            rows = await self.yahoo.search_news(q, limit=limit)
+            if isinstance(rows, list) and rows:
+                return [row for row in rows if isinstance(row, dict)][:limit]
+        except Exception as exc:
+            logger.debug("Yahoo news search failed for %s: %s", q, exc)
+        return []
+
+    async def get_company_news(self, ticker: str, limit: int = 30) -> list[dict[str, Any]]:
+        symbol = ticker.strip().upper()
+        if not symbol or not self.finnhub.api_key:
+            return []
+        try:
+            rows = await self.finnhub.get_company_news(symbol, limit=limit)
+            return [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+        except Exception as exc:
+            logger.debug("Finnhub company news failed for %s: %s", symbol, exc)
+            return []
+
+    async def get_market_news(self, category: str = "general", limit: int = 30) -> list[dict[str, Any]]:
+        if not self.finnhub.api_key:
+            return []
+        try:
+            rows = await self.finnhub.get_market_news(category=category, limit=limit)
+            return [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+        except Exception as exc:
+            logger.debug("Finnhub market news failed for %s: %s", category, exc)
+            return []
 
     async def fetch_depth(self, ticker: str, levels: int = 10) -> MarketDepth:
         symbol = ticker.strip().upper()

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from jose import JWTError, jwt
+
+from backend.config.security import get_jwt_secret
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_TTL_MINUTES = 15
@@ -13,7 +14,7 @@ REFRESH_TOKEN_TTL_DAYS = 7
 
 
 def _secret() -> str:
-    return os.getenv("JWT_SECRET_KEY", "dev-insecure-secret-key")
+    return get_jwt_secret()
 
 
 def _now_utc() -> datetime:

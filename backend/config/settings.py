@@ -8,10 +8,14 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
+from backend.config.env import load_local_env
+
+load_local_env()
+
 
 class AppSettings(BaseModel):
     app_name: str = "OpenTerminalUI API"
-    app_version: str = "0.1.0"
+    app_version: str = "0.1.1"
     cors_origins: list[str] = Field(
         default_factory=lambda: [
             "http://localhost:5173",
@@ -135,7 +139,7 @@ def get_settings() -> AppSettings:
         app_version=(
             _env("OPENTERMINALUI_APP_VERSION")
             or _env("OPENSCREENS_APP_VERSION", "TRADE_SCREENS_APP_VERSION")
-            or app_cfg.get("version", "0.1.0")
+            or app_cfg.get("version", "0.1.1")
         ),
         cors_origins=env_cors or app_cfg.get("cors_origins", _default_cors_origins()),
         sqlite_url=_normalize_sqlite_url(

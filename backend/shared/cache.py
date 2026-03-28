@@ -14,6 +14,8 @@ from typing import Any, Optional, Tuple
 
 from redis import asyncio as aioredis
 
+from backend.config.security import get_cache_signing_key
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,7 +27,7 @@ class MultiTierCache:
         self._redis: Optional[aioredis.Redis] = None
         self._db_conn: Optional[sqlite3.Connection] = None
         self._db_lock = threading.Lock()
-        key = os.getenv("CACHE_SIGNING_KEY", "openterminalui-dev-cache-key")
+        key = get_cache_signing_key()
         self._signing_key = key.encode("utf-8")
 
     async def initialize(self):

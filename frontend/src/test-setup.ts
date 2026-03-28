@@ -1,4 +1,6 @@
 import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach, vi } from "vitest";
 
 // Provide a robust localStorage/sessionStorage mock for jsdom environments
 // where the native storage may not expose standard methods.
@@ -33,3 +35,9 @@ globalThis.setTimeout = ((handler: TimerHandler, timeout?: number, ...args: unkn
 
 globalThis.setInterval = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
   nativeSetInterval(handler, clampDelay(timeout), ...args)) as typeof globalThis.setInterval;
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllTimers();
+  vi.useRealTimers();
+});

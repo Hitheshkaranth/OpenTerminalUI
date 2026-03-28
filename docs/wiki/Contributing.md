@@ -23,6 +23,8 @@ pip install -r backend/requirements-dev.txt   # test dependencies
 cp .env.example .env        # fill in keys as needed for local testing
 ```
 
+Use the repo-root `.env` as the canonical local config file. `backend/.env` remains supported for backward compatibility, but root `.env` takes precedence.
+
 Run the backend:
 
 ```bash

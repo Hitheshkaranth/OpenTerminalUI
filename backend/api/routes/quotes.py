@@ -131,23 +131,25 @@ async def get_quotes(
     registry = get_adapter_registry()
     adapter_quotes: list[dict[str, Any]] = []
     for symbol_item in local_syms:
-        for adapter in registry.get_chain(market_code):
-            try:
-                quote = await adapter.get_quote(symbol_item if market_code != "CRYPTO" else f"CRYPTO:{symbol_item}")
-            except Exception:
-                quote = None
-            if quote is None:
-                continue
-            adapter_quotes.append(
-                {
-                    "symbol": symbol_item,
-                    "last": quote.price,
-                    "change": quote.change,
-                    "changePct": quote.change_pct,
-                    "ts": quote.ts or now_iso,
-                }
+        try:
+            quote = await registry.invoke(
+                market_code,
+                "get_quote",
+                symbol_item if market_code != "CRYPTO" else f"CRYPTO:{symbol_item}",
             )
-            break
+        except Exception:
+            quote = None
+        if quote is None:
+            continue
+        adapter_quotes.append(
+            {
+                "symbol": symbol_item,
+                "last": quote.price,
+                "change": quote.change,
+                "changePct": quote.change_pct,
+                "ts": quote.ts or now_iso,
+            }
+        )
     if adapter_quotes:
         all_quotes.extend(adapter_quotes)
         return {"market": market_code, "quotes": all_quotes}

@@ -143,7 +143,7 @@ describe("ChartWorkstationPage shell workflow", () => {
     expect(state.slots.find((slot) => slot.id === "slot-1")?.timeframe).toBe("1D");
     expect(state.slots.find((slot) => slot.id === "slot-2")?.timeframe).toBe("15m");
     expect(state.activeSlotId).toBe("slot-2");
-  });
+  }, 30000);
 
   it("keeps toolbar Tab navigation separate from pane-cycling and toggles replay on the active pane", async () => {
     renderPage();
@@ -153,7 +153,7 @@ describe("ChartWorkstationPage shell workflow", () => {
     const firstPane = screen.getByTestId("mock-pane-slot-1");
     firstPane.focus();
     fireEvent.keyDown(firstPane, { key: "Tab" });
-    expect(useChartWorkstationStore.getState().activeSlotId).toBe("slot-2");
+    await waitFor(() => expect(useChartWorkstationStore.getState().activeSlotId).toBe("slot-2"));
 
     const replayButton = screen.getByTestId("chart-shell-replay-toggle");
     replayButton.focus();

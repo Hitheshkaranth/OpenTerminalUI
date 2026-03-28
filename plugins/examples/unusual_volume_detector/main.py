@@ -5,7 +5,7 @@ from backend.plugins.base import Plugin, PluginContext
 
 class PluginImpl(Plugin):
     name = "unusual_volume_detector"
-    version = "0.1.0"
+    version = "0.1.1"
 
     async def on_init(self, context: PluginContext):
         context.log("Unusual volume detector initialized")

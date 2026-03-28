@@ -134,8 +134,11 @@ async def get_stock(ticker: str) -> StockSnapshot:
     try:
         snap = await fetch_stock_snapshot_coalesced(ticker)
         try:
-            adapter = get_adapter_registry().get_adapter(classification.exchange or "NSE")
-            q = await adapter.get_quote(yf_symbol if classification.country_code == "US" else ticker.upper())
+            q = await get_adapter_registry().invoke(
+                classification.exchange or "NSE",
+                "get_quote",
+                yf_symbol if classification.country_code == "US" else ticker.upper(),
+            )
             if q is not None:
                 snap["current_price"] = q.price
                 snap["change_pct"] = q.change_pct
@@ -303,14 +306,9 @@ async def get_stocks(tickers: str) -> List[Dict[str, Any]]:
 @router.get("/stocks/{ticker}/returns")
 async def get_returns(ticker: str) -> Dict[str, Optional[float]]:
     fetcher = await get_unified_fetcher()
-    yf_symbol = await market_classifier.yfinance_symbol(ticker)
-    # Priority matrix says NSE -> Yahoo. `fetch_history` implements this.
     try:
-        # We need long history for returns (5y)
-        # Yahoo is best for this.
-        data = await fetcher.yahoo.get_chart(yf_symbol, range_str="5y", interval="1d")
+        data = await fetcher.fetch_history(ticker, range_str="5y", interval="1d")
 
-        # Parse Yahoo chart
         chart = (data.get("chart") or {}).get("result") or []
         if not chart:
             return {}
@@ -357,8 +355,7 @@ async def get_returns(ticker: str) -> Dict[str, Optional[float]]:
 @router.get("/v1/equity/company/{symbol}/performance", response_model=EquityPerformanceSnapshot)
 async def get_company_performance(symbol: str) -> EquityPerformanceSnapshot:
     fetcher = await get_unified_fetcher()
-    yf_symbol = await market_classifier.yfinance_symbol(symbol)
-    data = await fetcher.yahoo.get_chart(yf_symbol, range_str="2y", interval="1d")
+    data = await fetcher.fetch_history(symbol, range_str="2y", interval="1d")
     hist = _parse_yahoo_ohlc(data if isinstance(data, dict) else {})
     if hist.empty:
         raise HTTPException(status_code=404, detail="No chart history available")
@@ -425,8 +422,7 @@ async def get_delivery_series(
     range: str = Query(default="1y"),
 ) -> DeliverySeriesResponse:
     fetcher = await get_unified_fetcher()
-    yf_symbol = await market_classifier.yfinance_symbol(symbol)
-    data = await fetcher.yahoo.get_chart(yf_symbol, range_str=range, interval=interval)
+    data = await fetcher.fetch_history(symbol, range_str=range, interval=interval)
     hist = _parse_yahoo_ohlc(data if isinstance(data, dict) else {})
     if hist.empty:
         raise HTTPException(status_code=404, detail="No delivery history available")

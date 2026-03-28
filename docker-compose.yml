@@ -7,9 +7,11 @@ services:
     ports:
       - "${APP_PORT:-8000}:8000"
     environment:
+      OPENTERMINALUI_ENV: "${OPENTERMINALUI_ENV:-development}"
       FMP_API_KEY: "${FMP_API_KEY:-}"
       FINNHUB_API_KEY: "${FINNHUB_API_KEY:-}"
-      JWT_SECRET_KEY: "${JWT_SECRET_KEY:-dev-insecure-secret-key}"
+      JWT_SECRET_KEY: "${JWT_SECRET_KEY:-}"
+      CACHE_SIGNING_KEY: "${CACHE_SIGNING_KEY:-}"
       DATABASE_URL: "${DATABASE_URL:-sqlite+aiosqlite:////data/openterminal.db}"
       KITE_API_KEY: "${KITE_API_KEY:-}"
       KITE_API_SECRET: "${KITE_API_SECRET:-}"

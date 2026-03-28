@@ -28,7 +28,7 @@ beforeEach(() => {
   writeTextMock.mockResolvedValue(undefined);
   vi.stubGlobal("__BUILD_DATE__", "2026-03-11T00:00:00.000Z");
   vi.stubGlobal("__GIT_COMMIT__", "abcdef1234567");
-  vi.stubGlobal("__APP_VERSION__", "0.1.0");
+  vi.stubGlobal("__APP_VERSION__", "0.1.1");
 
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
@@ -52,7 +52,8 @@ describe("AboutPage dossier revamp", () => {
   it("renders repo intelligence, stack and module registry panels, and command surfaces", () => {
     renderPage();
 
-    expect(screen.getByRole("heading", { name: "OpenTerminalUI" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "OpenTerminal UI" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "OpenTerminalUI logo" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Tech Stack" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Module Registry" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Command Surfaces" })).toBeInTheDocument();

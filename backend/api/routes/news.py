@@ -258,7 +258,7 @@ def _yahoo_news_row_to_payload(row: dict[str, Any]) -> dict[str, Any] | None:
 
 async def _fetch_yahoo_news(query: str, limit: int = 50) -> list[dict[str, Any]]:
     fetcher = await get_unified_fetcher()
-    rows = await fetcher.yahoo.search_news(query, limit=limit)
+    rows = await fetcher.search_news(query, limit=limit)
     out: list[dict[str, Any]] = []
     for row in rows:
         parsed = _yahoo_news_row_to_payload(row)
@@ -307,10 +307,7 @@ async def get_symbol_news(
         return {"items": items[:limit]}
 
     fetcher = await get_unified_fetcher()
-    if not fetcher.finnhub.api_key:
-        return {"items": []}
-
-    rows = await fetcher.finnhub.get_company_news(ticker, limit=limit)
+    rows = await fetcher.get_company_news(ticker, limit=limit)
     items = _normalize_items(rows if isinstance(rows, list) else [])
     return {"items": items[:limit]}
 
@@ -328,10 +325,7 @@ async def get_market_news(
         return {"items": items[:limit]}
 
     fetcher = await get_unified_fetcher()
-    if not fetcher.finnhub.api_key:
-        return {"items": []}
-
-    rows = await fetcher.finnhub.get_market_news(category="general", limit=limit)
+    rows = await fetcher.get_market_news(category="general", limit=limit)
     items = _normalize_items(rows if isinstance(rows, list) else [])
     return {"items": items[:limit]}
 

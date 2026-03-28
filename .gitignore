@@ -9,6 +9,7 @@ __pycache__/
 .ruff_cache/
 .venv/
 .venv-ci/
+.venv*/
 venv/
 env/
 
@@ -26,6 +27,7 @@ frontend/.env.development
 *.sqlite
 *.sqlite3
 .yf_cache/
+data/bars/
 reports/*.xlsx
 reports/*.csv
 .coverage
@@ -40,6 +42,7 @@ frontend/.vite/
 frontend/tsconfig.tsbuildinfo
 frontend/test-results/
 frontend/playwright-report/
+test-results/
 
 # OS/editor
 .DS_Store

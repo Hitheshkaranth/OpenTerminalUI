@@ -3,17 +3,19 @@ from __future__ import annotations
 import sqlite3
 
 from sqlalchemy import event
+from sqlalchemy import inspect
 from sqlalchemy import create_engine
 from sqlalchemy import text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from backend.config.settings import get_settings
+from backend.db.base import get_sync_database_url
 from backend.shared.sqlite_utils import configure_sqlite_connection
 
-settings = get_settings()
+database_url = get_sync_database_url()
+connect_args = {"check_same_thread": False, "timeout": 15} if database_url.startswith("sqlite") else {}
 engine = create_engine(
-    settings.sqlite_url,
-    connect_args={"check_same_thread": False, "timeout": 15},
+    database_url,
+    connect_args=connect_args,
     pool_pre_ping=True,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -40,9 +42,11 @@ def _ensure_news_sentiment_columns() -> None:
         "sentiment_label": "TEXT",
         "sentiment_confidence": "REAL",
     }
+    inspector = inspect(engine)
+    if not inspector.has_table("news_articles"):
+        return
+    existing = {str(column["name"]) for column in inspector.get_columns("news_articles")}
     with engine.begin() as conn:
-        rows = conn.execute(text("PRAGMA table_info(news_articles)")).fetchall()
-        existing = {str(r[1]) for r in rows}
         for col, ddl in columns_to_add.items():
             if col in existing:
                 continue
@@ -61,12 +65,12 @@ def _ensure_backtest_columns() -> None:
             "execution_profile_json": "TEXT DEFAULT '{}'",
         },
     }
+    inspector = inspect(engine)
     with engine.begin() as conn:
         for table_name, columns_to_add in table_columns.items():
-            rows = conn.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
-            if not rows:
+            if not inspector.has_table(table_name):
                 continue
-            existing = {str(r[1]) for r in rows}
+            existing = {str(column["name"]) for column in inspector.get_columns(table_name)}
             for col, ddl in columns_to_add.items():
                 if col in existing:
                     continue

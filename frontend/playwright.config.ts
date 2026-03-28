@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:4173";
 const useExistingServer = process.env.PLAYWRIGHT_USE_EXISTING_SERVER === "1";
@@ -7,7 +8,8 @@ const e2eBackendPort = Number(process.env.E2E_BACKEND_PORT || 8010);
 const e2eFrontendPort = Number(process.env.E2E_FRONTEND_PORT || 4173);
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const chromiumLaunchArgs = ["--disable-gpu"];
-const repoRoot = path.resolve(__dirname, "..");
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(currentDir, "..");
 const sqlitePath = path.join(repoRoot, "data", "playwright-e2e.db").replace(/\\/g, "/");
 const sqliteUrl = process.env.OPENTERMINALUI_SQLITE_URL || `sqlite:///${sqlitePath}`;
 const databaseUrl = process.env.DATABASE_URL || sqliteUrl.replace("sqlite:///", "sqlite+aiosqlite:///");

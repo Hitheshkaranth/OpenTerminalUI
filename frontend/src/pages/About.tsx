@@ -167,6 +167,21 @@ const REPO_LANGUAGES = [
   { label: "Other", share: 1.4, color: "var(--ot-color-border-strong)" },
 ] as const;
 
+const BRAND_VALUES = [
+  {
+    label: "Terminal-first",
+    detail: "Shared shell, keyboard routing, and dense market context across desks.",
+  },
+  {
+    label: "Cross-market",
+    detail: "Equity, F&O, quant, risk, macro, and crypto workflows inside one product surface.",
+  },
+  {
+    label: "Open-source",
+    detail: "GitHub-backed product with Docker setup, inspectable code, and operator-friendly flows.",
+  },
+] as const;
+
 const CHANGELOG_COLORS: Record<(typeof CHANGELOG_ITEMS)[number]["kind"], string> = {
   feature: "var(--ot-color-accent-primary)",
   fix: "var(--ot-color-accent-secondary)",
@@ -243,6 +258,15 @@ function QuickNavLink({ label, to, badge }: { label: string; to: string; badge: 
   );
 }
 
+function BrandValueCard({ label, detail }: { label: string; detail: string }) {
+  return (
+    <div className="rounded-sm border border-terminal-border/70 bg-terminal-bg/45 p-3">
+      <div className="text-[10px] uppercase tracking-[0.16em] text-terminal-accent">{label}</div>
+      <p className="mt-2 text-xs leading-5 text-terminal-muted">{detail}</p>
+    </div>
+  );
+}
+
 export interface AboutProps {
   terminalType?: "market" | "fno";
 }
@@ -281,6 +305,7 @@ export function AboutPage({ terminalType = "market" }: AboutProps) {
     terminalType === "fno"
       ? "Derivatives workflows, strategy tooling, and cross-desk charting in one terminal dossier."
       : "Analyze. Trade. Optimize. Open-source Indian and US market analytics with shared terminal routing.";
+  const returnRoute = terminalType === "fno" ? "/fno" : "/equity/stocks";
 
   return (
     <div className="space-y-3 p-3 font-mono">
@@ -299,18 +324,82 @@ export function AboutPage({ terminalType = "market" }: AboutProps) {
       </header>
 
       <section aria-label="Product dossier header" className="rounded-sm border border-terminal-border bg-terminal-panel p-2">
-        <div className="relative overflow-hidden rounded-sm">
-          <AsciiHero className="h-[180px] w-full" palette="amber" quality="med" glow={0.5} />
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-terminal-bg/15 via-terminal-bg/45 to-terminal-bg/85 px-4 text-center">
-            <img src={logo} alt="OpenTerminalUI logo" className="h-12 w-12 rounded-sm border border-terminal-border bg-terminal-panel/80 p-1.5" />
-            <div className="space-y-1">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-terminal-muted">{deskLabel}</div>
-              <h1 className="text-2xl uppercase tracking-[0.14em] text-terminal-accent">OpenTerminalUI</h1>
-              <p className="mx-auto max-w-2xl text-[11px] text-terminal-muted">{descriptor}</p>
-              <p className="text-[10px] uppercase tracking-[0.14em] text-terminal-muted">
-                v{appVersion} | Built {builtDate} | Commit {shortCommit}
-              </p>
+        <div className="relative overflow-hidden rounded-sm border border-terminal-border/70">
+          <AsciiHero className="h-[340px] w-full" palette="amber" quality="med" glow={0.55} />
+          <div className="absolute inset-0 z-10 bg-[radial-gradient(circle_at_top,rgba(255,184,77,0.16),transparent_42%),linear-gradient(135deg,rgba(7,12,16,0.16),rgba(7,12,16,0.9))]" />
+          <div className="absolute inset-0 z-20 grid gap-4 px-4 py-5 lg:grid-cols-[minmax(0,1.3fr)_320px] lg:px-6 lg:py-6">
+            <div className="flex min-w-0 flex-col justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <TerminalBadge variant="accent">{deskLabel}</TerminalBadge>
+                <TerminalBadge variant="info">Product Dossier</TerminalBadge>
+                <TerminalBadge variant="live">v{appVersion}</TerminalBadge>
+              </div>
+
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+                <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-sm border border-terminal-accent/60 bg-terminal-panel/85 p-4 shadow-[0_0_40px_rgba(255,184,77,0.12)] lg:h-36 lg:w-36">
+                  <img src={logo} alt="OpenTerminalUI logo" className="h-full w-full object-contain" />
+                </div>
+                <div className="min-w-0 space-y-3">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-terminal-muted">OpenTerminal UI</div>
+                  <h1 className="text-3xl uppercase tracking-[0.16em] text-terminal-accent lg:text-5xl">OpenTerminal UI</h1>
+                  <p className="max-w-3xl text-sm leading-6 text-terminal-text">{descriptor}</p>
+                  <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.16em] text-terminal-muted">
+                    <span className="rounded-sm border border-terminal-border/70 bg-terminal-panel/70 px-2 py-1">
+                      Built {builtDate}
+                    </span>
+                    <span className="rounded-sm border border-terminal-border/70 bg-terminal-panel/70 px-2 py-1">
+                      Commit {shortCommit}
+                    </span>
+                    <span className="rounded-sm border border-terminal-border/70 bg-terminal-panel/70 px-2 py-1">
+                      Docker Ready
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-2 md:grid-cols-3">
+                {BRAND_VALUES.map((item) => (
+                  <BrandValueCard key={item.label} label={item.label} detail={item.detail} />
+                ))}
+              </div>
             </div>
+
+            <aside className="flex min-w-0 flex-col gap-3 rounded-sm border border-terminal-border/70 bg-terminal-panel/82 p-4 backdrop-blur-sm">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.16em] text-terminal-muted">Brand Signal</div>
+                <div className="mt-2 text-lg uppercase tracking-[0.16em] text-terminal-accent">One terminal, many desks</div>
+                <p className="mt-2 text-xs leading-5 text-terminal-muted">
+                  Shared navigation, charting infrastructure, and keyboard workflows keep the product consistent from equity to F&O.
+                </p>
+              </div>
+
+              <div className="rounded-sm border border-terminal-border/70 bg-terminal-bg/45 p-3">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-terminal-muted">Fast Access</div>
+                <div className="mt-3 grid gap-2">
+                  <QuickNavLink label="Return To Desk" to={returnRoute} badge={terminalType === "fno" ? "F&O" : "EQ"} />
+                  <QuickNavLink label="Open Home" to="/" badge="HOME" />
+                  <QuickNavLink label="Launch Security Hub" to="/equity/security" badge="SH" />
+                </div>
+              </div>
+
+              <div className="rounded-sm border border-terminal-border/70 bg-terminal-bg/45 p-3">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-terminal-muted">Build Identity</div>
+                <dl className="mt-3 grid gap-2 text-xs">
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-terminal-muted">Surface</dt>
+                    <dd className="text-terminal-text">Terminal Web App</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-terminal-muted">Version</dt>
+                    <dd className="text-terminal-text">{appVersion}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-terminal-muted">Desk</dt>
+                    <dd className="text-terminal-text">{deskLabel}</dd>
+                  </div>
+                </dl>
+              </div>
+            </aside>
           </div>
         </div>
       </section>

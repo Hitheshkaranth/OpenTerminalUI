@@ -1,30 +1,12 @@
-import { chromium, type FullConfig, type Page } from "@playwright/test";
+import { chromium, type FullConfig } from "@playwright/test";
 
 function makeJwt(payload: Record<string, unknown>): string {
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `x.${encoded}.y`;
 }
 
-async function warmProtectedRoute(
-  page: Page,
-  baseURL: string,
-  path: string,
-  readySelector: { text?: string; testId?: string; selector?: string },
-) {
-  await page.goto(`${baseURL}${path}`, { waitUntil: "domcontentloaded" });
-
-  if (readySelector.selector) {
-    await page.locator(readySelector.selector).first().waitFor({ state: "visible", timeout: 180_000 });
-  } else if (readySelector.text) {
-    await page.getByText(readySelector.text).waitFor({ state: "visible", timeout: 180_000 });
-  } else if (readySelector.testId) {
-    await page.getByTestId(readySelector.testId).waitFor({ state: "visible", timeout: 180_000 });
-  }
-}
-
 export default async function globalSetup(config: FullConfig) {
   const firstProjectBaseUrl = config.projects[0]?.use?.baseURL;
-  const baseURL = typeof firstProjectBaseUrl === "string" ? firstProjectBaseUrl : "http://127.0.0.1:4173";
   const browser = await chromium.launch({ args: ["--disable-gpu"] });
   const accessToken = makeJwt({
     sub: "e2e-user",
@@ -45,12 +27,9 @@ export default async function globalSetup(config: FullConfig) {
       [accessToken, refreshToken],
     );
 
-    await warmProtectedRoute(page, baseURL, "/backtesting", { text: "Backtesting Control Deck" });
-    await warmProtectedRoute(page, baseURL, "/equity/chart-workstation", { testId: "chart-workstation" });
-    await warmProtectedRoute(page, baseURL, "/equity/risk", { text: "RISK ENGINE CONTROL" });
-    await warmProtectedRoute(page, baseURL, "/equity/oms", { text: "Order Ticket + Compliance" });
-    await warmProtectedRoute(page, baseURL, "/equity/ops", { text: "Operational Workspace Control" });
-    await warmProtectedRoute(page, baseURL, "/equity/screener", { selector: ".ot-type-panel-title" });
+    if (typeof firstProjectBaseUrl === "string") {
+      await page.goto(firstProjectBaseUrl, { waitUntil: "domcontentloaded" });
+    }
   } finally {
     await context.close();
     await browser.close();

@@ -5,10 +5,10 @@ import logging
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 
 from backend.config.settings import get_settings
 from backend.core.kite_client import KiteClient
+from backend.db.base import sqlite_file_from_url
 from backend.shared.sqlite_utils import configure_sqlite_connection
 
 logger = logging.getLogger(__name__)
@@ -18,20 +18,6 @@ SUPPORTED_EXCHANGES = {"NSE", "BSE", "NFO"}
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def _sqlite_file_from_url(sqlite_url: str) -> Path:
-    # Examples:
-    # sqlite:///./backend/openterminalui.db
-    # sqlite:////data/openterminalui.db
-    if sqlite_url.startswith("sqlite:////"):
-        return Path(sqlite_url.removeprefix("sqlite:////")).resolve()
-    if sqlite_url.startswith("sqlite:///"):
-        return Path(sqlite_url.removeprefix("sqlite:///")).resolve()
-    if sqlite_url.startswith("sqlite://"):
-        return Path(sqlite_url.removeprefix("sqlite://")).resolve()
-    return Path("./backend/openterminalui.db").resolve()
-
 
 @dataclass
 class InstrumentRow:
@@ -45,7 +31,7 @@ class InstrumentRow:
 class InstrumentMapService:
     def __init__(self) -> None:
         settings = get_settings()
-        self.sqlite_path = _sqlite_file_from_url(settings.sqlite_url)
+        self.sqlite_path = sqlite_file_from_url(settings.sqlite_url)
         self._init_lock = asyncio.Lock()
         self._ready = False
 

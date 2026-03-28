@@ -13,6 +13,8 @@ cp .env.example .env
 docker compose up --build
 ```
 
+Use the repo-root `.env` as the canonical local config file. `backend/.env` is still read for backward compatibility, but root `.env` wins if both exist.
+
 App/API are served from backend container:
 
 - UI/API: `http://127.0.0.1:8000`

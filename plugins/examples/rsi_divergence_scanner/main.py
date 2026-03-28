@@ -5,7 +5,7 @@ from backend.plugins.base import Plugin, PluginContext
 
 class PluginImpl(Plugin):
     name = "rsi_divergence_scanner"
-    version = "0.1.0"
+    version = "0.1.1"
 
     async def on_init(self, context: PluginContext):
         context.log("RSI divergence scanner initialized")

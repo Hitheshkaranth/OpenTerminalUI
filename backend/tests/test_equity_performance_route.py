@@ -63,13 +63,10 @@ def _build_chart_payload(days: int = 420) -> dict:
 
 
 def test_get_company_performance_returns_expected_shape(monkeypatch) -> None:
-    class _FakeYahoo:
-        async def get_chart(self, symbol: str, range_str: str, interval: str):  # noqa: ARG002
-            assert symbol == "RELIANCE.NS"
-            return _build_chart_payload()
-
     class _FakeFetcher:
-        yahoo = _FakeYahoo()
+        async def fetch_history(self, symbol: str, range_str: str, interval: str):  # noqa: ARG002
+            assert symbol == "reliance"
+            return _build_chart_payload()
 
     async def _fake_get_unified_fetcher():
         return _FakeFetcher()
@@ -89,12 +86,9 @@ def test_get_company_performance_returns_expected_shape(monkeypatch) -> None:
 
 
 def test_get_company_performance_raises_on_missing_history(monkeypatch) -> None:
-    class _FakeYahoo:
-        async def get_chart(self, symbol: str, range_str: str, interval: str):  # noqa: ARG002
-            return {}
-
     class _FakeFetcher:
-        yahoo = _FakeYahoo()
+        async def fetch_history(self, symbol: str, range_str: str, interval: str):  # noqa: ARG002
+            return {}
 
     async def _fake_get_unified_fetcher():
         return _FakeFetcher()

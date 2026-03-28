@@ -23,6 +23,7 @@ COPY models/ ./models/
 COPY nlp/ ./nlp/
 COPY config/ ./config/
 COPY data/ ./data/
+COPY plugins/ ./plugins/
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 RUN sed -i 's/\r$//' backend/entrypoint.sh && chmod +x backend/entrypoint.sh
 

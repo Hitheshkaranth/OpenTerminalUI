@@ -535,8 +535,7 @@ async def get_chart(
                 registry = get_adapter_registry()
                 end_d = date.today()
                 start_d = end_d - timedelta(days=365)
-                # Ensure interval is passed here
-                adapter_rows = await registry.get_adapter(market).get_history(ticker, interval, start_d, end_d)
+                adapter_rows = await registry.invoke(market, "get_history", ticker, interval, start_d, end_d)
             except Exception:
                 adapter_rows = []
         if adapter_rows:

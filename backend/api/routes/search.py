@@ -106,10 +106,15 @@ async def search(q: str = Query(default=""), market: str = Query(default="NSE"))
             if m not in target_markets:
                 target_markets.append(m)
 
+        async def _registry_search(mkt: str, query_text: str):
+            if hasattr(registry, "invoke"):
+                return await registry.invoke(mkt, "search_instruments", query_text)
+            adapter = registry.get_adapter(mkt)
+            return await adapter.search_instruments(query_text)
+
         async def _search_market(mkt: str) -> list[SearchResult]:
             try:
-                adapter = registry.get_adapter(mkt)
-                rows = await adapter.search_instruments(q.strip())
+                rows = await _registry_search(mkt, q.strip())
                 out: list[SearchResult] = []
                 for row in rows[:15]:
                     out.append(

@@ -47,12 +47,9 @@ def _build_delivery_chart(days: int = 40) -> dict:
 
 
 def test_delivery_series_returns_points(monkeypatch) -> None:
-    class _FakeYahoo:
-        async def get_chart(self, symbol: str, range_str: str = "1y", interval: str = "1d"):  # noqa: ARG002
-            return _build_delivery_chart()
-
     class _FakeFetcher:
-        yahoo = _FakeYahoo()
+        async def fetch_history(self, symbol: str, range_str: str = "1y", interval: str = "1d"):  # noqa: ARG002
+            return _build_delivery_chart()
 
     async def _fake_get_unified_fetcher():
         return _FakeFetcher()

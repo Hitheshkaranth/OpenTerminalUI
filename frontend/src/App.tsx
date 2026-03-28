@@ -1,74 +1,76 @@
-import { Suspense, lazy } from "react";
+import { Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
+import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { TerminalBackground } from "./components/TerminalBackground";
 import { ThemeRuntime } from "./components/layout/ThemeRuntime";
+import { lazyWithRetry } from "./utils/lazyWithRetry";
 
-const EquityLayout = lazy(() => import("./equity/EquityLayout").then((m) => ({ default: m.EquityLayout })));
-const BacktestingLayout = lazy(() => import("./pages/BacktestingLayout").then((m) => ({ default: m.BacktestingLayout })));
-const FnoLayout = lazy(() => import("./fno/FnoLayout").then((m) => ({ default: m.FnoLayout })));
-const AccountLayout = lazy(() => import("./pages/AccountLayout").then((m) => ({ default: m.AccountLayout })));
+const EquityLayout = lazyWithRetry(() => import("./equity/EquityLayout").then((m) => ({ default: m.EquityLayout })));
+const BacktestingLayout = lazyWithRetry(() => import("./pages/BacktestingLayout").then((m) => ({ default: m.BacktestingLayout })));
+const FnoLayout = lazyWithRetry(() => import("./fno/FnoLayout").then((m) => ({ default: m.FnoLayout })));
+const AccountLayout = lazyWithRetry(() => import("./pages/AccountLayout").then((m) => ({ default: m.AccountLayout })));
 
-const HomePage = lazy(() => import("./pages/HomePage").then((m) => ({ default: m.HomePage })));
-const LoginPage = lazy(() => import("./pages/LoginPage").then((m) => ({ default: m.LoginPage })));
-const RegisterPage = lazy(() => import("./pages/Auth/RegisterPage").then((m) => ({ default: m.RegisterPage })));
-const ForgotAccessPage = lazy(() => import("./pages/Auth/ForgotAccessPage").then((m) => ({ default: m.ForgotAccessPage })));
+const HomePage = lazyWithRetry(() => import("./pages/HomePage").then((m) => ({ default: m.HomePage })));
+const LoginPage = lazyWithRetry(() => import("./pages/LoginPage").then((m) => ({ default: m.LoginPage })));
+const RegisterPage = lazyWithRetry(() => import("./pages/Auth/RegisterPage").then((m) => ({ default: m.RegisterPage })));
+const ForgotAccessPage = lazyWithRetry(() => import("./pages/Auth/ForgotAccessPage").then((m) => ({ default: m.ForgotAccessPage })));
 
-const StockDetailPage = lazy(() => import("./pages/StockDetail").then((m) => ({ default: m.StockDetailPage })));
-const SecurityHubPage = lazy(() => import("./pages/SecurityHub").then((m) => ({ default: m.SecurityHubPage })));
-const CommoditiesPage = lazy(() => import("./pages/Commodities").then((m) => ({ default: m.CommoditiesPage })));
-const ForexPage = lazy(() => import("./pages/Forex").then((m) => ({ default: m.ForexPage })));
-const HotlistsPage = lazy(() => import("./pages/Hotlists").then((m) => ({ default: m.HotlistsPage })));
-const AboutPage = lazy(() => import("./pages/About").then((m) => ({ default: m.AboutPage })));
-const DashboardPage = lazy(() => import("./pages/Dashboard").then((m) => ({ default: m.DashboardPage })));
-const ScreenerPage = lazy(() => import("./pages/Screener").then((m) => ({ default: m.ScreenerPage })));
-const PortfolioPage = lazy(() => import("./pages/Portfolio").then((m) => ({ default: m.PortfolioPage })));
-const WatchlistPage = lazy(() => import("./pages/Watchlist").then((m) => ({ default: m.WatchlistPage })));
-const NewsPage = lazy(() => import("./pages/News").then((m) => ({ default: m.NewsPage })));
-const AlertsPage = lazy(() => import("./pages/Alerts").then((m) => ({ default: m.AlertsPage })));
-const PaperTradingPage = lazy(() => import("./pages/PaperTrading").then((m) => ({ default: m.PaperTradingPage })));
-const RiskDashboardPage = lazy(() => import("./pages/RiskDashboard").then((m) => ({ default: m.RiskDashboardPage })));
-const OmsCompliancePage = lazy(() => import("./pages/OmsCompliance").then((m) => ({ default: m.OmsCompliancePage })));
-const OpsDashboardPage = lazy(() => import("./pages/OpsDashboard").then((m) => ({ default: m.OpsDashboardPage })));
-const SettingsPage = lazy(() => import("./pages/Settings").then((m) => ({ default: m.SettingsPage })));
-const PluginsPage = lazy(() => import("./pages/Plugins/Plugins").then((m) => ({ default: m.PluginsPage })));
-const ChartWorkstationPage = lazy(() => import("./pages/ChartWorkstationPage").then((m) => ({ default: m.ChartWorkstationPage })));
-const LaunchpadPage = lazy(() => import("./pages/Launchpad").then((m) => ({ default: m.LaunchpadPage })));
-const LaunchpadPopoutPage = lazy(() => import("./pages/LaunchpadPopout").then((m) => ({ default: m.LaunchpadPopoutPage })));
-const SplitComparisonPage = lazy(() => import("./pages/SplitComparison").then((m) => ({ default: m.SplitComparisonPage })));
-const YieldCurveDashboard = lazy(() => import("./pages/fixed-income/YieldCurveDashboard").then((m) => ({ default: m.YieldCurveDashboard })));
-const EconomicTerminal = lazy(() => import("./pages/economics/EconomicTerminal").then((m) => ({ default: m.EconomicTerminal })));
-const SectorRotationPage = lazy(() => import("./pages/SectorRotation").then((m) => ({ default: m.SectorRotationPage })));
-const CryptoWorkspacePage = lazy(() => import("./pages/CryptoWorkspace").then((m) => ({ default: m.CryptoWorkspacePage })));
-const BondsPage = lazy(() => import("./pages/equity/bonds/Bonds").then((m) => ({ default: m.BondsPage })));
-const ETFAnalyticsPage = lazy(() => import("./pages/ETFAnalytics").then((m) => ({ default: m.ETFAnalyticsPage })));
-const MutualFundsPage = lazy(() => import("./pages/MutualFunds").then((m) => ({ default: m.MutualFundsPage })));
+const StockDetailPage = lazyWithRetry(() => import("./pages/StockDetail").then((m) => ({ default: m.StockDetailPage })));
+const SecurityHubPage = lazyWithRetry(() => import("./pages/SecurityHub").then((m) => ({ default: m.SecurityHubPage })));
+const CommoditiesPage = lazyWithRetry(() => import("./pages/Commodities").then((m) => ({ default: m.CommoditiesPage })));
+const ForexPage = lazyWithRetry(() => import("./pages/Forex").then((m) => ({ default: m.ForexPage })));
+const HotlistsPage = lazyWithRetry(() => import("./pages/Hotlists").then((m) => ({ default: m.HotlistsPage })));
+const AboutPage = lazyWithRetry(() => import("./pages/About").then((m) => ({ default: m.AboutPage })));
+const DashboardPage = lazyWithRetry(() => import("./pages/Dashboard").then((m) => ({ default: m.DashboardPage })));
+const ScreenerPage = lazyWithRetry(() => import("./pages/Screener").then((m) => ({ default: m.ScreenerPage })));
+const PortfolioPage = lazyWithRetry(() => import("./pages/Portfolio").then((m) => ({ default: m.PortfolioPage })));
+const WatchlistPage = lazyWithRetry(() => import("./pages/Watchlist").then((m) => ({ default: m.WatchlistPage })));
+const NewsPage = lazyWithRetry(() => import("./pages/News").then((m) => ({ default: m.NewsPage })));
+const AlertsPage = lazyWithRetry(() => import("./pages/Alerts").then((m) => ({ default: m.AlertsPage })));
+const PaperTradingPage = lazyWithRetry(() => import("./pages/PaperTrading").then((m) => ({ default: m.PaperTradingPage })));
+const RiskDashboardPage = lazyWithRetry(() => import("./pages/RiskDashboard").then((m) => ({ default: m.RiskDashboardPage })));
+const OmsCompliancePage = lazyWithRetry(() => import("./pages/OmsCompliance").then((m) => ({ default: m.OmsCompliancePage })));
+const OpsDashboardPage = lazyWithRetry(() => import("./pages/OpsDashboard").then((m) => ({ default: m.OpsDashboardPage })));
+const SettingsPage = lazyWithRetry(() => import("./pages/Settings").then((m) => ({ default: m.SettingsPage })));
+const PluginsPage = lazyWithRetry(() => import("./pages/Plugins/Plugins").then((m) => ({ default: m.PluginsPage })));
+const ChartWorkstationPage = lazyWithRetry(() => import("./pages/ChartWorkstationPage").then((m) => ({ default: m.ChartWorkstationPage })));
+const LaunchpadPage = lazyWithRetry(() => import("./pages/Launchpad").then((m) => ({ default: m.LaunchpadPage })));
+const LaunchpadPopoutPage = lazyWithRetry(() => import("./pages/LaunchpadPopout").then((m) => ({ default: m.LaunchpadPopoutPage })));
+const SplitComparisonPage = lazyWithRetry(() => import("./pages/SplitComparison").then((m) => ({ default: m.SplitComparisonPage })));
+const YieldCurveDashboard = lazyWithRetry(() => import("./pages/fixed-income/YieldCurveDashboard").then((m) => ({ default: m.YieldCurveDashboard })));
+const EconomicTerminal = lazyWithRetry(() => import("./pages/economics/EconomicTerminal").then((m) => ({ default: m.EconomicTerminal })));
+const SectorRotationPage = lazyWithRetry(() => import("./pages/SectorRotation").then((m) => ({ default: m.SectorRotationPage })));
+const CryptoWorkspacePage = lazyWithRetry(() => import("./pages/CryptoWorkspace").then((m) => ({ default: m.CryptoWorkspacePage })));
+const BondsPage = lazyWithRetry(() => import("./pages/equity/bonds/Bonds").then((m) => ({ default: m.BondsPage })));
+const ETFAnalyticsPage = lazyWithRetry(() => import("./pages/ETFAnalytics").then((m) => ({ default: m.ETFAnalyticsPage })));
+const MutualFundsPage = lazyWithRetry(() => import("./pages/MutualFunds").then((m) => ({ default: m.MutualFundsPage })));
 
-const OptionChainPage = lazy(() => import("./fno/pages/OptionChainPage").then((m) => ({ default: m.OptionChainPage })));
-const GreeksPage = lazy(() => import("./fno/pages/GreeksPage").then((m) => ({ default: m.GreeksPage })));
-const FuturesPage = lazy(() => import("./fno/pages/FuturesPage").then((m) => ({ default: m.FuturesPage })));
-const OIAnalysisPage = lazy(() => import("./fno/pages/OIAnalysisPage").then((m) => ({ default: m.OIAnalysisPage })));
-const StrategyPage = lazy(() => import("./fno/pages/StrategyPage").then((m) => ({ default: m.StrategyPage })));
-const PCRPage = lazy(() => import("./fno/pages/PCRPage").then((m) => ({ default: m.PCRPage })));
-const HeatmapPage = lazy(() => import("./fno/pages/HeatmapPage").then((m) => ({ default: m.HeatmapPage })));
-const ExpiryPage = lazy(() => import("./fno/pages/ExpiryPage").then((m) => ({ default: m.ExpiryPage })));
-const FnoAboutPage = lazy(() => import("./fno/pages/AboutPage").then((m) => ({ default: m.FnoAboutPage })));
+const OptionChainPage = lazyWithRetry(() => import("./fno/pages/OptionChainPage").then((m) => ({ default: m.OptionChainPage })));
+const GreeksPage = lazyWithRetry(() => import("./fno/pages/GreeksPage").then((m) => ({ default: m.GreeksPage })));
+const FuturesPage = lazyWithRetry(() => import("./fno/pages/FuturesPage").then((m) => ({ default: m.FuturesPage })));
+const OIAnalysisPage = lazyWithRetry(() => import("./fno/pages/OIAnalysisPage").then((m) => ({ default: m.OIAnalysisPage })));
+const StrategyPage = lazyWithRetry(() => import("./fno/pages/StrategyPage").then((m) => ({ default: m.StrategyPage })));
+const PCRPage = lazyWithRetry(() => import("./fno/pages/PCRPage").then((m) => ({ default: m.PCRPage })));
+const HeatmapPage = lazyWithRetry(() => import("./fno/pages/HeatmapPage").then((m) => ({ default: m.HeatmapPage })));
+const ExpiryPage = lazyWithRetry(() => import("./fno/pages/ExpiryPage").then((m) => ({ default: m.ExpiryPage })));
+const FnoAboutPage = lazyWithRetry(() => import("./fno/pages/AboutPage").then((m) => ({ default: m.FnoAboutPage })));
 
-const BacktestingPage = lazy(() => import("./pages/Backtesting").then((m) => ({ default: m.BacktestingPage })));
-const ModelLabPage = lazy(() => import("./pages/ModelLab").then((m) => ({ default: m.ModelLabPage })));
-const ModelLabExperimentDetailPage = lazy(() => import("./pages/ModelLabExperimentDetail").then((m) => ({ default: m.ModelLabExperimentDetailPage })));
-const ModelLabRunReportPage = lazy(() => import("./pages/ModelLabRunReport").then((m) => ({ default: m.ModelLabRunReportPage })));
-const ModelLabComparePage = lazy(() => import("./pages/ModelLabCompare").then((m) => ({ default: m.ModelLabComparePage })));
-const ModelGovernancePage = lazy(() => import("./pages/ModelGovernance").then((m) => ({ default: m.ModelGovernancePage })));
+const BacktestingPage = lazyWithRetry(() => import("./pages/Backtesting").then((m) => ({ default: m.BacktestingPage })));
+const ModelLabPage = lazyWithRetry(() => import("./pages/ModelLab").then((m) => ({ default: m.ModelLabPage })));
+const ModelLabExperimentDetailPage = lazyWithRetry(() => import("./pages/ModelLabExperimentDetail").then((m) => ({ default: m.ModelLabExperimentDetailPage })));
+const ModelLabRunReportPage = lazyWithRetry(() => import("./pages/ModelLabRunReport").then((m) => ({ default: m.ModelLabRunReportPage })));
+const ModelLabComparePage = lazyWithRetry(() => import("./pages/ModelLabCompare").then((m) => ({ default: m.ModelLabComparePage })));
+const ModelGovernancePage = lazyWithRetry(() => import("./pages/ModelGovernance").then((m) => ({ default: m.ModelGovernancePage })));
 
-const PortfolioLabPage = lazy(() => import("./pages/PortfolioLab").then((m) => ({ default: m.PortfolioLabPage })));
-const PortfolioLabDetailPage = lazy(() => import("./pages/PortfolioLabDetail").then((m) => ({ default: m.PortfolioLabDetailPage })));
-const PortfolioLabRunReportPage = lazy(() => import("./pages/PortfolioLabRunReport").then((m) => ({ default: m.PortfolioLabRunReportPage })));
-const PortfolioLabBlendsPage = lazy(() => import("./pages/PortfolioLabBlends").then((m) => ({ default: m.PortfolioLabBlendsPage })));
+const PortfolioLabPage = lazyWithRetry(() => import("./pages/PortfolioLab").then((m) => ({ default: m.PortfolioLabPage })));
+const PortfolioLabDetailPage = lazyWithRetry(() => import("./pages/PortfolioLabDetail").then((m) => ({ default: m.PortfolioLabDetailPage })));
+const PortfolioLabRunReportPage = lazyWithRetry(() => import("./pages/PortfolioLabRunReport").then((m) => ({ default: m.PortfolioLabRunReportPage })));
+const PortfolioLabBlendsPage = lazyWithRetry(() => import("./pages/PortfolioLabBlends").then((m) => ({ default: m.PortfolioLabBlendsPage })));
 
-const AccountPage = lazy(() => import("./pages/Account").then((m) => ({ default: m.AccountPage })));
-const CockpitDashboard = lazy(() => import("./pages/Cockpit"));
+const AccountPage = lazyWithRetry(() => import("./pages/Account").then((m) => ({ default: m.AccountPage })));
+const CockpitDashboard = lazyWithRetry(() => import("./pages/Cockpit"));
 
 const RouteLoadingFallback = (
   <div className="flex min-h-[50vh] items-center justify-center p-4">
@@ -86,8 +88,9 @@ function App() {
       <div className="ot-vignette-overlay" />
       <div className="ot-scanline-overlay" />
       <div className="ot-route-layer">
-        <Suspense fallback={RouteLoadingFallback}>
-          <Routes>
+        <ErrorBoundary>
+          <Suspense fallback={RouteLoadingFallback}>
+            <Routes>
           <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
           <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
           <Route path="/login" element={<LoginPage />} />
@@ -189,8 +192,9 @@ function App() {
           <Route path="/settings" element={<Navigate to="/equity/settings" replace />} />
           <Route path="/plugins" element={<Navigate to="/equity/plugins" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ from typing import Any
 
 import pandas as pd
 
+from backend.db.base import sqlite_file_from_url
 from backend.config.settings import get_settings
 from backend.shared.sqlite_utils import configure_sqlite_connection
 
@@ -29,17 +30,6 @@ CREATE TABLE IF NOT EXISTS ohlcv_cache (
 CREATE INDEX IF NOT EXISTS idx_ohlcv_cache_lookup
 ON ohlcv_cache(symbol, interval, ts);
 """
-
-
-def _sqlite_file_from_url(sqlite_url: str) -> Path:
-    if sqlite_url.startswith("sqlite:////"):
-        return Path(sqlite_url.removeprefix("sqlite:////")).resolve()
-    if sqlite_url.startswith("sqlite:///"):
-        return Path(sqlite_url.removeprefix("sqlite:///")).resolve()
-    if sqlite_url.startswith("sqlite://"):
-        return Path(sqlite_url.removeprefix("sqlite://")).resolve()
-    return Path("./backend/openterminalui.db").resolve()
-
 
 def _interval_ms(interval: str) -> int | None:
     key = (interval or "").strip().lower()
@@ -119,7 +109,7 @@ class OHLCVCache:
         warm_ttl_seconds: int = 86_400,
     ) -> None:
         settings = get_settings()
-        self.sqlite_path = sqlite_path or _sqlite_file_from_url(settings.sqlite_url)
+        self.sqlite_path = sqlite_path or sqlite_file_from_url(settings.sqlite_url)
         self.cold_root = cold_root or Path(os.getenv("OHLCV_COLD_ROOT", "data/bars"))
         env_hot_ttl = int(os.getenv("OHLCV_HOT_TTL_SECONDS", str(hot_ttl_seconds)) or hot_ttl_seconds)
         env_warm_ttl = int(os.getenv("OHLCV_WARM_TTL_SECONDS", str(warm_ttl_seconds)) or warm_ttl_seconds)

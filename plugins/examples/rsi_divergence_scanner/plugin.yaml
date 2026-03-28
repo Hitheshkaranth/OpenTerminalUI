@@ -1,5 +1,5 @@
 name: rsi_divergence_scanner
-version: 0.1.0
+version: 0.1.1
 author: OpenTerminalUI
 description: Scans watchlist for RSI divergences and creates alerts
 dependencies: []

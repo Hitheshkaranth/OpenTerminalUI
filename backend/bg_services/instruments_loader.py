@@ -5,11 +5,11 @@ import logging
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from backend.api.deps import get_unified_fetcher
 from backend.config.settings import get_settings
+from backend.db.base import sqlite_file_from_url
 from backend.shared.sqlite_utils import configure_sqlite_connection
 
 logger = logging.getLogger(__name__)
@@ -17,17 +17,6 @@ logger = logging.getLogger(__name__)
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def _sqlite_file_from_url(sqlite_url: str) -> Path:
-    if sqlite_url.startswith("sqlite:////"):
-        return Path(sqlite_url.removeprefix("sqlite:////")).resolve()
-    if sqlite_url.startswith("sqlite:///"):
-        return Path(sqlite_url.removeprefix("sqlite:///")).resolve()
-    if sqlite_url.startswith("sqlite://"):
-        return Path(sqlite_url.removeprefix("sqlite://")).resolve()
-    return Path("./backend/openterminalui.db").resolve()
-
 
 def _to_iso_date(value: Any) -> str:
     if value is None:
@@ -59,7 +48,7 @@ class FutureContractRow:
 class InstrumentsLoader:
     def __init__(self, refresh_interval_seconds: int = 24 * 60 * 60) -> None:
         settings = get_settings()
-        self.sqlite_path = _sqlite_file_from_url(settings.sqlite_url)
+        self.sqlite_path = sqlite_file_from_url(settings.sqlite_url)
         self.refresh_interval_seconds = refresh_interval_seconds
         self._task: asyncio.Task | None = None
         self._stop_event = asyncio.Event()
