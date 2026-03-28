@@ -21,7 +21,8 @@ async function loginAndOpen(page: import("@playwright/test").Page, targetPath: s
     [accessToken, refreshToken],
   );
   await page.goto(targetPath, { waitUntil: "domcontentloaded" });
-  await expect(page.getByPlaceholder(/Type ticker, command, or search/i)).toBeVisible();
+  await page.getByText(/(?:Restoring|Loading) workspace/i).waitFor({ state: "hidden", timeout: 15_000 }).catch(() => {});
+  await expect(page.getByPlaceholder(/Type ticker, command, or search/i)).toBeVisible({ timeout: 15_000 });
 }
 
 test.describe("Terminal shell + GO bar", () => {

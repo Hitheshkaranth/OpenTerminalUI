@@ -1,274 +1,316 @@
 # OpenTerminalUI
 
 <p align="center">
-  <img src="assets/logo.png" alt="OpenTerminalUI Logo" width="560" />
+  <img src="assets/logo.png" alt="OpenTerminalUI logo" width="560" />
 </p>
 
 <p align="center">
-  <strong>Analyze. Trade. Optimize.</strong><br />
-  Open-source terminal-style trading and research workspace for India (NSE/BSE) and US (NYSE/NASDAQ) markets.
+  <strong>Open-source market terminal for discretionary traders, researchers, and quant workflows.</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/actions/workflows/ci.yml"><img src="https://github.com/Hitheshkaranth/OpenTerminalUI/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <img src="https://img.shields.io/badge/version-0.1.1-0f172a" alt="Version 0.1.1" />
   <img src="https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white" alt="Python 3.11" />
+  <img src="https://img.shields.io/badge/node-22-339933?logo=node.js&logoColor=white" alt="Node 22" />
   <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/React_18-61DAFB?logo=react&logoColor=black" alt="React 18" />
+  <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black" alt="React 18" />
   <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Vite_6-646CFF?logo=vite&logoColor=white" alt="Vite" />
-  <img src="https://img.shields.io/badge/Tailwind_CSS-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS" />
-  <img src="https://img.shields.io/badge/Playwright-2EAD33?logo=playwright&logoColor=white" alt="Playwright" />
-  <img src="https://img.shields.io/badge/Vitest-6E9F18?logo=vitest&logoColor=white" alt="Vitest" />
-  <img src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white" alt="Docker" />
-  <img src="https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white" alt="Redis" />
-  <img src="https://img.shields.io/badge/SQLAlchemy-D71F00?logo=sqlalchemy&logoColor=white" alt="SQLAlchemy" />
-  <img src="https://img.shields.io/badge/WebSocket-010101?logo=socketdotio&logoColor=white" alt="WebSocket" />
+  <img src="https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white" alt="Vite 6" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License" />
 </p>
 
----
+## Overview
 
-## What is OpenTerminalUI?
+OpenTerminalUI is a full-stack financial terminal with a terminal-style shell, research surfaces, chart workstations, derivatives tooling, portfolio analytics, and quant labs in one application.
 
-OpenTerminalUI is a Bloomberg-style, keyboard-first financial terminal built as an open-source full-stack application. It combines a **FastAPI + Python** backend with a **React + TypeScript** frontend to deliver real-time market data, charting, portfolio analytics, derivatives analysis, backtesting, and risk management in a unified terminal workspace.
+The current app is organized around:
 
-Designed for **traders, quant researchers, portfolio managers, risk analysts, and operations teams** working across Indian and US equity markets.
+- Equity research and security analysis
+- Multi-panel charting with replay, comparison, drawings, alerts, and workspace persistence
+- F&O workflows including option chain, Greeks, PCR, OI, futures, expiry, and strategy views
+- Portfolio, watchlist, paper trading, alerts, and operational dashboards
+- Quant workflows for backtesting, model lab, portfolio lab, and governance
+- Macro and cross-asset coverage for forex, commodities, bonds, ETFs, sector rotation, economics, crypto, and launchpad-style monitoring
 
----
+The backend is a FastAPI app. The frontend is a React + Vite app. In production, the backend serves the built frontend bundle.
 
-## Latest Updates (2026-03)
+## Product Surface
 
-- Multi-chart crosshair synchronization for linked Launchpad and workstation panels.
-- Volume Profile with VPOC and 70% value-area overlays.
-- Stabilized indicator pane behavior so non-price indicators no longer collapse price visibility.
-- Expanded market top bar workflow with larger ticker search/load controls.
-- Unified in-app branding to match the web favicon icon across top bar and rail.
-- Dockerized production serving at a single app endpoint (`http://localhost:8000`).
+### Core terminal shell
 
----
+- Command bar and GO bar routing
+- Persistent workspace framing and shell chrome
+- Keyboard-first navigation across major routes
+- Desktop and mobile-aware layouts
+
+### Equity and research
+
+- Home dashboard and market overview
+- Security hub and stock detail workflows
+- News, alerts, hotlists, watchlist, and screener workflows
+- Portfolio, paper trading, and account/settings surfaces
+
+### Advanced charting
+
+- Multi-chart workstation with saved layouts
+- Linked panes, synchronized crosshair/timeframe behavior, and replay controls
+- Comparison overlays, drawing tools, export helpers, and context overlays
+- Launchpad and split-comparison workflows
+
+### Derivatives and cross-asset
+
+- Option chain, Greeks, futures, OI analysis, PCR, strategy, expiry, and heatmap views
+- Commodities, forex, bonds, ETF analytics, mutual funds, economics, yield curve, and crypto workspace routes
+
+### Quant and ops
+
+- Backtesting dashboard
+- Model lab, run reports, compare flows, and governance
+- Portfolio lab, blends, and run reports
+- Risk, OMS/compliance, ops dashboard, cockpit, and plugin surfaces
+
+## Main Routes
+
+### Home and authentication
+
+- `/`
+- `/home`
+- `/login`
+- `/register`
+- `/forgot-access`
+- `/account`
+
+### Equity workspace
+
+- `/equity/dashboard`
+- `/equity/stocks`
+- `/equity/security`
+- `/equity/security/:ticker`
+- `/equity/commodities`
+- `/equity/forex`
+- `/equity/hotlists`
+- `/equity/screener`
+- `/equity/portfolio`
+- `/equity/portfolio/lab`
+- `/equity/watchlist`
+- `/equity/news`
+- `/equity/alerts`
+- `/equity/paper`
+- `/equity/risk`
+- `/equity/oms`
+- `/equity/ops`
+- `/equity/chart-workstation`
+- `/equity/launchpad`
+- `/equity/launchpad/popout`
+- `/equity/compare`
+- `/equity/yield-curve`
+- `/equity/economics`
+- `/equity/sector-rotation`
+- `/equity/crypto`
+- `/equity/etf-analytics`
+- `/equity/bonds`
+- `/equity/mutual-funds`
+- `/equity/plugins`
+- `/equity/settings`
+- `/equity/cockpit`
+- `/equity/stocks/about`
+
+### F&O workspace
+
+- `/fno`
+- `/fno/greeks`
+- `/fno/futures`
+- `/fno/oi`
+- `/fno/strategy`
+- `/fno/pcr`
+- `/fno/heatmap`
+- `/fno/expiry`
+- `/fno/about`
+
+### Backtesting and labs
+
+- `/backtesting`
+- `/backtesting/model-lab`
+- `/backtesting/model-lab/experiments/:id`
+- `/backtesting/model-lab/runs/:runId`
+- `/backtesting/model-lab/compare`
+- `/backtesting/model-governance`
+- `/model-lab`
+- `/portfolio-lab`
 
 ## Screenshots
 
 <p align="center">
-  <img src="assets/Enhanced_Home_Screen.png" alt="Dashboard" width="800" /><br />
-  <em>Dashboard with real-time tickers, market indices, and sector heatmaps</em>
+  <img src="assets/Enhanced_Home_Screen.png" alt="OpenTerminalUI home screen" width="900" />
 </p>
+<p align="center"><em>Home dashboard with shell chrome, market context, and workspace launch points.</em></p>
 
 <p align="center">
-  <img src="assets/Advanced_Workstation_6_Charts.png" alt="Chart Workstation" width="800" /><br />
-  <em>Multi-chart workstation with linked crosshairs and technical indicators</em>
+  <img src="assets/Advanced_Workstation_6_Charts.png" alt="Chart workstation" width="900" />
 </p>
+<p align="center"><em>Multi-panel chart workstation with advanced charting workflows.</em></p>
 
 <p align="center">
-  <img src="assets/Stock_Screen.png" alt="Stock Screener" width="800" /><br />
-  <em>Stock screener with custom filters and real-time data</em>
+  <img src="assets/Advanced_Portfolio_Monitoring.png" alt="Portfolio monitoring" width="900" />
 </p>
+<p align="center"><em>Portfolio and monitoring surfaces for holdings, performance, and risk review.</em></p>
 
 <p align="center">
-  <img src="assets/Advanced_Portfolio_Monitoring.png" alt="Portfolio Monitoring" width="800" /><br />
-  <em>Portfolio monitoring with allocation analysis and performance tracking</em>
+  <img src="assets/Backtesting_Models_Simulations.png" alt="Backtesting and model lab" width="900" />
 </p>
-
-<p align="center">
-  <img src="assets/Enhanced_Fundamental_Analysis.png" alt="Fundamental Analysis" width="800" /><br />
-  <em>Fundamental analysis with financial statements and valuation metrics</em>
-</p>
-
-<p align="center">
-  <img src="assets/Backtesting_Models_Simulations.png" alt="Backtesting" width="800" /><br />
-  <em>Backtesting lab with strategy simulation and performance reports</em>
-</p>
-
----
-
-## Features
-
-### Terminal Shell
-- **GO bar** (`Ctrl+G`) for instant ticker/command routing
-- **Command palette** (`Ctrl+K`) with fuzzy search and keyboard navigation
-- Ticker tape, status bar with market clock, and sidebar navigation
-- Semantic theme tokens with dark terminal aesthetic
-
-### Equity & Market Intelligence
-- Security Hub with chart, fundamentals, technicals, and news in tabbed views
-- Chart Workstation with multi-panel layouts and linked crosshair sync
-- Volume Profile overlay with VPOC and value-area lines
-- Screener with AST-based expression engine (no `eval`)
-- Watchlist management with real-time quote updates
-- Portfolio tracking and mutual fund mode
-
-### Derivatives (F&O)
-- Option chain with Greeks, OI, IV surface, and heatmaps
-- PCR analysis, expiry views, and strategy builders
-- Futures analytics with consistent terminal routing
-
-### Quant & Backtesting
-- Model Lab for strategy backtesting with experiment tracking
-- Portfolio Lab for blend analysis and multi-strategy comparison
-- Run reports, compare pages, and governance workflows
-
-### Crypto & Macro
-- Crypto workspace with charts, movers, and heatmaps
-- Economics dashboards with yield curve visualization
-- Sector rotation and split comparison tools
-
-### Risk & Operations
-- VaR, CVaR, stress testing, and scenario analysis
-- OMS blotter with compliance dashboards
-- Alert channels with WebSocket-driven real-time updates
-
-### Data Pipeline
-- Provider registry with deterministic fallback and health-aware ordering
-- Adapters: Kite Connect, Finnhub, yfinance, FMP, NSEPython, Polygon
-- OHLCV caching with candle aggregation
-- Redis pub/sub quote bus (graceful in-memory fallback)
-
----
+<p align="center"><em>Quant workflows for experiments, simulations, and reports.</em></p>
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                     Frontend (React 18)                      │
-│  Vite  ·  TypeScript  ·  Tailwind CSS  ·  Zustand  ·  cmdk  │
-│  TanStack Query  ·  Lightweight Charts  ·  Recharts  ·  D3  │
-│  React Router v6  ·  React Grid Layout  ·  ReactFlow        │
-└────────────────────┬──────────────────┬──────────────────────┘
-                     │  REST + WS       │
-┌────────────────────▼──────────────────▼──────────────────────┐
-│                    Backend (FastAPI)                          │
-│  Python 3.11  ·  SQLAlchemy  ·  Pydantic  ·  Redis           │
-│  APScheduler  ·  WebSockets  ·  httpx  ·  pandas  ·  numpy   │
-├──────────────────────────────────────────────────────────────┤
-│  Providers: Kite · Finnhub · yfinance · FMP · NSEPython      │
-│  Services:  MarketDataHub · CandleAggregator · OHLCVCache    │
-│  Compute:   Screener · Risk · Backtesting · Portfolio Lab     │
-└──────────────────────────────────────────────────────────────┘
-```
+### Frontend
 
----
+- React 18
+- TypeScript
+- Vite
+- React Router
+- TanStack Query
+- Zustand
+- Tailwind CSS
+- lightweight-charts
+- Playwright + Vitest
 
-## Repository Structure
+### Backend
 
-```
-backend/                  FastAPI app, services, providers, tests
-  api/routes/             REST and WebSocket endpoints
-  providers/              Market data provider adapters
-  services/               Core business logic (candle, risk, backtest)
-  screener/               AST-based screener engine
-  db/                     Database models, OHLCV cache, migrations
-  tests/                  257 pytest tests with coverage enforcement
-frontend/                 React app with terminal UI
-  src/components/         UI components (layout, terminal, charts)
-  src/pages/              Route pages (equity, fno, crypto, etc.)
-  src/shared/             Shared chart logic and data transforms
-  src/stores/             Zustand state management
-  src/__tests__/           92 Vitest unit tests
-  tests/e2e/              24 Playwright E2E tests
-plugins/                  Plugin extension points
-config/                   Runtime configuration
-data/                     Fixtures and market reference data
-docs/                     Architecture documentation
-.github/workflows/        CI pipeline (pytest + Vitest + Playwright)
-```
+- FastAPI
+- Python 3.11
+- SQLAlchemy
+- Redis
+- SQLite by default, Postgres optional
+- Provider adapters for market data and research endpoints
+- Pytest for backend validation
 
----
+## Running Locally
 
-## Quick Start
+### Prerequisites
 
-### Docker (recommended)
+- Python `3.11`
+- Node `22`
+- npm
+- Docker and Docker Compose, if you want the containerized flow
+
+### Option 1: Docker
+
+This is the quickest full-stack path.
 
 ```bash
-git clone https://github.com/Hitheshkaranth/OpenTerminalUI.git
-cd OpenTerminalUI
-docker compose up -d --build
+docker compose up --build
 ```
 
-App (backend + built frontend): `http://localhost:8000`
+App:
 
-### Local Development
+- Backend + built frontend: `http://localhost:8000`
 
-**Backend:**
+Optional services:
+
+- Redis: `localhost:6379`
+- Postgres profile: `docker compose --profile postgres up --build`
+
+### Option 2: Local development
+
+Backend:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # or .\.venv\Scripts\Activate.ps1 on Windows
+python3.11 -m venv .venv
+source .venv/bin/activate
 pip install -r backend/requirements.txt
-uvicorn backend.main:app --reload --port 8000
+PYTHONPATH=. uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-**Frontend:**
+Frontend:
 
 ```bash
 cd frontend
-npm ci
+npm install
 npm run dev
 ```
 
-### Environment Variables
+App URLs in local dev:
 
-Copy `.env.example` to `.env` and configure your API keys:
+- Backend API: `http://127.0.0.1:8000`
+- Frontend dev server: `http://127.0.0.1:5173`
 
-```bash
-cp .env.example .env
-```
+## Environment Notes
 
-Required for live data: Kite Connect, Finnhub, FMP, or Polygon API keys. The app runs with mock/cached data when keys are not configured.
+The repo can run without fully configured production credentials, but some provider-backed features degrade or return fallback/mock behavior when API keys are absent.
 
----
+Common environment variables:
+
+- `FMP_API_KEY`
+- `FINNHUB_API_KEY`
+- `KITE_API_KEY`
+- `KITE_API_SECRET`
+- `KITE_ACCESS_TOKEN`
+- `JWT_SECRET_KEY`
+- `CACHE_SIGNING_KEY`
+- `DATABASE_URL`
+- `REDIS_URL`
+- `OPENTERMINALUI_CORS_ORIGINS`
+- `OPENTERMINALUI_PREFETCH_ENABLED`
+
+The backend also loads local environment settings through `backend.config.env`.
 
 ## Testing
 
+### Backend
+
 ```bash
-# Backend (257 tests, 45% coverage threshold)
-PYTHONPATH=. pytest backend/tests -q --cov=backend --cov-fail-under=45
-
-# Frontend unit tests (92 tests)
-cd frontend && npm test
-
-# E2E tests (24 tests, Chromium + Mobile)
-cd frontend && npx playwright install --with-deps chromium
-cd frontend && npm run test:e2e
+PYTHONPYCACHEPREFIX=/tmp/codex-pycache PYTHONPATH=. python -m compileall backend
+PYTHONPYCACHEPREFIX=/tmp/codex-pycache PYTHONPATH=. pytest backend/tests -q
 ```
 
----
+### Frontend
 
-## CI Pipeline
+```bash
+cd frontend
+npm run build
+NODE_OPTIONS=--max-old-space-size=4096 npx vitest run
+```
 
-The GitHub Actions workflow (`.github/workflows/ci.yml`) enforces on every push and PR:
+### End-to-end
 
-| Gate | Tool | Threshold |
-|------|------|-----------|
-| Backend compile check | `python -m compileall` | Zero errors |
-| Backend test suite | pytest | 257 tests, 45% coverage |
-| Frontend build | `tsc + vite build` | Zero errors |
-| Frontend unit tests | Vitest | 92 tests passing |
-| E2E browser tests | Playwright (Chromium) | 24 tests passing |
+Install browsers if needed:
 
----
+```bash
+cd frontend
+npx playwright install chromium
+```
 
-## Tech Stack
+Run the smoke suite:
 
-| Layer | Technologies |
-|-------|-------------|
-| **Frontend** | React 18, TypeScript, Vite 6, Tailwind CSS 3, Zustand, TanStack Query, Lightweight Charts, Recharts, D3, cmdk, React Router v6, ReactFlow |
-| **Backend** | Python 3.11, FastAPI, SQLAlchemy, Pydantic, Redis, APScheduler, httpx, pandas, NumPy |
-| **Data Providers** | Kite Connect, Finnhub, yfinance, FMP, NSEPython, Polygon |
-| **Quant/ML** | XGBoost, statsmodels, Optuna, HMMLearn, empyrical |
-| **Testing** | pytest, Vitest, Playwright, Testing Library |
-| **Infrastructure** | Docker, GitHub Actions CI, WebSocket, Redis pub/sub |
+```bash
+npm run test:e2e
+```
 
----
+## Current CI Gate
 
-## Contributing
+The repository CI currently checks the same broad path used for local verification:
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/my-feature`)
-3. Ensure all tests pass (`pytest`, `npm test`, `npm run test:e2e`)
-4. Commit your changes and open a pull request
+- Python compile check
+- Backend pytest suite
+- Frontend production build
+- Vitest suite
+- Playwright smoke tests
 
----
+## Repository Layout
+
+```text
+backend/                 FastAPI app, adapters, services, routes, tests
+frontend/                React app, routes, components, Vitest tests, Playwright specs
+plugins/                 Example plugin integrations
+docs/                    Wiki, specs, plans, and contributor docs
+data/                    Local app data and test sqlite files
+docker-compose.yml       Local container stack
+```
+
+## Status
+
+This repository is actively evolving. Routes, workflows, and product surfaces are broader than a simple stock dashboard and should be treated as a terminal platform rather than a single-purpose screener app.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT

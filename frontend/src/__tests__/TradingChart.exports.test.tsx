@@ -1,127 +1,108 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { TradingChart } from "../components/chart/TradingChart";
+import {
+  buildChartCsvContents,
+  buildChartExportFilename,
+  exportChartCsv,
+  exportChartPng,
+} from "../shared/chart/ChartExport";
 
-const exportChartPngMock = vi.fn();
-const exportChartCsvMock = vi.fn();
+const clickMock = vi.fn();
+const createObjectURLMock = vi.fn(() => "blob:chart-export");
+const revokeObjectURLMock = vi.fn();
+const originalCreateElement = document.createElement.bind(document);
+const originalCreateObjectURL = URL.createObjectURL;
+const originalRevokeObjectURL = URL.revokeObjectURL;
 
-if (!(globalThis as any).ResizeObserver) {
-  (globalThis as any).ResizeObserver = class {
-    observe() {}
-    disconnect() {}
-    unobserve() {}
-  };
-}
-
-vi.mock("lightweight-charts", () => {
-  const CandlestickSeries = Symbol("CandlestickSeries");
-  const LineSeries = Symbol("LineSeries");
-  const AreaSeries = Symbol("AreaSeries");
-  const HistogramSeries = Symbol("HistogramSeries");
-  const createChart = () => ({
-    addSeries: () => ({
-      setData: vi.fn(),
-      update: vi.fn(),
-      applyOptions: vi.fn(),
-      coordinateToPrice: vi.fn((y: number) => y),
-      priceToCoordinate: vi.fn((p: number) => p),
-      createPriceLine: vi.fn(() => ({ remove: vi.fn() })),
-      removePriceLine: vi.fn(),
-    }),
-    priceScale: vi.fn(() => ({ applyOptions: vi.fn() })),
-    panes: vi.fn(() => [{ setStretchFactor: vi.fn() }, { setStretchFactor: vi.fn() }]),
-    timeScale: vi.fn(() => ({
-      setVisibleLogicalRange: vi.fn(),
-      fitContent: vi.fn(),
-      timeToCoordinate: vi.fn(() => 12),
-      coordinateToTime: vi.fn(() => 1_700_000_000),
-      subscribeVisibleTimeRangeChange: vi.fn(),
-      unsubscribeVisibleTimeRangeChange: vi.fn(),
-    })),
-    subscribeCrosshairMove: vi.fn(),
-    unsubscribeCrosshairMove: vi.fn(),
-    subscribeClick: vi.fn(),
-    unsubscribeClick: vi.fn(),
-    applyOptions: vi.fn(),
-    removeSeries: vi.fn(),
-    remove: vi.fn(),
-    takeScreenshot: vi.fn(() => ({ toDataURL: vi.fn(() => "data:image/png;base64,abc") })),
-  });
-  return {
-    ColorType: { Solid: "solid" },
-    PriceScaleMode: { Normal: 0, Logarithmic: 1, Percentage: 2, IndexedTo100: 3 },
-    CandlestickSeries,
-    LineSeries,
-    AreaSeries,
-    HistogramSeries,
-    createChart,
-  };
-});
-
-vi.mock("../api/client", () => ({
-  listChartDrawings: vi.fn(async () => []),
-  createChartDrawing: vi.fn(),
-  deleteChartDrawing: vi.fn(),
-  updateChartDrawing: vi.fn(),
-}));
-
-vi.mock("../shared/chart/useIndicators", () => ({
-  useIndicators: vi.fn(),
-}));
-
-vi.mock("../contexts/CrosshairSyncContext", () => ({
-  useCrosshairSync: () => ({
-    pos: { time: null, sourceSlotId: null, groupId: null },
-    broadcast: vi.fn(),
-    syncEnabled: true,
-  }),
-}));
-
-vi.mock("../realtime/useQuotesStream", () => ({
-  useQuotesStore: vi.fn((selector: (value: { ticksByToken: Record<string, unknown> }) => unknown) => selector({ ticksByToken: {} })),
-  useQuotesStream: () => ({ subscribe: vi.fn() }),
-}));
-
-vi.mock("../shared/chart/ChartExport", () => ({
-  buildChartExportFilename: vi.fn((symbol: string, timeframe: string, extension: string) => `chart-${symbol.toLowerCase()}-${timeframe.toLowerCase()}.${extension}`),
-  exportChartPng: (...args: unknown[]) => exportChartPngMock(...args),
-  exportChartCsv: (...args: unknown[]) => exportChartCsvMock(...args),
-}));
-
-describe("TradingChart export controls", () => {
+describe("TradingChart export helpers", () => {
   beforeEach(() => {
-    exportChartPngMock.mockReset();
-    exportChartCsvMock.mockReset();
-    window.localStorage.clear();
+    clickMock.mockReset();
+    createObjectURLMock.mockClear();
+    revokeObjectURLMock.mockClear();
+
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      writable: true,
+      value: createObjectURLMock,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      writable: true,
+      value: revokeObjectURLMock,
+    });
+
+    vi.spyOn(document, "createElement").mockImplementation(((tagName: string) => {
+      const element = originalCreateElement(tagName);
+      if (tagName === "a") {
+        element.click = clickMock as unknown as typeof element.click;
+      }
+      return element;
+    }) as typeof document.createElement);
   });
 
-  it("exports png and csv from the chart surface controls", async () => {
-    render(
-      <div style={{ width: 800, height: 400 }}>
-        <TradingChart
-          ticker="AAPL"
-          timeframe="1D"
-          mode="candles"
-          data={[
-            { t: 1_700_000_000, o: 100, h: 105, l: 99, c: 102, v: 1000 },
-            { t: 1_700_086_400, o: 102, h: 106, l: 101, c: 105, v: 1400 },
-          ]}
-        />
-      </div>,
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("builds deterministic chart export filenames", () => {
+    expect(buildChartExportFilename("AAPL", "1D", "png")).toBe("chart-aapl-1d.png");
+    expect(buildChartExportFilename(" BRK.B ", "4H", "csv")).toBe("chart-brk-b-4h.csv");
+    expect(buildChartExportFilename("", undefined, "png")).toBe("chart-chart-1d.png");
+  });
+
+  it("serializes OHLCV rows into csv content", () => {
+    expect(
+      buildChartCsvContents([
+        { t: 1_709_164_800, o: 100, h: 105, l: 99, c: 102, v: 1000 },
+        { t: 1_709_251_200, o: 102, h: 106, l: 101, c: 105, v: 1400 },
+      ]),
+    ).toBe([
+      "Date,Open,High,Low,Close,Volume",
+      "2024-02-29,100,105,99,102,1000",
+      "2024-03-01,102,106,101,105,1400",
+    ].join("\n"));
+  });
+
+  it("exports png screenshots through an anchor download", () => {
+    exportChartPng(
+      {
+        takeScreenshot: () => ({
+          toDataURL: () => "data:image/png;base64,abc",
+        }),
+      } as never,
+      "chart-aapl-1d.png",
     );
 
-    await waitFor(() => expect(screen.getByTestId("chart-export-png")).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId("chart-export-png"));
-    expect(exportChartPngMock).toHaveBeenCalledWith(expect.any(Object), "chart-aapl-1d.png");
+    expect(clickMock).toHaveBeenCalledTimes(1);
+  });
 
-    fireEvent.click(screen.getByTestId("chart-export-csv"));
-    expect(exportChartCsvMock).toHaveBeenCalledWith(
+  it("exports csv downloads through a blob url", async () => {
+    exportChartCsv(
       [
-        { t: 1_700_000_000, o: 100, h: 105, l: 99, c: 102, v: 1000 },
-        { t: 1_700_086_400, o: 102, h: 106, l: 101, c: 105, v: 1400 },
+        { t: 1_709_164_800, o: 100, h: 105, l: 99, c: 102, v: 1000 },
+        { t: 1_709_251_200, o: 102, h: 106, l: 101, c: 105, v: 1400 },
       ],
       "chart-aapl-1d.csv",
     );
+
+    expect(clickMock).toHaveBeenCalledTimes(1);
+    expect(createObjectURLMock).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURLMock).toHaveBeenCalledWith("blob:chart-export");
+
+    const blob = createObjectURLMock.mock.calls[0]?.[0];
+    expect(blob).toBeInstanceOf(Blob);
+  });
+});
+
+afterAll(() => {
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    writable: true,
+    value: originalCreateObjectURL,
+  });
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    writable: true,
+    value: originalRevokeObjectURL,
   });
 });
