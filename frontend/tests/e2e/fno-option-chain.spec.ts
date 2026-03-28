@@ -52,8 +52,8 @@ test("fno option chain table renders with mocked backend data", async ({ page })
     await demoButton.click();
     await page.goto("/fno");
   }
-  await expect(page.getByText("Symbol").first()).toBeVisible();
-  await expect(page.getByText("Expiry").first()).toBeVisible();
+  await expect(page.locator("label", { hasText: "Symbol" }).first()).toBeVisible();
+  await expect(page.locator("label", { hasText: "Expiry" }).first()).toBeVisible();
   await expect(page.getByText("Strike Range")).toBeVisible();
   await expect(page.getByRole("button", { name: /All/i })).toBeVisible();
 

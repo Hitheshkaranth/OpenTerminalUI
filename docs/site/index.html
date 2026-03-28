@@ -9,51 +9,51 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Lucide Icons (same library used by the app) -->
+  <script src="https://unpkg.com/lucide@0.475.0/dist/umd/lucide.min.js" defer></script>
   <style>
     /* ================================================================
-       OpenTerminalUI Design System — exact tokens from terminal-theme.css
+       DESIGN SYSTEM TOKENS — extracted from terminal-theme.css
        ================================================================ */
     :root {
-      /* Canvas */
       --ot-canvas: #0d1117;
       --ot-canvas-elevated: #0f141b;
       --ot-surface-1: #161b22;
       --ot-surface-2: #1a212b;
       --ot-surface-3: #222b36;
-      /* Borders */
       --ot-border-subtle: #212a36;
       --ot-border: #2d3745;
       --ot-border-strong: #3a4658;
-      /* Text */
       --ot-text: #d7dde7;
       --ot-text-secondary: #adb7c6;
       --ot-text-muted: #7f8b9d;
       --ot-text-inverse: #0d1117;
-      /* Accent — the amber/orange */
       --ot-amber: #ff6b00;
       --ot-amber-hover: #ff8b3d;
       --ot-amber-dim: #c85100;
       --ot-amber-glow: rgba(255, 107, 0, 0.14);
       --ot-amber-glow-strong: rgba(255, 159, 26, 0.35);
-      /* Cyan */
       --ot-cyan: #18ffff;
       --ot-info: #448aff;
-      /* Market */
       --ot-green: #00e676;
       --ot-red: #ff3d3d;
       --ot-warn: #ffb74d;
       --ot-green-soft: rgba(0, 230, 118, 0.15);
       --ot-red-soft: rgba(255, 61, 61, 0.15);
-      /* Fonts */
       --ot-font-data: 'Fira Code', 'JetBrains Mono', 'IBM Plex Mono', 'Courier New', monospace;
       --ot-font-ui: 'Inter', 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
-      /* Radius */
       --ot-radius: 2px;
+      --ot-radius-sm: 3px;
+      /* home widget tokens */
+      --ot-widget-surface: var(--ot-surface-2);
+      --ot-widget-surface-hover: color-mix(in srgb, var(--ot-surface-2) 88%, var(--ot-amber) 12%);
+      --ot-widget-border: var(--ot-border-subtle);
+      --ot-widget-border-strong: color-mix(in srgb, var(--ot-amber) 36%, var(--ot-border));
+      --ot-widget-shadow: color-mix(in srgb, var(--ot-canvas) 54%, transparent);
     }
 
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html { scroll-behavior: smooth; }
-
     body {
       font-family: var(--ot-font-ui);
       background: var(--ot-canvas);
@@ -62,63 +62,36 @@
       overflow-x: hidden;
       -webkit-font-smoothing: antialiased;
     }
-
-    ::selection {
-      background: color-mix(in srgb, var(--ot-amber) 20%, transparent);
-    }
-
+    ::selection { background: color-mix(in srgb, var(--ot-amber) 20%, transparent); }
     ::-webkit-scrollbar { width: 10px; height: 10px; }
     ::-webkit-scrollbar-track { background: #05070b; }
     ::-webkit-scrollbar-thumb { background: var(--ot-border); border-radius: 2px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--ot-border-strong); }
-
     a { color: var(--ot-amber); text-decoration: none; transition: color 0.16s ease; }
     a:hover { color: var(--ot-amber-hover); }
 
-    /* ---- Scanline overlay (from terminal-theme.css) ---- */
+    /* Scanline overlay */
     body::after {
-      content: '';
-      position: fixed; inset: 0;
-      pointer-events: none;
-      background: repeating-linear-gradient(
-        0deg,
-        rgba(0, 0, 0, 0.03) 0px,
-        rgba(0, 0, 0, 0.03) 1px,
-        transparent 1px,
-        transparent 3px
-      );
-      z-index: 9999;
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+      background: repeating-linear-gradient(0deg, rgba(0,0,0,0.03) 0px, rgba(0,0,0,0.03) 1px, transparent 1px, transparent 3px);
     }
-
-    /* ---- Vignette overlay (from terminal-theme.css) ---- */
+    /* Vignette overlay */
     body::before {
-      content: '';
-      position: fixed; inset: 0;
-      pointer-events: none;
-      background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.5) 100%);
-      z-index: 9998;
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9998;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%);
     }
 
     /* ================================================================
-       STATUS BAR — fixed amber top bar (28px, matches app exactly)
+       STATUS BAR — 28px amber bar (matches app exactly)
        ================================================================ */
     .ot-status-bar {
       position: fixed; top: 0; left: 0; right: 0; z-index: 200;
-      height: 28px;
-      background: var(--ot-amber);
-      border-bottom: 1px solid #e98a00;
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      align-items: center;
+      height: 28px; background: var(--ot-amber); border-bottom: 1px solid #e98a00;
+      display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
       padding: 0 16px;
-      font-family: var(--ot-font-data);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--ot-text-inverse);
+      font-family: var(--ot-font-data); font-size: 10px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase; color: var(--ot-text-inverse);
     }
-    .ot-status-bar .left { text-align: left; }
     .ot-status-bar .center { text-align: center; font-weight: 600; }
     .ot-status-bar .right { text-align: right; font-weight: 600; display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
     .ot-status-bar .live-dot {
@@ -128,672 +101,368 @@
     }
 
     /* ================================================================
-       TICKER TAPE — scrolling market data bar
+       TICKER TAPE
        ================================================================ */
     .ot-ticker-tape {
       position: fixed; top: 28px; left: 0; right: 0; z-index: 199;
-      border-top: 1px solid rgba(255, 149, 0, 0.08);
-      border-bottom: 1px solid rgba(255, 149, 0, 0.08);
-      background: rgba(10, 10, 10, 0.62);
-      padding: 7px 0;
-      overflow: hidden;
-      white-space: nowrap;
+      border-bottom: 1px solid rgba(255,149,0,0.08);
+      background: rgba(10,10,10,0.62); padding: 7px 0;
+      overflow: hidden; white-space: nowrap;
     }
-    .ot-ticker-tape .track {
-      display: inline-block;
-      animation: otTickerMove 40s linear infinite;
-    }
-    .ot-ticker-tape .item {
-      display: inline-block;
-      margin-right: 18px;
-      font-family: var(--ot-font-data);
-      font-size: 11px;
-      font-variant-numeric: tabular-nums;
-    }
+    .ot-ticker-tape .track { display: inline-block; animation: otTickerMove 45s linear infinite; }
+    .ot-ticker-tape .item { display: inline-block; margin-right: 18px; font-family: var(--ot-font-data); font-size: 11px; font-variant-numeric: tabular-nums; }
     .ot-ticker-tape .sym { color: #e0e0e0; font-weight: 600; }
     .ot-ticker-tape .price { color: var(--ot-text-muted); margin-left: 6px; }
     .ot-ticker-tape .up { color: var(--ot-green); }
-    .ot-ticker-tape .dn { color: var(--ot-red); }
 
     /* ================================================================
-       NAV RAIL — left sidebar icon rail (matches app sidebar)
+       NAV RAIL — matches IconRail.tsx exactly (64px wide, glyph labels)
        ================================================================ */
     .ot-nav-rail {
       position: fixed; top: 60px; left: 0; bottom: 0; z-index: 100;
-      width: 52px;
+      width: 64px;
       background: var(--ot-canvas-elevated);
-      border-right: 1px solid var(--ot-border-subtle);
+      border-right: 1px solid var(--ot-border);
       display: flex; flex-direction: column; align-items: center;
-      padding: 12px 0;
-      gap: 2px;
+      padding: 8px;
     }
-    .ot-nav-rail a {
-      display: flex; align-items: center; justify-content: center;
-      width: 36px; height: 36px;
-      border-radius: var(--ot-radius);
+    .ot-nav-rail .brand-icon {
+      width: 28px; height: 28px;
+      border: 1px solid var(--ot-border); border-radius: 4px;
+      padding: 2px; object-fit: contain;
+      margin-bottom: 8px;
+    }
+    .ot-nav-rail .rail-items { flex: 1; overflow: auto; width: 100%; display: flex; flex-direction: column; gap: 1px; }
+    .ot-nav-rail .rail-item {
+      display: flex; flex-direction: column; align-items: center; gap: 1px;
+      padding: 6px 4px;
+      border: 1px solid transparent; border-radius: var(--ot-radius);
       color: var(--ot-text-muted);
-      font-size: 14px;
-      transition: background 0.16s, color 0.16s, border-color 0.16s;
-      border: 1px solid transparent;
+      font-family: var(--ot-font-data);
+      text-decoration: none;
+      transition: border-color 0.16s, background 0.16s, color 0.16s;
+      cursor: pointer;
     }
-    .ot-nav-rail a:hover {
-      background: var(--ot-surface-2);
-      color: var(--ot-amber);
+    .ot-nav-rail .rail-item:hover {
       border-color: var(--ot-border);
+      color: var(--ot-text);
     }
-    .ot-nav-rail a.active {
-      background: rgba(255, 107, 0, 0.12);
+    .ot-nav-rail .rail-item.active {
+      border-color: color-mix(in srgb, var(--ot-amber) 80%, transparent);
+      background: rgba(255,107,0,0.15);
       color: var(--ot-amber);
-      border-color: var(--ot-amber);
     }
-    .ot-nav-rail .logo-icon {
-      width: 32px; height: 32px; border-radius: 4px;
-      margin-bottom: 12px;
-      border: 1px solid var(--ot-border);
-      padding: 2px;
+    .ot-nav-rail .rail-glyph {
+      font-size: 9px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      line-height: 1;
+    }
+    .ot-nav-rail .rail-label {
+      font-size: 9px; line-height: 1.1;
+      font-family: var(--ot-font-ui);
+    }
+    .ot-nav-rail .rail-footer {
+      border-top: 1px solid var(--ot-border); padding-top: 8px; width: 100%;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .ot-nav-rail .cmd-btn {
+      width: 100%; padding: 4px; border: 1px solid var(--ot-border); border-radius: var(--ot-radius);
+      background: transparent; color: var(--ot-text-muted);
+      font-family: var(--ot-font-data); font-size: 9px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer;
+      transition: border-color 0.16s, color 0.16s;
+    }
+    .ot-nav-rail .cmd-btn:hover { border-color: var(--ot-amber); color: var(--ot-amber); }
+    .ot-nav-rail .avatar {
+      width: 24px; height: 24px; border-radius: 50%;
+      border: 1px solid var(--ot-border); display: flex; align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 500; color: var(--ot-amber); margin: 4px auto 0;
     }
 
     /* ================================================================
-       MAIN CONTENT AREA
+       MAIN AREA
        ================================================================ */
-    .ot-main {
-      margin-left: 52px;
-      padding-top: 60px;
+    .ot-main { margin-left: 64px; padding-top: 60px; }
+    .ot-main > section, .ot-main > div.section-divider { max-width: 1140px; margin-left: auto; margin-right: auto; }
+    section { padding: 24px 16px; }
+
+    /* Section headers */
+    .section-label {
+      font-family: var(--ot-font-data); font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.14em; color: var(--ot-amber); margin-bottom: 4px;
     }
+    .section-title { font-size: 18px; font-weight: 700; line-height: 1.2; margin-bottom: 4px; }
+    .section-sub { font-size: 12px; color: var(--ot-text-muted); margin-bottom: 16px; max-width: 600px; }
+    .section-divider { height: 1px; background: var(--ot-border-subtle); max-width: 1140px; margin: 0 auto; }
 
     /* ================================================================
-       TERMINAL PANEL — the core card component
+       TERMINAL PANEL
        ================================================================ */
     .ot-panel {
-      background: var(--ot-surface-1);
-      border: 1px solid var(--ot-border-subtle);
-      border-radius: var(--ot-radius);
-      overflow: hidden;
-      transition: border-color 0.2s ease;
-    }
-    .ot-panel:hover {
-      border-color: var(--ot-border);
+      background: var(--ot-surface-1); border: 1px solid var(--ot-border-subtle);
+      border-radius: var(--ot-radius); overflow: hidden;
     }
     .ot-panel-header {
-      padding: 3px 8px;
-      min-height: 26px;
-      background: var(--ot-surface-2);
-      border-bottom: 1px solid var(--ot-border);
-      display: flex; align-items: center; gap: 6px;
-      font-family: var(--ot-font-data);
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--ot-amber);
+      padding: 3px 8px; min-height: 26px;
+      background: var(--ot-surface-2); border-bottom: 1px solid var(--ot-border);
+      display: flex; align-items: center; gap: 8px;
+      font-family: var(--ot-font-data); font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em; color: var(--ot-amber);
     }
-    .ot-panel-body {
-      padding: 12px;
+    .ot-panel-header .header-icon { width: 14px; height: 14px; stroke: var(--ot-amber); }
+    .ot-panel-header .subtitle {
+      font-weight: 400; color: var(--ot-text-muted); font-size: 10px; margin-left: auto;
     }
-    .ot-panel-footer {
-      padding: 2px 8px;
-      border-top: 1px solid var(--ot-border-subtle);
-      font-family: var(--ot-font-data);
-      font-size: 10px;
-      color: var(--ot-text-muted);
-    }
-    .ot-panel.active {
-      border-color: var(--ot-amber);
-      box-shadow: inset 0 0 0 1px rgba(255, 149, 0, 0.18);
-    }
+    .ot-panel-body { padding: 12px; }
 
     /* ================================================================
-       BADGE — ot-type-badge
+       BADGE
        ================================================================ */
     .ot-badge {
       display: inline-flex; align-items: center; gap: 4px;
-      padding: 2px 8px;
-      border: 1px solid var(--ot-border);
-      border-radius: var(--ot-radius);
-      font-family: var(--ot-font-data);
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--ot-text-muted);
+      padding: 2px 8px; border: 1px solid var(--ot-border); border-radius: var(--ot-radius);
+      font-family: var(--ot-font-data); font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em; color: var(--ot-text-muted);
     }
-    .ot-badge.accent { border-color: var(--ot-amber); color: var(--ot-amber); background: rgba(255, 107, 0, 0.1); }
+    .ot-badge .dot { width: 5px; height: 5px; border-radius: 1px; background: currentColor; opacity: 0.9; }
+    .ot-badge.accent { border-color: var(--ot-amber); color: var(--ot-amber); background: rgba(255,107,0,0.1); }
     .ot-badge.live { border-color: var(--ot-green); color: var(--ot-green); background: var(--ot-green-soft); }
-    .ot-badge.warn { border-color: var(--ot-warn); color: var(--ot-warn); background: rgba(255, 183, 77, 0.1); }
-    .ot-badge.info { border-color: var(--ot-info); color: var(--ot-info); background: rgba(68, 138, 255, 0.1); }
-    .ot-badge .dot {
-      width: 5px; height: 5px; border-radius: 1px;
-      background: currentColor; opacity: 0.9;
-    }
+    .ot-badge.info { border-color: var(--ot-info); color: var(--ot-info); background: rgba(68,138,255,0.08); }
+    .ot-badge.warn { border-color: var(--ot-warn); color: var(--ot-warn); background: rgba(255,183,77,0.1); }
 
     /* ================================================================
-       BUTTONS — matching TerminalButton
+       BUTTONS
        ================================================================ */
     .ot-btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 6px;
       min-height: 32px; padding: 6px 12px;
-      border: 1px solid var(--ot-border);
-      border-radius: var(--ot-radius);
-      font-family: var(--ot-font-data);
-      font-size: 11px; font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--ot-text-muted);
-      background: transparent;
-      cursor: pointer;
+      border: 1px solid var(--ot-border); border-radius: var(--ot-radius);
+      font-family: var(--ot-font-data); font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--ot-text-muted); background: transparent; cursor: pointer;
       transition: border-color 0.16s, background 0.16s, color 0.16s, box-shadow 0.16s, transform 0.16s;
     }
-    .ot-btn:hover {
-      border-color: var(--ot-amber);
-      color: var(--ot-text);
-    }
-    .ot-btn:focus-visible {
-      outline: 1px solid var(--ot-amber);
-      outline-offset: 1px;
-      box-shadow: 0 0 0 2px var(--ot-amber-glow-strong);
-    }
-    .ot-btn-accent {
-      border-color: var(--ot-amber);
-      background: var(--ot-amber);
-      color: var(--ot-text-inverse);
-    }
-    .ot-btn-accent:hover {
-      background: var(--ot-amber-hover);
-      color: var(--ot-text-inverse);
-      transform: scale(1.01);
-    }
-    .ot-btn-outline {
-      border-color: var(--ot-amber);
-      color: var(--ot-amber);
-      background: rgba(255, 107, 0, 0.08);
-    }
-    .ot-btn-outline:hover {
-      background: rgba(255, 107, 0, 0.2);
-      color: var(--ot-text);
-      box-shadow: 0 0 0 2px var(--ot-amber-glow);
-    }
+    .ot-btn:hover { border-color: var(--ot-amber); color: var(--ot-text); }
+    .ot-btn-accent { border-color: var(--ot-amber); background: var(--ot-amber); color: var(--ot-text-inverse); animation: otIdlePulse 2.6s ease-in-out infinite; }
+    .ot-btn-accent:hover { background: var(--ot-amber-hover); color: var(--ot-text-inverse); transform: scale(1.01); }
+    .ot-btn-outline { border-color: var(--ot-amber); color: var(--ot-amber); background: rgba(255,107,0,0.08); }
+    .ot-btn-outline:hover { background: rgba(255,107,0,0.2); color: var(--ot-text); box-shadow: 0 0 0 2px var(--ot-amber-glow); }
+    .ot-btn .btn-icon { width: 14px; height: 14px; }
 
     /* ================================================================
-       TABLE — matching TerminalTable dense mode
+       TABLE
        ================================================================ */
-    .ot-table {
-      width: 100%; border-collapse: collapse;
-      font-family: var(--ot-font-data);
-      font-variant-numeric: tabular-nums;
-    }
-    .ot-table th {
-      padding: 4px 8px;
-      font-size: 10px; font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--ot-text-muted);
-      text-align: left;
-      background: var(--ot-surface-2);
-      border-bottom: 1px solid var(--ot-border);
-    }
-    .ot-table td {
-      padding: 4px 8px; height: 24px;
-      font-size: 11px;
-      border-bottom: 1px solid var(--ot-border-subtle);
-      color: var(--ot-text-secondary);
-    }
+    .ot-table { width: 100%; border-collapse: collapse; font-family: var(--ot-font-data); font-variant-numeric: tabular-nums; }
+    .ot-table th { padding: 4px 8px; font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ot-text-muted); text-align: left; background: var(--ot-surface-2); border-bottom: 1px solid var(--ot-border); }
+    .ot-table td { padding: 4px 8px; height: 24px; font-size: 11px; border-bottom: 1px solid var(--ot-border-subtle); color: var(--ot-text-secondary); }
     .ot-table tr:last-child td { border-bottom: none; }
     .ot-table tr:hover td { background: var(--ot-surface-2); }
-    .ot-table code {
-      font-family: var(--ot-font-data);
-      padding: 1px 4px;
-      background: rgba(255, 107, 0, 0.08);
-      border-radius: 2px;
-      font-size: 10px;
-      color: var(--ot-amber);
-    }
+    .ot-table code { font-family: var(--ot-font-data); padding: 1px 4px; background: rgba(255,107,0,0.08); border-radius: 2px; font-size: 10px; color: var(--ot-amber); }
 
     /* ================================================================
-       SECTIONS
+       HERO — login-page 60/40 split
        ================================================================ */
-    section {
-      max-width: 1140px; margin: 0 auto;
-      padding: 32px 16px;
-    }
-    .section-label {
-      font-family: var(--ot-font-data);
-      font-size: 10px; font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.14em;
-      color: var(--ot-amber);
-      margin-bottom: 4px;
-    }
-    .section-title {
-      font-family: var(--ot-font-ui);
-      font-size: 18px; font-weight: 700;
-      line-height: 1.2;
-      color: var(--ot-text);
-      margin-bottom: 4px;
-    }
-    .section-sub {
-      font-size: 12px;
-      color: var(--ot-text-muted);
-      line-height: 1.5;
-      margin-bottom: 16px;
-      max-width: 600px;
-    }
-    .section-divider {
-      height: 1px;
-      background: var(--ot-border-subtle);
-      margin: 0;
-    }
-
-    /* ================================================================
-       HERO — login-page inspired layout
-       ================================================================ */
-    .ot-hero {
-      min-height: calc(100vh - 60px);
-      display: grid;
-      grid-template-columns: 58% 42%;
-      position: relative;
-    }
+    .ot-hero { min-height: calc(100vh - 60px); display: grid; grid-template-columns: 58% 42%; }
     .ot-hero-visual {
-      position: relative;
-      border-right: 1px solid var(--ot-border);
-      overflow: hidden;
-      display: flex; align-items: flex-end;
-      padding: 48px;
-      background:
-        radial-gradient(ellipse 80% 60% at 30% 80%, rgba(255, 107, 0, 0.06) 0%, transparent 60%),
-        var(--ot-canvas);
+      position: relative; border-right: 1px solid var(--ot-border); overflow: hidden;
+      display: flex; align-items: flex-end; padding: 48px;
+      background: radial-gradient(ellipse 80% 60% at 30% 80%, rgba(255,107,0,0.06) 0%, transparent 60%), var(--ot-canvas);
     }
-    .ot-hero-visual .hero-screenshot {
-      position: absolute; inset: 0;
-      width: 100%; height: 100%;
-      object-fit: cover;
-      opacity: 0.18;
-      filter: blur(0.5px);
-    }
-    .ot-hero-brand {
-      position: relative; z-index: 2;
-      animation: otFadeInLeft 0.65s ease;
+    .ot-hero-visual .hero-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.18; filter: blur(0.5px); }
+    .ot-hero-brand { position: relative; z-index: 2; animation: otFadeInLeft 0.65s ease; }
+    .ot-hero-brand .brand-logo { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+    .ot-hero-brand .brand-logo img {
+      width: 56px; height: 56px; border: 1px solid var(--ot-border); border-radius: 6px; padding: 6px;
+      background: rgba(10,10,10,0.78);
     }
     .ot-hero-brand .kicker {
-      font-family: var(--ot-font-data);
-      font-size: 10px; font-weight: 600;
-      letter-spacing: 0.4em;
-      text-transform: uppercase;
-      color: var(--ot-amber);
-      margin-bottom: 8px;
+      font-family: var(--ot-font-data); font-size: 10px; font-weight: 600;
+      letter-spacing: 0.4em; text-transform: uppercase; color: var(--ot-amber);
     }
-    .ot-hero-brand h1 {
-      font-family: var(--ot-font-ui);
-      line-height: 1.05;
-    }
-    .ot-hero-brand h1 .amber {
-      font-size: clamp(48px, 5vw, 64px);
-      font-weight: 700;
-      color: var(--ot-amber);
-      display: block;
-    }
-    .ot-hero-brand h1 .light {
-      font-size: clamp(48px, 5vw, 64px);
-      font-weight: 300;
-      color: var(--ot-text-inverse);
-      display: inline;
-    }
-    .ot-hero-brand .tagline {
-      margin-top: 16px;
-      font-size: 13px;
-      color: var(--ot-text-muted);
-      max-width: 420px;
-      line-height: 1.6;
-    }
-    .ot-hero-brand .version-row {
-      margin-top: 16px;
-      display: flex; gap: 8px; flex-wrap: wrap;
-    }
+    .ot-hero-brand h1 { line-height: 1.05; }
+    .ot-hero-brand h1 .amber { font-size: clamp(48px, 5vw, 64px); font-weight: 700; color: var(--ot-amber); display: block; }
+    .ot-hero-brand h1 .light { font-size: clamp(48px, 5vw, 64px); font-weight: 300; color: var(--ot-text-inverse); }
+    .ot-hero-brand .tagline { margin-top: 16px; font-size: 13px; color: var(--ot-text-muted); max-width: 420px; line-height: 1.6; }
+    .ot-hero-brand .version-row { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+
     .ot-hero-panel {
       display: flex; align-items: center; justify-content: center;
-      background: rgba(17, 17, 17, 0.95);
-      border-left: 1px solid var(--ot-border);
-      position: relative;
-      padding: 48px 40px;
+      background: rgba(17,17,17,0.95); border-left: 1px solid var(--ot-border);
+      position: relative; padding: 48px 40px;
     }
-    .ot-hero-panel::before {
-      content: '';
-      position: absolute; left: 0; top: 0; bottom: 0;
-      width: 1px;
-      background: rgba(255, 149, 0, 0.1);
+    .ot-hero-panel::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: rgba(255,149,0,0.1); }
+    .ot-hero-inner { width: 100%; max-width: 360px; }
+    .ot-hero-inner .panel-label { font-family: var(--ot-font-data); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ot-text-muted); margin-bottom: 4px; }
+    .ot-hero-inner h2 { font-size: 24px; font-weight: 700; margin-bottom: 16px; }
+    .ot-hero-inner p.desc { font-size: 12px; color: var(--ot-text-muted); margin-bottom: 16px; line-height: 1.6; }
+    .code-box {
+      background: var(--ot-surface-1); border: 1px solid var(--ot-border); border-radius: var(--ot-radius);
+      padding: 12px 14px; font-family: var(--ot-font-data); font-size: 12px; color: var(--ot-green); line-height: 1.8; margin-bottom: 16px;
     }
-    .ot-hero-panel-content {
-      width: 100%; max-width: 360px;
+    .code-box .prompt { color: var(--ot-text-muted); }
+    .btn-row { display: flex; flex-direction: column; gap: 8px; }
+    .btn-row .ot-btn { width: 100%; }
+    .hero-divider { height: 1px; background: rgba(255,149,0,0.4); margin: 16px 0; }
+    .links-row { display: flex; gap: 16px; font-family: var(--ot-font-data); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+    /* ================================================================
+       QUICK NAV GRID — matches QuickNavGrid.tsx + terminal-theme.css exactly
+       ================================================================ */
+    .ot-nav-grid { display: grid; gap: 12px; }
+    .ot-nav-section { display: grid; gap: 8px; }
+    .ot-nav-section-title {
+      margin: 0; color: var(--ot-text-muted);
+      font-family: var(--ot-font-ui); font-size: 10px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
     }
-    .ot-hero-panel-content .panel-label {
-      font-family: var(--ot-font-data);
-      font-size: 10px; font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.14em;
-      color: var(--ot-text-muted);
-      margin-bottom: 4px;
+    .ot-nav-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .ot-nav-tile {
+      display: grid; align-content: start; gap: 6px;
+      min-height: 76px; padding: 12px;
+      border: 1px solid var(--ot-widget-border);
+      border-radius: var(--ot-radius-sm);
+      background: var(--ot-widget-surface);
+      color: var(--ot-text); text-align: left; cursor: pointer;
+      transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+      text-decoration: none;
     }
-    .ot-hero-panel-content h2 {
-      font-family: var(--ot-font-ui);
-      font-size: 24px; font-weight: 700;
+    .ot-nav-tile:hover {
+      border-color: var(--ot-widget-border-strong);
+      background: var(--ot-widget-surface-hover);
+      box-shadow: 0 10px 24px var(--ot-widget-shadow);
       color: var(--ot-text);
-      margin-bottom: 16px;
     }
-    .ot-hero-panel-content p {
-      font-size: 12px;
-      color: var(--ot-text-muted);
-      margin-bottom: 20px;
-      line-height: 1.6;
+    .ot-nav-tile .tile-icon { width: 16px; height: 16px; stroke: var(--ot-text-muted); transition: stroke 0.16s; }
+    .ot-nav-tile:hover .tile-icon { stroke: var(--ot-amber); }
+    .ot-nav-tile .tile-label {
+      font-family: var(--ot-font-ui); font-size: 12px; font-weight: 600;
+      letter-spacing: 0.03em; text-transform: uppercase;
     }
-    .ot-hero-panel-content .code-box {
-      background: var(--ot-surface-1);
-      border: 1px solid var(--ot-border);
-      border-radius: var(--ot-radius);
-      padding: 12px 14px;
-      font-family: var(--ot-font-data);
-      font-size: 12px;
-      color: var(--ot-green);
-      line-height: 1.8;
-      margin-bottom: 16px;
+    .ot-nav-tile .tile-shortcut {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: fit-content; min-width: 36px; min-height: 20px;
+      padding: 0 8px; border: 1px solid var(--ot-widget-border);
+      border-radius: 999px; background: var(--ot-canvas-elevated);
+      color: var(--ot-amber); font-family: var(--ot-font-data);
+      font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
     }
-    .ot-hero-panel-content .code-box .prompt { color: var(--ot-text-muted); }
-    .ot-hero-panel-content .code-box .comment { color: var(--ot-text-muted); font-style: italic; }
-    .ot-hero-panel-content .btn-row {
-      display: flex; flex-direction: column; gap: 8px;
-    }
-    .ot-hero-panel-content .btn-row .ot-btn { width: 100%; }
-    .ot-hero-panel-content .divider {
-      height: 1px;
-      background: rgba(255, 149, 0, 0.4);
-      margin: 16px 0;
-    }
-    .ot-hero-panel-content .links-row {
-      display: flex; gap: 16px;
-      font-family: var(--ot-font-data);
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+    .ot-nav-tile .tile-desc {
+      color: var(--ot-text-muted); font-family: var(--ot-font-ui);
+      font-size: 11px; line-height: 1.35;
     }
 
     /* ================================================================
-       FEATURE GRID — terminal panel cards
+       FEATURE GRID — workstation-style 2px gap panels
        ================================================================ */
     .ot-features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-      gap: 2px;
-      background: var(--ot-border);
-      border: 1px solid var(--ot-border);
-      border-radius: var(--ot-radius);
-      overflow: hidden;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 2px; background: var(--ot-border);
+      border: 1px solid var(--ot-border); border-radius: var(--ot-radius); overflow: hidden;
     }
     .ot-feature-card {
-      background: var(--ot-surface-1);
-      padding: 12px;
+      background: var(--ot-surface-1); padding: 12px;
       transition: background 0.2s;
-    }
-    .ot-feature-card:hover {
-      background: var(--ot-surface-2);
-    }
-    .ot-feature-card .card-header {
-      display: flex; align-items: center; gap: 8px;
-      margin-bottom: 8px;
-    }
-    .ot-feature-card .card-icon {
-      width: 28px; height: 28px;
-      display: flex; align-items: center; justify-content: center;
-      border-radius: var(--ot-radius);
-      font-size: 13px;
-      border: 1px solid;
-      flex-shrink: 0;
-    }
-    .icon-amber { border-color: var(--ot-amber); color: var(--ot-amber); background: rgba(255, 107, 0, 0.1); }
-    .icon-green { border-color: var(--ot-green); color: var(--ot-green); background: var(--ot-green-soft); }
-    .icon-cyan { border-color: var(--ot-cyan); color: var(--ot-cyan); background: rgba(24, 255, 255, 0.08); }
-    .icon-red { border-color: var(--ot-red); color: var(--ot-red); background: var(--ot-red-soft); }
-    .icon-blue { border-color: var(--ot-info); color: var(--ot-info); background: rgba(68, 138, 255, 0.08); }
-    .icon-warn { border-color: var(--ot-warn); color: var(--ot-warn); background: rgba(255, 183, 77, 0.1); }
-
-    .ot-feature-card h3 {
-      font-family: var(--ot-font-data);
-      font-size: 11px; font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--ot-text);
-    }
-    .ot-feature-card p {
-      font-size: 11px;
-      color: var(--ot-text-muted);
-      line-height: 1.55;
-    }
-    .ot-feature-card .tag-row {
-      margin-top: 8px;
-      display: flex; gap: 6px; flex-wrap: wrap;
-    }
-
-    /* ================================================================
-       SCREENSHOT GALLERY — workstation-style grid
-       ================================================================ */
-    .ot-screenshots-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 2px;
-      background: var(--ot-border);
-      border: 1px solid var(--ot-border);
-      border-radius: var(--ot-radius);
-      overflow: hidden;
-    }
-    .ot-screenshot-card {
-      background: var(--ot-surface-1);
-      overflow: hidden;
-      transition: background 0.2s;
-    }
-    .ot-screenshot-card:hover { background: var(--ot-surface-2); }
-    .ot-screenshot-card img {
-      width: 100%; display: block;
-      border-bottom: 1px solid var(--ot-border-subtle);
-    }
-    .ot-screenshot-card .cap {
-      padding: 4px 8px;
-      font-family: var(--ot-font-data);
-      font-size: 10px;
-      color: var(--ot-text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-
-    /* ================================================================
-       ARCHITECTURE DIAGRAMS — monospace panel
-       ================================================================ */
-    .ot-arch {
-      background: var(--ot-surface-1);
-      border: 1px solid var(--ot-border-subtle);
-      border-radius: var(--ot-radius);
-      overflow-x: auto;
-    }
-    .ot-arch .ot-panel-header span.title { color: var(--ot-amber); }
-    .ot-arch pre {
-      font-family: var(--ot-font-data);
-      font-size: 11px;
-      line-height: 1.55;
-      color: var(--ot-text-muted);
-      padding: 12px;
-      white-space: pre;
-      overflow-x: auto;
-    }
-    .ot-arch .a { color: var(--ot-amber); }
-    .ot-arch .g { color: var(--ot-green); }
-    .ot-arch .c { color: var(--ot-cyan); }
-    .ot-arch .r { color: var(--ot-red); }
-    .ot-arch .w { color: var(--ot-warn); }
-    .ot-arch .t { color: var(--ot-text); }
-
-    /* ================================================================
-       DOWNLOAD SECTION — 3-column grid
-       ================================================================ */
-    .ot-download-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 2px;
-      background: var(--ot-border);
-      border: 1px solid var(--ot-border);
-      border-radius: var(--ot-radius);
-      overflow: hidden;
-    }
-    .ot-download-card {
-      background: var(--ot-surface-1);
-      padding: 16px;
-    }
-    .ot-download-card .dl-label {
-      font-family: var(--ot-font-data);
-      font-size: 10px; font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--ot-amber);
-      margin-bottom: 8px;
-    }
-    .ot-download-card h3 {
-      font-size: 14px; font-weight: 600;
-      margin-bottom: 4px;
-    }
-    .ot-download-card p {
-      font-size: 11px;
-      color: var(--ot-text-muted);
-      line-height: 1.5;
-      margin-bottom: 12px;
-    }
-    .ot-download-card .code-box {
-      background: var(--ot-canvas);
-      border: 1px solid var(--ot-border-subtle);
-      border-radius: var(--ot-radius);
-      padding: 8px 10px;
-      font-family: var(--ot-font-data);
-      font-size: 11px;
-      color: var(--ot-green);
-      line-height: 1.7;
-      margin-bottom: 12px;
-    }
-    .ot-download-card .code-box .prompt { color: var(--ot-text-muted); }
-
-    /* ================================================================
-       QUICKSTART STEPS
-       ================================================================ */
-    .ot-steps {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 2px;
-      background: var(--ot-border);
-      border: 1px solid var(--ot-border);
-      border-radius: var(--ot-radius);
-      overflow: hidden;
-    }
-    .ot-step {
-      background: var(--ot-surface-1);
-      padding: 16px;
-    }
-    .ot-step .step-num {
-      display: flex; align-items: center; justify-content: center;
-      width: 24px; height: 24px;
-      border: 1px solid var(--ot-amber);
-      border-radius: var(--ot-radius);
-      font-family: var(--ot-font-data);
-      font-size: 11px; font-weight: 700;
-      color: var(--ot-amber);
-      margin-bottom: 8px;
-    }
-    .ot-step h3 {
-      font-family: var(--ot-font-data);
-      font-size: 11px; font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--ot-text);
-      margin-bottom: 4px;
-    }
-    .ot-step p {
-      font-size: 11px;
-      color: var(--ot-text-muted);
-      line-height: 1.55;
-    }
-    .ot-step code {
-      font-family: var(--ot-font-data);
-      padding: 1px 4px;
-      background: rgba(255, 107, 0, 0.08);
-      border-radius: 2px;
-      font-size: 10px;
-      color: var(--ot-amber);
-    }
-
-    /* ================================================================
-       FOOTER — matching market status bar style
-       ================================================================ */
-    .ot-footer {
-      border-top: 1px solid var(--ot-border-subtle);
-      padding: 12px 16px;
-      display: flex; align-items: center; justify-content: space-between;
-      max-width: 1140px; margin: 0 auto;
-    }
-    .ot-footer .left-links {
-      display: flex; gap: 16px;
-      font-family: var(--ot-font-data);
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    .ot-footer .left-links a { color: var(--ot-text-muted); }
-    .ot-footer .left-links a:hover { color: var(--ot-amber); }
-    .ot-footer .right-text {
-      font-family: var(--ot-font-data);
-      font-size: 10px;
-      color: var(--ot-text-muted);
-      letter-spacing: 0.04em;
-    }
-
-    /* ================================================================
-       KEYFRAME ANIMATIONS (from terminal-theme.css)
-       ================================================================ */
-    @keyframes otPulse {
-      0%, 100% { transform: scale(1); opacity: 0.85; }
-      50% { transform: scale(1.3); opacity: 1; }
-    }
-    @keyframes otTickerMove {
-      from { transform: translateX(0); }
-      to { transform: translateX(-50%); }
-    }
-    @keyframes otFadeInLeft {
-      from { opacity: 0; transform: translateX(-16px); }
-      to { opacity: 1; transform: translateX(0); }
-    }
-    @keyframes otStaggerIn {
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes otIdlePulse {
-      0%, 100% { box-shadow: 0 0 0 0 var(--ot-amber-glow); }
-      50% { box-shadow: 0 0 0 2px var(--ot-amber-glow); }
-    }
-
-    /* Stagger animation for feature cards */
-    .ot-feature-card {
       opacity: 0; transform: translateY(8px);
       animation: otStaggerIn 0.4s ease forwards;
     }
-    .ot-feature-card:nth-child(1) { animation-delay: 0s; }
-    .ot-feature-card:nth-child(2) { animation-delay: 0.06s; }
-    .ot-feature-card:nth-child(3) { animation-delay: 0.12s; }
-    .ot-feature-card:nth-child(4) { animation-delay: 0.18s; }
-    .ot-feature-card:nth-child(5) { animation-delay: 0.24s; }
-    .ot-feature-card:nth-child(6) { animation-delay: 0.30s; }
-    .ot-feature-card:nth-child(7) { animation-delay: 0.36s; }
-    .ot-feature-card:nth-child(8) { animation-delay: 0.42s; }
-    .ot-feature-card:nth-child(9) { animation-delay: 0.48s; }
-    .ot-feature-card:nth-child(10) { animation-delay: 0.54s; }
-    .ot-feature-card:nth-child(11) { animation-delay: 0.60s; }
-    .ot-feature-card:nth-child(12) { animation-delay: 0.66s; }
-    .ot-feature-card:nth-child(13) { animation-delay: 0.72s; }
-    .ot-feature-card:nth-child(14) { animation-delay: 0.78s; }
-    .ot-feature-card:nth-child(15) { animation-delay: 0.84s; }
-    .ot-feature-card:nth-child(16) { animation-delay: 0.90s; }
+    .ot-feature-card:hover { background: var(--ot-surface-2); }
+    .ot-feature-card .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .ot-feature-card .card-icon {
+      width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+      border-radius: var(--ot-radius); font-size: 13px; border: 1px solid; flex-shrink: 0;
+    }
+    .ot-feature-card .card-icon svg { width: 14px; height: 14px; }
+    .icon-amber { border-color: var(--ot-amber); color: var(--ot-amber); background: rgba(255,107,0,0.1); }
+    .icon-amber svg { stroke: var(--ot-amber); }
+    .icon-green { border-color: var(--ot-green); color: var(--ot-green); background: var(--ot-green-soft); }
+    .icon-green svg { stroke: var(--ot-green); }
+    .icon-cyan { border-color: var(--ot-cyan); color: var(--ot-cyan); background: rgba(24,255,255,0.08); }
+    .icon-cyan svg { stroke: var(--ot-cyan); }
+    .icon-red { border-color: var(--ot-red); color: var(--ot-red); background: var(--ot-red-soft); }
+    .icon-red svg { stroke: var(--ot-red); }
+    .icon-blue { border-color: var(--ot-info); color: var(--ot-info); background: rgba(68,138,255,0.08); }
+    .icon-blue svg { stroke: var(--ot-info); }
+    .icon-warn { border-color: var(--ot-warn); color: var(--ot-warn); background: rgba(255,183,77,0.1); }
+    .icon-warn svg { stroke: var(--ot-warn); }
+    .ot-feature-card h3 { font-family: var(--ot-font-data); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+    .ot-feature-card p { font-size: 11px; color: var(--ot-text-muted); line-height: 1.55; }
+    .ot-feature-card .tag-row { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+    /* stagger delays */
+    .ot-feature-card:nth-child(1){animation-delay:0s}.ot-feature-card:nth-child(2){animation-delay:.06s}.ot-feature-card:nth-child(3){animation-delay:.12s}.ot-feature-card:nth-child(4){animation-delay:.18s}.ot-feature-card:nth-child(5){animation-delay:.24s}.ot-feature-card:nth-child(6){animation-delay:.3s}.ot-feature-card:nth-child(7){animation-delay:.36s}.ot-feature-card:nth-child(8){animation-delay:.42s}.ot-feature-card:nth-child(9){animation-delay:.48s}.ot-feature-card:nth-child(10){animation-delay:.54s}.ot-feature-card:nth-child(11){animation-delay:.6s}.ot-feature-card:nth-child(12){animation-delay:.66s}.ot-feature-card:nth-child(13){animation-delay:.72s}.ot-feature-card:nth-child(14){animation-delay:.78s}.ot-feature-card:nth-child(15){animation-delay:.84s}
 
-    /* Idle pulse on accent button */
-    .ot-btn-accent { animation: otIdlePulse 2.6s ease-in-out infinite; }
+    /* ================================================================
+       SCREENSHOTS — workstation grid style
+       ================================================================ */
+    .ot-screenshots-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr);
+      gap: 2px; background: var(--ot-border);
+      border: 1px solid var(--ot-border); border-radius: var(--ot-radius); overflow: hidden;
+    }
+    .ot-screenshot-card { background: var(--ot-surface-1); overflow: hidden; }
+    .ot-screenshot-card img { width: 100%; display: block; border-bottom: 1px solid var(--ot-border-subtle); }
+    .ot-screenshot-card .cap { padding: 4px 8px; font-family: var(--ot-font-data); font-size: 10px; color: var(--ot-text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    /* ================================================================
+       ARCHITECTURE — monospace panel
+       ================================================================ */
+    .ot-arch { background: var(--ot-surface-1); border: 1px solid var(--ot-border-subtle); border-radius: var(--ot-radius); overflow-x: auto; margin-bottom: 12px; }
+    .ot-arch pre { font-family: var(--ot-font-data); font-size: 11px; line-height: 1.55; color: var(--ot-text-muted); padding: 12px; white-space: pre; }
+    .ot-arch .a{color:var(--ot-amber)}.ot-arch .g{color:var(--ot-green)}.ot-arch .c{color:var(--ot-cyan)}.ot-arch .r{color:var(--ot-red)}.ot-arch .w{color:var(--ot-warn)}.ot-arch .t{color:var(--ot-text)}
+
+    /* ================================================================
+       DOWNLOAD GRID
+       ================================================================ */
+    .ot-download-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 2px; background: var(--ot-border);
+      border: 1px solid var(--ot-border); border-radius: var(--ot-radius); overflow: hidden;
+    }
+    .ot-download-card { background: var(--ot-surface-1); padding: 16px; }
+    .ot-download-card .dl-label { font-family: var(--ot-font-data); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ot-amber); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+    .ot-download-card .dl-label svg { width: 12px; height: 12px; stroke: var(--ot-amber); }
+    .ot-download-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .ot-download-card p { font-size: 11px; color: var(--ot-text-muted); line-height: 1.5; margin-bottom: 12px; }
+    .ot-download-card .code-box { background: var(--ot-canvas); border-color: var(--ot-border-subtle); padding: 8px 10px; font-size: 11px; line-height: 1.7; }
+
+    /* ================================================================
+       QUICK START STEPS
+       ================================================================ */
+    .ot-steps {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 2px; background: var(--ot-border);
+      border: 1px solid var(--ot-border); border-radius: var(--ot-radius); overflow: hidden;
+    }
+    .ot-step { background: var(--ot-surface-1); padding: 16px; }
+    .ot-step .step-num {
+      display: flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; border: 1px solid var(--ot-amber); border-radius: var(--ot-radius);
+      font-family: var(--ot-font-data); font-size: 11px; font-weight: 700; color: var(--ot-amber); margin-bottom: 8px;
+    }
+    .ot-step h3 { font-family: var(--ot-font-data); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+    .ot-step p { font-size: 11px; color: var(--ot-text-muted); line-height: 1.55; }
+    .ot-step code { font-family: var(--ot-font-data); padding: 1px 4px; background: rgba(255,107,0,0.08); border-radius: 2px; font-size: 10px; color: var(--ot-amber); }
+
+    /* ================================================================
+       FOOTER
+       ================================================================ */
+    .ot-footer {
+      border-top: 1px solid var(--ot-border-subtle); padding: 12px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      max-width: 1140px; margin: 0 auto;
+    }
+    .ot-footer .links { display: flex; gap: 16px; font-family: var(--ot-font-data); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .ot-footer .links a { color: var(--ot-text-muted); }
+    .ot-footer .links a:hover { color: var(--ot-amber); }
+    .ot-footer .right { font-family: var(--ot-font-data); font-size: 10px; color: var(--ot-text-muted); }
+
+    /* ================================================================
+       ANIMATIONS
+       ================================================================ */
+    @keyframes otPulse { 0%,100%{transform:scale(1);opacity:.85} 50%{transform:scale(1.3);opacity:1} }
+    @keyframes otTickerMove { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+    @keyframes otFadeInLeft { from{opacity:0;transform:translateX(-16px)} to{opacity:1;transform:translateX(0)} }
+    @keyframes otStaggerIn { to{opacity:1;transform:translateY(0)} }
+    @keyframes otIdlePulse { 0%,100%{box-shadow:0 0 0 0 var(--ot-amber-glow)} 50%{box-shadow:0 0 0 2px var(--ot-amber-glow)} }
 
     /* ================================================================
        RESPONSIVE
@@ -808,90 +477,81 @@
       .ot-screenshots-grid { grid-template-columns: 1fr; }
       .ot-download-grid { grid-template-columns: 1fr; }
       .ot-steps { grid-template-columns: 1fr; }
+      .ot-nav-tiles { grid-template-columns: repeat(2, 1fr); }
       .ot-footer { flex-direction: column; gap: 8px; text-align: center; }
     }
   </style>
 </head>
 <body>
 
-<!-- ============================================================
-     STATUS BAR (amber top bar — matches app exactly)
-     ============================================================ -->
+<!-- STATUS BAR -->
 <div class="ot-status-bar">
-  <div class="left">OPENTERMINALUI</div>
+  <div>OPENTERMINALUI</div>
   <div class="center">SYSTEM STATUS : ONLINE</div>
-  <div class="right">
-    <span class="live-dot"></span>
-    <span>v0.1.1</span>
-    <span>MIT LICENSE</span>
-  </div>
+  <div class="right"><span class="live-dot"></span> v0.1.1 <span>MIT LICENSE</span></div>
 </div>
 
-<!-- ============================================================
-     TICKER TAPE (scrolling market data bar)
-     ============================================================ -->
-<div class="ot-ticker-tape">
-  <div class="track">
-    <span class="item"><span class="sym">FEATURES</span><span class="price up">70+ Indicators</span></span>
-    <span class="item"><span class="sym">CHARTING</span><span class="price up">Multi-Panel Workstation</span></span>
-    <span class="item"><span class="sym">F&amp;O</span><span class="price up">Option Chain + Greeks</span></span>
-    <span class="item"><span class="sym">BACKTEST</span><span class="price up">Model Lab + Portfolio Lab</span></span>
-    <span class="item"><span class="sym">RISK</span><span class="price">VaR + CVaR + PCA</span></span>
-    <span class="item"><span class="sym">MARKETS</span><span class="price">NSE BSE NYSE NASDAQ</span></span>
-    <span class="item"><span class="sym">CRYPTO</span><span class="price up">Full Workspace</span></span>
-    <span class="item"><span class="sym">FOREX</span><span class="price">Central Bank Monitor</span></span>
-    <span class="item"><span class="sym">SCREENER</span><span class="price up">15+ Viz Modes</span></span>
-    <span class="item"><span class="sym">PORTFOLIO</span><span class="price up">Multi-Portfolio + TCA</span></span>
-    <span class="item"><span class="sym">ALERTS</span><span class="price">WebSocket Push</span></span>
-    <span class="item"><span class="sym">PLUGINS</span><span class="price up">Extensible API</span></span>
-    <!-- duplicate for seamless loop -->
-    <span class="item"><span class="sym">FEATURES</span><span class="price up">70+ Indicators</span></span>
-    <span class="item"><span class="sym">CHARTING</span><span class="price up">Multi-Panel Workstation</span></span>
-    <span class="item"><span class="sym">F&amp;O</span><span class="price up">Option Chain + Greeks</span></span>
-    <span class="item"><span class="sym">BACKTEST</span><span class="price up">Model Lab + Portfolio Lab</span></span>
-    <span class="item"><span class="sym">RISK</span><span class="price">VaR + CVaR + PCA</span></span>
-    <span class="item"><span class="sym">MARKETS</span><span class="price">NSE BSE NYSE NASDAQ</span></span>
-    <span class="item"><span class="sym">CRYPTO</span><span class="price up">Full Workspace</span></span>
-    <span class="item"><span class="sym">FOREX</span><span class="price">Central Bank Monitor</span></span>
-    <span class="item"><span class="sym">SCREENER</span><span class="price up">15+ Viz Modes</span></span>
-    <span class="item"><span class="sym">PORTFOLIO</span><span class="price up">Multi-Portfolio + TCA</span></span>
-    <span class="item"><span class="sym">ALERTS</span><span class="price">WebSocket Push</span></span>
-    <span class="item"><span class="sym">PLUGINS</span><span class="price up">Extensible API</span></span>
-  </div>
-</div>
+<!-- TICKER TAPE -->
+<div class="ot-ticker-tape"><div class="track">
+  <span class="item"><span class="sym">FEATURES</span><span class="price up">70+ Indicators</span></span>
+  <span class="item"><span class="sym">CHARTING</span><span class="price up">Multi-Panel Workstation</span></span>
+  <span class="item"><span class="sym">F&amp;O</span><span class="price up">Option Chain + Greeks</span></span>
+  <span class="item"><span class="sym">BACKTEST</span><span class="price up">Model Lab + Portfolio Lab</span></span>
+  <span class="item"><span class="sym">RISK</span><span class="price">VaR + CVaR + PCA</span></span>
+  <span class="item"><span class="sym">MARKETS</span><span class="price">NSE BSE NYSE NASDAQ</span></span>
+  <span class="item"><span class="sym">CRYPTO</span><span class="price up">Full Workspace</span></span>
+  <span class="item"><span class="sym">SCREENER</span><span class="price up">15+ Viz Modes</span></span>
+  <span class="item"><span class="sym">PORTFOLIO</span><span class="price up">Analytics + TCA</span></span>
+  <span class="item"><span class="sym">ALERTS</span><span class="price">WebSocket Push</span></span>
+  <span class="item"><span class="sym">PLUGINS</span><span class="price up">Extensible API</span></span>
+  <span class="item"><span class="sym">FEATURES</span><span class="price up">70+ Indicators</span></span>
+  <span class="item"><span class="sym">CHARTING</span><span class="price up">Multi-Panel Workstation</span></span>
+  <span class="item"><span class="sym">F&amp;O</span><span class="price up">Option Chain + Greeks</span></span>
+  <span class="item"><span class="sym">BACKTEST</span><span class="price up">Model Lab + Portfolio Lab</span></span>
+  <span class="item"><span class="sym">RISK</span><span class="price">VaR + CVaR + PCA</span></span>
+  <span class="item"><span class="sym">MARKETS</span><span class="price">NSE BSE NYSE NASDAQ</span></span>
+  <span class="item"><span class="sym">CRYPTO</span><span class="price up">Full Workspace</span></span>
+  <span class="item"><span class="sym">SCREENER</span><span class="price up">15+ Viz Modes</span></span>
+  <span class="item"><span class="sym">PORTFOLIO</span><span class="price up">Analytics + TCA</span></span>
+  <span class="item"><span class="sym">ALERTS</span><span class="price">WebSocket Push</span></span>
+  <span class="item"><span class="sym">PLUGINS</span><span class="price up">Extensible API</span></span>
+</div></div>
 
-<!-- ============================================================
-     NAV RAIL (left sidebar icon strip)
-     ============================================================ -->
+<!-- NAV RAIL (matches IconRail.tsx — logo + 2-letter glyphs + labels) -->
 <nav class="ot-nav-rail">
-  <img class="logo-icon" src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/logo.png" alt="OT" />
-  <a href="#features" class="active" title="Features">&#9041;</a>
-  <a href="#screenshots" title="Screenshots">&#9634;</a>
-  <a href="#architecture" title="Architecture">&#9776;</a>
-  <a href="#requirements" title="Requirements">&#9881;</a>
-  <a href="#download" title="Download">&#8615;</a>
-  <a href="https://github.com/Hitheshkaranth/OpenTerminalUI" title="GitHub">&#9733;</a>
+  <img class="brand-icon" src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/logo.png" alt="OpenTerminalUI" />
+  <div class="rail-items">
+    <a class="rail-item active" href="#features"><span class="rail-glyph">HM</span><span class="rail-label">Home</span></a>
+    <a class="rail-item" href="#features"><span class="rail-glyph">MK</span><span class="rail-label">Market</span></a>
+    <a class="rail-item" href="#screenshots"><span class="rail-glyph">WS</span><span class="rail-label">Workstation</span></a>
+    <a class="rail-item" href="#architecture"><span class="rail-glyph">LP</span><span class="rail-label">Launchpad</span></a>
+    <a class="rail-item" href="#features"><span class="rail-glyph">SC</span><span class="rail-label">Screener</span></a>
+    <a class="rail-item" href="#features"><span class="rail-glyph">PF</span><span class="rail-label">Portfolio</span></a>
+    <a class="rail-item" href="#features"><span class="rail-glyph">WL</span><span class="rail-label">Watchlist</span></a>
+    <a class="rail-item" href="#features"><span class="rail-glyph">NW</span><span class="rail-label">News</span></a>
+    <a class="rail-item" href="#features"><span class="rail-glyph">AL</span><span class="rail-label">Alerts</span></a>
+    <a class="rail-item" href="#requirements"><span class="rail-glyph">ST</span><span class="rail-label">Settings</span></a>
+  </div>
+  <div class="rail-footer">
+    <button class="cmd-btn" title="Command Palette (Ctrl+K)">CMD</button>
+    <div class="avatar">GH</div>
+  </div>
 </nav>
 
-<!-- ============================================================
-     MAIN CONTENT
-     ============================================================ -->
+<!-- MAIN -->
 <div class="ot-main">
 
-  <!-- ============================================================
-       HERO (login-page style: 60/40 split)
-       ============================================================ -->
-  <section class="ot-hero" style="max-width: none; padding: 0;">
+  <!-- HERO -->
+  <section class="ot-hero" style="max-width:none;padding:0;">
     <div class="ot-hero-visual">
-      <img class="hero-screenshot" src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Enhanced_Home_Screen.png" alt="" />
+      <img class="hero-bg" src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Enhanced_Home_Screen.png" alt="" />
       <div class="ot-hero-brand">
-        <div class="kicker">Open-Source &middot; Self-Hosted &middot; Terminal</div>
-        <h1>
-          <span class="amber">OPEN</span><span class="light">TERMINALUI</span>
-        </h1>
-        <p class="tagline">
-          A professional-grade market terminal for discretionary traders, researchers, and quant teams. Real-time charting, derivatives analytics, backtesting labs, portfolio management, and 70+ technical indicators.
-        </p>
+        <div class="brand-logo">
+          <img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/logo.png" alt="OpenTerminalUI" />
+        </div>
+        <div class="kicker">Open-Source &middot; Self-Hosted &middot; Financial Terminal</div>
+        <h1><span class="amber">OPEN</span><span class="light">TERMINALUI</span></h1>
+        <p class="tagline">A professional-grade market terminal for discretionary traders, researchers, and quant teams. Real-time charting, derivatives analytics, backtesting labs, and portfolio management &mdash; all self-hosted.</p>
         <div class="version-row">
           <span class="ot-badge accent"><span class="dot"></span> v0.1.1</span>
           <span class="ot-badge live"><span class="dot"></span> MIT License</span>
@@ -900,10 +560,10 @@
       </div>
     </div>
     <div class="ot-hero-panel">
-      <div class="ot-hero-panel-content">
+      <div class="ot-hero-inner">
         <div class="panel-label">Quick Deploy</div>
         <h2>GET STARTED</h2>
-        <p>Clone, build, and launch the full terminal stack in under 5 minutes with Docker Compose.</p>
+        <p class="desc">Clone, build, and launch the full stack in under 5 minutes with Docker Compose.</p>
         <div class="code-box">
           <span class="prompt">$</span> git clone https://github.com/<br/>
           &nbsp;&nbsp;Hitheshkaranth/OpenTerminalUI.git<br/>
@@ -911,10 +571,10 @@
           <span class="prompt">$</span> docker compose up --build
         </div>
         <div class="btn-row">
-          <a class="ot-btn ot-btn-accent" href="https://github.com/Hitheshkaranth/OpenTerminalUI">ACCESS TERMINAL ></a>
-          <a class="ot-btn ot-btn-outline" href="https://github.com/Hitheshkaranth/OpenTerminalUI/archive/refs/heads/main.zip">Download .zip</a>
+          <a class="ot-btn ot-btn-accent" href="https://github.com/Hitheshkaranth/OpenTerminalUI"><i data-lucide="terminal" class="btn-icon"></i> ACCESS TERMINAL ></a>
+          <a class="ot-btn ot-btn-outline" href="https://github.com/Hitheshkaranth/OpenTerminalUI/archive/refs/heads/main.zip"><i data-lucide="download" class="btn-icon"></i> Download .zip</a>
         </div>
-        <div class="divider"></div>
+        <div class="hero-divider"></div>
         <div class="links-row">
           <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/CONTRIBUTING.md">Contributing</a>
           <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/issues">Issues</a>
@@ -926,147 +586,138 @@
 
   <div class="section-divider"></div>
 
-  <!-- ============================================================
-       FEATURES
-       ============================================================ -->
+  <!-- QUICK NAVIGATION (matches QuickNavGrid from HomePage) -->
+  <section id="navigation">
+    <div class="section-label">Navigation Tools</div>
+    <div class="section-title">Workspace Grid</div>
+    <div class="section-sub">Jump to any workspace &mdash; same grid layout as the home dashboard.</div>
+
+    <div class="ot-nav-grid">
+      <div class="ot-nav-section">
+        <h3 class="ot-nav-section-title">EQUITY</h3>
+        <div class="ot-nav-tiles">
+          <a class="ot-nav-tile" href="#features"><i data-lucide="bar-chart-3" class="tile-icon"></i><span class="tile-label">Market</span><span class="tile-shortcut">F1</span></a>
+          <a class="ot-nav-tile" href="#screenshots"><i data-lucide="layout-grid" class="tile-icon"></i><span class="tile-label">Workstation</span><span class="tile-shortcut">WS</span></a>
+          <a class="ot-nav-tile" href="#features"><i data-lucide="search" class="tile-icon"></i><span class="tile-label">Screener</span><span class="tile-shortcut">F2</span></a>
+          <a class="ot-nav-tile" href="#features"><i data-lucide="briefcase" class="tile-icon"></i><span class="tile-label">Portfolio</span><span class="tile-shortcut">F3</span></a>
+          <a class="ot-nav-tile" href="#features"><i data-lucide="building-2" class="tile-icon"></i><span class="tile-label">Security Hub</span><span class="tile-shortcut">SH</span></a>
+          <a class="ot-nav-tile" href="#features"><i data-lucide="globe" class="tile-icon"></i><span class="tile-label">Economics</span><span class="tile-shortcut">EC</span></a>
+          <a class="ot-nav-tile" href="#features"><i data-lucide="trending-up" class="tile-icon"></i><span class="tile-label">Yield Curve</span><span class="tile-shortcut">YC</span></a>
+          <a class="ot-nav-tile" href="#features"><i data-lucide="columns-3" class="tile-icon"></i><span class="tile-label">Compare</span><span class="tile-shortcut">CMP</span></a>
+        </div>
+      </div>
+      <div class="ot-nav-section">
+        <h3 class="ot-nav-section-title">F&amp;O</h3>
+        <div class="ot-nav-tiles">
+          <a class="ot-nav-tile" href="#features"><i data-lucide="grid-3x3" class="tile-icon"></i><span class="tile-label">Option Chain</span><span class="tile-shortcut">OP</span></a>
+          <a class="ot-nav-tile" href="#features"><i data-lucide="activity" class="tile-icon"></i><span class="tile-label">Greeks</span><span class="tile-shortcut">GR</span></a>
+          <a class="ot-nav-tile" href="#features"><i data-lucide="trending-down" class="tile-icon"></i><span class="tile-label">OI Analysis</span><span class="tile-shortcut">OI</span></a>
+          <a class="ot-nav-tile" href="#features"><i data-lucide="zap" class="tile-icon"></i><span class="tile-label">PCR</span><span class="tile-shortcut">PCR</span></a>
+        </div>
+      </div>
+      <div class="ot-nav-section">
+        <h3 class="ot-nav-section-title">BACK TEST</h3>
+        <div class="ot-nav-tiles">
+          <a class="ot-nav-tile" href="#features"><i data-lucide="play" class="tile-icon"></i><span class="tile-label">Backtesting</span><span class="tile-shortcut">F9</span></a>
+          <a class="ot-nav-tile" href="#features"><i data-lucide="sparkles" class="tile-icon"></i><span class="tile-label">Model Lab</span><span class="tile-shortcut">ML</span></a>
+          <a class="ot-nav-tile" href="#features"><i data-lucide="database" class="tile-icon"></i><span class="tile-label">Portfolio Lab</span><span class="tile-shortcut">PL</span></a>
+          <a class="ot-nav-tile" href="#features"><i data-lucide="shield-alert" class="tile-icon"></i><span class="tile-label">Governance</span><span class="tile-shortcut">GOV</span></a>
+        </div>
+      </div>
+      <div class="ot-nav-section">
+        <h3 class="ot-nav-section-title">INTEL</h3>
+        <div class="ot-nav-tiles">
+          <a class="ot-nav-tile" href="#features"><i data-lucide="bell" class="tile-icon"></i><span class="tile-label">Alerts</span><span class="tile-shortcut">AL</span></a>
+          <a class="ot-nav-tile" href="#features"><i data-lucide="file-text" class="tile-icon"></i><span class="tile-label">News</span><span class="tile-shortcut">NW</span></a>
+          <a class="ot-nav-tile" href="#features"><i data-lucide="table" class="tile-icon"></i><span class="tile-label">Watchlist</span><span class="tile-shortcut">WL</span></a>
+          <a class="ot-nav-tile" href="#features"><i data-lucide="plus" class="tile-icon"></i><span class="tile-label">Plugins</span><span class="tile-shortcut">PLG</span></a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- FEATURES -->
   <section id="features">
     <div class="section-label">Platform Capabilities</div>
     <div class="section-title">Features</div>
-    <div class="section-sub">Everything you need in a financial terminal &mdash; from real-time market data to institutional-grade quant workflows.</div>
+    <div class="section-sub">Everything you need in a financial terminal &mdash; real-time data to institutional-grade quant workflows.</div>
 
     <div class="ot-features-grid">
       <div class="ot-feature-card">
-        <div class="card-header">
-          <div class="card-icon icon-amber">&#9002;</div>
-          <h3>Terminal Shell</h3>
-        </div>
-        <p>Bloomberg-style GO bar (Ctrl+G), command palette (Ctrl+K) with 25+ functions, function key shortcuts (F1-F9), rolling ticker tape, and persistent workspace framing. Keyboard-first navigation with desktop and mobile layouts.</p>
+        <div class="card-header"><div class="card-icon icon-amber"><i data-lucide="command"></i></div><h3>Terminal Shell</h3></div>
+        <p>GO bar (Ctrl+G), command palette (Ctrl+K) with 25+ functions, function keys (F1-F9), rolling ticker tape, and persistent workspace framing. Keyboard-first with desktop and mobile layouts.</p>
         <div class="tag-row"><span class="ot-badge accent">Core</span></div>
       </div>
-
       <div class="ot-feature-card">
-        <div class="card-header">
-          <div class="card-icon icon-green">&#9041;</div>
-          <h3>Chart Workstation</h3>
-        </div>
-        <p>Up to 9 synchronized panels with crosshair linking. 70+ technical indicators (SMA, EMA, RSI, MACD, Bollinger, VWAP, Supertrend, etc.), drawing tools with templates, replay mode, volume profile, comparison overlays. 1m to monthly timeframes with extended hours.</p>
+        <div class="card-header"><div class="card-icon icon-green"><i data-lucide="layout-grid"></i></div><h3>Chart Workstation</h3></div>
+        <p>Up to 9 synchronized panels with crosshair linking. 70+ indicators, drawing tools with templates, replay mode, volume profile, comparison overlays. 1m to monthly with extended hours.</p>
         <div class="tag-row"><span class="ot-badge live">Charting</span></div>
       </div>
-
       <div class="ot-feature-card">
-        <div class="card-header">
-          <div class="card-icon icon-blue">&#9776;</div>
-          <h3>Equity Research</h3>
-        </div>
-        <p>8-tab security hub: overview, financials, chart, news/sentiment, ownership, estimates, peers, ESG. Fundamental metrics, earnings calendar, shareholding history, corporate actions, and peer comparison matrices.</p>
+        <div class="card-header"><div class="card-icon icon-blue"><i data-lucide="building-2"></i></div><h3>Equity Research</h3></div>
+        <p>8-tab security hub: overview, financials, chart, news/sentiment, ownership, estimates, peers, ESG. Earnings calendar, shareholding history, corporate actions, and peer matrices.</p>
         <div class="tag-row"><span class="ot-badge info">Research</span></div>
       </div>
-
       <div class="ot-feature-card">
-        <div class="card-header">
-          <div class="card-icon icon-warn">&#9881;</div>
-          <h3>Advanced Screener</h3>
-        </div>
-        <p>Query builder with 15+ visualization modes: tables, treemaps, heatmaps, scatter plots, radar charts, box plots, bubble charts, waterfall, RRG quadrants. Multi-market scanning across NSE, BSE, NYSE, NASDAQ with custom formulas and score-based ranking.</p>
+        <div class="card-header"><div class="card-icon icon-warn"><i data-lucide="search"></i></div><h3>Advanced Screener</h3></div>
+        <p>Query builder with 15+ visualization modes: tables, treemaps, heatmaps, scatter plots, radar charts, box plots, bubble charts, RRG quadrants. Multi-market scanning with score-based ranking.</p>
         <div class="tag-row"><span class="ot-badge warn">Screener</span></div>
       </div>
-
       <div class="ot-feature-card">
-        <div class="card-header">
-          <div class="card-icon icon-red">&#8711;</div>
-          <h3>Futures &amp; Options</h3>
-        </div>
-        <p>Full option chain with live Greeks (Delta, Gamma, Theta, Vega, Rho). IV analysis with term structure. Strategy builder for multi-leg positions. OI analysis, PCR tracking, IV/OI heatmaps, futures term structure, and expiry calendar.</p>
+        <div class="card-header"><div class="card-icon icon-red"><i data-lucide="grid-3x3"></i></div><h3>Futures &amp; Options</h3></div>
+        <p>Full option chain with live Greeks (Delta, Gamma, Theta, Vega, Rho). IV analysis, strategy builder, OI analysis, PCR tracking, IV/OI heatmaps, futures term structure, expiry calendar.</p>
         <div class="tag-row"><span class="ot-badge" style="border-color:var(--ot-red);color:var(--ot-red);background:var(--ot-red-soft);">Derivatives</span></div>
       </div>
-
       <div class="ot-feature-card">
-        <div class="card-header">
-          <div class="card-icon icon-green">&#9733;</div>
-          <h3>Portfolio &amp; Risk</h3>
-        </div>
-        <p>Multi-portfolio management with allocation charts, benchmark overlay, correlation heatmap. Risk engine with VaR/CVaR, EWMA volatility, PCA factor exposures, stress testing. Paper trading with realistic fills, slippage, and TCA analytics.</p>
+        <div class="card-header"><div class="card-icon icon-green"><i data-lucide="briefcase"></i></div><h3>Portfolio &amp; Risk</h3></div>
+        <p>Multi-portfolio management, benchmark overlay, correlation heatmap. Risk engine: VaR/CVaR, EWMA volatility, PCA factors, stress testing. Paper trading with realistic fills and TCA.</p>
         <div class="tag-row"><span class="ot-badge live">Portfolio</span></div>
       </div>
-
       <div class="ot-feature-card">
-        <div class="card-header">
-          <div class="card-icon icon-cyan">&#9881;</div>
-          <h3>Backtesting &amp; Model Lab</h3>
-        </div>
-        <p>10+ strategy templates. Vectorized NumPy engine with realistic execution simulation. Equity curves, 3D parameter surfaces, Monte Carlo, walk-forward analysis, monthly heatmaps. Model Lab for experiment tracking with CAGR, Sharpe, Sortino, max drawdown.</p>
+        <div class="card-header"><div class="card-icon icon-cyan"><i data-lucide="sparkles"></i></div><h3>Backtesting &amp; Model Lab</h3></div>
+        <p>10+ strategy templates. Vectorized NumPy engine. Equity curves, 3D surfaces, Monte Carlo, walk-forward, monthly heatmaps. Model Lab: experiment tracking with Sharpe, Sortino, max drawdown.</p>
         <div class="tag-row"><span class="ot-badge" style="border-color:var(--ot-cyan);color:var(--ot-cyan);background:rgba(24,255,255,0.08);">Quant</span></div>
       </div>
-
       <div class="ot-feature-card">
-        <div class="card-header">
-          <div class="card-icon icon-cyan">&#9055;</div>
-          <h3>Portfolio Lab</h3>
-        </div>
-        <p>Multi-asset portfolio backtesting with up to 200 assets. Risk parity, equal weight, momentum weighting. Strategy blends with up to 10 strategies. Rebalance scheduling, attribution analysis, and correlation matrices.</p>
+        <div class="card-header"><div class="card-icon icon-cyan"><i data-lucide="database"></i></div><h3>Portfolio Lab</h3></div>
+        <p>Multi-asset backtesting (200 assets). Risk parity, equal weight, momentum weighting. Strategy blends, rebalance scheduling, attribution analysis, and correlation matrices.</p>
         <div class="tag-row"><span class="ot-badge" style="border-color:var(--ot-cyan);color:var(--ot-cyan);background:rgba(24,255,255,0.08);">Quant</span></div>
       </div>
-
       <div class="ot-feature-card">
-        <div class="card-header">
-          <div class="card-icon icon-amber">&#9889;</div>
-          <h3>Real-Time Data</h3>
-        </div>
-        <p>Multi-provider WebSocket feeds from Zerodha Kite (India) and Finnhub (US). Candle aggregation at all intervals. Provider waterfall with automatic failover. Multi-level caching (SQLite L1 + Redis L2). Redis pub/sub for horizontal scaling.</p>
+        <div class="card-header"><div class="card-icon icon-amber"><i data-lucide="activity"></i></div><h3>Real-Time Data</h3></div>
+        <p>Multi-provider WebSocket: Zerodha Kite (India), Finnhub (US). Candle aggregation, provider waterfall failover. L1 SQLite + L2 Redis caching. Redis pub/sub for horizontal scaling.</p>
         <div class="tag-row"><span class="ot-badge accent">Data</span></div>
       </div>
-
       <div class="ot-feature-card">
-        <div class="card-header">
-          <div class="card-icon icon-warn">&#9888;</div>
-          <h3>Alerts &amp; Scanner</h3>
-        </div>
-        <p>Price, technical, and momentum-based alerts with WebSocket push notifications. Breakout scanner with confidence scoring, trigger/invalidation levels. Alert history timeline with deduplication and desktop notifications.</p>
+        <div class="card-header"><div class="card-icon icon-warn"><i data-lucide="bell"></i></div><h3>Alerts &amp; Scanner</h3></div>
+        <p>Price, technical, momentum-based alerts with WebSocket push. Breakout scanner with confidence scoring. Alert history with deduplication and desktop notifications.</p>
         <div class="tag-row"><span class="ot-badge warn">Alerts</span></div>
       </div>
-
       <div class="ot-feature-card">
-        <div class="card-header">
-          <div class="card-icon icon-blue">&#9729;</div>
-          <h3>Cross-Asset &amp; Macro</h3>
-        </div>
-        <p>Commodities, forex with central bank monitor, crypto workspace, ETF analytics with overlap analysis, mutual funds with SIP calculator, bonds, US Treasury yield curve with inversion detection, economics calendar, and sector rotation RRG.</p>
+        <div class="card-header"><div class="card-icon icon-blue"><i data-lucide="globe"></i></div><h3>Cross-Asset &amp; Macro</h3></div>
+        <p>Commodities, forex + central bank monitor, crypto workspace, ETF analytics, mutual funds + SIP calculator, bonds, yield curve with inversion detection, economics calendar, sector rotation RRG.</p>
         <div class="tag-row"><span class="ot-badge info">Multi-Asset</span></div>
       </div>
-
       <div class="ot-feature-card">
-        <div class="card-header">
-          <div class="card-icon icon-green">&#8634;</div>
-          <h3>Sector Rotation</h3>
-        </div>
-        <p>Interactive Relative Rotation Graph with 12-week trailing momentum paths. Benchmark-relative sector analysis with quadrant classification: leading, lagging, improving, and weakening.</p>
-        <div class="tag-row"><span class="ot-badge live">Analysis</span></div>
-      </div>
-
-      <div class="ot-feature-card">
-        <div class="card-header">
-          <div class="card-icon icon-warn">&#9993;</div>
-          <h3>News &amp; Sentiment</h3>
-        </div>
-        <p>Real-time news ingestion with bullish/bearish/neutral sentiment classification and confidence scores. Ticker-specific and market-wide feeds with multi-period filtering and sentiment trend visualization.</p>
-        <div class="tag-row"><span class="ot-badge warn">Research</span></div>
-      </div>
-
-      <div class="ot-feature-card">
-        <div class="card-header">
-          <div class="card-icon icon-red">&#9745;</div>
-          <h3>OMS &amp; Compliance</h3>
-        </div>
-        <p>Order management with restricted list enforcement and immutable audit log. Model governance with version tracking and promotion workflows. Ops cockpit with feed health monitoring and kill switches.</p>
+        <div class="card-header"><div class="card-icon icon-red"><i data-lucide="shield-alert"></i></div><h3>OMS &amp; Compliance</h3></div>
+        <p>Order management, restricted list enforcement, immutable audit log. Model governance with version tracking. Ops cockpit with feed health monitoring and kill switches.</p>
         <div class="tag-row"><span class="ot-badge" style="border-color:var(--ot-red);color:var(--ot-red);background:var(--ot-red-soft);">Ops</span></div>
       </div>
-
       <div class="ot-feature-card">
-        <div class="card-header">
-          <div class="card-icon icon-cyan">&#9998;</div>
-          <h3>Plugins &amp; Scripting</h3>
-        </div>
-        <p>Extensible plugin API with included examples: RSI Divergence Scanner, Sector Rotation Monitor, Unusual Volume Detector. Sandboxed Python execution and OpenScript chart-based indicator scripting with library.</p>
+        <div class="card-header"><div class="card-icon icon-amber"><i data-lucide="file-text"></i></div><h3>News &amp; Sentiment</h3></div>
+        <p>Real-time news with bullish/bearish/neutral sentiment + confidence scores. Ticker-specific and market-wide feeds with multi-period filtering and trend visualization.</p>
+        <div class="tag-row"><span class="ot-badge accent">Research</span></div>
+      </div>
+      <div class="ot-feature-card">
+        <div class="card-header"><div class="card-icon icon-green"><i data-lucide="trending-up"></i></div><h3>Sector Rotation</h3></div>
+        <p>Interactive RRG with 12-week trailing momentum paths. Benchmark-relative sector analysis with quadrant classification: leading, lagging, improving, and weakening.</p>
+        <div class="tag-row"><span class="ot-badge live">Analysis</span></div>
+      </div>
+      <div class="ot-feature-card">
+        <div class="card-header"><div class="card-icon icon-cyan"><i data-lucide="plus"></i></div><h3>Plugins &amp; Scripting</h3></div>
+        <p>Extensible plugin API. Included: RSI Divergence Scanner, Sector Rotation Monitor, Unusual Volume Detector. Sandboxed Python execution and OpenScript for chart indicators.</p>
         <div class="tag-row"><span class="ot-badge" style="border-color:var(--ot-cyan);color:var(--ot-cyan);background:rgba(24,255,255,0.08);">Plugins</span></div>
       </div>
     </div>
@@ -1074,58 +725,31 @@
 
   <div class="section-divider"></div>
 
-  <!-- ============================================================
-       SCREENSHOTS
-       ============================================================ -->
+  <!-- SCREENSHOTS -->
   <section id="screenshots">
     <div class="section-label">Interface</div>
     <div class="section-title">Screenshots</div>
-    <div class="section-sub">The terminal in action across its major workspaces.</div>
-
     <div class="ot-screenshots-grid">
-      <div class="ot-screenshot-card">
-        <img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Enhanced_Home_Screen.png" alt="Home Dashboard" loading="lazy" />
-        <div class="cap">Home Dashboard &mdash; Market context, portfolio sparkline, workspace grid</div>
-      </div>
-      <div class="ot-screenshot-card">
-        <img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Advanced_Workstation_6_Charts.png" alt="Chart Workstation" loading="lazy" />
-        <div class="cap">Chart Workstation &mdash; 6-panel sync with indicators and drawing tools</div>
-      </div>
-      <div class="ot-screenshot-card">
-        <img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Stock_Screen.png" alt="Stock Detail" loading="lazy" />
-        <div class="cap">Stock Detail &mdash; Real-time quotes, multi-timeframe charting, analysis tabs</div>
-      </div>
-      <div class="ot-screenshot-card">
-        <img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Enhanced_Fundamental_Analysis.png" alt="Security Hub" loading="lazy" />
-        <div class="cap">Fundamental Analysis &mdash; Scorecard, DuPont analysis, quarterly results</div>
-      </div>
-      <div class="ot-screenshot-card">
-        <img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Advanced_Portfolio_Monitoring.png" alt="Portfolio" loading="lazy" />
-        <div class="cap">Portfolio Analytics &mdash; Holdings, risk metrics, correlation heatmap</div>
-      </div>
-      <div class="ot-screenshot-card">
-        <img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Back_testing.png" alt="Backtesting" loading="lazy" />
-        <div class="cap">Backtesting &mdash; Strategy signals on chart with indicator overlays</div>
-      </div>
+      <div class="ot-screenshot-card"><img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Enhanced_Home_Screen.png" alt="Home" loading="lazy" /><div class="cap">Home Dashboard &mdash; Mission Control</div></div>
+      <div class="ot-screenshot-card"><img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Advanced_Workstation_6_Charts.png" alt="Workstation" loading="lazy" /><div class="cap">Chart Workstation &mdash; 6-Panel Sync</div></div>
+      <div class="ot-screenshot-card"><img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Stock_Screen.png" alt="Stock" loading="lazy" /><div class="cap">Stock Detail &mdash; Multi-Timeframe Chart</div></div>
+      <div class="ot-screenshot-card"><img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Enhanced_Fundamental_Analysis.png" alt="Fundamentals" loading="lazy" /><div class="cap">Fundamental Analysis &mdash; Security Hub</div></div>
+      <div class="ot-screenshot-card"><img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Advanced_Portfolio_Monitoring.png" alt="Portfolio" loading="lazy" /><div class="cap">Portfolio Analytics &mdash; Risk + Correlation</div></div>
+      <div class="ot-screenshot-card"><img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Back_testing.png" alt="Backtest" loading="lazy" /><div class="cap">Backtesting &mdash; Strategy Signals + Overlays</div></div>
     </div>
   </section>
 
   <div class="section-divider"></div>
 
-  <!-- ============================================================
-       ARCHITECTURE
-       ============================================================ -->
+  <!-- ARCHITECTURE -->
   <section id="architecture">
     <div class="section-label">System Design</div>
     <div class="section-title">Architecture</div>
-    <div class="section-sub">A layered full-stack architecture for extensibility, real-time data flow, and institutional-grade analytics.</div>
 
-    <!-- System Overview -->
-    <div class="ot-arch" style="margin-bottom: 12px;">
-      <div class="ot-panel-header"><span class="title">SYSTEM OVERVIEW</span></div>
+    <div class="ot-arch">
+      <div class="ot-panel-header"><i data-lucide="layout-grid" class="header-icon"></i> <span class="title">System Overview</span></div>
       <pre>
   <span class="a">CLIENT TIER</span>                          <span class="a">API GATEWAY</span>                         <span class="a">PERSISTENCE</span>
-  ============                          ===========                         ===========
 
   +---------------------------+         +---------------------------+       +-----------------+
   | <span class="g">React 18 + TypeScript</span>     |  REST   | <span class="w">FastAPI + Uvicorn</span>         |       | <span class="c">SQLite</span>          |
@@ -1138,326 +762,184 @@
                                                       |                     +-----------------+
                                         +-------------v-------------+       | <span class="c">PostgreSQL 16</span>   |
                                         | <span class="g">SERVICE LAYER</span>             | ----> | <span class="c">(production)</span>    |
-                                        |                           |       +-----------------+
-                                        | <span class="g">Unified Fetcher</span>           |
-                                        | <span class="g">Screener Engine</span>            |
-                                        | <span class="g">Model Lab + Portfolio Lab</span>  |
+                                        | <span class="g">Unified Fetcher</span>           |       +-----------------+
+                                        | <span class="g">Screener + Model Lab</span>      |
                                         | <span class="g">Risk Engine + Alert Sched</span>  |
                                         | <span class="g">Provider Registry</span>          |
                                         +-------------+-------------+
                                                       |
                                         +-------------v-------------+
                                         | <span class="r">DATA PROVIDERS</span>            |
-                                        |                           |
-                                        | <span class="r">Zerodha Kite</span>  (IN live)   |
-                                        | <span class="r">Finnhub</span>       (US live)   |
-                                        | <span class="r">FMP</span>           (US hist)   |
-                                        | <span class="r">Yahoo Finance</span> (fallback)  |
-                                        | <span class="r">NSEPython</span>     (F&O / CA)  |
+                                        | <span class="r">Kite</span> | <span class="r">Finnhub</span> | <span class="r">FMP</span> | <span class="r">Yahoo</span>|
                                         +---------------------------+</pre>
     </div>
 
-    <!-- Data Flow -->
-    <div class="ot-arch" style="margin-bottom: 12px;">
-      <div class="ot-panel-header"><span class="title">REAL-TIME DATA FLOW</span></div>
-      <pre>
-  <span class="r">Exchange Ticks</span>             <span class="w">Adapter Layer</span>              <span class="g">Backend</span>                    <span class="a">Client</span>
-  ==============             =============              =======                    ======
-
-  +-----------+              +-------------+
-  | <span class="r">NSE / BSE</span> | ------------> | <span class="w">Kite WS</span>     | ----+
-  +-----------+              +-------------+     |
-                                                 |     +----------------+         +----------------+
-  +-----------+              +-------------+     +---> | <span class="g">Quote Hub</span>      | ------> | <span class="a">/api/ws/quotes</span> |
-  | <span class="r">NYSE</span>      | ------------> | <span class="w">Finnhub WS</span>  | ----+     | <span class="g">(fan-out)</span>      |         | <span class="a">WebSocket</span>      |
-  | <span class="r">NASDAQ</span>    |              +-------------+     |     +--------+-------+         +--------+-------+
-  +-----------+                                  |              |                          |
-                                                 |     +--------v-------+         +--------v-------+
-  +-----------+              +-------------+     |     | <span class="g">Bar Aggregator</span> |         | <span class="a">Chart Engine</span>   |
-  | <span class="r">REST APIs</span> | ------------> | <span class="w">FMP / Yahoo</span> | ----+     | <span class="g">(1m -> Xm)</span>     |         | <span class="a">Lightweight</span>    |
-  +-----------+              +-------------+           +--------+-------+         | <span class="a">Charts v5</span>      |
-                                                                |                 +--------+-------+
-                                                       +--------v-------+                  |
-                                                       | <span class="g">OHLCV Cache</span>    |         +--------v-------+
-                                                       | <span class="g">SQLite + Redis</span> |         | <span class="a">70+ Indicators</span> |
-                                                       +----------------+         +----------------+</pre>
-    </div>
-
-    <!-- Provider Waterfall -->
-    <div class="ot-arch" style="margin-bottom: 12px;">
-      <div class="ot-panel-header"><span class="title">PROVIDER WATERFALL</span></div>
-      <pre>
-  <span class="t">Unified Fetcher receives request for symbol + interval</span>
-         |
-         v
-  +------+------+     <span class="g">HIT</span>     +---------------------+
-  | <span class="w">L1: SQLite</span>  | ----------> | <span class="g">Return cached bars</span>  |
-  | <span class="w">OHLCV Cache</span> |             +---------------------+
-  +------+------+
-         | <span class="r">MISS</span>
-         v
-  +------+------+     <span class="g">HIT</span>     +---------------------+
-  | <span class="w">L2: Redis</span>   | ----------> | <span class="g">Populate L1, return</span> |
-  | <span class="w">Cache</span>       |             +---------------------+
-  +------+------+
-         | <span class="r">MISS</span>
-         v
-  +------+------+     <span class="g">OK</span>      +---------------------+
-  | <span class="w">Primary</span>    | ----------> | <span class="g">Populate L1+L2</span>     |
-  | <span class="w">Provider</span>   |             | <span class="g">Return bars</span>        |
-  +------+------+             +---------------------+
-         | <span class="r">FAIL</span>
-         v
-  +------+------+     <span class="g">OK</span>      +---------------------+
-  | <span class="w">Fallback</span>   | ----------> | <span class="g">Populate L1+L2</span>     |
-  | <span class="w">Provider</span>   |             | <span class="g">Return bars</span>        |
-  +------+------+             +---------------------+
-         | <span class="r">FAIL</span>
-         v
-  +------+------+
-  | <span class="r">Error 503</span>  |
-  +-------------+</pre>
-    </div>
-
-    <!-- Backtesting Pipeline -->
     <div class="ot-arch">
-      <div class="ot-panel-header"><span class="title">BACKTESTING PIPELINE</span></div>
+      <div class="ot-panel-header"><i data-lucide="activity" class="header-icon"></i> <span class="title">Real-Time Data Flow</span></div>
       <pre>
-  <span class="a">User</span>                  <span class="w">Engine</span>                    <span class="g">Reports</span>                  <span class="r">Governance</span>
-  ====                  ======                    =======                  ==========
+  <span class="r">Exchange Ticks</span>             <span class="w">Adapters</span>               <span class="g">Backend</span>                    <span class="a">Client</span>
 
-  +-------------+       +------------------+      +-------------------+    +------------------+
-  | <span class="a">Define</span>      | ----> | <span class="w">Vectorized NumPy</span> | ---> | <span class="g">Equity Curve</span>      | -> | <span class="r">Model Registry</span>   |
-  | <span class="a">Experiment</span>  |       | <span class="w">Engine</span>           |      | <span class="g">Drawdown Chart</span>    |    | <span class="r">Version Track</span>    |
-  +------+------+       +--------+---------+      | <span class="g">Monthly Heatmap</span>   |    | <span class="r">Promote to</span>       |
-         |                       |                | <span class="g">Rolling Sharpe</span>    |    | <span class="r">Paper Trading</span>    |
-  +------v------+       +--------v---------+      | <span class="g">Trade Analysis</span>    |    +--------+---------+
-  | <span class="a">Set Params</span>  |       | <span class="w">Realistic Fills</span>  |      | <span class="g">3D Param Surface</span> |             |
-  | <span class="a">Universe</span>    |       | <span class="w">Slippage Model</span>   |      | <span class="g">Monte Carlo</span>      |    +--------v---------+
-  | <span class="a">Cost Model</span>  |       | <span class="w">Commission</span>       |      | <span class="g">Walk-Forward</span>     |    | <span class="r">Paper Trading</span>    |
-  +------+------+       +--------+---------+      +-------------------+    | <span class="r">Live Validation</span>  |
-         |                       |                                        +------------------+
-  +------v------+       +--------v---------+
-  | <span class="a">Submit Run</span>  | ----> | <span class="w">Async Job</span>        |
-  | <span class="a">(async)</span>     |       | <span class="w">Poll -> Result</span>   |
-  +-------------+       +------------------+</pre>
+  +-----------+              +------------+
+  | <span class="r">NSE / BSE</span> | ------------> | <span class="w">Kite WS</span>    | ---+
+  +-----------+              +------------+    |
+                                               |    +----------------+         +-----------------+
+  +-----------+              +------------+    +--> | <span class="g">Quote Hub</span>      | ------> | <span class="a">/api/ws/quotes</span>  |
+  | <span class="r">NYSE</span>      | ------------> | <span class="w">Finnhub WS</span> | ---+    | <span class="g">(fan-out)</span>      |         | <span class="a">WebSocket</span>       |
+  +-----------+              +------------+    |    +-------+--------+         +--------+--------+
+                                               |            |                           |
+  +-----------+              +------------+    |    +-------v--------+         +--------v--------+
+  | <span class="r">REST APIs</span> | ------------> | <span class="w">FMP/Yahoo</span>  | ---+    | <span class="g">Bar Aggregator</span> |         | <span class="a">Chart Engine</span>    |
+  +-----------+              +------------+         | <span class="g">(1m -> Xm)</span>     |         | <span class="a">LW Charts v5</span>   |
+                                                    +-------+--------+         +--------+--------+
+                                                            |                           |
+                                                    +-------v--------+         +--------v--------+
+                                                    | <span class="g">OHLCV Cache</span>    |         | <span class="a">70+ Indicators</span>  |
+                                                    | <span class="g">SQLite + Redis</span> |         | <span class="a">+ Overlays</span>      |
+                                                    +----------------+         +-----------------+</pre>
+    </div>
+
+    <div class="ot-arch">
+      <div class="ot-panel-header"><i data-lucide="database" class="header-icon"></i> <span class="title">Provider Waterfall</span></div>
+      <pre>
+  <span class="t">Request</span> --> <span class="w">L1 SQLite Cache</span> --<span class="g">HIT</span>--> return | <span class="r">MISS</span> --> <span class="w">L2 Redis</span> --<span class="g">HIT</span>--> populate L1, return
+                                                        | <span class="r">MISS</span> --> <span class="w">Primary Provider</span> --<span class="g">OK</span>--> populate L1+L2, return
+                                                                             | <span class="r">FAIL</span> --> <span class="w">Fallback Provider</span> --<span class="g">OK</span>--> return
+                                                                                                  | <span class="r">FAIL</span> --> <span class="r">Error 503</span></pre>
     </div>
   </section>
 
   <div class="section-divider"></div>
 
-  <!-- ============================================================
-       SYSTEM REQUIREMENTS
-       ============================================================ -->
+  <!-- REQUIREMENTS -->
   <section id="requirements">
     <div class="section-label">Deployment</div>
     <div class="section-title">System Requirements</div>
-    <div class="section-sub">OpenTerminalUI runs on any modern desktop or server.</div>
 
-    <div class="ot-panel" style="margin-bottom: 12px;">
-      <div class="ot-panel-header"><span>Hardware</span></div>
-      <table class="ot-table">
-        <thead><tr><th>Component</th><th>Minimum</th><th>Recommended</th></tr></thead>
-        <tbody>
-          <tr><td>Operating System</td><td>Linux, macOS, Windows 10+</td><td>Ubuntu 22.04+ / macOS 13+</td></tr>
-          <tr><td>CPU</td><td>2 cores</td><td>4+ cores</td></tr>
-          <tr><td>RAM</td><td>4 GB</td><td>8 GB+</td></tr>
-          <tr><td>Disk Space</td><td>2 GB</td><td>10 GB+ (for historical data cache)</td></tr>
-          <tr><td>Display</td><td>1280 x 720</td><td>1920 x 1080+</td></tr>
-          <tr><td>Browser</td><td>Chrome 90+, Firefox 90+, Safari 15+</td><td>Latest Chrome or Firefox</td></tr>
-        </tbody>
-      </table>
+    <div class="ot-panel" style="margin-bottom:12px;">
+      <div class="ot-panel-header"><i data-lucide="settings" class="header-icon"></i> Hardware</div>
+      <table class="ot-table"><thead><tr><th>Component</th><th>Minimum</th><th>Recommended</th></tr></thead><tbody>
+        <tr><td>OS</td><td>Linux, macOS, Windows 10+</td><td>Ubuntu 22.04+ / macOS 13+</td></tr>
+        <tr><td>CPU</td><td>2 cores</td><td>4+ cores</td></tr>
+        <tr><td>RAM</td><td>4 GB</td><td>8 GB+</td></tr>
+        <tr><td>Disk</td><td>2 GB</td><td>10 GB+ (historical data cache)</td></tr>
+        <tr><td>Display</td><td>1280 x 720</td><td>1920 x 1080+</td></tr>
+      </tbody></table>
     </div>
-
-    <div class="ot-panel" style="margin-bottom: 12px;">
-      <div class="ot-panel-header"><span>Software Dependencies</span></div>
-      <table class="ot-table">
-        <thead><tr><th>Software</th><th>Version</th><th>Notes</th></tr></thead>
-        <tbody>
-          <tr><td>Docker</td><td><code>20.10+</code></td><td>Required for containerized deployment</td></tr>
-          <tr><td>Docker Compose</td><td><code>v2.0+</code></td><td>Included with Docker Desktop</td></tr>
-          <tr><td>Python</td><td><code>3.11+</code></td><td>Local development only</td></tr>
-          <tr><td>Node.js</td><td><code>22+</code></td><td>Local frontend development only</td></tr>
-          <tr><td>Git</td><td><code>2.30+</code></td><td>For cloning the repository</td></tr>
-        </tbody>
-      </table>
+    <div class="ot-panel" style="margin-bottom:12px;">
+      <div class="ot-panel-header"><i data-lucide="database" class="header-icon"></i> Software</div>
+      <table class="ot-table"><thead><tr><th>Software</th><th>Version</th><th>Notes</th></tr></thead><tbody>
+        <tr><td>Docker</td><td><code>20.10+</code></td><td>Containerized deployment</td></tr>
+        <tr><td>Docker Compose</td><td><code>v2.0+</code></td><td>Included with Docker Desktop</td></tr>
+        <tr><td>Python</td><td><code>3.11+</code></td><td>Local dev only</td></tr>
+        <tr><td>Node.js</td><td><code>22+</code></td><td>Local frontend dev only</td></tr>
+      </tbody></table>
     </div>
-
-    <div class="ot-panel" style="margin-bottom: 12px;">
-      <div class="ot-panel-header"><span>Optional Services</span></div>
-      <table class="ot-table">
-        <thead><tr><th>Service</th><th>Purpose</th><th>Default</th></tr></thead>
-        <tbody>
-          <tr><td>Redis</td><td>Real-time quote pub/sub, L2 cache, sessions</td><td>Included in Docker Compose</td></tr>
-          <tr><td>PostgreSQL 16</td><td>Production database (higher concurrency)</td><td>SQLite used by default</td></tr>
-        </tbody>
-      </table>
-    </div>
-
     <div class="ot-panel">
-      <div class="ot-panel-header"><span>Market Data API Keys (Optional)</span></div>
-      <div class="ot-panel-body" style="padding: 8px 12px;">
-        <p style="font-size: 11px; color: var(--ot-text-muted); margin-bottom: 8px;">The platform runs without API keys using fallback providers. Add keys for full real-time and historical data:</p>
-      </div>
-      <table class="ot-table">
-        <thead><tr><th>Provider</th><th>Coverage</th><th>Env Variable</th></tr></thead>
-        <tbody>
-          <tr><td>Financial Modeling Prep</td><td>US equities, fundamentals, earnings</td><td><code>FMP_API_KEY</code></td></tr>
-          <tr><td>Finnhub</td><td>US real-time WebSocket ticks</td><td><code>FINNHUB_API_KEY</code></td></tr>
-          <tr><td>Zerodha Kite</td><td>India NSE/BSE real-time + historical</td><td><code>KITE_API_KEY</code></td></tr>
-        </tbody>
-      </table>
+      <div class="ot-panel-header"><i data-lucide="zap" class="header-icon"></i> API Keys <span class="subtitle">Optional &mdash; fallback providers work without keys</span></div>
+      <table class="ot-table"><thead><tr><th>Provider</th><th>Coverage</th><th>Env Variable</th></tr></thead><tbody>
+        <tr><td>Financial Modeling Prep</td><td>US equities, fundamentals</td><td><code>FMP_API_KEY</code></td></tr>
+        <tr><td>Finnhub</td><td>US real-time WebSocket</td><td><code>FINNHUB_API_KEY</code></td></tr>
+        <tr><td>Zerodha Kite</td><td>India NSE/BSE live + historical</td><td><code>KITE_API_KEY</code></td></tr>
+      </tbody></table>
     </div>
   </section>
 
   <div class="section-divider"></div>
 
-  <!-- ============================================================
-       DOWNLOAD
-       ============================================================ -->
+  <!-- DOWNLOAD -->
   <section id="download">
     <div class="section-label">Install</div>
     <div class="section-title">Download &amp; Deploy</div>
-    <div class="section-sub">Three ways to get OpenTerminalUI running.</div>
 
     <div class="ot-download-grid">
       <div class="ot-download-card">
-        <div class="dl-label">Option 1 &mdash; Docker</div>
+        <div class="dl-label"><i data-lucide="external-link"></i> Docker</div>
         <h3>Container Deploy</h3>
-        <p>Fastest path. Full stack (backend + frontend + SQLite) in a single container. Optional Redis and PostgreSQL via Compose profiles.</p>
-        <div class="code-box">
-          <span class="prompt">$</span> git clone https://github.com/<br/>
-          &nbsp;&nbsp;Hitheshkaranth/OpenTerminalUI.git<br/>
-          <span class="prompt">$</span> cd OpenTerminalUI<br/>
-          <span class="prompt">$</span> docker compose up --build
-        </div>
-        <a class="ot-btn ot-btn-accent" href="https://github.com/Hitheshkaranth/OpenTerminalUI" style="width:100%;animation:none;">Clone Repository</a>
+        <p>Full stack in a single container. Optional Redis and PostgreSQL via Compose profiles.</p>
+        <div class="code-box"><span class="prompt">$</span> git clone https://github.com/<br/>&nbsp;&nbsp;Hitheshkaranth/OpenTerminalUI.git<br/><span class="prompt">$</span> cd OpenTerminalUI<br/><span class="prompt">$</span> docker compose up --build</div>
+        <a class="ot-btn ot-btn-accent" href="https://github.com/Hitheshkaranth/OpenTerminalUI" style="width:100%;animation:none;"><i data-lucide="external-link" class="btn-icon"></i> Clone Repo</a>
       </div>
-
       <div class="ot-download-card">
-        <div class="dl-label">Option 2 &mdash; Local Dev</div>
+        <div class="dl-label"><i data-lucide="settings"></i> Local Dev</div>
         <h3>Build from Source</h3>
-        <p>Run backend and frontend separately with hot-reload. Best for development and contribution.</p>
-        <div class="code-box">
-          <span class="prompt">$</span> python3.11 -m venv .venv<br/>
-          <span class="prompt">$</span> source .venv/bin/activate<br/>
-          <span class="prompt">$</span> pip install -r backend/requirements.txt<br/>
-          <span class="prompt">$</span> PYTHONPATH=. uvicorn backend.main:app --reload<br/><br/>
-          <span class="prompt">$</span> cd frontend && npm ci && npm run dev
-        </div>
-        <a class="ot-btn ot-btn-outline" href="https://github.com/Hitheshkaranth/OpenTerminalUI" style="width:100%;">View Source</a>
+        <p>Backend and frontend with hot-reload. Best for development.</p>
+        <div class="code-box"><span class="prompt">$</span> python3.11 -m venv .venv<br/><span class="prompt">$</span> source .venv/bin/activate<br/><span class="prompt">$</span> pip install -r backend/requirements.txt<br/><span class="prompt">$</span> PYTHONPATH=. uvicorn backend.main:app --reload</div>
+        <a class="ot-btn ot-btn-outline" href="https://github.com/Hitheshkaranth/OpenTerminalUI" style="width:100%;"><i data-lucide="copy" class="btn-icon"></i> View Source</a>
       </div>
-
       <div class="ot-download-card">
-        <div class="dl-label">Option 3 &mdash; Archive</div>
+        <div class="dl-label"><i data-lucide="download"></i> Archive</div>
         <h3>Download Release</h3>
-        <p>Download a zip of the latest main branch. Deploy to any server with Docker or run locally.</p>
-        <div class="code-box">
-          <span class="prompt">$</span> curl -LO https://github.com/<br/>
-          &nbsp;&nbsp;Hitheshkaranth/OpenTerminalUI/<br/>
-          &nbsp;&nbsp;archive/refs/heads/main.zip<br/>
-          <span class="prompt">$</span> unzip main.zip<br/>
-          <span class="prompt">$</span> cd OpenTerminalUI-main
-        </div>
-        <a class="ot-btn" href="https://github.com/Hitheshkaranth/OpenTerminalUI/archive/refs/heads/main.zip" style="width:100%;">Download .zip</a>
+        <p>Zip of the latest main branch for offline deployment.</p>
+        <div class="code-box"><span class="prompt">$</span> curl -LO https://github.com/<br/>&nbsp;&nbsp;Hitheshkaranth/OpenTerminalUI/<br/>&nbsp;&nbsp;archive/refs/heads/main.zip</div>
+        <a class="ot-btn" href="https://github.com/Hitheshkaranth/OpenTerminalUI/archive/refs/heads/main.zip" style="width:100%;"><i data-lucide="download" class="btn-icon"></i> Download .zip</a>
       </div>
     </div>
   </section>
 
   <div class="section-divider"></div>
 
-  <!-- ============================================================
-       QUICK START
-       ============================================================ -->
+  <!-- QUICK START -->
   <section>
     <div class="section-label">Getting Started</div>
     <div class="section-title">Quick Start</div>
-    <div class="section-sub">From clone to dashboard in three steps.</div>
-
     <div class="ot-steps">
-      <div class="ot-step">
-        <div class="step-num">1</div>
-        <h3>Clone &amp; Configure</h3>
-        <p>Clone the repo and copy <code>.env.example</code> to <code>.env</code>. Optionally add market data API keys for full provider access.</p>
-      </div>
-      <div class="ot-step">
-        <div class="step-num">2</div>
-        <h3>Launch</h3>
-        <p>Run <code>docker compose up --build</code> and wait for the health check. The full stack starts on port <code>8000</code>.</p>
-      </div>
-      <div class="ot-step">
-        <div class="step-num">3</div>
-        <h3>Explore</h3>
-        <p>Open <code>localhost:8000</code>, register an account, and press <code>Ctrl+K</code> to open the command palette. Type any ticker to begin.</p>
-      </div>
+      <div class="ot-step"><div class="step-num">1</div><h3>Clone &amp; Configure</h3><p>Clone the repo, <code>cp .env.example .env</code>, optionally add API keys.</p></div>
+      <div class="ot-step"><div class="step-num">2</div><h3>Launch</h3><p>Run <code>docker compose up --build</code>. Full stack on port <code>8000</code>.</p></div>
+      <div class="ot-step"><div class="step-num">3</div><h3>Explore</h3><p>Open <code>localhost:8000</code>, register, press <code>Ctrl+K</code> for command palette.</p></div>
     </div>
   </section>
 
   <div class="section-divider"></div>
 
-  <!-- ============================================================
-       KEYBOARD SHORTCUTS
-       ============================================================ -->
+  <!-- KEYBOARD SHORTCUTS -->
   <section>
     <div class="section-label">Navigation</div>
     <div class="section-title">Keyboard Shortcuts</div>
-
     <div class="ot-panel">
-      <table class="ot-table">
-        <thead><tr><th>Shortcut</th><th>Action</th></tr></thead>
-        <tbody>
-          <tr><td><code>Ctrl+G</code></td><td>GO Bar &mdash; symbol lookup and route navigation</td></tr>
-          <tr><td><code>Ctrl+K</code></td><td>Command Palette &mdash; fuzzy search across all features</td></tr>
-          <tr><td><code>F1</code> - <code>F9</code></td><td>Function keys for workspace switching</td></tr>
-          <tr><td><code>1</code> - <code>7</code></td><td>Timeframe hotkeys in chart views</td></tr>
-          <tr><td><code>Esc</code></td><td>Close active panel or dialog</td></tr>
-        </tbody>
-      </table>
+      <div class="ot-panel-header"><i data-lucide="command" class="header-icon"></i> Hotkeys</div>
+      <table class="ot-table"><thead><tr><th>Shortcut</th><th>Action</th></tr></thead><tbody>
+        <tr><td><code>Ctrl+G</code></td><td>GO Bar &mdash; symbol lookup and navigation</td></tr>
+        <tr><td><code>Ctrl+K</code></td><td>Command Palette &mdash; fuzzy search all features</td></tr>
+        <tr><td><code>F1</code>-<code>F9</code></td><td>Function keys for workspace switching</td></tr>
+        <tr><td><code>1</code>-<code>7</code></td><td>Timeframe hotkeys in chart views</td></tr>
+        <tr><td><code>Esc</code></td><td>Close active panel or dialog</td></tr>
+      </tbody></table>
     </div>
   </section>
 
   <div class="section-divider"></div>
 
-  <!-- ============================================================
-       CONTRIBUTING
-       ============================================================ -->
+  <!-- CONTRIBUTING -->
   <section>
     <div class="section-label">Community</div>
     <div class="section-title">Contributing</div>
-    <div class="section-sub">OpenTerminalUI is MIT-licensed and welcomes contributions.</div>
-
-    <div class="ot-features-grid" style="grid-template-columns: repeat(2, 1fr);">
-      <div class="ot-feature-card" style="animation: none; opacity: 1; transform: none;">
-        <h3 style="margin-bottom: 8px;">Development Workflow</h3>
-        <p>Fork the repo, create a branch (<code>feat/your-feature</code>), write tests first, and run <code>make gate</code> before opening a PR. CI checks: Python compile, pytest (45% coverage gate), frontend build, Vitest, and Playwright E2E.</p>
+    <div class="ot-features-grid" style="grid-template-columns:repeat(2,1fr);">
+      <div class="ot-feature-card" style="animation:none;opacity:1;transform:none;">
+        <div class="card-header"><div class="card-icon icon-green"><i data-lucide="plus"></i></div><h3>Development</h3></div>
+        <p>Fork, branch (<code>feat/your-feature</code>), write tests, run <code>make gate</code>. CI: pytest 45% coverage, frontend build, Vitest, Playwright E2E.</p>
       </div>
-      <div class="ot-feature-card" style="animation: none; opacity: 1; transform: none;">
-        <h3 style="margin-bottom: 8px;">Resources</h3>
-        <p>
-          <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/CONTRIBUTING.md">Contributing Guide</a><br/>
-          <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/issues">Issue Tracker</a><br/>
-          <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/docs/wiki/Getting-Started.md">Getting Started Wiki</a><br/>
-          <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/docs/wiki/Contributing.md">Developer Wiki</a>
-        </p>
+      <div class="ot-feature-card" style="animation:none;opacity:1;transform:none;">
+        <div class="card-header"><div class="card-icon icon-blue"><i data-lucide="external-link"></i></div><h3>Resources</h3></div>
+        <p><a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/CONTRIBUTING.md">Contributing Guide</a><br/><a href="https://github.com/Hitheshkaranth/OpenTerminalUI/issues">Issue Tracker</a><br/><a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/docs/wiki/Getting-Started.md">Getting Started Wiki</a></p>
       </div>
     </div>
   </section>
 
 </div><!-- .ot-main -->
 
-<!-- ============================================================
-     FOOTER — status bar style
-     ============================================================ -->
-<div class="section-divider"></div>
-<footer class="ot-footer" style="margin-left: 52px;">
-  <div class="left-links">
+<div class="section-divider" style="margin-left:64px;"></div>
+<footer class="ot-footer" style="margin-left:64px;">
+  <div class="links">
     <a href="https://github.com/Hitheshkaranth/OpenTerminalUI">GitHub</a>
     <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/issues">Issues</a>
     <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/CONTRIBUTING.md">Contributing</a>
     <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/LICENSE">MIT License</a>
   </div>
-  <div class="right-text">OpenTerminalUI &mdash; Open-source financial terminal</div>
+  <div class="right">OpenTerminalUI &mdash; Open-source financial terminal</div>
 </footer>
+
+<!-- Initialize Lucide Icons -->
+<script>document.addEventListener("DOMContentLoaded",function(){if(window.lucide)window.lucide.createIcons();});</script>
 
 </body>
 </html>
