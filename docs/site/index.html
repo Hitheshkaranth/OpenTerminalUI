@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenTerminalUI - Open-Source Financial Terminal</title>
+  <meta name="description" content="Open-source market terminal for discretionary traders, researchers, and quant workflows. Real-time charting, derivatives, backtesting, and portfolio analytics." />
+  <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/logo.png" />
+  <style>
+    :root {
+      --bg: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1a2332;
+      --border: #1e293b;
+      --accent: #22d3ee;
+      --accent-dim: #0891b2;
+      --green: #34d399;
+      --red: #f87171;
+      --amber: #fbbf24;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Cascadia Code', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* Scanline overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.03) 2px,
+        rgba(0, 0, 0, 0.03) 4px
+      );
+      z-index: 9999;
+    }
+
+    a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+    a:hover { color: #67e8f9; }
+
+    /* ---- Nav ---- */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(10, 14, 23, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+    }
+    nav .nav-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 56px;
+    }
+    nav .logo {
+      display: flex; align-items: center; gap: 0.6rem;
+      font-family: var(--mono); font-weight: 700; font-size: 1.05rem;
+      color: var(--accent);
+    }
+    nav .logo img { height: 28px; border-radius: 4px; }
+    nav .nav-links { display: flex; gap: 1.5rem; }
+    nav .nav-links a {
+      color: var(--text-muted); font-size: 0.85rem; font-weight: 500;
+      letter-spacing: 0.02em; transition: color 0.2s;
+    }
+    nav .nav-links a:hover { color: var(--accent); }
+
+    /* ---- Hero ---- */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center;
+      padding: 6rem 2rem 4rem;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% 0%, rgba(34, 211, 238, 0.08) 0%, transparent 60%),
+        var(--bg);
+    }
+    .hero .badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.35rem 1rem; border-radius: 999px;
+      background: rgba(34, 211, 238, 0.1); border: 1px solid rgba(34, 211, 238, 0.2);
+      font-family: var(--mono); font-size: 0.75rem; color: var(--accent);
+      margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(2.4rem, 5vw, 4rem);
+      font-weight: 800;
+      line-height: 1.15;
+      max-width: 800px;
+      background: linear-gradient(135deg, #e2e8f0 0%, #22d3ee 50%, #34d399 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      margin-top: 1.2rem;
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      max-width: 640px;
+    }
+    .hero .cta-row {
+      margin-top: 2rem;
+      display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center;
+    }
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.75rem 1.5rem; border-radius: 8px;
+      font-size: 0.9rem; font-weight: 600;
+      transition: all 0.2s; cursor: pointer; border: none;
+    }
+    .btn-primary {
+      background: var(--accent); color: var(--bg);
+    }
+    .btn-primary:hover { background: #67e8f9; color: var(--bg); }
+    .btn-secondary {
+      background: var(--bg-card); color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+    .hero-screenshot {
+      margin-top: 3rem;
+      max-width: 960px; width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+    }
+
+    .tech-badges {
+      margin-top: 2rem;
+      display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center;
+    }
+    .tech-badges img { height: 22px; }
+
+    /* ---- Sections ---- */
+    section {
+      max-width: 1200px; margin: 0 auto;
+      padding: 5rem 2rem;
+    }
+    section h2 {
+      font-size: 2rem; font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    section .section-sub {
+      color: var(--text-muted); font-size: 1.05rem;
+      margin-bottom: 3rem; max-width: 640px;
+    }
+
+    /* ---- Feature grid ---- */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 1.25rem;
+    }
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      transition: border-color 0.25s, background 0.25s;
+    }
+    .feature-card:hover {
+      border-color: var(--accent-dim);
+      background: var(--bg-card-hover);
+    }
+    .feature-card .icon {
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      margin-bottom: 0.75rem;
+    }
+    .feature-card h3 {
+      font-size: 1.05rem; font-weight: 600;
+      margin-bottom: 0.4rem;
+    }
+    .feature-card p {
+      font-size: 0.875rem; color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .feature-card .tag {
+      display: inline-block; margin-top: 0.6rem;
+      padding: 0.15rem 0.5rem; border-radius: 4px;
+      font-family: var(--mono); font-size: 0.7rem;
+      background: rgba(34, 211, 238, 0.1); color: var(--accent);
+    }
+
+    /* color-coded icons */
+    .icon-cyan { background: rgba(34, 211, 238, 0.12); color: var(--accent); }
+    .icon-green { background: rgba(52, 211, 153, 0.12); color: var(--green); }
+    .icon-amber { background: rgba(251, 191, 36, 0.12); color: var(--amber); }
+    .icon-red { background: rgba(248, 113, 113, 0.12); color: var(--red); }
+    .icon-purple { background: rgba(167, 139, 250, 0.12); color: #a78bfa; }
+    .icon-blue { background: rgba(96, 165, 250, 0.12); color: #60a5fa; }
+
+    /* ---- Screenshots gallery ---- */
+    .screenshots-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+      gap: 1.5rem;
+    }
+    .screenshot-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      transition: border-color 0.25s;
+    }
+    .screenshot-card:hover { border-color: var(--accent-dim); }
+    .screenshot-card img {
+      width: 100%; display: block;
+    }
+    .screenshot-card .caption {
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem; color: var(--text-muted);
+      border-top: 1px solid var(--border);
+    }
+
+    /* ---- Architecture ---- */
+    .arch-diagram {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      overflow-x: auto;
+    }
+    .arch-diagram pre {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      white-space: pre;
+    }
+    .arch-diagram .hl { color: var(--accent); }
+    .arch-diagram .hlg { color: var(--green); }
+    .arch-diagram .hla { color: var(--amber); }
+    .arch-diagram .hlr { color: var(--red); }
+
+    /* ---- Requirements table ---- */
+    .req-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--bg-card);
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .req-table th {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(30, 41, 59, 0.5);
+      border-bottom: 1px solid var(--border);
+    }
+    .req-table td {
+      padding: 0.65rem 1rem;
+      font-size: 0.9rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .req-table tr:last-child td { border-bottom: none; }
+    .req-table code {
+      font-family: var(--mono);
+      padding: 0.15rem 0.4rem;
+      background: rgba(34, 211, 238, 0.08);
+      border-radius: 4px;
+      font-size: 0.82rem;
+      color: var(--accent);
+    }
+
+    /* ---- Download cards ---- */
+    .download-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.25rem;
+    }
+    .download-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.75rem;
+      text-align: center;
+      transition: border-color 0.25s;
+    }
+    .download-card:hover { border-color: var(--accent-dim); }
+    .download-card .dl-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .download-card h3 {
+      font-size: 1.1rem; font-weight: 600; margin-bottom: 0.4rem;
+    }
+    .download-card p {
+      font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;
+    }
+    .download-card .btn { width: 100%; justify-content: center; }
+
+    /* ---- Code blocks ---- */
+    .code-block {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--green);
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .code-block .prompt { color: var(--text-dim); }
+    .code-block .comment { color: var(--text-dim); }
+
+    /* ---- Footer ---- */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 3rem 2rem;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--text-muted); }
+    footer a:hover { color: var(--accent); }
+    footer .footer-links {
+      display: flex; gap: 1.5rem; justify-content: center;
+      margin-bottom: 1rem;
+    }
+
+    /* ---- Responsive ---- */
+    @media (max-width: 768px) {
+      nav .nav-links { display: none; }
+      .features-grid { grid-template-columns: 1fr; }
+      .screenshots-grid { grid-template-columns: 1fr; }
+      .download-grid { grid-template-columns: 1fr; }
+      section { padding: 3rem 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav>
+  <div class="nav-inner">
+    <a class="logo" href="#">
+      <img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/logo.png" alt="Logo" />
+      OpenTerminalUI
+    </a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#screenshots">Screenshots</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#requirements">Requirements</a>
+      <a href="#download">Download</a>
+      <a href="https://github.com/Hitheshkaranth/OpenTerminalUI">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="badge">v0.1.1 &mdash; MIT Licensed &mdash; Self-Hosted</div>
+  <h1>The Open-Source Financial Terminal</h1>
+  <p>
+    A professional-grade market terminal for discretionary traders, researchers, and quant teams.
+    Real-time charting, derivatives analytics, backtesting labs, portfolio management, and 70+ technical indicators &mdash; all in one self-hosted platform.
+  </p>
+  <div class="cta-row">
+    <a class="btn btn-primary" href="#download">Get Started</a>
+    <a class="btn btn-secondary" href="https://github.com/Hitheshkaranth/OpenTerminalUI">View on GitHub</a>
+  </div>
+  <img class="hero-screenshot" src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Enhanced_Home_Screen.png" alt="OpenTerminalUI Home Screen" />
+  <div class="tech-badges">
+    <img src="https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white" alt="Python 3.11" />
+    <img src="https://img.shields.io/badge/node-22-339933?logo=node.js&logoColor=white" alt="Node 22" />
+    <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI" />
+    <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black" alt="React 18" />
+    <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+    <img src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white" alt="Docker" />
+    <img src="https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white" alt="SQLite" />
+    <img src="https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white" alt="Redis" />
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <h2>Platform Features</h2>
+  <p class="section-sub">Everything you need in a financial terminal &mdash; from real-time market data to institutional-grade quant workflows.</p>
+
+  <div class="features-grid">
+    <!-- Terminal Shell -->
+    <div class="feature-card">
+      <div class="icon icon-cyan">&#9002;</div>
+      <h3>Terminal-Grade Shell</h3>
+      <p>Bloomberg-style GO bar (Ctrl+G), command palette (Ctrl+K), and function key shortcuts (F1-F9). Keyboard-first navigation designed for speed. Desktop and mobile-aware layouts with persistent workspace framing.</p>
+      <span class="tag">CORE</span>
+    </div>
+
+    <!-- Charting -->
+    <div class="feature-card">
+      <div class="icon icon-green">&#9041;</div>
+      <h3>Multi-Panel Chart Workstation</h3>
+      <p>Up to 9 synchronized chart panels with crosshair linking, 70+ technical indicators, drawing tools with templates, replay controls, volume profile overlay, and comparison series. Supports 1m to monthly timeframes with extended hours toggle.</p>
+      <span class="tag">CHARTING</span>
+    </div>
+
+    <!-- Equity Research -->
+    <div class="feature-card">
+      <div class="icon icon-blue">&#9776;</div>
+      <h3>Equity Research &amp; Security Hub</h3>
+      <p>Deep security analysis with 8 tabs: overview, financials, chart, news sentiment, ownership, analyst estimates, peers, and ESG. Company fundamentals, earnings calendar, promoter holdings, and corporate actions tracking.</p>
+      <span class="tag">RESEARCH</span>
+    </div>
+
+    <!-- Screener -->
+    <div class="feature-card">
+      <div class="icon icon-amber">&#9881;</div>
+      <h3>Advanced Multi-Market Screener</h3>
+      <p>Query builder with 15+ visualization modes: tables, treemaps, heatmaps, scatter plots, radar charts, box plots, bubble charts, waterfall charts, RRG quadrants, and more. Scan across NSE, BSE, NYSE, and NASDAQ with custom formulas.</p>
+      <span class="tag">SCREENER</span>
+    </div>
+
+    <!-- F&O -->
+    <div class="feature-card">
+      <div class="icon icon-red">&#8711;</div>
+      <h3>Futures &amp; Options Analytics</h3>
+      <p>Full option chain with live Greeks (Delta, Gamma, Theta, Vega, Rho), OI analysis, PCR tracking, strategy builder for multi-leg positions, IV heatmaps, expiry calendar, and futures term structure visualization.</p>
+      <span class="tag">DERIVATIVES</span>
+    </div>
+
+    <!-- Portfolio -->
+    <div class="feature-card">
+      <div class="icon icon-green">&#9733;</div>
+      <h3>Portfolio &amp; Risk Management</h3>
+      <p>Multi-portfolio management with allocation charts, benchmark comparison, correlation heatmaps, VaR/CVaR, EWMA volatility, PCA factor exposures, stress testing, and tax lot tracking. Paper trading engine with realistic order fills and TCA.</p>
+      <span class="tag">PORTFOLIO</span>
+    </div>
+
+    <!-- Backtesting -->
+    <div class="feature-card">
+      <div class="icon icon-purple">&#9881;</div>
+      <h3>Backtesting &amp; Model Lab</h3>
+      <p>10+ pre-built strategy templates with intraday and daily backtesting. 3D parameter surfaces, Monte Carlo simulations, walk-forward analysis, and monthly return heatmaps. Model Lab for experiment tracking with CAGR, Sharpe, Sortino, and max drawdown metrics.</p>
+      <span class="tag">QUANT</span>
+    </div>
+
+    <!-- Portfolio Lab -->
+    <div class="feature-card">
+      <div class="icon icon-purple">&#9055;</div>
+      <h3>Portfolio Lab &amp; Strategy Blends</h3>
+      <p>Multi-asset portfolio backtesting with risk parity, equal weight, and momentum weighting modes. Strategy blend definitions with up to 10 strategies and 200 assets. Rebalance scheduling, contributor attribution, and correlation matrices.</p>
+      <span class="tag">QUANT</span>
+    </div>
+
+    <!-- Real-time -->
+    <div class="feature-card">
+      <div class="icon icon-cyan">&#9889;</div>
+      <h3>Real-Time Market Data</h3>
+      <p>Multi-provider WebSocket feeds from Zerodha Kite (India) and Finnhub (US). Tick-by-tick broadcast, candle aggregation at all intervals, Redis pub/sub for horizontal scaling, and distributed bar construction with provider failover.</p>
+      <span class="tag">DATA</span>
+    </div>
+
+    <!-- Alerts -->
+    <div class="feature-card">
+      <div class="icon icon-amber">&#9888;</div>
+      <h3>Alerts &amp; Breakout Scanner</h3>
+      <p>Price, technical, and momentum-based alerts with WebSocket push notifications. Breakout scanner with confidence scoring, trigger/invalidation levels, and deduplication. Alert history timeline and real-time desktop notifications.</p>
+      <span class="tag">ALERTS</span>
+    </div>
+
+    <!-- Cross-asset -->
+    <div class="feature-card">
+      <div class="icon icon-blue">&#9729;</div>
+      <h3>Cross-Asset &amp; Macro Coverage</h3>
+      <p>Commodities, forex with central bank monitor, cryptocurrency workspace, ETF analytics with overlap analysis, mutual fund research with SIP calculator, bonds, US Treasury yield curve with inversion detection, and economic calendar.</p>
+      <span class="tag">MULTI-ASSET</span>
+    </div>
+
+    <!-- Sector Rotation -->
+    <div class="feature-card">
+      <div class="icon icon-green">&#8634;</div>
+      <h3>Sector Rotation &amp; RRG</h3>
+      <p>Interactive Relative Rotation Graph with 12-week trailing momentum paths. Benchmark-relative sector analysis, visual momentum/correlation display, and quadrant classification for leading, lagging, improving, and weakening sectors.</p>
+      <span class="tag">ANALYSIS</span>
+    </div>
+
+    <!-- News & Sentiment -->
+    <div class="feature-card">
+      <div class="icon icon-amber">&#9993;</div>
+      <h3>News &amp; Sentiment Analysis</h3>
+      <p>Real-time and historical news ingestion with bullish/bearish/neutral sentiment classification and confidence scores. Ticker-specific and market-wide feeds with multi-period filtering and sentiment trend visualization.</p>
+      <span class="tag">RESEARCH</span>
+    </div>
+
+    <!-- OMS & Compliance -->
+    <div class="feature-card">
+      <div class="icon icon-red">&#9745;</div>
+      <h3>OMS, Compliance &amp; Governance</h3>
+      <p>Order management with restricted list enforcement, immutable audit log, and compliance dashboard. Model governance with version tracking, promotion workflows, and risk limit monitoring. Ops cockpit with feed health and kill switches.</p>
+      <span class="tag">OPS</span>
+    </div>
+
+    <!-- Plugins -->
+    <div class="feature-card">
+      <div class="icon icon-purple">&#9881;</div>
+      <h3>Extensible Plugin System</h3>
+      <p>Build custom analysis modules with the plugin API. Included examples: RSI Divergence Scanner, Sector Rotation Monitor, and Unusual Volume Detector. Dynamic registration with full market data and chart context access.</p>
+      <span class="tag">PLUGINS</span>
+    </div>
+
+    <!-- Scripting -->
+    <div class="feature-card">
+      <div class="icon icon-cyan">&#9998;</div>
+      <h3>Python Scripting &amp; OpenScript</h3>
+      <p>Sandboxed Python execution with security-hardened imports. Custom indicator computation and strategy scripting. OpenScript language for chart-based indicator development with script library and sharing.</p>
+      <span class="tag">SCRIPTING</span>
+    </div>
+  </div>
+</section>
+
+<!-- Screenshots -->
+<section id="screenshots">
+  <h2>Screenshots</h2>
+  <p class="section-sub">See OpenTerminalUI in action across its major workspaces.</p>
+
+  <div class="screenshots-grid">
+    <div class="screenshot-card">
+      <img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Enhanced_Home_Screen.png" alt="Home Dashboard" loading="lazy" />
+      <div class="caption">Home dashboard with market context, workspace launch grid, and system health indicators.</div>
+    </div>
+    <div class="screenshot-card">
+      <img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Advanced_Workstation_6_Charts.png" alt="Chart Workstation" loading="lazy" />
+      <div class="caption">Multi-panel chart workstation with synchronized crosshairs and technical indicators.</div>
+    </div>
+    <div class="screenshot-card">
+      <img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Stock_Screen.png" alt="Stock Screen" loading="lazy" />
+      <div class="caption">Stock detail page with real-time quotes, charting, and fundamental analysis tabs.</div>
+    </div>
+    <div class="screenshot-card">
+      <img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Enhanced_Fundamental_Analysis.png" alt="Fundamental Analysis" loading="lazy" />
+      <div class="caption">Security hub with deep fundamental analysis, financials, and peer comparison.</div>
+    </div>
+    <div class="screenshot-card">
+      <img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Advanced_Portfolio_Monitoring.png" alt="Portfolio Monitoring" loading="lazy" />
+      <div class="caption">Portfolio analytics with allocation, benchmark overlay, correlation heatmap, and risk metrics.</div>
+    </div>
+    <div class="screenshot-card">
+      <img src="https://raw.githubusercontent.com/Hitheshkaranth/OpenTerminalUI/main/assets/Backtesting_Models_Simulations.png" alt="Backtesting Lab" loading="lazy" />
+      <div class="caption">Backtesting workspace with equity curves, parameter sensitivity, and Monte Carlo simulation.</div>
+    </div>
+  </div>
+</section>
+
+<!-- Architecture -->
+<section id="architecture">
+  <h2>Architecture</h2>
+  <p class="section-sub">A layered full-stack architecture designed for extensibility, real-time data flow, and institutional-grade analytics.</p>
+
+  <!-- High-level system diagram -->
+  <h3 style="margin-bottom: 1rem; font-size: 1.1rem;">System Overview</h3>
+  <div class="arch-diagram">
+    <pre>
+    <span class="hl">+--------------------------------------------------+</span>
+    <span class="hl">|                    CLIENT TIER                   |</span>
+    <span class="hl">+--------------------------------------------------+</span>
+    |  <span class="hlg">React 18 + TypeScript + Vite</span>                    |
+    |                                                  |
+    |  +------------+  +----------+  +-------------+   |
+    |  | <span class="hlg">Chart</span>      |  | <span class="hlg">Command</span>  |  | <span class="hlg">Zustand</span>     |   |
+    |  | <span class="hlg">Workstation</span>|  | <span class="hlg">Palette</span>  |  | <span class="hlg">Stores</span>      |   |
+    |  +------+-----+  +----+-----+  +------+------+   |
+    |         |              |               |          |
+    |  +------+--------------+---------------+------+   |
+    |  |       <span class="hlg">TanStack Query + Axios + WebSocket</span>     |   |
+    |  +------------------------+-----------------------+   |
+    +--------------------------|------------------------+
+                               | REST / WS
+    <span class="hla">+--------------------------|------------------------+</span>
+    <span class="hla">|                    API GATEWAY                    |</span>
+    <span class="hla">+--------------------------------------------------+</span>
+    |  <span class="hla">FastAPI + Uvicorn</span>                                |
+    |  JWT Auth | CORS | Rate Limiting                 |
+    |                                                  |
+    |  +--------+  +-------+  +---------+  +--------+  |
+    |  | <span class="hla">Equity</span> |  | <span class="hla">F&amp;O</span>   |  | <span class="hla">Backtest</span> |  | <span class="hla">Risk</span>   |  |
+    |  | <span class="hla">Routes</span> |  | <span class="hla">Routes</span> |  | <span class="hla">Routes</span>   |  | <span class="hla">Routes</span> |  |
+    |  +---+----+  +---+---+  +----+----+  +---+----+  |
+    +------|------------|-----------|-----------|-------+
+           |            |           |           |
+    <span class="hlg">+------|------------|-----------|-----------|-------+</span>
+    <span class="hlg">|                 SERVICE LAYER                     |</span>
+    <span class="hlg">+--------------------------------------------------+</span>
+    |  +-------------+  +----------+  +------------+   |
+    |  | <span class="hlg">Unified</span>     |  | <span class="hlg">Screener</span> |  | <span class="hlg">Model Lab</span>  |   |
+    |  | <span class="hlg">Fetcher</span>     |  | <span class="hlg">Engine</span>   |  | <span class="hlg">Engine</span>     |   |
+    |  +------+------+  +----+-----+  +-----+-----+   |
+    |         |              |               |          |
+    |  +------+--------------+---------------+------+   |
+    |  |        <span class="hlg">Provider Registry + Failover</span>         |   |
+    |  +------------------------+-----------------------+   |
+    +--------------------------|------------------------+
+                               |
+    <span class="hlr">+--------------------------|------------------------+</span>
+    <span class="hlr">|                  DATA PROVIDERS                   |</span>
+    <span class="hlr">+--------------------------------------------------+</span>
+    |                                                  |
+    |  +---------+  +---------+  +-----+  +--------+  |
+    |  | <span class="hlr">Zerodha</span> |  | <span class="hlr">Finnhub</span> |  | <span class="hlr">FMP</span> |  | <span class="hlr">Yahoo</span>  |  |
+    |  | <span class="hlr">Kite</span>    |  |         |  |     |  | <span class="hlr">Finance</span>|  |
+    |  +---------+  +---------+  +-----+  +--------+  |
+    +--------------------------------------------------+
+                               |
+    <span class="hl">+--------------------------|------------------------+</span>
+    <span class="hl">|                  PERSISTENCE                      |</span>
+    <span class="hl">+--------------------------------------------------+</span>
+    |  +----------+   +---------+   +----------------+ |
+    |  | <span class="hl">SQLite</span>   |   | <span class="hl">Redis</span>   |   | <span class="hl">PostgreSQL</span>    | |
+    |  | <span class="hl">(Default)</span>|   | <span class="hl">(Cache)</span>  |   | <span class="hl">(Production)</span>  | |
+    |  +----------+   +---------+   +----------------+ |
+    +--------------------------------------------------+</pre>
+  </div>
+
+  <!-- Data flow diagram -->
+  <h3 style="margin: 2.5rem 0 1rem; font-size: 1.1rem;">Real-Time Data Flow</h3>
+  <div class="arch-diagram">
+    <pre>
+    <span class="hlr">Market Exchanges</span>       <span class="hla">Provider Adapters</span>        <span class="hlg">Backend Services</span>         <span class="hl">Client</span>
+    ===============       ==================       ==================       ======
+
+    +----------+          +---------------+
+    | <span class="hlr">NSE/BSE</span>  | -------> | <span class="hla">Kite WS</span>       | ---+
+    +----------+          +---------------+    |
+                                               |   +----------------+      +---------------+
+    +----------+          +---------------+    +-> | <span class="hlg">Quote Hub</span>      | ---> | <span class="hl">WebSocket</span>     |
+    | <span class="hlr">NYSE</span>     | -------> | <span class="hla">Finnhub WS</span>    | ---+  | <span class="hlg">(fan-out)</span>     |      | <span class="hl">/api/ws/quotes</span>|
+    | <span class="hlr">NASDAQ</span>   |          +---------------+    |   +-------+--------+      +-------+-------+
+    +----------+                               |           |                        |
+                                               |   +-------v--------+      +-------v-------+
+    +----------+          +---------------+    |   | <span class="hlg">Bar Aggregator</span> |      | <span class="hl">Chart Engine</span>  |
+    | <span class="hlr">REST</span>     | -------> | <span class="hla">FMP / Yahoo</span>   | ---+   | <span class="hlg">(1m->Xm)</span>     |      | <span class="hl">(Lightweight</span>  |
+    | <span class="hlr">APIs</span>     |          +---------------+        +-------+--------+      | <span class="hl"> Charts v5)</span>   |
+    +----------+                                           |               +-------+-------+
+                                                   +-------v--------+              |
+                                                   | <span class="hlg">OHLCV Cache</span>    |      +-------v-------+
+                                                   | <span class="hlg">(SQLite+Redis)</span> |      | <span class="hl">Indicators</span>    |
+                                                   +----------------+      | <span class="hl">+ Overlays</span>    |
+                                                                           +---------------+</pre>
+  </div>
+
+  <!-- Backtesting pipeline -->
+  <h3 style="margin: 2.5rem 0 1rem; font-size: 1.1rem;">Backtesting &amp; Model Lab Pipeline</h3>
+  <div class="arch-diagram">
+    <pre>
+    <span class="hl">User Request</span>          <span class="hla">Execution Engine</span>          <span class="hlg">Reporting</span>                <span class="hlr">Governance</span>
+    ============          ================          =========                ==========
+
+    +-------------+       +----------------+       +------------------+     +----------------+
+    | <span class="hl">Define</span>      | ----> | <span class="hla">Vectorized</span>     | ----> | <span class="hlg">Equity Curve</span>     | --> | <span class="hlr">Model Registry</span> |
+    | <span class="hl">Experiment</span>  |       | <span class="hla">NumPy Engine</span>   |       | <span class="hlg">Drawdown Chart</span>   |     | <span class="hlr">Version Track</span>  |
+    +------+------+       +-------+--------+       | <span class="hlg">Monthly Heatmap</span>  |     | <span class="hlr">Promote to</span>     |
+           |                      |                | <span class="hlg">Rolling Sharpe</span>   |     | <span class="hlr">Paper Trading</span>  |
+    +------v------+       +-------v--------+       | <span class="hlg">Trade Analysis</span>   |     +-------+--------+
+    | <span class="hl">Set Params</span>  |       | <span class="hla">Realistic Fills</span> |       +--------+---------+             |
+    | <span class="hl">Universe</span>    |       | <span class="hla">Slippage Model</span> |                |                 +-------v--------+
+    | <span class="hl">Cost Model</span>  |       | <span class="hla">Commission</span>     |       +--------v---------+     | <span class="hlr">Paper Trading</span>  |
+    +------+------+       +-------+--------+       | <span class="hlg">Compare Runs</span>     |     | <span class="hlr">Live Validation</span>|
+           |                      |                | <span class="hlg">Walk-Forward</span>     |     +----------------+
+    +------v------+       +-------v--------+       | <span class="hlg">Param Sweep</span>      |
+    | <span class="hl">Submit Run</span>  | ----> | <span class="hla">Async Job</span>      |       +------------------+
+    | <span class="hl">(async)</span>     |       | <span class="hla">Poll -> Result</span> |
+    +-------------+       +----------------+</pre>
+  </div>
+
+  <!-- Provider waterfall -->
+  <h3 style="margin: 2.5rem 0 1rem; font-size: 1.1rem;">Provider Waterfall Architecture</h3>
+  <div class="arch-diagram">
+    <pre>
+    <span class="hl">Unified Fetcher</span> receives request for symbol + interval
+           |
+           v
+    +------+------+     <span class="hlg">HIT</span>     +------------------+
+    | <span class="hla">L1: SQLite</span>  | ----------> | Return cached    |
+    | <span class="hla">OHLCV Cache</span> |             | bars immediately |
+    +------+------+             +------------------+
+           | <span class="hlr">MISS</span>
+           v
+    +------+------+     <span class="hlg">HIT</span>     +------------------+
+    | <span class="hla">L2: Redis</span>   | ----------> | Populate L1,     |
+    | <span class="hla">Cache</span>       |             | return bars      |
+    +------+------+             +------------------+
+           | <span class="hlr">MISS</span>
+           v
+    +------+------+     <span class="hlg">OK</span>      +------------------+
+    | <span class="hla">Primary</span>    | ----------> | Populate L1+L2,  |
+    | <span class="hla">Provider</span>   |             | return bars      |
+    +------+------+             +------------------+
+           | <span class="hlr">FAIL</span>
+           v
+    +------+------+     <span class="hlg">OK</span>      +------------------+
+    | <span class="hla">Fallback</span>   | ----------> | Populate L1+L2,  |
+    | <span class="hla">Provider</span>   |             | return bars      |
+    +------+------+             +------------------+
+           | <span class="hlr">FAIL</span>
+           v
+    +------+------+
+    | <span class="hlr">Return</span>     |
+    | <span class="hlr">Error 503</span>  |
+    +-------------+</pre>
+  </div>
+</section>
+
+<!-- System Requirements -->
+<section id="requirements">
+  <h2>System Requirements</h2>
+  <p class="section-sub">OpenTerminalUI runs on any modern desktop or server. Here's what you need.</p>
+
+  <h3 style="margin-bottom: 1rem; font-size: 1.1rem;">Minimum Requirements</h3>
+  <table class="req-table">
+    <thead>
+      <tr><th>Component</th><th>Minimum</th><th>Recommended</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Operating System</td><td>Linux, macOS, or Windows 10+</td><td>Ubuntu 22.04+ / macOS 13+</td></tr>
+      <tr><td>CPU</td><td>2 cores</td><td>4+ cores</td></tr>
+      <tr><td>RAM</td><td>4 GB</td><td>8 GB+</td></tr>
+      <tr><td>Disk Space</td><td>2 GB</td><td>10 GB+ (for historical data caching)</td></tr>
+      <tr><td>Display</td><td>1280 x 720</td><td>1920 x 1080+</td></tr>
+      <tr><td>Browser</td><td>Chrome 90+, Firefox 90+, Safari 15+, Edge 90+</td><td>Latest Chrome or Firefox</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin: 2rem 0 1rem; font-size: 1.1rem;">Software Dependencies</h3>
+  <table class="req-table">
+    <thead>
+      <tr><th>Software</th><th>Version</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Docker</td><td><code>20.10+</code></td><td>Required for containerized deployment</td></tr>
+      <tr><td>Docker Compose</td><td><code>v2.0+</code></td><td>Included with Docker Desktop</td></tr>
+      <tr><td>Python</td><td><code>3.11+</code></td><td>Required only for local (non-Docker) development</td></tr>
+      <tr><td>Node.js</td><td><code>22+</code></td><td>Required only for local frontend development</td></tr>
+      <tr><td>npm</td><td><code>10+</code></td><td>Bundled with Node.js</td></tr>
+      <tr><td>Git</td><td><code>2.30+</code></td><td>For cloning the repository</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin: 2rem 0 1rem; font-size: 1.1rem;">Optional Services</h3>
+  <table class="req-table">
+    <thead>
+      <tr><th>Service</th><th>Purpose</th><th>Default</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Redis</td><td>Real-time quote pub/sub, L2 cache, session store</td><td>Included in Docker Compose</td></tr>
+      <tr><td>PostgreSQL 16</td><td>Production database (higher concurrency)</td><td>SQLite used by default</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin: 2rem 0 1rem; font-size: 1.1rem;">Market Data API Keys (Optional)</h3>
+  <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+    The platform runs without API keys using fallback providers. Add keys to unlock full real-time and historical data:
+  </p>
+  <table class="req-table">
+    <thead>
+      <tr><th>Provider</th><th>Coverage</th><th>Environment Variable</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Financial Modeling Prep</td><td>US equities, fundamentals, earnings</td><td><code>FMP_API_KEY</code></td></tr>
+      <tr><td>Finnhub</td><td>US real-time WebSocket ticks</td><td><code>FINNHUB_API_KEY</code></td></tr>
+      <tr><td>Zerodha Kite</td><td>India NSE/BSE real-time + historical</td><td><code>KITE_API_KEY</code>, <code>KITE_API_SECRET</code>, <code>KITE_ACCESS_TOKEN</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- Download -->
+<section id="download">
+  <h2>Download &amp; Install</h2>
+  <p class="section-sub">Get started in under 5 minutes with Docker, or build from source for full development flexibility.</p>
+
+  <div class="download-grid">
+    <!-- Docker -->
+    <div class="download-card">
+      <div class="dl-icon">&#128451;</div>
+      <h3>Docker Image</h3>
+      <p>Fastest path to a running instance. Includes backend, frontend, and SQLite by default. Optional Redis and PostgreSQL via Docker Compose profiles.</p>
+      <div class="code-block" style="text-align: left; margin-bottom: 1rem;">
+        <span class="prompt">$</span> git clone https://github.com/Hitheshkaranth/OpenTerminalUI.git<br/>
+        <span class="prompt">$</span> cd OpenTerminalUI<br/>
+        <span class="prompt">$</span> docker compose up --build
+      </div>
+      <a class="btn btn-primary" href="https://github.com/Hitheshkaranth/OpenTerminalUI" style="margin-bottom: 0.5rem;">Clone from GitHub</a>
+      <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.75rem;">
+        App available at <code>http://localhost:8000</code> after build
+      </p>
+    </div>
+
+    <!-- Source Build -->
+    <div class="download-card">
+      <div class="dl-icon">&#128187;</div>
+      <h3>Build from Source</h3>
+      <p>For development and contribution. Run backend and frontend separately with hot-reload for instant feedback during development.</p>
+      <div class="code-block" style="text-align: left; margin-bottom: 1rem;">
+        <span class="comment"># Backend</span><br/>
+        <span class="prompt">$</span> python3.11 -m venv .venv<br/>
+        <span class="prompt">$</span> source .venv/bin/activate<br/>
+        <span class="prompt">$</span> pip install -r backend/requirements.txt<br/>
+        <span class="prompt">$</span> PYTHONPATH=. uvicorn backend.main:app --reload<br/><br/>
+        <span class="comment"># Frontend</span><br/>
+        <span class="prompt">$</span> cd frontend && npm ci && npm run dev
+      </div>
+      <a class="btn btn-secondary" href="https://github.com/Hitheshkaranth/OpenTerminalUI">View Source</a>
+    </div>
+
+    <!-- Release Archive -->
+    <div class="download-card">
+      <div class="dl-icon">&#128230;</div>
+      <h3>Release Archive</h3>
+      <p>Download a specific tagged release as a zip or tarball. Useful for deploying a known-good version to production servers.</p>
+      <div class="code-block" style="text-align: left; margin-bottom: 1rem;">
+        <span class="prompt">$</span> curl -LO https://github.com/<br/>
+        &nbsp;&nbsp;Hitheshkaranth/OpenTerminalUI/<br/>
+        &nbsp;&nbsp;archive/refs/heads/main.zip
+      </div>
+      <a class="btn btn-secondary" href="https://github.com/Hitheshkaranth/OpenTerminalUI/archive/refs/heads/main.zip">Download .zip</a>
+    </div>
+  </div>
+
+  <!-- Docker Compose profiles -->
+  <h3 style="margin: 2.5rem 0 1rem; font-size: 1.1rem;">Docker Compose Profiles</h3>
+  <div class="code-block">
+    <span class="comment"># Default: Backend + Frontend (SQLite)</span><br/>
+    <span class="prompt">$</span> docker compose up --build<br/><br/>
+    <span class="comment"># With PostgreSQL for production workloads</span><br/>
+    <span class="prompt">$</span> docker compose --profile postgres up --build<br/><br/>
+    <span class="comment"># Environment variables (create .env from .env.example)</span><br/>
+    <span class="prompt">$</span> cp .env.example .env<br/>
+    <span class="prompt">$</span> docker compose up --build
+  </div>
+</section>
+
+<!-- Quick start -->
+<section id="quickstart">
+  <h2>Quick Start Guide</h2>
+  <p class="section-sub">From clone to dashboard in three steps.</p>
+
+  <div class="features-grid" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="feature-card" style="text-align: center;">
+      <div class="icon icon-cyan" style="margin: 0 auto 0.75rem; font-size: 1.5rem;">1</div>
+      <h3>Clone &amp; Configure</h3>
+      <p>Clone the repo, copy <code>.env.example</code> to <code>.env</code>, and optionally add your market data API keys for full provider access.</p>
+    </div>
+    <div class="feature-card" style="text-align: center;">
+      <div class="icon icon-green" style="margin: 0 auto 0.75rem; font-size: 1.5rem;">2</div>
+      <h3>Launch</h3>
+      <p>Run <code>docker compose up --build</code> and wait for the health check to pass. The full stack (backend + frontend) starts on port 8000.</p>
+    </div>
+    <div class="feature-card" style="text-align: center;">
+      <div class="icon icon-amber" style="margin: 0 auto 0.75rem; font-size: 1.5rem;">3</div>
+      <h3>Explore</h3>
+      <p>Open <code>http://localhost:8000</code>, register an account, and use <strong>Ctrl+K</strong> to open the command palette. Type any ticker symbol to begin.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Contributing -->
+<section id="contributing">
+  <h2>Contributing</h2>
+  <p class="section-sub">OpenTerminalUI is MIT-licensed and welcomes contributions from the community.</p>
+
+  <div class="features-grid" style="grid-template-columns: repeat(2, 1fr);">
+    <div class="feature-card">
+      <h3>Development Workflow</h3>
+      <p>Fork the repo, create a feature branch (<code>feat/your-feature</code>), write tests first, and run <code>make gate</code> before opening a PR. The CI checks Python compile, pytest (45% coverage threshold), frontend build, Vitest, and Playwright E2E tests.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Resources</h3>
+      <p>
+        <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/CONTRIBUTING.md">Contributing Guide</a><br/>
+        <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/issues">Issue Tracker</a><br/>
+        <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/docs/wiki/Getting-Started.md">Getting Started Wiki</a><br/>
+        <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/docs/wiki/Contributing.md">Developer Wiki</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-links">
+    <a href="https://github.com/Hitheshkaranth/OpenTerminalUI">GitHub</a>
+    <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/issues">Issues</a>
+    <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/CONTRIBUTING.md">Contributing</a>
+    <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/LICENSE">MIT License</a>
+  </div>
+  <p>OpenTerminalUI &mdash; Open-source financial terminal for traders, researchers, and quant teams.</p>
+</footer>
+
+</body>
+</html>
