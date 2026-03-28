@@ -127,10 +127,11 @@
       padding: 8px;
     }
     .ot-nav-rail .brand-icon {
-      width: 28px; height: 28px;
-      border: 1px solid var(--ot-border); border-radius: 4px;
-      padding: 2px; object-fit: contain;
-      margin-bottom: 8px;
+      width: 36px; height: 36px;
+      border: 1.5px solid var(--ot-amber); border-radius: 6px;
+      padding: 3px; object-fit: contain;
+      margin-bottom: 10px;
+      box-shadow: 0 0 10px rgba(255,107,0,0.2);
     }
     .ot-nav-rail .rail-items { flex: 1; overflow: auto; width: 100%; display: flex; flex-direction: column; gap: 1px; }
     .ot-nav-rail .rail-item {
@@ -272,8 +273,9 @@
     .ot-hero-brand { position: relative; z-index: 2; animation: otFadeInLeft 0.65s ease; }
     .ot-hero-brand .brand-logo { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
     .ot-hero-brand .brand-logo img {
-      width: 56px; height: 56px; border: 1px solid var(--ot-border); border-radius: 6px; padding: 6px;
-      background: rgba(10,10,10,0.78);
+      width: 80px; height: 80px; border: 2px solid var(--ot-amber); border-radius: 10px; padding: 8px;
+      background: rgba(10,10,10,0.85);
+      box-shadow: 0 0 24px rgba(255,107,0,0.25), 0 0 48px rgba(255,107,0,0.08);
     }
     .ot-hero-brand .kicker {
       font-family: var(--ot-font-data); font-size: 10px; font-weight: 600;
@@ -281,7 +283,7 @@
     }
     .ot-hero-brand h1 { line-height: 1.05; }
     .ot-hero-brand h1 .amber { font-size: clamp(48px, 5vw, 64px); font-weight: 700; color: var(--ot-amber); display: block; }
-    .ot-hero-brand h1 .light { font-size: clamp(48px, 5vw, 64px); font-weight: 300; color: var(--ot-text-inverse); }
+    .ot-hero-brand h1 .light { font-size: clamp(48px, 5vw, 64px); font-weight: 300; color: var(--ot-text); }
     .ot-hero-brand .tagline { margin-top: 16px; font-size: 13px; color: var(--ot-text-muted); max-width: 420px; line-height: 1.6; }
     .ot-hero-brand .version-row { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
 
