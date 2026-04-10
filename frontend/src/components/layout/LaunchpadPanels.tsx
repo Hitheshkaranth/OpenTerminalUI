@@ -25,10 +25,28 @@ import { OrderBookPanel } from "../market/OrderBookPanel";
 import { HeatmapView } from "../watchlist/HeatmapView";
 import { SectorRotationMap } from "../analysis/SectorRotationMap";
 import { OptionChainTable } from "../../fno/components/OptionChainTable";
+import { PanelBody } from "./PanelChrome";
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { Send, Sparkles, User, Bot, Loader2 } from "lucide-react";
+import { HotKeyPanel } from "../trading/HotKeyPanel";
 
 type PanelProps = { panel: LaunchpadPanelConfig };
+
+export function LaunchpadTemplatePlaceholderPanel({ panel }: PanelProps) {
+  return (
+    <PanelBody className="flex h-full min-h-[160px] flex-col justify-between gap-3">
+      <div>
+        <div className="ot-type-panel-title text-terminal-accent">{panel.title}</div>
+        <div className="mt-1 text-xs text-terminal-muted">
+          {panel.type} is available as a saved Launchpad template slot but does not have a dedicated embedded panel yet.
+        </div>
+      </div>
+      <div className="rounded-sm border border-terminal-border bg-terminal-bg px-2 py-1 text-[10px] text-terminal-muted">
+        {panel.symbol ? `Symbol: ${panel.symbol}` : "Assign a symbol or replace this panel from the Launchpad toolbar."}
+      </div>
+    </PanelBody>
+  );
+}
 
 export function LaunchpadAIResearchPanel({ panel }: PanelProps) {
   const [query, setQuery] = useState("");
@@ -544,4 +562,8 @@ export function LaunchpadFundamentalsPanel({ panel }: PanelProps) {
       </div>
     </div>
   );
+}
+
+export function LaunchpadHotKeyTradingPanel(_: PanelProps) {
+  return <HotKeyPanel className="h-full border-0 rounded-none bg-transparent p-0 shadow-none" />;
 }

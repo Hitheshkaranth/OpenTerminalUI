@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -16,7 +16,7 @@ def log_audit(db: Session, event_type: str, entity_type: str, entity_id: str | N
             entity_type=entity_type,
             entity_id=entity_id,
             payload_json=payload,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
     )
     db.commit()
@@ -63,8 +63,8 @@ def create_order(
         status="accepted" if accepted else "rejected",
         rejection_reason=rejection_reason,
         meta_json=meta_json,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
     db.add(row)
     db.commit()
@@ -87,7 +87,7 @@ def create_fill(db: Session, order_id: str, symbol: str, quantity: float, fill_p
         quantity=float(quantity),
         fill_price=float(fill_price),
         cost=float(cost),
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     db.add(row)
     db.commit()

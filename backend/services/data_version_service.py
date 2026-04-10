@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -23,7 +23,7 @@ def get_active_data_version(db: Session) -> DataVersionORM:
         description="Default internal dataset snapshot",
         source="internal",
         is_active=True,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         metadata_json={"bootstrap": True},
     )
     db.add(default)
@@ -40,7 +40,7 @@ def create_data_version(db: Session, name: str, description: str = "", source: s
         description=description.strip(),
         source=source.strip() or "internal",
         is_active=bool(activate),
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         metadata_json=metadata or {},
     )
     db.add(row)

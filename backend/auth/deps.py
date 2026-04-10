@@ -86,4 +86,8 @@ def auth_exempt_path(path: str) -> bool:
         return True
     if path.startswith("/api/auth"):
         return True
+    if path.startswith("/api/v1"):
+        return True
+    if path.startswith("/api/public"):
+        return True
     return False

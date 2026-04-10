@@ -7,6 +7,7 @@ import {
   X,
   GripVertical,
   LayoutGrid,
+  Search,
 } from "lucide-react";
 
 import {
@@ -35,6 +36,7 @@ const PANEL_TYPES: LaunchpadPanelType[] = [
   "option-chain",
   "watchlist-heatmap",
   "sector-rotation",
+  "hotkeys",
 ];
 
 function typeIconLabel(type: LaunchpadPanelType) {
@@ -44,13 +46,36 @@ function typeIconLabel(type: LaunchpadPanelType) {
     case "watchlist":
       return "WL";
     case "news-feed":
+    case "news":
       return "NW";
+    case "overview":
+      return "OV";
     case "order-book":
       return "OB";
+    case "screener":
+    case "screener-results":
+      return "SC";
+    case "financials":
+    case "fundamentals":
+      return "FN";
+    case "portfolio-allocation":
+      return "AL";
+    case "portfolio-performance":
+      return "PF";
+    case "risk-metrics":
+      return "RM";
     case "market-pulse":
       return "MP";
     case "yield-curve":
       return "YC";
+    case "economics":
+      return "EC";
+    case "greeks":
+      return "GR";
+    case "oi-chart":
+      return "OI";
+    case "peers":
+      return "PR";
     case "ai-research":
       return "AI";
     case "option-chain":
@@ -59,6 +84,8 @@ function typeIconLabel(type: LaunchpadPanelType) {
       return "HM";
     case "sector-rotation":
       return "RRG";
+    case "hotkeys":
+      return "HK";
     default:
       return "PN";
   }
@@ -110,7 +137,7 @@ function VisibilityMount({
   );
 }
 
-export function LaunchpadWorkspace() {
+export function LaunchpadWorkspace({ toolbarActions }: { toolbarActions?: ReactNode }) {
   const {
     activeLayout,
     activeLayoutId,
@@ -139,7 +166,14 @@ export function LaunchpadWorkspace() {
   const [layoutNameDraft, setLayoutNameDraft] = useState("");
   const [panelTypeOpen, setPanelTypeOpen] = useState(false);
   const [focusedPanelId, setFocusedPanelId] = useState<string | null>(null);
+  const [panelSearch, setPanelSearch] = useState("");
+  
   const panels = activeLayout?.panels ?? [];
+
+  const filteredPanelTypes = useMemo(() => 
+    PANEL_TYPES.filter(t => t.toLowerCase().includes(panelSearch.toLowerCase())),
+    [panelSearch]
+  );
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -240,6 +274,7 @@ export function LaunchpadWorkspace() {
           ))}
         </div>
         <div className="ml-auto flex items-center gap-1">
+          {toolbarActions}
           <div className="relative">
             <button
               type="button"
@@ -249,20 +284,36 @@ export function LaunchpadWorkspace() {
               <Plus className="h-3.5 w-3.5" /> Panel
             </button>
             {panelTypeOpen ? (
-              <div className="absolute right-0 top-8 z-40 w-44 rounded-sm border border-terminal-border bg-[#0F141B] p-1 shadow-xl">
-                {PANEL_TYPES.map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => {
-                      addPanel(type);
-                      setPanelTypeOpen(false);
-                    }}
-                    className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-terminal-panel"
-                  >
-                    {type}
-                  </button>
-                ))}
+              <div className="absolute right-0 top-8 z-40 w-48 rounded-sm border border-terminal-border bg-[#0F141B] p-2 shadow-xl">
+                <div className="relative mb-2">
+                  <Search className="absolute left-2 top-1.5 h-3 w-3 text-terminal-muted" />
+                  <input
+                    autoFocus
+                    className="w-full rounded-sm border border-terminal-border bg-terminal-bg pl-7 pr-2 py-1 text-[10px] outline-none focus:border-terminal-accent"
+                    placeholder="Search panels..."
+                    value={panelSearch}
+                    onChange={(e) => setPanelSearch(e.target.value)}
+                  />
+                </div>
+                <div className="max-h-60 overflow-auto">
+                  {filteredPanelTypes.map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => {
+                        addPanel(type);
+                        setPanelTypeOpen(false);
+                        setPanelSearch("");
+                      }}
+                      className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-terminal-panel capitalize"
+                    >
+                      {type.replace(/-/g, " ")}
+                    </button>
+                  ))}
+                  {filteredPanelTypes.length === 0 && (
+                    <div className="px-2 py-1 text-[10px] text-terminal-muted italic text-center">No matching panels</div>
+                  )}
+                </div>
               </div>
             ) : null}
           </div>
@@ -299,6 +350,7 @@ export function LaunchpadWorkspace() {
                 tabIndex={0}
                 onFocus={() => setFocusedPanelId(panel.id)}
                 data-launchpad-panel-id={panel.id}
+                data-testid="launchpad-panel-frame"
               >
                 <PanelHeader
                   title={

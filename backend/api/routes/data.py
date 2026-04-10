@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -20,9 +20,9 @@ async def get_ohlcv(
 ) -> dict[str, Any]:
     try:
         if not end:
-            end = datetime.utcnow().strftime("%Y-%m-%d")
+            end = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         if not start:
-            start = (datetime.utcnow() - timedelta(days=365 * 5)).strftime("%Y-%m-%d")
+            start = (datetime.now(timezone.utc) - timedelta(days=365 * 5)).strftime("%Y-%m-%d")
         service = get_historical_data_service()
         normalized, bars = service.fetch_daily_ohlcv(
             raw_symbol=symbol,

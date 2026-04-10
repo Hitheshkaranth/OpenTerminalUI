@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
@@ -46,10 +46,10 @@ def put_user_layouts(
     user_key = _user_key_from_request(request)
     row = db.query(UserLayoutORM).filter(UserLayoutORM.user_key == user_key).first()
     if row is None:
-        row = UserLayoutORM(user_key=user_key, layouts_json=payload.items, updated_at=datetime.utcnow())
+        row = UserLayoutORM(user_key=user_key, layouts_json=payload.items, updated_at=datetime.now(timezone.utc))
         db.add(row)
     else:
         row.layouts_json = payload.items
-        row.updated_at = datetime.utcnow()
+        row.updated_at = datetime.now(timezone.utc)
     db.commit()
     return {"ok": True, "count": len(payload.items)}

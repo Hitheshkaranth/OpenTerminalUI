@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import itertools
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -63,7 +63,7 @@ class ModelLabService:
                 start_date=payload.start_date,
                 end_date=payload.end_date,
                 cost_model_json=payload.cost_model_json,
-                created_at=datetime.utcnow().isoformat(),
+                created_at=datetime.now(timezone.utc).isoformat(),
             )
             db.add(row)
             db.commit()
@@ -129,7 +129,7 @@ class ModelLabService:
         if row.status != mapped:
             row.status = mapped
             if mapped in {"succeeded", "failed"}:
-                row.finished_at = datetime.utcnow().isoformat()
+                row.finished_at = datetime.now(timezone.utc).isoformat()
             db.commit()
 
     async def enqueue_run(self, experiment_id: str, force_refresh: bool = False) -> dict:
@@ -176,7 +176,7 @@ class ModelLabService:
                 experiment_id=experiment_id,
                 backtest_run_id=backtest_run_id,
                 status="queued",
-                started_at=datetime.utcnow().isoformat(),
+                started_at=datetime.now(timezone.utc).isoformat(),
                 finished_at=None,
                 error=None,
             )

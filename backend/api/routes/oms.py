@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -76,7 +76,7 @@ async def oms_order(
             cost=0.0,
         )
         order.status = "filled"
-        order.updated_at = datetime.utcnow()
+        order.updated_at = datetime.now(timezone.utc)
         db.commit()
         fill_payload = {
             "id": fill.id,
@@ -145,7 +145,7 @@ def oms_restricted(
     symbol = payload.symbol.strip().upper()
     row = db.query(RestrictedListORM).filter(RestrictedListORM.symbol == symbol).first()
     if row is None:
-        row = RestrictedListORM(symbol=symbol, reason=payload.reason, active=payload.active, created_at=datetime.utcnow())
+        row = RestrictedListORM(symbol=symbol, reason=payload.reason, active=payload.active, created_at=datetime.now(timezone.utc))
         db.add(row)
     else:
         row.reason = payload.reason

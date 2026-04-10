@@ -7,8 +7,7 @@ from datetime import datetime, timedelta, timezone
 from statistics import mean
 from typing import Any
 
-import httpx
-
+from backend.alerts.delivery import deliver_alert
 from backend.alerts.scanner_rules import process_scanner_tick
 from backend.shared.db import SessionLocal
 from backend.models import AlertConditionType, AlertORM, AlertStatus, AlertTriggerORM
@@ -260,16 +259,27 @@ class AlertEvaluatorService:
                 .all()
             )
             for alert in alerts:
+                now = _utcnow()
+                if self._should_expire(alert, now):
+                    alert.status = AlertStatus.EXPIRED.value
+                    db.commit()
+                    continue
+                if self._max_triggers_reached(alert):
+                    alert.status = AlertStatus.EXPIRED.value
+                    db.commit()
+                    continue
                 if not self._cooldown_ready(alert):
                     continue
                 ok, triggered_value = self._evaluate(alert, tick)
                 if not ok:
                     continue
-                now = _utcnow()
                 trigger_context = self._build_trigger_context(alert, tick, triggered_value)
-                alert.status = AlertStatus.TRIGGERED.value
                 alert.triggered_at = now
+                alert.last_triggered_at = now
                 alert.last_triggered_value = triggered_value
+                alert.trigger_count = int(alert.trigger_count or 0) + 1
+                if self._max_triggers_reached(alert):
+                    alert.status = AlertStatus.EXPIRED.value
                 db.add(
                     AlertTriggerORM(
                         alert_id=alert.id,
@@ -282,22 +292,38 @@ class AlertEvaluatorService:
                     )
                 )
                 db.commit()
+                message = self._build_delivery_message(alert, triggered_value, now)
+                await deliver_alert(alert, message, db=db)
                 await self._emit_alert_event(alert, triggered_value, now, trigger_context)
-                await self._send_telegram_if_configured(alert, triggered_value, now)
             if self._hub is not None:
                 await process_scanner_tick(db, self._hub, tick)
         finally:
             db.close()
 
+    @staticmethod
+    def _should_expire(alert: AlertORM, now: datetime) -> bool:
+        return bool(alert.expiry_date and alert.expiry_date <= now)
+
+    @staticmethod
+    def _max_triggers_reached(alert: AlertORM) -> bool:
+        max_triggers = max(0, int(alert.max_triggers or 0))
+        return max_triggers > 0 and int(alert.trigger_count or 0) >= max_triggers
+
     def _cooldown_ready(self, alert: AlertORM) -> bool:
-        if not alert.triggered_at:
+        last_triggered_at = alert.last_triggered_at or alert.triggered_at
+        if not last_triggered_at:
             return True
+        cooldown_minutes = max(0, int(alert.cooldown_minutes or 0))
+        if cooldown_minutes > 0:
+            return _utcnow() >= last_triggered_at + timedelta(minutes=cooldown_minutes)
         cooldown = max(0, int(alert.cooldown_seconds or 0))
         if cooldown == 0:
             return True
-        return _utcnow() >= alert.triggered_at + timedelta(seconds=cooldown)
+        return _utcnow() >= last_triggered_at + timedelta(seconds=cooldown)
 
     def _evaluate(self, alert: AlertORM, tick: dict[str, Any]) -> tuple[bool, float | None]:
+        if isinstance(alert.conditions, list) and alert.conditions:
+            return self._evaluate_conditions(alert, tick)
         ctype = str(alert.condition_type)
         params = alert.parameters if isinstance(alert.parameters, dict) else {}
         ltp = _safe_float(tick.get("ltp"))
@@ -343,6 +369,109 @@ class AlertEvaluatorService:
             history = list(self._price_cache[alert.symbol])
             previous_price = history[-2] if len(history) >= 2 else None
             return DrawingCrossCondition().evaluate(tick, params, previous_price)
+        return False, None
+
+    def _evaluate_conditions(self, alert: AlertORM, tick: dict[str, Any]) -> tuple[bool, float | None]:
+        conditions = [condition for condition in alert.conditions if isinstance(condition, dict)]
+        if not conditions:
+            return False, None
+        results: list[tuple[bool, float | None]] = [self._evaluate_condition(alert, tick, condition) for condition in conditions]
+        logic = str(alert.logic or "AND").strip().upper()
+        ok = all(result for result, _ in results) if logic == "AND" else any(result for result, _ in results)
+        triggered_value = next((value for result, value in results if result and value is not None), None)
+        if triggered_value is None:
+            triggered_value = next((value for _, value in results if value is not None), None)
+        return ok, triggered_value
+
+    def _evaluate_condition(self, alert: AlertORM, tick: dict[str, Any], condition: dict[str, Any]) -> tuple[bool, float | None]:
+        field = str(condition.get("field") or "").strip().lower()
+        operator = str(condition.get("operator") or "").strip().lower()
+        params = condition.get("params") if isinstance(condition.get("params"), dict) else {}
+        value = _safe_float(condition.get("value"))
+        history = list(self._price_cache[alert.symbol])
+        previous_price = history[-2] if len(history) >= 2 else _safe_float(tick.get("previous_ltp"))
+        ltp = _safe_float(tick.get("ltp"))
+        change_pct = _safe_float(tick.get("change_pct"))
+        volume = _safe_float(tick.get("volume"))
+        oi_change = _safe_float(tick.get("oi_change") or tick.get("open_interest_change"))
+        iv = _safe_float(tick.get("iv") or tick.get("implied_volatility"))
+
+        if field == "price":
+            if operator == "above":
+                return bool(ltp is not None and value is not None and ltp > value), ltp
+            if operator == "below":
+                return bool(ltp is not None and value is not None and ltp < value), ltp
+            if operator == "cross_above":
+                return bool(previous_price is not None and ltp is not None and value is not None and previous_price <= value < ltp), ltp
+            if operator == "cross_below":
+                return bool(previous_price is not None and ltp is not None and value is not None and previous_price >= value > ltp), ltp
+
+        if field == "change_pct":
+            if operator == "above":
+                return bool(change_pct is not None and value is not None and change_pct > value), change_pct
+            if operator == "below":
+                return bool(change_pct is not None and value is not None and change_pct < value), change_pct
+
+        if field == "volume":
+            if operator == "above":
+                return bool(volume is not None and value is not None and volume > value), volume
+            if operator == "spike":
+                lookback = max(2, int(params.get("lookback") or 20))
+                multiplier = max(1.0, _safe_float(params.get("multiplier")) or value or 2.0)
+                seq = list(self._volume_cache[alert.symbol])[-lookback:]
+                if volume is None or len(seq) < 2:
+                    return False, volume
+                baseline = mean(seq[:-1]) if len(seq) > 1 else mean(seq)
+                return bool(baseline > 0 and volume >= baseline * multiplier), volume
+
+        if field == "rsi_14":
+            period = max(2, int(params.get("period") or 14))
+            rsi = self._calc_rsi(history, period)
+            if operator == "above":
+                return bool(rsi is not None and value is not None and rsi > value), rsi
+            if operator == "below":
+                return bool(rsi is not None and value is not None and rsi < value), rsi
+
+        if field == "macd_signal":
+            prev = self._calc_macd(history[:-1])
+            curr = self._calc_macd(history)
+            if prev is None or curr is None:
+                return False, None
+            prev_macd, prev_signal = prev
+            curr_macd, curr_signal = curr
+            if operator == "cross_above":
+                return bool(prev_macd <= prev_signal and curr_macd > curr_signal), curr_macd
+            if operator == "cross_below":
+                return bool(prev_macd >= prev_signal and curr_macd < curr_signal), curr_macd
+
+        if field == "ema_cross":
+            fast = max(2, int(params.get("fast_period") or 9))
+            slow = max(fast + 1, int(params.get("slow_period") or 21))
+            if len(history) < slow + 2:
+                return False, None
+            prev_fast = self._ema(history[:-1], fast)
+            prev_slow = self._ema(history[:-1], slow)
+            curr_fast = self._ema(history, fast)
+            curr_slow = self._ema(history, slow)
+            if None in {prev_fast, prev_slow, curr_fast, curr_slow}:
+                return False, None
+            if operator == "cross_above":
+                return bool(prev_fast <= prev_slow and curr_fast > curr_slow), curr_fast - curr_slow
+            if operator == "cross_below":
+                return bool(prev_fast >= prev_slow and curr_fast < curr_slow), curr_fast - curr_slow
+
+        if field == "oi_change":
+            if operator == "above":
+                return bool(oi_change is not None and value is not None and oi_change > value), oi_change
+            if operator == "below":
+                return bool(oi_change is not None and value is not None and oi_change < value), oi_change
+
+        if field == "iv":
+            if operator == "above":
+                return bool(iv is not None and value is not None and iv > value), iv
+            if operator == "below":
+                return bool(iv is not None and value is not None and iv < value), iv
+
         return False, None
 
     def _evaluate_indicator_crossover(self, symbol: str, params: dict[str, Any]) -> bool:
@@ -462,6 +591,9 @@ class AlertEvaluatorService:
             "tick": dict(tick),
             "triggered_value": triggered_value,
         }
+        if isinstance(alert.conditions, list) and alert.conditions:
+            context["conditions"] = alert.conditions
+            context["logic"] = alert.logic or "AND"
         if isinstance(chart_context, dict):
             context["chart_context"] = chart_context
             source = chart_context.get("source")
@@ -472,6 +604,28 @@ class AlertEvaluatorService:
         if "note" in params:
             context["note"] = params.get("note")
         return context
+
+    @staticmethod
+    def _build_delivery_message(alert: AlertORM, triggered_value: float | None, now: datetime) -> str:
+        condition_text = str(alert.condition_type)
+        if isinstance(alert.conditions, list) and alert.conditions:
+            parts = []
+            for condition in alert.conditions:
+                if not isinstance(condition, dict):
+                    continue
+                field = str(condition.get("field") or "").strip()
+                operator = str(condition.get("operator") or "").strip()
+                value = condition.get("value")
+                parts.append(f"{field} {operator} {value}")
+            if parts:
+                condition_text = f" {str(alert.logic or 'AND').upper()} ".join(parts)
+        return (
+            f"Alert triggered\n"
+            f"Symbol: {alert.symbol}\n"
+            f"Condition: {condition_text}\n"
+            f"Value: {triggered_value}\n"
+            f"Time: {now.isoformat()}"
+        )
 
     @staticmethod
     def _build_event_payload(
@@ -511,27 +665,6 @@ class AlertEvaluatorService:
         payload = self._build_event_payload(alert, triggered_value, now, context)
         await self._hub.broadcast_alert(payload)
         await self._hub.broadcast(alert.symbol, payload)
-
-    async def _send_telegram_if_configured(self, alert: AlertORM, triggered_value: float | None, now: datetime) -> None:
-        params = alert.parameters if isinstance(alert.parameters, dict) else {}
-        token = str(params.get("telegram_bot_token") or "").strip()
-        chat_id = str(params.get("telegram_chat_id") or "").strip()
-        if not token or not chat_id:
-            return
-        text = (
-            f"Alert triggered\n"
-            f"Symbol: {alert.symbol}\n"
-            f"Condition: {alert.condition_type}\n"
-            f"Value: {triggered_value}\n"
-            f"Time: {now.isoformat()}"
-        )
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        try:
-            async with httpx.AsyncClient(timeout=5.0, trust_env=False) as client:
-                await client.post(url, json={"chat_id": chat_id, "text": text})
-        except Exception:
-            return
-
 
 _alert_service = AlertEvaluatorService()
 

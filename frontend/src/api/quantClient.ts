@@ -62,6 +62,50 @@ export async function fetchSectorConcentration(ticker?: string) {
   return data;
 }
 
+export async function fetchPredefinedStressScenarios() {
+  const { data } = await api.get("/risk/scenarios/predefined");
+  return data;
+}
+
+export async function runStressScenario(payload: {
+  portfolio_id: string;
+  scenario_id?: string;
+  custom_shocks?: Record<string, number>;
+}) {
+  const { data } = await api.post("/risk/scenarios/run", payload);
+  return data;
+}
+
+export async function runStressMonteCarlo(payload: { portfolio_id: string; n_simulations?: number }) {
+  const { data } = await api.post("/risk/scenarios/monte-carlo", payload);
+  return data;
+}
+
+export async function fetchStressScenarioHistory() {
+  const { data } = await api.get("/risk/scenarios/history");
+  return data;
+}
+
+export async function fetchFactorExposures(portfolioId: string = "current") {
+  const { data } = await api.get("/risk/factor-exposures", { params: { portfolio_id: portfolioId } });
+  return data;
+}
+
+export async function fetchFactorAttribution(portfolioId: string = "current", period: string = "1Y") {
+  const { data } = await api.get("/risk/factor-attribution", { params: { portfolio_id: portfolioId, period } });
+  return data;
+}
+
+export async function fetchFactorHistory(portfolioId: string = "current", period: string = "1Y", window: number = 60) {
+  const { data } = await api.get("/risk/factor-history", { params: { portfolio_id: portfolioId, period, window } });
+  return data;
+}
+
+export async function fetchFactorReturns(period: string = "1Y") {
+  const { data } = await api.get("/risk/factor-returns", { params: { period } });
+  return data;
+}
+
 // Experiments Registry
 export async function createExperiment(payload: any) {
   const { data } = await api.post("/experiments", payload);

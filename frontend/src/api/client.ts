@@ -24,6 +24,9 @@ import type {
   PitFundamentalsResponse,
   UniverseMembersResponse,
   RiskPortfolioResponse,
+  CorrelationMatrixResponse,
+  CorrelationRollingResponse,
+  CorrelationClustersResponse,
   OmsOrder,
   AuditEvent,
   KillSwitch,
@@ -45,10 +48,15 @@ import type {
   ScreenerPresetV3,
   ScreenerRunRequestV3,
   ScreenerRunResponseV3,
+  CustomFormulaRunRequest,
+  CustomFormulaResponse,
+  SavedFormula,
   StockSnapshot,
   UserScreenV3,
   WatchlistItem,
   AlertRule,
+  AlertCondition,
+  AlertDeliveryOptions,
   AlertTriggerEvent,
   MutualFund,
   MutualFundCompareResponse,
@@ -78,9 +86,17 @@ import type {
   MacroIndicatorsResponse,
   AIQueryResult,
   Watchlist,
+  JournalEntry,
+  JournalStats,
+  JournalEquityPoint,
+  JournalCalendarDay,
+  InsiderTrade,
+  InsiderStockResponse,
+  InsiderTopActivityRow,
+  InsiderClusterRow,
 } from "../types";
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
   timeout: 30000,
 });
@@ -232,6 +248,51 @@ export async function fetchSecurityHubEsg(ticker: string, limit = 10): Promise<S
   return data;
 }
 
+export async function fetchRecentInsiderTrades(params?: {
+  days?: number;
+  min_value?: number;
+  type?: "buy" | "sell" | "";
+  limit?: number;
+}): Promise<{ trades: InsiderTrade[] }> {
+  const { data } = await api.get<{ trades: InsiderTrade[] }>("/insider/recent", {
+    params: {
+      days: params?.days,
+      min_value: params?.min_value,
+      type: params?.type || undefined,
+      limit: params?.limit,
+    },
+  });
+  return data;
+}
+
+export async function fetchInsiderStock(symbol: string, days = 365): Promise<InsiderStockResponse> {
+  const { data } = await api.get<InsiderStockResponse>(`/insider/stock/${encodeURIComponent(symbol)}`, {
+    params: { days },
+  });
+  return data;
+}
+
+export async function fetchTopInsiderBuyers(days = 90, limit = 20): Promise<{ buyers: InsiderTopActivityRow[] }> {
+  const { data } = await api.get<{ buyers: InsiderTopActivityRow[] }>("/insider/top-buyers", {
+    params: { days, limit },
+  });
+  return data;
+}
+
+export async function fetchTopInsiderSellers(days = 90, limit = 20): Promise<{ sellers: InsiderTopActivityRow[] }> {
+  const { data } = await api.get<{ sellers: InsiderTopActivityRow[] }>("/insider/top-sellers", {
+    params: { days, limit },
+  });
+  return data;
+}
+
+export async function fetchInsiderClusterBuys(days = 30, min_insiders = 3): Promise<{ clusters: InsiderClusterRow[] }> {
+  const { data } = await api.get<{ clusters: InsiderClusterRow[] }>("/insider/cluster-buys", {
+    params: { days, min_insiders },
+  });
+  return data;
+}
+
 export async function runScreener(rules: ScreenerRule[], limit = 50): Promise<ScreenerResponse> {
   const { data } = await api.post<ScreenerResponse>("/screener/run", {
     rules,
@@ -376,6 +437,29 @@ export async function deleteSavedScreenV3(id: string): Promise<void> {
 export async function fetchPublicScreensV3(limit = 50, offset = 0): Promise<UserScreenV3[]> {
   const { data } = await api.get<{ items: UserScreenV3[] }>("/screener/public", { params: { limit, offset } });
   return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function runCustomFormulaScreener(payload: CustomFormulaRunRequest): Promise<CustomFormulaResponse> {
+  const { data } = await api.post<CustomFormulaResponse>("/screener/custom-formula", payload, { timeout: 120000 });
+  return data;
+}
+
+export async function fetchSavedFormulas(): Promise<SavedFormula[]> {
+  const { data } = await api.get<SavedFormula[]>("/screener/saved-formulas");
+  return Array.isArray(data) ? data : [];
+}
+
+export async function createSavedFormula(payload: {
+  name: string;
+  formula: string;
+  description?: string;
+}): Promise<SavedFormula> {
+  const { data } = await api.post<SavedFormula>("/screener/saved-formulas", payload);
+  return data;
+}
+
+export async function deleteSavedFormula(id: number): Promise<void> {
+  await api.delete(`/screener/saved-formulas/${id}`);
 }
 
 export async function publishScreenV3(id: string): Promise<UserScreenV3> {
@@ -757,6 +841,44 @@ export async function fetchVolumeProfile(
   return data;
 }
 
+export interface TapeTrade {
+  timestamp: string;
+  price: number;
+  quantity: number;
+  value: number;
+  side: "buy" | "sell" | "neutral";
+}
+
+export interface TapeRecentResponse {
+  trades: TapeTrade[];
+}
+
+export interface TapeSummaryResponse {
+  total_volume: number;
+  buy_volume: number;
+  sell_volume: number;
+  buy_pct: number;
+  large_trade_count: number;
+  avg_trade_size: number;
+  trades_per_min: number;
+}
+
+export async function fetchTapeRecent(symbol: string, limit = 500): Promise<TapeRecentResponse> {
+  const { data } = await api.get<TapeRecentResponse>(`/tape/${encodeURIComponent(symbol)}/recent`, {
+    params: { limit },
+  });
+  return {
+    trades: Array.isArray(data?.trades) ? data.trades : [],
+  };
+}
+
+export async function fetchTapeSummary(symbol: string, limit = 500): Promise<TapeSummaryResponse> {
+  const { data } = await api.get<TapeSummaryResponse>(`/tape/${encodeURIComponent(symbol)}/summary`, {
+    params: { limit },
+  });
+  return data;
+}
+
 export type ChartBatchSource = "batch" | "fallback";
 
 export async function fetchChartsBatchWithMeta(
@@ -811,6 +933,42 @@ export async function fetchStock(ticker: string, market = "NSE"): Promise<StockS
   return getQuote(ticker, market);
 }
 
+export type DepthLevel = {
+  price: number;
+  quantity: number;
+  size: number;
+  orders: number;
+  cumulative_qty: number;
+};
+
+export type DepthSnapshotResponse = {
+  symbol: string;
+  market: string;
+  provider_key: string;
+  as_of: string;
+  mid_price: number;
+  spread: number;
+  spread_pct: number;
+  tick_size: number;
+  levels: number;
+  total_bid_quantity: number;
+  total_ask_quantity: number;
+  total_bid_qty: number;
+  total_ask_qty: number;
+  last_price: number;
+  last_qty: number;
+  imbalance: number;
+  bids: DepthLevel[];
+  asks: DepthLevel[];
+};
+
+export async function fetchDepth(symbol: string, market = "NSE", levels = 20): Promise<DepthSnapshotResponse> {
+  const { data } = await api.get<DepthSnapshotResponse>(`/depth/${encodeURIComponent(symbol)}`, {
+    params: { market, levels },
+  });
+  return data;
+}
+
 export async function fetchFinancials(ticker: string, period: "annual" | "quarterly", market = "NSE"): Promise<FinancialsResponse> {
   return getFinancials(ticker, market, period);
 }
@@ -848,6 +1006,34 @@ export async function fetchPortfolioCorrelation(params?: { window?: number }): P
   return data;
 }
 
+export async function fetchCorrelationMatrix(payload: {
+  symbols: string[];
+  period: "1M" | "3M" | "6M" | "1Y" | "3Y";
+  frequency: "daily";
+}): Promise<CorrelationMatrixResponse> {
+  const { data } = await api.post<CorrelationMatrixResponse>("/correlation/matrix", payload);
+  return data;
+}
+
+export async function fetchRollingCorrelation(payload: {
+  symbol1: string;
+  symbol2: string;
+  window: number;
+  period: "1Y" | "3Y";
+}): Promise<CorrelationRollingResponse> {
+  const { data } = await api.post<CorrelationRollingResponse>("/correlation/rolling", payload);
+  return data;
+}
+
+export async function fetchCorrelationClusters(payload: {
+  symbols: string[];
+  period: "1M" | "3M" | "6M" | "1Y" | "3Y";
+  n_clusters: number;
+}): Promise<CorrelationClustersResponse> {
+  const { data } = await api.post<CorrelationClustersResponse>("/correlation/clusters", payload);
+  return data;
+}
+
 export async function fetchPortfolioDividends(params?: { days?: number }): Promise<PortfolioDividendTracker> {
   const { data } = await api.get<PortfolioDividendTracker>("/portfolio/analytics/dividends", { params });
   return data;
@@ -880,7 +1066,7 @@ export async function realizeTaxLots(payload: {
 }
 
 export async function downloadExport(dataType: string, format: "csv" | "xlsx" | "pdf"): Promise<Blob> {
-  const { data } = await api.get(`/export/${encodeURIComponent(dataType)}`, {
+  const { data } = await api.get(`/api/export/${encodeURIComponent(dataType)}`, {
     params: { format },
     responseType: "blob",
   });
@@ -888,8 +1074,13 @@ export async function downloadExport(dataType: string, format: "csv" | "xlsx" | 
 }
 
 export async function fetchScheduledReports(): Promise<ScheduledReport[]> {
-  const { data } = await api.get<{ items: ScheduledReport[] }>("/reports/scheduled");
-  return Array.isArray(data?.items) ? data.items : [];
+  try {
+    const { data } = await api.get<{ items: ScheduledReport[] }>("/reports/scheduled");
+    return Array.isArray(data?.items) ? data.items : [];
+  } catch (e) {
+    console.error("fetchScheduledReports failed", e);
+    return [];
+  }
 }
 
 export async function createScheduledReport(payload: { report_type: string; frequency: string; email: string; data_type: string }): Promise<ScheduledReport> {
@@ -1036,8 +1227,13 @@ export async function deleteWatchlistItem(itemId: number): Promise<void> {
 }
 
 export async function fetchAlerts(): Promise<AlertRule[]> {
-  const { data } = await api.get<{ alerts: AlertRule[] }>("/alerts");
-  return data.alerts;
+  try {
+    const { data } = await api.get<{ alerts: AlertRule[] }>("/alerts");
+    return Array.isArray(data?.alerts) ? data.alerts : [];
+  } catch (e) {
+    console.error("fetchAlerts failed", e);
+    return [];
+  }
 }
 
 export async function fetchAlertsFiltered(opts?: { status?: string; symbol?: string }): Promise<AlertRule[]> {
@@ -1071,22 +1267,43 @@ export async function createAlert(payload: {
   condition_type?: string;
   parameters?: Record<string, unknown>;
   cooldown_seconds?: number;
+  conditions?: AlertCondition[];
+  logic?: string;
+  delivery_channels?: string[];
+  delivery_config?: Record<string, unknown>;
+  cooldown_minutes?: number;
+  expiry_date?: string | null;
+  max_triggers?: number;
   ticker?: string;
   alert_type?: string;
   condition?: string;
   threshold?: number;
   note?: string;
   channels?: string[];
-}): Promise<void> {
+}): Promise<{ status: string; alert: AlertRule }> {
   try {
-    await api.post("/alerts", payload);
+    const { data } = await api.post<{ status: string; alert: AlertRule }>("/alerts", payload);
+    return data;
   } catch (error) {
     throw new Error(extractApiErrorMessage(error, "Failed to create alert"));
   }
 }
 
-export async function updateAlert(alertId: string, payload: { status?: string; cooldown_seconds?: number; parameters?: Record<string, unknown>; channels?: string[] }): Promise<void> {
-  await api.patch(`/alerts/${alertId}`, payload);
+export async function updateAlert(alertId: string, payload: {
+  status?: string;
+  cooldown_seconds?: number;
+  parameters?: Record<string, unknown>;
+  channels?: string[];
+  conditions?: AlertCondition[];
+  logic?: string;
+  delivery_channels?: string[];
+  delivery_config?: Record<string, unknown>;
+  cooldown_minutes?: number;
+  expiry_date?: string | null;
+  max_triggers?: number;
+}): Promise<{ status: string; id: string; alert: AlertRule }> {
+  const { data } = await api.patch<{ status: string; id: string; alert: AlertRule }>(`/alerts/${alertId}`, payload);
+  return data;
 }
 
 export async function fetchAlertHistory(page = 1, pageSize = 25): Promise<{ page: number; page_size: number; total: number; history: AlertTriggerEvent[] }> {
@@ -1098,6 +1315,57 @@ export async function fetchAlertHistory(page = 1, pageSize = 25): Promise<{ page
 
 export async function deleteAlert(alertId: string): Promise<void> {
   await api.delete(`/alerts/${alertId}`);
+}
+
+export async function testAlertDelivery(alertId: string): Promise<{ status: string; id: string; channels: string[] }> {
+  const { data } = await api.post<{ status: string; id: string; channels: string[] }>(`/alerts/${alertId}/test`);
+  return data;
+}
+
+export async function fetchAlertDeliveryOptions(): Promise<AlertDeliveryOptions> {
+  const { data } = await api.get<AlertDeliveryOptions>("/alerts/delivery-options");
+  return data;
+}
+
+export interface Notification {
+  id: number;
+  type: "alert" | "news" | "system" | "trade";
+  priority: "low" | "medium" | "high" | "critical";
+  title: string;
+  body?: string;
+  ticker?: string;
+  action_url?: string;
+  read: boolean;
+  created_at: string;
+}
+
+export async function fetchNotifications(params?: {
+  type?: Notification["type"];
+  read?: boolean;
+  priority?: Notification["priority"];
+  limit?: number;
+  offset?: number;
+}): Promise<Notification[]> {
+  const { data } = await api.get<Notification[]>("/notifications", { params });
+  return data;
+}
+
+export async function fetchNotificationUnreadCount(): Promise<number> {
+  const { data } = await api.get<{ count: number }>("/notifications/unread-count");
+  return Number(data.count || 0);
+}
+
+export async function markNotificationRead(notificationId: number): Promise<Notification> {
+  const { data } = await api.put<Notification>(`/notifications/${notificationId}/read`);
+  return data;
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  await api.put("/notifications/read-all");
+}
+
+export async function deleteNotification(notificationId: number): Promise<void> {
+  await api.delete(`/notifications/${notificationId}`);
 }
 
 export async function fetchShareholding(ticker: string): Promise<{ history?: Array<Record<string, unknown>>; warning?: string }> {
@@ -1787,3 +2055,73 @@ export async function generateAdvancedReport(type: "stock" | "portfolio" | "back
   const { data } = await api.post<Blob>("/reports/generate", { type, params }, { responseType: "blob" });
   return data;
 }
+
+export type JournalEntryPayload = {
+  symbol: string;
+  direction: "LONG" | "SHORT";
+  entry_date: string;
+  entry_price: number;
+  exit_date?: string | null;
+  exit_price?: number | null;
+  quantity: number;
+  fees?: number;
+  strategy?: string | null;
+  setup?: string | null;
+  emotion?: string | null;
+  notes?: string | null;
+  tags?: string[];
+  rating?: number | null;
+};
+
+export type JournalEntryUpdatePayload = Partial<JournalEntryPayload> & {
+  clear_exit?: boolean;
+};
+
+export type JournalListFilters = {
+  symbol?: string;
+  strategy?: string;
+  emotion?: string;
+  start?: string;
+  end?: string;
+  tags?: string[];
+};
+
+export async function fetchJournalEntries(filters: JournalListFilters = {}): Promise<JournalEntry[]> {
+  const { data } = await api.get<{ entries: JournalEntry[] }>("/journal", {
+    params: {
+      ...filters,
+      tags: filters.tags?.join(","),
+    },
+  });
+  return Array.isArray(data.entries) ? data.entries : [];
+}
+
+export async function createJournalEntry(payload: JournalEntryPayload): Promise<JournalEntry> {
+  const { data } = await api.post<{ entry: JournalEntry }>("/journal", payload);
+  return data.entry;
+}
+
+export async function updateJournalEntry(id: number, payload: JournalEntryUpdatePayload): Promise<JournalEntry> {
+  const { data } = await api.put<{ entry: JournalEntry }>(`/journal/${id}`, payload);
+  return data.entry;
+}
+
+export async function deleteJournalEntry(id: number): Promise<void> {
+  await api.delete(`/journal/${id}`);
+}
+
+export async function fetchJournalStats(): Promise<JournalStats> {
+  const { data } = await api.get<JournalStats>("/journal/stats");
+  return data;
+}
+
+export async function fetchJournalEquityCurve(): Promise<JournalEquityPoint[]> {
+  const { data } = await api.get<{ points: JournalEquityPoint[] }>("/journal/equity-curve");
+  return Array.isArray(data.points) ? data.points : [];
+}
+
+export async function fetchJournalCalendar(): Promise<JournalCalendarDay[]> {
+  const { data } = await api.get<{ days: JournalCalendarDay[] }>("/journal/calendar");
+  return Array.isArray(data.days) ? data.days : [];
+}
+

@@ -6,12 +6,15 @@ import { TerminalInput } from "../components/terminal/TerminalInput";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { TerminalTable } from "../components/terminal/TerminalTable";
 import { DataManager } from "../components/settings/DataManager";
+import { APIKeyManager } from "../components/settings/APIKeyManager";
+import { ErrorBoundary } from "../components/common/ErrorBoundary";
 import { useSettingsStore } from "../store/settingsStore";
 import { COUNTRY_MARKETS } from "../types";
 import type { AlertRule, CountryCode, MarketCode } from "../types";
 import type { ScheduledReport } from "../types";
 
 export function SettingsPage() {
+  console.log("Rendering SettingsPage");
   const selectedCountry = useSettingsStore((s) => s.selectedCountry);
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
   const displayCurrency = useSettingsStore((s) => s.displayCurrency);
@@ -44,8 +47,9 @@ export function SettingsPage() {
     try {
       setError(null);
       const [alertsRes, reportsRes] = await Promise.all([fetchAlerts(), fetchScheduledReports()]);
-      setAlerts(alertsRes);
-      setScheduled(reportsRes);
+      console.log("Settings data loaded:", { alerts: alertsRes.length, reports: reportsRes.length });
+      setAlerts(alertsRes || []);
+      setScheduled(reportsRes || []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load alerts");
     }
@@ -126,10 +130,10 @@ export function SettingsPage() {
 
       {error && <div className="rounded-sm border border-terminal-neg bg-terminal-neg/10 p-2 text-xs text-terminal-neg">{error}</div>}
 
-      <TerminalPanel title={`Alert Rules (${alerts.length})`}>
+      <TerminalPanel title={`Alert Rules (${(alerts || []).length})`}>
         <TerminalTable
-          rows={alerts}
-          rowKey={(row) => String(row.id)}
+          rows={alerts || []}
+          rowKey={(row) => String(row?.id || Math.random())}
           emptyText="No alert rules configured"
           columns={[
             { key: "ticker", label: "Ticker", render: (row) => row.ticker },
@@ -236,8 +240,14 @@ export function SettingsPage() {
       </TerminalPanel>
 
       <TerminalPanel title="Backtest Data">
-        <DataManager />
+        <ErrorBoundary>
+          <DataManager />
+        </ErrorBoundary>
       </TerminalPanel>
+
+      <ErrorBoundary>
+        <APIKeyManager />
+      </ErrorBoundary>
     </div>
   );
 }

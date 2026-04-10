@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from backend.api.routes import backtest, futures, indicators, news, quotes, screener, stocks
+from backend.api.routes import backtest, correlation, futures, indicators, news, quotes, screener, stocks
 from backend.equity.routes import mutual_funds
 
 
@@ -34,3 +34,7 @@ def test_indicators_router_registered() -> None:
 
 def test_backtesting_router_registered() -> None:
     assert backtest.router is not None
+
+
+def test_correlation_router_registered() -> None:
+    assert correlation.router is not None

@@ -7,30 +7,46 @@ import {
   useGroupSymbolState,
   type LinkGroup,
 } from "../contexts/SymbolLinkContext";
-import type { LaunchpadPanelConfig, LaunchpadPanelType } from "../components/layout/LaunchpadContext";
+import {
+  isLaunchpadPanelType,
+  type LaunchpadPanelConfig,
+  type LaunchpadPanelType,
+} from "../components/layout/LaunchpadContext";
 
 const PANEL_RENDERERS: Record<LaunchpadPanelType, ComponentType<{ panel: LaunchpadPanelConfig }>> = {
   chart: lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadChartPanel }))),
   watchlist: lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadWatchlistPanel }))),
+  news: lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadNewsFeedPanel }))),
   "news-feed": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadNewsFeedPanel }))),
   "order-book": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadOrderBookPanel }))),
   "ticker-detail": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadTickerDetailPanel }))),
+  overview: lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadTickerDetailPanel }))),
+  screener: lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadScreenerResultsPanel }))),
   "screener-results": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadScreenerResultsPanel }))),
   alerts: lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadAlertsPanel }))),
+  financials: lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadFundamentalsPanel }))),
   "portfolio-summary": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadPortfolioSummaryPanel }))),
+  "portfolio-allocation": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
+  "portfolio-performance": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
+  "risk-metrics": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
   heatmap: lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadHeatmapPanel }))),
   "market-pulse": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadMarketPulsePanel }))),
   fundamentals: lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadFundamentalsPanel }))),
   "yield-curve": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadYieldCurvePanel }))),
+  economics: lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
+  greeks: lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
+  "oi-chart": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
+  peers: lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
   "ai-research": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadAIResearchPanel }))),
   "option-chain": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadOptionChainPanel }))),
   "watchlist-heatmap": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadWatchlistHeatmapPanel }))),
   "sector-rotation": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadSectorRotationPanel }))),
+  hotkeys: lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadHotKeyTradingPanel }))),
 };
 
 function toPanelType(value: string | null): LaunchpadPanelType {
   const v = String(value || "").trim() as LaunchpadPanelType;
-  if (v in PANEL_RENDERERS) return v;
+  if (isLaunchpadPanelType(v) && v in PANEL_RENDERERS) return v;
   return "chart";
 }
 

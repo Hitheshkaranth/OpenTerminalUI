@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -91,9 +91,9 @@ def promote_model(
         name=payload.registry_name.strip(),
         run_id=payload.run_id,
         stage=payload.stage,
-        promoted_at=datetime.utcnow(),
+        promoted_at=datetime.now(timezone.utc),
         metadata_json=payload.metadata,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     db.add(entry)
     db.commit()

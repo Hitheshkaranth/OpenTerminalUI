@@ -9,6 +9,7 @@ import {
   fetchPaperTrades,
   placePaperOrder,
 } from "../api/client";
+import { HotKeyPanel } from "../components/trading/HotKeyPanel";
 
 export function PaperTradingPage() {
   const [portfolios, setPortfolios] = useState<Array<{ id: string; name: string; initial_capital: number; current_cash: number }>>([]);
@@ -147,6 +148,8 @@ export function PaperTradingPage() {
           </button>
         </div>
       </div>
+
+      <HotKeyPanel embedded className="shadow-[0_0_0_1px_rgba(148,163,184,0.08)]" />
 
       {selectedPortfolio && (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -38,7 +38,7 @@ async def feed_health(_: User = Depends(get_current_user)) -> dict[str, Any]:
         "kite_stream_status": hub.kite_stream_status(),
         "us_provider_health": us_stream.provider_health_snapshot(),
         "us_primary_provider": us_stream.primary_provider_name(),
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -76,12 +76,12 @@ def set_kill_switch(
 ) -> dict[str, Any]:
     row = db.query(OpsKillSwitchORM).filter(OpsKillSwitchORM.scope == payload.scope).first()
     if row is None:
-        row = OpsKillSwitchORM(scope=payload.scope, enabled=payload.enabled, reason=payload.reason, updated_at=datetime.utcnow())
+        row = OpsKillSwitchORM(scope=payload.scope, enabled=payload.enabled, reason=payload.reason, updated_at=datetime.now(timezone.utc))
         db.add(row)
     else:
         row.enabled = payload.enabled
         row.reason = payload.reason
-        row.updated_at = datetime.utcnow()
+        row.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(row)
     log_audit(

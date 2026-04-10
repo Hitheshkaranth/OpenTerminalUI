@@ -100,10 +100,13 @@ OpenTerminalUI is a self-hosted, full-stack financial terminal that combines rea
 - **Analyst Estimates** &mdash; consensus tracking, revisions, and target prices
 - **Corporate Actions** &mdash; splits, dividends, rights, bonuses timeline
 - **Peer Comparison** &mdash; relative valuation matrices across comparable companies
+- **Insider Trading Monitor** &mdash; recent insider trades, per-stock insider activity, top buyers/sellers leaderboard, and cluster-buy detection with minimum insider thresholds
+- **Trade Journal** &mdash; trade logging with equity curve, calendar heatmap, and performance statistics
 
 ### Advanced Screener
 
 - **Query Builder** &mdash; custom filters with preset formulas and arithmetic operations
+- **Custom Formula Engine** &mdash; write, save, and share custom formulas with server-side evaluation, formula library with descriptions and categories
 - **15+ Visualization Modes** &mdash; tables with sparklines, sector treemaps, heatmaps, scatter plots, radar charts, box plots, bubble charts, waterfall charts, RRG quadrants, gauge dials, distribution histograms, stacked area, and comparison bars
 - **Multi-Market Scanning** &mdash; NSE, BSE, NYSE, NASDAQ with technical and fundamental overlays
 - **Preset Management** &mdash; save, load, share, and browse community screens
@@ -117,6 +120,7 @@ OpenTerminalUI is a self-hosted, full-stack financial terminal that combines rea
 - **OI Analysis** &mdash; open interest trends, buildup patterns, strike-level concentration
 - **PCR Tracking** &mdash; put-call ratio monitoring with overbought/oversold signals
 - **Heatmaps** &mdash; IV/volume/OI heatmaps across the strike grid
+- **Options Flow** &mdash; unusual activity scanner with volume/OI ratios, premium tracking, heat scores, and bullish/bearish sentiment classification
 - **Futures Analytics** &mdash; term structure, basis analysis, contract specifications
 - **Expiry Calendar** &mdash; contract schedules with roll suggestions
 
@@ -126,8 +130,9 @@ OpenTerminalUI is a self-hosted, full-stack financial terminal that combines rea
 - **Allocation & Attribution** &mdash; sector allocation charts, contributor/detractor analysis
 - **Benchmark Overlay** &mdash; compare against indices with relative performance metrics
 - **Risk Engine** &mdash; VaR (95%), CVaR, EWMA volatility, rolling correlation, PCA factor exposures
-- **Stress Testing** &mdash; scenario analysis with configurable shock parameters
-- **Correlation Heatmap** &mdash; cross-holding dependency visualization
+- **Factor Analytics** &mdash; multi-factor exposure radar, attribution waterfall, rolling factor history, and factor return comparison across market, size, value, momentum, quality, and low-volatility factors
+- **Stress Testing** &mdash; 6 predefined macro scenarios (GFC 2008, COVID 2020, rate shock, INR depreciation, tech rotation, commodity spike), custom shock builder, Monte Carlo simulation, and historical event replay
+- **Correlation Deep Dive** &mdash; correlation matrix, rolling correlation with regime detection, hierarchical clustering with dendrogram, and cross-asset dependency visualization
 - **Tax Lot Manager** &mdash; cost basis tracking across tax lots
 - **Dividend Tracker** &mdash; income tracking with ex-date calendar
 - **Paper Trading** &mdash; virtual trading engine with realistic order fills, slippage modeling, and TCA analytics
@@ -167,10 +172,12 @@ OpenTerminalUI is a self-hosted, full-stack financial terminal that combines rea
 
 ### Alerts & Breakout Scanner
 
-- **Price/Technical/Momentum Alerts** &mdash; create rules with trigger and invalidation levels
+- **Multi-Condition Alert Builder** &mdash; compound rules with AND/OR logic, multi-field conditions (price, volume, RSI, MACD, moving averages), and natural-language summary
+- **Multi-Channel Delivery** &mdash; in-app, email, webhook, Slack, and Telegram with per-channel configuration and delivery testing
+- **Alert Lifecycle** &mdash; cooldown periods, expiry dates, max trigger limits, trigger history with deduplication
 - **WebSocket Push** &mdash; real-time desktop notifications on alert trigger
 - **Breakout Scanner** &mdash; automated pattern detection with confidence scoring
-- **Alert History** &mdash; timeline of triggered alerts with deduplication
+- **Alert History** &mdash; full timeline with delivery status and re-trigger tracking
 
 ### Operations & Compliance
 

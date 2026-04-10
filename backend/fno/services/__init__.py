@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from backend.fno.services.greeks_engine import GreeksEngine, get_greeks_engine
+from backend.fno.services.flow_service import OptionsFlowService, get_options_flow_service
 from backend.fno.services.instruments import InstrumentsLoader, get_instruments_loader
 from backend.fno.services.iv_engine import IVEngine, get_iv_engine
 from backend.fno.services.oi_analyzer import OIAnalyzer, get_oi_analyzer
@@ -13,9 +14,11 @@ __all__ = [
     "InstrumentsLoader",
     "IVEngine",
     "OIAnalyzer",
+    "OptionsFlowService",
     "OptionChainFetcher",
     "PCRTracker",
     "StrategyBuilder",
+    "get_options_flow_service",
     "get_greeks_engine",
     "get_instruments_loader",
     "get_iv_engine",

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -112,8 +112,8 @@ async def run_backtest(payload: BacktestRequest, db: Session = Depends(get_db)) 
             error="",
             data_version_id=resolved_data_version_id,
             execution_profile_json=payload.execution_profile,
-            created_at=datetime.utcnow().isoformat(),
-            updated_at=datetime.utcnow().isoformat(),
+            created_at=datetime.now(timezone.utc).isoformat(),
+            updated_at=datetime.now(timezone.utc).isoformat(),
         )
     )
     db.commit()

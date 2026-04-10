@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, List, Optional
 from uuid import uuid4
 
@@ -51,7 +51,7 @@ def list_watchlists(db: Session = Depends(get_db)):
             name="Default Watchlist",
             symbols_json=["AAPL", "MSFT", "TSLA", "GOOGL"],
             column_config_json={},
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         db.add(default_wl)
         db.commit()
@@ -79,7 +79,7 @@ def create_watchlist(payload: WatchlistCreate, db: Session = Depends(get_db)):
         name=payload.name,
         symbols_json=[],
         column_config_json=payload.column_config,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     db.add(new_wl)
     db.commit()

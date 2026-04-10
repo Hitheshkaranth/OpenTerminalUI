@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 
 import { TerminalPanel } from "../../../components/terminal/TerminalPanel";
+import { ExportButton } from "../../../components/common/ExportButton";
 import { DataGrid } from "../../../components/common/DataGrid";
 import { useStockStore } from "../../../store/stockStore";
 import { InlineBar } from "./InlineBar";
@@ -43,7 +44,11 @@ export function ResultsTable() {
   };
 
   return (
-    <TerminalPanel title="Results" subtitle={`Rows: ${rows.length}`}>
+    <TerminalPanel
+      title="Results"
+      subtitle={`Rows: ${rows.length}`}
+      actions={<ExportButton source="screener_results" data={rows} />}
+    >
       <DataGrid
         preset="screener"
         rows={rows}

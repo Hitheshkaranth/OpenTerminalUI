@@ -9,8 +9,9 @@ from typing import Any
 @dataclass(frozen=True)
 class DepthLevel:
     price: float
-    size: int
+    quantity: int
     orders: int
+    cumulative_qty: int
 
 
 @dataclass(frozen=True)
@@ -21,12 +22,16 @@ class DepthSnapshot:
     as_of: datetime
     mid_price: float
     spread: float
+    spread_pct: float
     tick_size: float
     bids: tuple[DepthLevel, ...]
     asks: tuple[DepthLevel, ...]
     levels: int
     total_bid_quantity: int
     total_ask_quantity: int
+    last_price: float
+    last_qty: float
+    imbalance: float
 
     def to_wire(self) -> dict[str, Any]:
         return {
@@ -36,16 +41,34 @@ class DepthSnapshot:
             "as_of": self.as_of.isoformat(),
             "mid_price": self.mid_price,
             "spread": self.spread,
+            "spread_pct": self.spread_pct,
             "tick_size": self.tick_size,
             "levels": self.levels,
             "total_bid_quantity": self.total_bid_quantity,
             "total_ask_quantity": self.total_ask_quantity,
+            "total_bid_qty": self.total_bid_quantity,
+            "total_ask_qty": self.total_ask_quantity,
+            "last_price": self.last_price,
+            "last_qty": self.last_qty,
+            "imbalance": self.imbalance,
             "bids": [
-                {"price": level.price, "size": level.size, "orders": level.orders}
+                {
+                    "price": level.price,
+                    "quantity": level.quantity,
+                    "size": level.quantity,
+                    "orders": level.orders,
+                    "cumulative_qty": level.cumulative_qty,
+                }
                 for level in self.bids
             ],
             "asks": [
-                {"price": level.price, "size": level.size, "orders": level.orders}
+                {
+                    "price": level.price,
+                    "quantity": level.quantity,
+                    "size": level.quantity,
+                    "orders": level.orders,
+                    "cumulative_qty": level.cumulative_qty,
+                }
                 for level in self.asks
             ],
         }
@@ -122,8 +145,8 @@ class OrderBookService:
         ask_anchor = mid_price + spread / 2.0
         created_at = datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(minutes=seed % 500_000)
 
-        bids: list[DepthLevel] = []
-        asks: list[DepthLevel] = []
+        bid_levels: list[tuple[float, int, int]] = []
+        ask_levels: list[tuple[float, int, int]] = []
         total_bid_quantity = 0
         total_ask_quantity = 0
 
@@ -135,15 +158,35 @@ class OrderBookService:
             ask_size = 520 + ((seed >> ((index + 5) % 16)) % 920) + level_no * 42
             bid_orders = 1 + ((seed >> ((index + 3) % 16)) % 4)
             ask_orders = 1 + ((seed >> ((index + 7) % 16)) % 4)
-            bids.append(DepthLevel(price=bid_price, size=int(bid_size), orders=int(bid_orders)))
-            asks.append(DepthLevel(price=ask_price, size=int(ask_size), orders=int(ask_orders)))
+            bid_levels.append((bid_price, int(bid_size), int(bid_orders)))
+            ask_levels.append((ask_price, int(ask_size), int(ask_orders)))
             total_bid_quantity += int(bid_size)
             total_ask_quantity += int(ask_size)
 
-        bids.sort(key=lambda row: row.price, reverse=True)
-        asks.sort(key=lambda row: row.price)
+        bid_levels.sort(key=lambda row: row[0], reverse=True)
+        ask_levels.sort(key=lambda row: row[0])
+
+        running_bid = 0
+        bids: list[DepthLevel] = []
+        for price, quantity, orders in bid_levels:
+            running_bid += quantity
+            bids.append(DepthLevel(price=price, quantity=quantity, orders=orders, cumulative_qty=running_bid))
+
+        running_ask = 0
+        asks: list[DepthLevel] = []
+        for price, quantity, orders in ask_levels:
+            running_ask += quantity
+            asks.append(DepthLevel(price=price, quantity=quantity, orders=orders, cumulative_qty=running_ask))
 
         spread_value = round(asks[0].price - bids[0].price, precision) if bids and asks else 0.0
+        spread_pct = round((spread_value / mid_price) * 100.0, 6) if mid_price > 0 else 0.0
+        last_price = round(mid_price + (((seed % 5) - 2) * tick_size * 0.5), precision)
+        last_qty = float(50 + (seed % 450))
+        total_visible = total_bid_quantity + total_ask_quantity
+        imbalance = round(
+            ((total_bid_quantity - total_ask_quantity) / total_visible) if total_visible > 0 else 0.0,
+            6,
+        )
         return DepthSnapshot(
             symbol=symbol,
             market=market,
@@ -151,18 +194,22 @@ class OrderBookService:
             as_of=created_at,
             mid_price=mid_price,
             spread=spread_value,
+            spread_pct=spread_pct,
             tick_size=tick_size,
             bids=tuple(bids),
             asks=tuple(asks),
             levels=levels,
             total_bid_quantity=total_bid_quantity,
             total_ask_quantity=total_ask_quantity,
+            last_price=last_price,
+            last_qty=last_qty,
+            imbalance=imbalance,
         )
 
     def get_snapshot(self, symbol: str, market_hint: str | None = None, levels: int = 10) -> DepthSnapshot:
         normalized_symbol = self._normalize_symbol(symbol)
         normalized_market = self._normalize_market(market_hint, normalized_symbol)
-        safe_levels = max(1, min(int(levels), 25))
+        safe_levels = max(1, min(int(levels), 40))
         cache_key = f"{normalized_symbol}:{normalized_market}:{safe_levels}"
         now = datetime.now(timezone.utc).timestamp()
         cached = self._cache.get(cache_key)

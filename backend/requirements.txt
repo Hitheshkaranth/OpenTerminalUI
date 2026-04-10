@@ -9,6 +9,7 @@ pydantic
 PyYAML
 requests
 httpx
+aiohttp
 h2
 redis
 apscheduler
@@ -35,3 +36,4 @@ statsmodels
 xgboost
 polygon-api-client
 websockets>=12.0
+python-multipart

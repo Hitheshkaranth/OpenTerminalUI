@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from uuid import uuid4
 
 import numpy as np
@@ -81,7 +81,7 @@ class PortfolioLabService:
                 rebalance_frequency=payload.rebalance_frequency,
                 weighting_method=payload.weighting_method,
                 constraints_json=payload.constraints_json,
-                created_at=datetime.utcnow().isoformat(),
+                created_at=datetime.now(timezone.utc).isoformat(),
             )
             db.add(row)
             db.commit()
@@ -132,7 +132,7 @@ class PortfolioLabService:
                 name=payload.name,
                 strategies_json=payload.strategies_json,
                 blend_method=payload.blend_method,
-                created_at=datetime.utcnow().isoformat(),
+                created_at=datetime.now(timezone.utc).isoformat(),
             )
             db.add(row)
             db.commit()
@@ -455,7 +455,7 @@ class PortfolioLabService:
                 portfolio_id=portfolio_id,
                 blend_id=blend_id,
                 status="running",
-                started_at=datetime.utcnow().isoformat(),
+                started_at=datetime.now(timezone.utc).isoformat(),
             )
             db.add(run)
             db.commit()
@@ -472,12 +472,12 @@ class PortfolioLabService:
                 db.add(PortfolioRunTimeseries(run_id=run.id, series_json={**series, "tables": tables}))
                 db.add(PortfolioRunMatrices(run_id=run.id, matrices_json=matrices))
                 run.status = "succeeded"
-                run.finished_at = datetime.utcnow().isoformat()
+                run.finished_at = datetime.now(timezone.utc).isoformat()
                 run.error = None
                 db.commit()
             except Exception as exc:
                 run.status = "failed"
-                run.finished_at = datetime.utcnow().isoformat()
+                run.finished_at = datetime.now(timezone.utc).isoformat()
                 run.error = str(exc)
                 db.commit()
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from types import SimpleNamespace
 
@@ -183,7 +183,7 @@ def add_portfolio_holding(
 ) -> dict[str, Any]:
     _portfolio_for_user(db, portfolio_id, current_user.id)
     symbol = payload.symbol.strip().upper()
-    lot_id = payload.lot_id.strip() or datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    lot_id = payload.lot_id.strip() or datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     row = PortfolioHoldingORM(
         portfolio_id=portfolio_id,
         symbol=symbol,
@@ -201,7 +201,7 @@ def add_portfolio_holding(
             type="buy",
             shares=float(payload.shares),
             price=float(payload.cost_basis_per_share),
-            date=payload.purchase_date or datetime.utcnow().date().isoformat(),
+            date=payload.purchase_date or datetime.now(timezone.utc).date().isoformat(),
             fees=0.0,
             lot_id=lot_id,
             notes=payload.notes,
@@ -267,7 +267,7 @@ def add_portfolio_transaction(
     db.add(tx)
 
     if payload.type in {"buy", "sell"} and payload.shares > 0:
-        lot_id = payload.lot_id.strip() or ("manual" if payload.type == "sell" else datetime.utcnow().strftime("%Y%m%d%H%M%S"))
+        lot_id = payload.lot_id.strip() or ("manual" if payload.type == "sell" else datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S"))
         row = (
             db.query(PortfolioHoldingORM)
             .filter(
@@ -411,8 +411,8 @@ async def get_portfolio_analytics(
             inception_candidates.append(datetime.fromisoformat(str(tx.date)))
         except Exception:
             pass
-    inception = min(inception_candidates) if inception_candidates else datetime.utcnow()
-    years = max((datetime.utcnow() - inception).days / 365.25, 1 / 365.25)
+    inception = min(inception_candidates) if inception_candidates else datetime.now(timezone.utc)
+    years = max((datetime.now(timezone.utc) - inception).days / 365.25, 1 / 365.25)
     initial_capital = float(portfolio.starting_cash or 0.0)
     final_equity = float(total_value + realized)
     if initial_capital > 0 and final_equity > 0:

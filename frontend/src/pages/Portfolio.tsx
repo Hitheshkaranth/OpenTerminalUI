@@ -34,6 +34,7 @@ import { EarningsDateBadge } from "../components/EarningsDateBadge";
 import { MutualFundPortfolioSection } from "../components/mutualFunds/MutualFundPortfolioSection";
 import { PortfolioEventsCalendar } from "../components/PortfolioEventsCalendar";
 import { TerminalButton } from "../components/terminal/TerminalButton";
+import { ExportButton } from "../components/common/ExportButton";
 import { TerminalInput } from "../components/terminal/TerminalInput";
 import { usePortfolioEarnings } from "../hooks/useStocks";
 import { useSettingsStore } from "../store/settingsStore";
@@ -1110,7 +1111,10 @@ export function PortfolioPage() {
 
             <div className="space-y-3 xl:col-span-8">
               <div className="rounded border border-terminal-border bg-terminal-panel p-3">
-              <div className="mb-2 text-sm font-semibold">Holdings</div>
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-sm font-semibold">Holdings</div>
+                <ExportButton source="portfolio" data={data.items} />
+              </div>
               <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px]">
                   <span className="rounded border border-terminal-accent/40 bg-terminal-bg px-2 py-1 text-terminal-text">
                     Total Holdings: <span className="text-terminal-text">{holdingsCount}</span>

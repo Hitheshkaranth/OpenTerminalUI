@@ -12,6 +12,8 @@ import {
   generateAdvancedReport,
 } from "../api/client";
 import { TradingChart } from "../components/chart/TradingChart";
+import { TimeAndSales } from "../components/market/TimeAndSales";
+import { InsiderStockDetail } from "../components/security/InsiderStockDetail";
 import { DenseTable } from "../components/terminal/DenseTable";
 import { SentimentBadge } from "../components/terminal/SentimentBadge";
 import { SentimentChart } from "../components/terminal/SentimentChart";
@@ -27,7 +29,7 @@ import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
 import type { ChartPoint } from "../types";
 
-type HubTab = "overview" | "financials" | "chart" | "news" | "ownership" | "estimates" | "peers" | "esg";
+type HubTab = "overview" | "financials" | "chart" | "news" | "ownership" | "estimates" | "peers" | "esg" | "tape" | "insider";
 
 const HUB_TABS: TerminalTabItem[] = [
   { id: "overview", label: "Overview" },
@@ -38,6 +40,8 @@ const HUB_TABS: TerminalTabItem[] = [
   { id: "estimates", label: "Estimates" },
   { id: "peers", label: "Peers" },
   { id: "esg", label: "ESG" },
+  { id: "tape", label: "Tape" },
+  { id: "insider", label: "Insider" },
 ];
 
 function MiniRangeBar({ low, high, current }: { low: number | null; high: number | null; current: number | null }) {
@@ -657,6 +661,14 @@ export function SecurityHubPage() {
             )}
           </TerminalPanel>
         ) : null}
+
+        {tab === "tape" ? (
+          <div className="min-h-[780px]">
+            <TimeAndSales ticker={activeTicker} className="min-h-[780px]" />
+          </div>
+        ) : null}
+
+        {tab === "insider" ? <InsiderStockDetail ticker={activeTicker} /> : null}
       </div>
     </div>
   );

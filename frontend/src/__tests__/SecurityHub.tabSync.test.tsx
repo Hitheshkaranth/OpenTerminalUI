@@ -21,6 +21,7 @@ vi.mock("../api/client", () => ({
   fetchSecurityHubOwnership: vi.fn(async () => ({})),
   fetchSecurityHubEstimates: vi.fn(async () => ({})),
   fetchSecurityHubEsg: vi.fn(async () => ({})),
+  fetchInsiderStock: vi.fn(async () => ({ trades: [], summary: { total_buys: 0, total_sells: 0, net_value: 0, insider_count: 0 } })),
 }));
 
 vi.mock("../components/chart/TradingChart", () => ({

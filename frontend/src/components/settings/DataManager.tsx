@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { api } from "../../api/client";
 
 type CatalogItem = {
   name: string;
@@ -15,9 +16,8 @@ export function DataManager() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/v1/backtest/data/catalog");
-      if (!res.ok) throw new Error(`Catalog load failed (${res.status})`);
-      const data = (await res.json()) as { items?: CatalogItem[] };
+      const res = await api.get("/api/v1/backtest/data/catalog");
+      const data = res.data as { items?: CatalogItem[] };
       setItems(Array.isArray(data.items) ? data.items : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load data catalog");

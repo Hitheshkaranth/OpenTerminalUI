@@ -11,6 +11,7 @@ import { HeatmapView } from "./HeatmapView";
 import { useQuotesStream, useQuotesStore } from "../../realtime/useQuotesStream";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useDisplayCurrency } from "../../hooks/useDisplayCurrency";
+import { ExportButton } from "../common/ExportButton";
 import { TerminalButton } from "../terminal/TerminalButton";
 import { TerminalInput } from "../terminal/TerminalInput";
 import { TerminalCombobox } from "../terminal/TerminalCombobox";
@@ -249,8 +250,17 @@ export function WatchlistManager() {
 
           <div className="flex items-center gap-2">
             {activeWl && (
-              <div className="w-52">
-                <TerminalCombobox
+              <>
+                <ExportButton
+                  source="watchlist"
+                  data={activeWl.symbols.map(s => {
+                    const live = ticksByToken[`${selectedMarket}:${s}`];
+                    return { symbol: s, price: live?.ltp, change_pct: live?.change_pct, volume: live?.volume };
+                  })}
+                  filename={`${activeWl.name}_watchlist.csv`}
+                />
+                <div className="w-52">
+                  <TerminalCombobox
                   placeholder="Search ticker..."
                   value={searchQuery}
                   items={tickerResults}
@@ -273,6 +283,7 @@ export function WatchlistManager() {
                   )}
                 />
               </div>
+              </>
             )}
             <TerminalButton
               size="sm"

@@ -9,7 +9,8 @@ from backend.api.routes import (
     reports, screener, scripting, search, shareholding, stocks,
     stream, valuation, options, audit, data_layer, governance, patterns,
     user_layouts, portfolios,
-    oms, ops, risk
+    oms, ops, risk,
+    api_keys, dividends, rs, public_api
 )
 from backend.equity.routes import earnings, events, mutual_funds, auth
 from backend.model_lab import router as model_lab_router
@@ -34,6 +35,10 @@ equity_router.include_router(backtests.router, prefix="/api", tags=["backtests"]
 equity_router.include_router(alerts.router, prefix="/api", tags=["alerts"])
 equity_router.include_router(reports.router, prefix="/api", tags=["reports"])
 equity_router.include_router(export.router, prefix="/api", tags=["export"])
+equity_router.include_router(api_keys.router, prefix="/api", tags=["api-keys"])
+equity_router.include_router(dividends.router, prefix="/api", tags=["dividends"])
+equity_router.include_router(rs.router, prefix="/api", tags=["rs"])
+equity_router.include_router(public_api.router, prefix="/api", tags=["public-api"])
 equity_router.include_router(plugins.router, prefix="/api", tags=["plugins"])
 equity_router.include_router(data.router, prefix="/api", tags=["data"])
 equity_router.include_router(news.router, prefix="/api", tags=["news"])
@@ -47,7 +52,7 @@ equity_router.include_router(commodities.router, prefix="/api", tags=["commoditi
 equity_router.include_router(forex.router, prefix="/api", tags=["forex"])
 equity_router.include_router(hotlists.router, prefix="/api", tags=["hotlists"])
 equity_router.include_router(depth.router, prefix="/api", tags=["depth"])
-equity_router.include_router(patterns.router, tags=["patterns"])
+equity_router.include_router(patterns.router, prefix="/api", tags=["patterns"])
 equity_router.include_router(paper.router, prefix="/api", tags=["paper"])
 equity_router.include_router(portfolios.router, prefix="/api", tags=["portfolios"])
 equity_router.include_router(scripting.router, prefix="/api", tags=["scripting"])

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
@@ -102,7 +102,7 @@ async def get_prices(
 @router.get("/fundamentals/{symbol}")
 def get_fundamentals(
     symbol: str,
-    as_of: str = Query(default_factory=lambda: datetime.utcnow().strftime("%Y-%m-%d")),
+    as_of: str = Query(default_factory=lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d")),
     data_version_id: str | None = Query(default=None),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),

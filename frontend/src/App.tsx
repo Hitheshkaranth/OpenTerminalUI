@@ -22,6 +22,7 @@ const SecurityHubPage = lazyWithRetry(() => import("./pages/SecurityHub").then((
 const CommoditiesPage = lazyWithRetry(() => import("./pages/Commodities").then((m) => ({ default: m.CommoditiesPage })));
 const ForexPage = lazyWithRetry(() => import("./pages/Forex").then((m) => ({ default: m.ForexPage })));
 const HotlistsPage = lazyWithRetry(() => import("./pages/Hotlists").then((m) => ({ default: m.HotlistsPage })));
+const InsiderActivityPage = lazyWithRetry(() => import("./pages/InsiderActivityPage").then((m) => ({ default: m.InsiderActivityPage })));
 const AboutPage = lazyWithRetry(() => import("./pages/About").then((m) => ({ default: m.AboutPage })));
 const DashboardPage = lazyWithRetry(() => import("./pages/Dashboard").then((m) => ({ default: m.DashboardPage })));
 const ScreenerPage = lazyWithRetry(() => import("./pages/Screener").then((m) => ({ default: m.ScreenerPage })));
@@ -30,12 +31,16 @@ const WatchlistPage = lazyWithRetry(() => import("./pages/Watchlist").then((m) =
 const NewsPage = lazyWithRetry(() => import("./pages/News").then((m) => ({ default: m.NewsPage })));
 const AlertsPage = lazyWithRetry(() => import("./pages/Alerts").then((m) => ({ default: m.AlertsPage })));
 const PaperTradingPage = lazyWithRetry(() => import("./pages/PaperTrading").then((m) => ({ default: m.PaperTradingPage })));
+const PositionSizerPage = lazyWithRetry(() => import("./pages/PositionSizerPage").then((m) => ({ default: m.PositionSizerPage })));
+const TradeJournalPage = lazyWithRetry(() => import("./pages/TradeJournalPage").then((m) => ({ default: m.TradeJournalPage })));
 const RiskDashboardPage = lazyWithRetry(() => import("./pages/RiskDashboard").then((m) => ({ default: m.RiskDashboardPage })));
+const CorrelationDashboardPage = lazyWithRetry(() => import("./pages/CorrelationDashboardPage").then((m) => ({ default: m.CorrelationDashboardPage })));
 const OmsCompliancePage = lazyWithRetry(() => import("./pages/OmsCompliance").then((m) => ({ default: m.OmsCompliancePage })));
 const OpsDashboardPage = lazyWithRetry(() => import("./pages/OpsDashboard").then((m) => ({ default: m.OpsDashboardPage })));
 const SettingsPage = lazyWithRetry(() => import("./pages/Settings").then((m) => ({ default: m.SettingsPage })));
 const PluginsPage = lazyWithRetry(() => import("./pages/Plugins/Plugins").then((m) => ({ default: m.PluginsPage })));
 const ChartWorkstationPage = lazyWithRetry(() => import("./pages/ChartWorkstationPage").then((m) => ({ default: m.ChartWorkstationPage })));
+const MultiTimeframePage = lazyWithRetry(() => import("./pages/MultiTimeframePage").then((m) => ({ default: m.MultiTimeframePage })));
 const LaunchpadPage = lazyWithRetry(() => import("./pages/Launchpad").then((m) => ({ default: m.LaunchpadPage })));
 const LaunchpadPopoutPage = lazyWithRetry(() => import("./pages/LaunchpadPopout").then((m) => ({ default: m.LaunchpadPopoutPage })));
 const SplitComparisonPage = lazyWithRetry(() => import("./pages/SplitComparison").then((m) => ({ default: m.SplitComparisonPage })));
@@ -46,6 +51,10 @@ const CryptoWorkspacePage = lazyWithRetry(() => import("./pages/CryptoWorkspace"
 const BondsPage = lazyWithRetry(() => import("./pages/equity/bonds/Bonds").then((m) => ({ default: m.BondsPage })));
 const ETFAnalyticsPage = lazyWithRetry(() => import("./pages/ETFAnalytics").then((m) => ({ default: m.ETFAnalyticsPage })));
 const MutualFundsPage = lazyWithRetry(() => import("./pages/MutualFunds").then((m) => ({ default: m.MutualFundsPage })));
+const MarketHeatmapPage = lazyWithRetry(() => import("./pages/MarketHeatmapPage").then((m) => ({ default: m.MarketHeatmapPage })));
+const DividendDashboardPage = lazyWithRetry(() => import("./pages/DividendDashboardPage").then((m) => ({ default: m.DividendDashboardPage })));
+const TimeAndSalesPage = lazyWithRetry(() => import("./pages/TimeAndSalesPage").then((m) => ({ default: m.TimeAndSalesPage })));
+const DOMPage = lazyWithRetry(() => import("./pages/DOMPage").then((m) => ({ default: m.DOMPage })));
 
 const OptionChainPage = lazyWithRetry(() => import("./fno/pages/OptionChainPage").then((m) => ({ default: m.OptionChainPage })));
 const GreeksPage = lazyWithRetry(() => import("./fno/pages/GreeksPage").then((m) => ({ default: m.GreeksPage })));
@@ -53,6 +62,9 @@ const FuturesPage = lazyWithRetry(() => import("./fno/pages/FuturesPage").then((
 const OIAnalysisPage = lazyWithRetry(() => import("./fno/pages/OIAnalysisPage").then((m) => ({ default: m.OIAnalysisPage })));
 const StrategyPage = lazyWithRetry(() => import("./fno/pages/StrategyPage").then((m) => ({ default: m.StrategyPage })));
 const PCRPage = lazyWithRetry(() => import("./fno/pages/PCRPage").then((m) => ({ default: m.PCRPage })));
+const OptionsFlowPage = lazyWithRetry(() => import("./fno/pages/OptionsFlowPage").then((m) => ({ default: m.OptionsFlowPage })));
+const RelativeStrengthPage = lazyWithRetry(() => import("./pages/RelativeStrengthPage").then((m) => ({ default: m.RelativeStrengthPage })));
+const DataQualityDashboard = lazyWithRetry(() => import("./pages/DataQualityDashboard").then((m) => ({ default: m.DataQualityDashboard })));
 const HeatmapPage = lazyWithRetry(() => import("./fno/pages/HeatmapPage").then((m) => ({ default: m.HeatmapPage })));
 const ExpiryPage = lazyWithRetry(() => import("./fno/pages/ExpiryPage").then((m) => ({ default: m.ExpiryPage })));
 const FnoAboutPage = lazyWithRetry(() => import("./fno/pages/AboutPage").then((m) => ({ default: m.FnoAboutPage })));
@@ -105,8 +117,13 @@ function App() {
             <Route path="commodities" element={<CommoditiesPage />} />
             <Route path="forex" element={<ForexPage />} />
             <Route path="hotlists" element={<HotlistsPage />} />
+            <Route path="insider" element={<InsiderActivityPage />} />
             <Route path="stocks/about" element={<AboutPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="heatmap" element={<MarketHeatmapPage />} />
+            <Route path="dividends" element={<DividendDashboardPage />} />
+            <Route path="rs" element={<RelativeStrengthPage />} />
+            <Route path="data-quality" element={<DataQualityDashboard />} />
             <Route path="screener" element={<ScreenerPage />} />
             <Route path="portfolio" element={<PortfolioPage />} />
             <Route path="portfolio/lab" element={<PortfolioLabPage />} />
@@ -119,12 +136,18 @@ function App() {
             <Route path="news" element={<NewsPage />} />
             <Route path="alerts" element={<AlertsPage />} />
             <Route path="paper" element={<PaperTradingPage />} />
+            <Route path="position-sizer" element={<PositionSizerPage />} />
+            <Route path="journal" element={<TradeJournalPage />} />
             <Route path="risk" element={<RiskDashboardPage />} />
+            <Route path="correlation" element={<CorrelationDashboardPage />} />
             <Route path="oms" element={<OmsCompliancePage />} />
             <Route path="ops" element={<OpsDashboardPage />} />
             <Route path="plugins" element={<PluginsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="chart-workstation" element={<ChartWorkstationPage />} />
+            <Route path="mta" element={<MultiTimeframePage />} />
+            <Route path="dom" element={<DOMPage />} />
+            <Route path="tape" element={<TimeAndSalesPage />} />
             <Route path="launchpad" element={<LaunchpadPage />} />
             <Route path="launchpad/popout" element={<LaunchpadPopoutPage />} />
             <Route path="compare" element={<SplitComparisonPage />} />
@@ -143,6 +166,7 @@ function App() {
             <Route path="oi" element={<OIAnalysisPage />} />
             <Route path="strategy" element={<StrategyPage />} />
             <Route path="pcr" element={<PCRPage />} />
+            <Route path="flow" element={<OptionsFlowPage />} />
             <Route path="heatmap" element={<HeatmapPage />} />
             <Route path="expiry" element={<ExpiryPage />} />
             <Route path="about" element={<FnoAboutPage />} />
@@ -187,6 +211,7 @@ function App() {
           <Route path="/alerts" element={<Navigate to="/equity/alerts" replace />} />
           <Route path="/paper" element={<Navigate to="/equity/paper" replace />} />
           <Route path="/risk" element={<Navigate to="/equity/risk" replace />} />
+          <Route path="/correlation" element={<Navigate to="/equity/correlation" replace />} />
           <Route path="/oms" element={<Navigate to="/equity/oms" replace />} />
           <Route path="/ops" element={<Navigate to="/equity/ops" replace />} />
           <Route path="/settings" element={<Navigate to="/equity/settings" replace />} />

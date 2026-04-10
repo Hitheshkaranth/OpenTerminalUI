@@ -8,6 +8,7 @@ import { TerminalPanel } from "../../components/terminal/TerminalPanel";
 import { AlternateDataFilter } from "./screener/AlternateDataFilter";
 import { AdvancedArithmetic } from "./screener/AdvancedArithmetic";
 import { CompanyDetailDrawer } from "./screener/CompanyDetailDrawer";
+import { CustomFormulaScreener } from "./screener/CustomFormulaScreener";
 import { FilterChips } from "./screener/FilterChips";
 import { PublicScreens } from "./screener/PublicScreens";
 import { QueryBar } from "./screener/QueryBar";
@@ -81,6 +82,7 @@ function ScreenerWorkspace() {
             {[
               ["library", "Screens Library"],
               ["custom", "Custom Query"],
+              ["formula", "Custom Formula"],
               ["saved", "Saved Screens"],
               ["public", "Public Screens"],
             ].map(([id, label]) => (
@@ -109,6 +111,8 @@ function ScreenerWorkspace() {
             </div>
           </section>
         ) : null}
+
+        {tab === "formula" ? <CustomFormulaScreener /> : null}
 
         {tab === "saved" ? <SavedScreens /> : null}
         {tab === "public" ? <PublicScreens /> : null}

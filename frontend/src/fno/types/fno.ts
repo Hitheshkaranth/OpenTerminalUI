@@ -163,6 +163,43 @@ export type IvSurfaceResponse = {
   surface: number[][];
 };
 
+export type FlowStrikeContext = {
+  atm_strike: number;
+  pcr_oi: number;
+  pcr_volume: number;
+  strike_row: StrikeData;
+};
+
+export type OptionsFlowItem = {
+  timestamp: string;
+  symbol: string;
+  expiry: string;
+  strike: number;
+  option_type: "CE" | "PE";
+  volume: number;
+  avg_volume: number;
+  volume_ratio: number;
+  oi: number;
+  oi_change: number;
+  premium_value: number;
+  implied_vol: number;
+  sentiment: "bullish" | "bearish";
+  heat_score: number;
+  spot_price?: number;
+  chain_context?: FlowStrikeContext;
+};
+
+export type OptionsFlowSummary = {
+  total_premium: number;
+  bullish_premium: number;
+  bearish_premium: number;
+  bullish_pct: number;
+  bearish_pct: number;
+  top_symbols: Array<{ symbol: string; premium: number; flow_count: number }>;
+  premium_by_hour: Array<{ hour: string; bullish: number; bearish: number }>;
+  flow_count?: number;
+};
+
 export const DEFAULT_FNO_SYMBOLS = [
   "NIFTY",
   "BANKNIFTY",
@@ -198,5 +235,5 @@ export function formatIndianCompact(value: number): string {
 
 export function formatCurrencyINR(value: number): string {
   if (!Number.isFinite(value)) return "-";
-  return `?${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  return `Rs ${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 }

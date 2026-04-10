@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import uuid4
 
@@ -177,7 +177,7 @@ async def add_fund_to_portfolio(fund: PortfolioMutualFundCreate, db: Session = D
         avg_nav=float(fund.avg_nav),
         xirr=fund.xirr,
         sip_transactions=json.dumps(fund.sip_transactions or []),
-        added_at=datetime.utcnow().isoformat(),
+        added_at=datetime.now(timezone.utc).isoformat(),
     )
     db.add(row)
     db.commit()

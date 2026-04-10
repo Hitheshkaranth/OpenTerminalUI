@@ -3,6 +3,7 @@ from __future__ import annotations
 __all__ = [
     "admin",
     "commodities",
+    "correlation",
     "depth",
     "forex",
     "stocks",

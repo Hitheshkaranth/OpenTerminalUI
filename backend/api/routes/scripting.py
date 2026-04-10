@@ -5,7 +5,7 @@ import io
 import queue
 import threading
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 from contextlib import redirect_stdout
@@ -98,8 +98,8 @@ def _compile_or_raise(source: str) -> CompileResult:
 def _script_from_source(script_id: str, payload: UserScriptCreateRequest | UserScriptUpdateRequest, *, existing: UserScript | None = None) -> UserScript:
     source = payload.source if isinstance(payload, UserScriptCreateRequest) else payload.source or (existing.source if existing else "")
     compile_result = _compile_or_raise(source)
-    created_at = existing.created_at if existing else datetime.utcnow()
-    updated_at = datetime.utcnow()
+    created_at = existing.created_at if existing else datetime.now(timezone.utc)
+    updated_at = datetime.now(timezone.utc)
     return UserScript(
         id=existing.id if existing else uuid4().hex,
         name=payload.name if isinstance(payload, UserScriptCreateRequest) else (payload.name if payload.name is not None else existing.name if existing else ""),

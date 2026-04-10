@@ -285,6 +285,51 @@ export type PortfolioCorrelationResponse = {
   rolling: Array<{ date: string; pair: string; value: number }>;
 };
 
+export type CorrelationMatrixResponse = {
+  symbols: string[];
+  matrix: number[][];
+  period_start: string;
+  period_end: string;
+};
+
+export type CorrelationRollingPoint = {
+  date: string;
+  correlation: number;
+};
+
+export type CorrelationRegime = {
+  start: string;
+  end: string;
+  avg_correlation: number;
+  label: "high" | "medium" | "low";
+};
+
+export type CorrelationRollingResponse = {
+  series: CorrelationRollingPoint[];
+  current: number;
+  avg: number;
+  min: number;
+  max: number;
+  regimes: CorrelationRegime[];
+};
+
+export type CorrelationCluster = {
+  cluster_id: number;
+  symbols: string[];
+  avg_intra_correlation: number;
+};
+
+export type CorrelationDendrogramNode = {
+  name?: string;
+  distance: number;
+  children: CorrelationDendrogramNode[];
+};
+
+export type CorrelationClustersResponse = {
+  clusters: CorrelationCluster[];
+  dendrogram: CorrelationDendrogramNode;
+};
+
 export type PortfolioDividendTracker = {
   upcoming: Array<{
     symbol: string;
@@ -392,6 +437,15 @@ export type AlertRule = {
   status?: string;
   triggered_at?: string | null;
   cooldown_seconds?: number;
+  conditions?: AlertCondition[];
+  logic?: "AND" | "OR" | string;
+  delivery_channels?: string[];
+  delivery_config?: Record<string, unknown>;
+  cooldown_minutes?: number;
+  last_triggered_at?: string | null;
+  expiry_date?: string | null;
+  max_triggers?: number;
+  trigger_count?: number;
   channels?: string[];
   channel_status?: Record<string, { enabled: boolean; configured: boolean }>;
   ticker: string;
@@ -400,6 +454,26 @@ export type AlertRule = {
   threshold: number | null | undefined;
   note: string;
   created_at: string;
+};
+
+export type AlertCondition = {
+  field: string;
+  operator: string;
+  value: number | string | null;
+  params?: Record<string, unknown>;
+};
+
+export type AlertDeliveryChannel = "in_app" | "webhook" | "telegram" | "discord";
+
+export type AlertDeliveryOptions = {
+  channels: Record<
+    string,
+    {
+      label: string;
+      required_config: string[];
+      available: boolean;
+    }
+  >;
 };
 
 export type AlertTriggerEvent = {
@@ -932,6 +1006,53 @@ export type CorporateEvent = {
   url?: string | null;
 };
 
+export type InsiderTrade = {
+  date: string;
+  symbol: string;
+  name: string;
+  insider_name: string;
+  designation?: string | null;
+  type: "buy" | "sell" | string;
+  quantity: number;
+  price?: number | null;
+  value?: number | null;
+  post_holding_pct?: number | null;
+};
+
+export type InsiderStockSummary = {
+  total_buys: number;
+  total_sells: number;
+  net_value: number;
+  insider_count: number;
+};
+
+export type InsiderStockResponse = {
+  trades: InsiderTrade[];
+  summary: InsiderStockSummary;
+};
+
+export type InsiderTopActivityRow = {
+  symbol: string;
+  name: string;
+  total_value: number;
+  trade_count: number;
+  avg_price: number;
+  latest_date?: string | null;
+};
+
+export type InsiderClusterRow = {
+  symbol: string;
+  name: string;
+  insider_count: number;
+  total_value: number;
+  insiders: Array<{
+    name: string;
+    designation?: string | null;
+    value: number;
+    date?: string | null;
+  }>;
+};
+
 export type EarningsDate = {
   symbol: string;
   company_name: string;
@@ -1013,6 +1134,42 @@ export type ScreenerRunResponseV3 = {
   execution_time_ms: number;
   results: Array<Record<string, unknown>>;
   viz_data: Record<string, unknown>;
+};
+
+export type CustomFormulaRunRequest = {
+  formula: string;
+  universe: "nifty50" | "nifty100" | "nifty200" | "nifty500" | "all";
+  sort: "asc" | "desc";
+  limit: number;
+  filter_expr?: string;
+};
+
+export type CustomFormulaResult = Record<string, unknown> & {
+  symbol: string;
+  name?: string;
+  sector?: string;
+  computed_value: number;
+  pe?: number | null;
+  pb?: number | null;
+  roe?: number | null;
+  market_cap?: number | null;
+};
+
+export type CustomFormulaResponse = {
+  results: CustomFormulaResult[];
+  formula: string;
+  count: number;
+  meta?: {
+    warnings?: Array<{ code: string; message: string }>;
+  };
+};
+
+export type SavedFormula = {
+  id: number;
+  name: string;
+  formula: string;
+  description: string;
+  created_at?: string | null;
 };
 
 export type AccountRiskProfile = "conservative" | "moderate" | "aggressive";
@@ -1099,6 +1256,81 @@ export type UserScreenV3 = {
   upvotes: number;
   created_at?: string | null;
   updated_at?: string | null;
+};
+
+export type JournalEntry = {
+  id: number;
+  user_id: string;
+  symbol: string;
+  direction: "LONG" | "SHORT";
+  entry_date: string;
+  entry_price: number;
+  exit_date: string | null;
+  exit_price: number | null;
+  quantity: number;
+  pnl: number | null;
+  pnl_pct: number | null;
+  fees: number;
+  strategy: string | null;
+  setup: string | null;
+  emotion: string | null;
+  notes: string | null;
+  tags: string[];
+  rating: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type JournalStatsGroup = {
+  count: number;
+  win_rate: number;
+};
+
+export type JournalStrategyStats = JournalStatsGroup & {
+  strategy: string;
+  avg_pnl: number;
+};
+
+export type JournalEmotionStats = JournalStatsGroup & {
+  emotion: string;
+};
+
+export type JournalDayStats = {
+  day: string;
+  count: number;
+  avg_pnl: number;
+};
+
+export type JournalStats = {
+  total_trades: number;
+  open_trades: number;
+  closed_trades: number;
+  win_rate: number;
+  avg_win_pct: number;
+  avg_loss_pct: number;
+  profit_factor: number | null;
+  largest_win: number;
+  largest_loss: number;
+  expectancy: number;
+  current_streak: number;
+  best_streak: number;
+  worst_streak: number;
+  total_pnl: number;
+  avg_pnl: number;
+  by_strategy: JournalStrategyStats[];
+  by_day_of_week: JournalDayStats[];
+  by_emotion: JournalEmotionStats[];
+};
+
+export type JournalEquityPoint = {
+  date: string;
+  cumulative_pnl: number;
+};
+
+export type JournalCalendarDay = {
+  date: string;
+  pnl: number;
+  trade_count: number;
 };
 
 export * from "./markets";

@@ -15,20 +15,32 @@ import type { LinkGroup } from "../../contexts/SymbolLinkContext";
 export type LaunchpadPanelType =
   | "chart"
   | "watchlist"
+  | "news"
   | "news-feed"
   | "order-book"
   | "ticker-detail"
+  | "overview"
+  | "screener"
   | "screener-results"
   | "alerts"
+  | "financials"
   | "portfolio-summary"
+  | "portfolio-allocation"
+  | "portfolio-performance"
+  | "risk-metrics"
   | "heatmap"
   | "market-pulse"
   | "fundamentals"
   | "yield-curve"
+  | "economics"
+  | "greeks"
+  | "oi-chart"
+  | "peers"
   | "ai-research"
   | "option-chain"
   | "watchlist-heatmap"
-  | "sector-rotation";
+  | "sector-rotation"
+  | "hotkeys";
 
 export type LaunchpadPanelConfig = {
   id: string;
@@ -62,6 +74,7 @@ type LaunchpadContextValue = {
   deleteLayout: (id: string) => void;
   updatePanel: (panelId: string, patch: Partial<LaunchpadPanelConfig>) => void;
   updatePanelsLayout: (panels: Array<Pick<LaunchpadPanelConfig, "id" | "x" | "y" | "w" | "h">>) => void;
+  replacePanels: (panels: LaunchpadPanelConfig[]) => void;
   closePanel: (panelId: string) => void;
   setPanelPoppedOut: (panelId: string, poppedOut: boolean) => void;
   addPanel: (type: LaunchpadPanelType) => void;
@@ -75,6 +88,41 @@ type LaunchpadContextValue = {
 const LaunchpadContext = createContext<LaunchpadContextValue | null>(null);
 const STORAGE_KEY = "ot:launchpad:layouts:v1";
 const ACTIVE_KEY = "ot:launchpad:active:v1";
+
+export const SUPPORTED_LAUNCHPAD_PANEL_TYPES: LaunchpadPanelType[] = [
+  "chart",
+  "watchlist",
+  "news",
+  "news-feed",
+  "order-book",
+  "ticker-detail",
+  "overview",
+  "screener",
+  "screener-results",
+  "alerts",
+  "financials",
+  "portfolio-summary",
+  "portfolio-allocation",
+  "portfolio-performance",
+  "risk-metrics",
+  "heatmap",
+  "market-pulse",
+  "fundamentals",
+  "yield-curve",
+  "economics",
+  "greeks",
+  "oi-chart",
+  "peers",
+  "ai-research",
+  "option-chain",
+  "watchlist-heatmap",
+  "sector-rotation",
+  "hotkeys",
+];
+
+export function isLaunchpadPanelType(value: string): value is LaunchpadPanelType {
+  return SUPPORTED_LAUNCHPAD_PANEL_TYPES.includes(value as LaunchpadPanelType);
+}
 
 function isLinkGroup(value: unknown): value is LinkGroup {
   return value === "none" || value === "red" || value === "blue" || value === "green" || value === "yellow";
@@ -164,20 +212,32 @@ function writeLocalLayouts(layouts: LaunchpadLayoutPreset[]) {
 const PANEL_REGISTRY: Record<LaunchpadPanelType, ComponentType<{ panel: LaunchpadPanelConfig }>> = {
   chart: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadChartPanel }))),
   watchlist: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadWatchlistPanel }))),
+  news: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadNewsFeedPanel }))),
   "news-feed": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadNewsFeedPanel }))),
   "order-book": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadOrderBookPanel }))),
   "ticker-detail": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadTickerDetailPanel }))),
+  overview: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadTickerDetailPanel }))),
+  screener: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadScreenerResultsPanel }))),
   "screener-results": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadScreenerResultsPanel }))),
   alerts: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadAlertsPanel }))),
+  financials: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadFundamentalsPanel }))),
   "portfolio-summary": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadPortfolioSummaryPanel }))),
+  "portfolio-allocation": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
+  "portfolio-performance": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
+  "risk-metrics": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
   heatmap: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadHeatmapPanel }))),
   "market-pulse": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadMarketPulsePanel }))),
   fundamentals: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadFundamentalsPanel }))),
   "yield-curve": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadYieldCurvePanel }))),
+  economics: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
+  greeks: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
+  "oi-chart": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
+  peers: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
   "ai-research": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadAIResearchPanel }))),
   "option-chain": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadOptionChainPanel }))),
   "watchlist-heatmap": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadWatchlistHeatmapPanel }))),
   "sector-rotation": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadSectorRotationPanel }))),
+  hotkeys: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadHotKeyTradingPanel }))),
 };
 
 export function LaunchpadProvider({ children }: { children: ReactNode }) {
@@ -318,6 +378,12 @@ export function LaunchpadProvider({ children }: { children: ReactNode }) {
           });
           return changed ? { ...layout, panels: nextPanels } : layout;
         });
+      },
+      replacePanels: (panels) => {
+        mutateActiveLayout((layout) => ({
+          ...layout,
+          panels: panels.map((panel) => normalizePanelConfig(panel)),
+        }));
       },
       closePanel: (panelId) => {
         mutateActiveLayout((layout) => ({

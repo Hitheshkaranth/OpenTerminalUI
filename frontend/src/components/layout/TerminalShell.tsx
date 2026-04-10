@@ -21,8 +21,12 @@ import { executeParsedCommand, parseCommand } from "./commanding";
 import { useSettingsStore } from "../../store/settingsStore";
 import { HudOverlay } from "./HudOverlay";
 import { AlertToasts } from "./AlertToasts";
+import { useNotificationStore } from "../../store/notificationStore";
 import type { ThemeVariant } from "../../store/settingsStore";
 import { TerminalSelect } from "../terminal/TerminalSelect";
+import { HotKeyPanelFloat } from "../trading/HotKeyPanelFloat";
+import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
+import { ShortcutOverlay } from "../common/ShortcutOverlay";
 
 export type WorkspacePreset = "trader" | "quant" | "pm" | "risk" | "ops";
 
@@ -229,6 +233,9 @@ export function TerminalShell({
     rightRailStorageKey,
     defaultRightRailOpen,
   );
+  const fetchUnreadCount = useNotificationStore((s) => s.fetchUnreadCount);
+
+  useKeyboardShortcuts();
 
   const hasRightRail = Boolean(rightRailContent) || Boolean(rightRailSections?.length);
 
@@ -244,25 +251,12 @@ export function TerminalShell({
   );
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-      const key = event.key.toLowerCase();
-      const onChartWorkstation = location.pathname.includes("/equity/chart-workstation");
-      if (key === "w") {
-        if (onChartWorkstation) return;
-        event.preventDefault();
-        navigate("/equity/watchlist");
-      } else if (key === "n") {
-        event.preventDefault();
-        navigate("/equity/news");
-      } else if (key === "9") {
-        event.preventDefault();
-        navigate("/equity/launchpad");
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [location.pathname, navigate]);
+    void fetchUnreadCount();
+    const timer = window.setInterval(() => {
+      void fetchUnreadCount();
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [fetchUnreadCount]);
 
   return (
     <TerminalShellContext.Provider value={shellCtx}>
@@ -304,9 +298,11 @@ export function TerminalShell({
 
         {showInstallPrompt ? <InstallPromptBanner /> : null}
         {showMobileBottomNav ? <MobileBottomNav /> : null}
+        <HotKeyPanelFloat />
         <CommandPalette />
         <HudOverlay />
         <AlertToasts />
+        <ShortcutOverlay />
       </div>
     </TerminalShellContext.Provider>
   );

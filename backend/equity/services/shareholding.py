@@ -5,7 +5,7 @@ Fetches quarterly shareholding data from NSE India website.
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 import httpx
@@ -90,7 +90,7 @@ def _model_to_dict(model: BaseModel) -> dict[str, Any]:
 
 
 def _default_pattern_payload(symbol: str, warning: Optional[str] = None) -> dict[str, Any]:
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     quarter = "Latest"
     categories = [
         {
@@ -286,7 +286,7 @@ class ShareholdingService:
             if parsed_q:
                 as_of_date = parsed_q.strftime("%Y-%m-%d")
 
-        return quarter or "Latest", as_of_date or datetime.utcnow().strftime("%Y-%m-%d"), total_shares
+        return quarter or "Latest", as_of_date or datetime.now(timezone.utc).strftime("%Y-%m-%d"), total_shares
 
     def _classify_category(self, name: str) -> str:
         low = name.lower()
@@ -521,7 +521,7 @@ class ShareholdingService:
                 warning = f"FMP institutional fallback unavailable: {exc}"
 
         quarter = "Latest"
-        as_of = datetime.utcnow().strftime("%Y-%m-%d")
+        as_of = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         payload = _default_pattern_payload(symbol, warning)
         payload["source"] = "fmp"
         payload["institutional_holders"] = holders

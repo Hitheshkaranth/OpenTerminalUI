@@ -7,6 +7,8 @@ import type {
   IvSurfaceResponse,
   OIAnalysis,
   OptionChainResponse,
+  OptionsFlowItem,
+  OptionsFlowSummary,
   PCRByStrikePoint,
   PCRCurrentResponse,
   PCRHistoryPoint,
@@ -152,4 +154,45 @@ export async function fetchExpiryDashboard(): Promise<Array<{
     }>
   }>("/fno/expiry/dashboard");
   return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function fetchOptionsFlow(params: {
+  symbol?: string;
+  minPremium?: number;
+  optionType?: "CE" | "PE";
+  expiry?: string;
+  limit?: number;
+}): Promise<{ flows: OptionsFlowItem[]; count: number }> {
+  const { data } = await api.get<{ flows: OptionsFlowItem[]; count: number }>("/fno/flow/unusual", {
+    params: {
+      symbol: params.symbol || undefined,
+      min_premium: params.minPremium ?? 0,
+      option_type: params.optionType || undefined,
+      expiry: params.expiry || undefined,
+      limit: params.limit ?? 100,
+    },
+  });
+  return {
+    flows: Array.isArray(data?.flows) ? data.flows : [],
+    count: Number(data?.count || 0),
+  };
+}
+
+export async function fetchOptionsFlowSummary(period: "1d" | "5d" = "1d"): Promise<OptionsFlowSummary> {
+  const { data } = await api.get<OptionsFlowSummary>("/fno/flow/summary", { params: { period } });
+  return data;
+}
+
+export async function fetchOptionsTickerFlow(symbol: string): Promise<{
+  flows: OptionsFlowItem[];
+  ticker_summary: { total_premium: number; bullish_pct: number; top_strikes: Array<{ strike: number; premium: number; flow_count: number }> };
+}> {
+  const { data } = await api.get<{
+    flows: OptionsFlowItem[];
+    ticker_summary: { total_premium: number; bullish_pct: number; top_strikes: Array<{ strike: number; premium: number; flow_count: number }> };
+  }>(`/fno/flow/ticker/${encodeURIComponent(symbol.trim().toUpperCase())}`);
+  return {
+    flows: Array.isArray(data?.flows) ? data.flows : [],
+    ticker_summary: data?.ticker_summary ?? { total_premium: 0, bullish_pct: 0, top_strikes: [] },
+  };
 }

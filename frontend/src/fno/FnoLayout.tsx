@@ -18,8 +18,9 @@ const LINKS = [
   { to: "/fno/oi", label: "OI Analysis", key: "F4" },
   { to: "/fno/strategy", label: "Strategy", key: "F5" },
   { to: "/fno/pcr", label: "PCR", key: "F6" },
-  { to: "/fno/expiry", label: "Expiry", key: "F7" },
-  { to: "/fno/about", label: "About", key: "F8" },
+  { to: "/fno/flow", label: "Flow", key: "F7" },
+  { to: "/fno/expiry", label: "Expiry", key: "F8" },
+  { to: "/fno/about", label: "About", key: "F9" },
 ] as const;
 
 const POPULAR_FNO_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"] as const;

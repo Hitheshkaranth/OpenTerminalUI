@@ -15,8 +15,10 @@ service = orderbook_service
 
 class DepthLevelResponse(BaseModel):
     price: float
+    quantity: int
     size: int
     orders: int
+    cumulative_qty: int
 
 
 class DepthSnapshotResponse(BaseModel):
@@ -26,10 +28,16 @@ class DepthSnapshotResponse(BaseModel):
     as_of: datetime
     mid_price: float
     spread: float
+    spread_pct: float
     tick_size: float
     levels: int
     total_bid_quantity: int
     total_ask_quantity: int
+    total_bid_qty: float
+    total_ask_qty: float
+    last_price: float
+    last_qty: float
+    imbalance: float
     bids: list[DepthLevelResponse] = Field(default_factory=list)
     asks: list[DepthLevelResponse] = Field(default_factory=list)
 
@@ -38,7 +46,7 @@ class DepthSnapshotResponse(BaseModel):
 def get_depth_snapshot(
     symbol: str,
     market: str = Query(default="US"),
-    levels: int = Query(default=10, ge=1, le=25),
+    levels: int = Query(default=20, ge=1, le=40),
 ) -> Any:
     try:
         snapshot = service.get_snapshot(symbol, market_hint=market, levels=levels)

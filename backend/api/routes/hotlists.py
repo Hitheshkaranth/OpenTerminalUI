@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -43,5 +43,5 @@ async def get_hotlist(
         list_type=str(list_type).strip().lower(),
         market=str(market).strip().upper(),
         items=[HotlistItem(**row) for row in items],
-        updated_at=datetime.utcnow(),
+        updated_at=datetime.now(timezone.utc),
     )

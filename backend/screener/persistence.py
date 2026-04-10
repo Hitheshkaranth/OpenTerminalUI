@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -74,7 +74,7 @@ def ensure_default_presets(db: Session, user_id: str) -> None:
     exists = db.query(ScanPresetORM).filter(ScanPresetORM.user_id == user_id).count()
     if exists > 0:
         return
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     for payload in default_preset_pack():
         row = ScanPresetORM(
             user_id=user_id,
@@ -116,7 +116,7 @@ def list_presets(db: Session, user_id: str) -> list[ScanPresetOut]:
 
 
 def create_preset(db: Session, user_id: str, payload: ScanPresetCreate) -> ScanPresetOut:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     row = ScanPresetORM(
         user_id=user_id,
         name=payload.name,
@@ -154,7 +154,7 @@ def update_preset(db: Session, user_id: str, preset_id: str, payload: ScanPreset
     row.liquidity_gate_json = payload.liquidity_gate.model_dump()
     row.rules_json = [x.model_dump() for x in payload.rules]
     row.ranking_json = payload.ranking.model_dump()
-    row.updated_at = datetime.utcnow()
+    row.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(row)
     return ScanPresetOut(
@@ -180,7 +180,7 @@ def delete_preset(db: Session, user_id: str, preset_id: str) -> bool:
 
 
 def create_run(db: Session, user_id: str, preset_id: str | None, status: str = "running", meta: dict[str, Any] | None = None) -> ScanRunORM:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     row = ScanRunORM(
         user_id=user_id,
         preset_id=preset_id,
@@ -202,7 +202,7 @@ def finalize_run(db: Session, run_id: str, status: str, summary: dict[str, Any])
         return
     row.status = status
     row.summary_json = summary
-    row.finished_at = datetime.utcnow()
+    row.finished_at = datetime.now(timezone.utc)
     db.commit()
 
 

@@ -90,7 +90,7 @@ def test_data_version_and_adjusted_prices() -> None:
                 amount=None,
                 notes="2-for-1",
                 data_version_id=version_id,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             )
         )
         db.commit()

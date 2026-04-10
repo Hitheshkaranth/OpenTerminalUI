@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
@@ -39,7 +39,7 @@ class WatchlistORM(Base):
     name: Mapped[str] = mapped_column(String(128), index=True)
     symbols_json: Mapped[list] = mapped_column(JSON, default=list)  # Ordered array of tickers
     column_config_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class WatchlistItem(Base):
@@ -74,7 +74,7 @@ class AlertRuleORM(Base):
     condition: Mapped[str] = mapped_column(String(32))
     threshold: Mapped[float] = mapped_column(Float)
     note: Mapped[str] = mapped_column(String(256), default="")
-    created_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.utcnow().isoformat())
+    created_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class AlertHistoryORM(Base):
@@ -84,7 +84,7 @@ class AlertHistoryORM(Base):
     rule_id: Mapped[int] = mapped_column(Integer, index=True)
     ticker: Mapped[str] = mapped_column(String(32), index=True)
     message: Mapped[str] = mapped_column(String(512))
-    triggered_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.utcnow().isoformat())
+    triggered_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class FutureContract(Base):
@@ -101,7 +101,7 @@ class FutureContract(Base):
     instrument_token: Mapped[int] = mapped_column(Integer, index=True)
     lot_size: Mapped[int] = mapped_column(Integer, default=0)
     tick_size: Mapped[float] = mapped_column(Float, default=0.0)
-    updated_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.utcnow().isoformat())
+    updated_at: Mapped[str] = mapped_column(String(32), default=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class NewsArticle(Base):
@@ -121,7 +121,7 @@ class NewsArticle(Base):
     sentiment_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     sentiment_label: Mapped[str | None] = mapped_column(String(16), nullable=True)
     sentiment_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
-    created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())
+    created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class BacktestRun(Base):
@@ -136,8 +136,8 @@ class BacktestRun(Base):
     error: Mapped[str] = mapped_column(Text, default="")
     data_version_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("data_versions.id", ondelete="SET NULL"), nullable=True, index=True)
     execution_profile_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())
-    updated_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())
+    created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class ModelExperiment(Base):
@@ -154,7 +154,7 @@ class ModelExperiment(Base):
     start_date: Mapped[str] = mapped_column(String(16), index=True)
     end_date: Mapped[str] = mapped_column(String(16), index=True)
     cost_model_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat(), index=True)
+    created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.now(timezone.utc).isoformat(), index=True)
 
 
 class ModelRun(Base):
@@ -164,7 +164,7 @@ class ModelRun(Base):
     experiment_id: Mapped[str] = mapped_column(String(36), ForeignKey("model_experiments.id", ondelete="CASCADE"), index=True)
     backtest_run_id: Mapped[str] = mapped_column(String(64), index=True)
     status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
-    started_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat(), index=True)
+    started_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.now(timezone.utc).isoformat(), index=True)
     finished_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     data_version_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("data_versions.id", ondelete="SET NULL"), nullable=True, index=True)
@@ -217,7 +217,7 @@ class PortfolioDefinition(Base):
     rebalance_frequency: Mapped[str] = mapped_column(String(16), default=RebalanceFrequency.WEEKLY.value, index=True)
     weighting_method: Mapped[str] = mapped_column(String(16), default=WeightingMethod.EQUAL.value, index=True)
     constraints_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat(), index=True)
+    created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.now(timezone.utc).isoformat(), index=True)
 
 
 class StrategyBlend(Base):
@@ -227,7 +227,7 @@ class StrategyBlend(Base):
     name: Mapped[str] = mapped_column(String(160), index=True)
     strategies_json: Mapped[list] = mapped_column(JSON, default=list)
     blend_method: Mapped[str] = mapped_column(String(32), default=BlendMethod.WEIGHTED_SUM_RETURNS.value, index=True)
-    created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat(), index=True)
+    created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.now(timezone.utc).isoformat(), index=True)
 
 
 class PortfolioRun(Base):
@@ -237,7 +237,7 @@ class PortfolioRun(Base):
     portfolio_id: Mapped[str] = mapped_column(String(36), ForeignKey("portfolio_definitions.id", ondelete="CASCADE"), index=True)
     blend_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("strategy_blends.id", ondelete="SET NULL"), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
-    started_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat(), index=True)
+    started_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.now(timezone.utc).isoformat(), index=True)
     finished_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -299,7 +299,7 @@ class PortfolioMutualFundHolding(Base):
     avg_nav: Mapped[float] = mapped_column(Float)
     xirr: Mapped[float | None] = mapped_column(Float, nullable=True)
     sip_transactions: Mapped[str] = mapped_column(Text, default="[]")
-    added_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.utcnow().isoformat())
+    added_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class AlertConditionType(str, enum.Enum):
@@ -309,6 +309,7 @@ class AlertConditionType(str, enum.Enum):
     VOLUME_SPIKE = "volume_spike"
     INDICATOR_CROSSOVER = "indicator_crossover"
     CUSTOM_EXPRESSION = "custom_expression"
+    MULTI_CONDITION = "multi_condition"
 
 
 class AlertStatus(str, enum.Enum):
@@ -328,9 +329,18 @@ class AlertORM(Base):
     condition_type: Mapped[AlertConditionType] = mapped_column(String(32), index=True)
     parameters: Mapped[dict] = mapped_column(JSON, default=dict)
     status: Mapped[AlertStatus] = mapped_column(String(16), index=True, default=AlertStatus.ACTIVE.value)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     triggered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cooldown_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    conditions: Mapped[list] = mapped_column(JSON, default=list)
+    logic: Mapped[str] = mapped_column(String(5), default="AND")
+    delivery_channels: Mapped[list] = mapped_column(JSON, default=lambda: ["in_app"])
+    delivery_config: Mapped[dict] = mapped_column(JSON, default=dict)
+    cooldown_minutes: Mapped[int] = mapped_column(Integer, default=0)
+    last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    expiry_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    max_triggers: Mapped[int] = mapped_column(Integer, default=0)
+    trigger_count: Mapped[int] = mapped_column(Integer, default=0)
     last_triggered_value: Mapped[float | None] = mapped_column(Float, nullable=True)
     last_notification_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
@@ -345,7 +355,7 @@ class AlertTriggerORM(Base):
     condition_type: Mapped[str] = mapped_column(String(32), index=True)
     triggered_value: Mapped[float | None] = mapped_column(Float, nullable=True)
     context: Mapped[dict] = mapped_column(JSON, default=dict)
-    triggered_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    triggered_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
 
 
@@ -360,8 +370,8 @@ class ScanPresetORM(Base):
     liquidity_gate_json: Mapped[dict] = mapped_column(JSON, default=dict)
     rules_json: Mapped[list] = mapped_column(JSON, default=list)
     ranking_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class ScanRunORM(Base):
@@ -370,7 +380,7 @@ class ScanRunORM(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
     preset_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("scan_presets.id", ondelete="SET NULL"), nullable=True, index=True)
-    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(16), default="running", index=True)
     meta_json: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -408,8 +418,8 @@ class ScanAlertRuleORM(Base):
     last_event_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     last_event_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     meta_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class UserScreenORM(Base):
@@ -424,8 +434,18 @@ class UserScreenORM(Base):
     viz_config: Mapped[dict] = mapped_column(JSON, default=dict)
     is_public: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     upvotes: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+
+
+class SavedFormulaORM(Base):
+    __tablename__ = "saved_formulas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    formula: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class DataVersionORM(Base):
@@ -436,7 +456,7 @@ class DataVersionORM(Base):
     description: Mapped[str] = mapped_column(String(512), default="")
     source: Mapped[str] = mapped_column(String(64), default="internal")
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
@@ -452,7 +472,7 @@ class CorpActionORM(Base):
     amount: Mapped[float | None] = mapped_column(Float, nullable=True)
     notes: Mapped[str] = mapped_column(String(512), default="")
     data_version_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("data_versions.id", ondelete="SET NULL"), nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class PriceEodORM(Base):
@@ -468,7 +488,7 @@ class PriceEodORM(Base):
     close: Mapped[float] = mapped_column(Float)
     volume: Mapped[float] = mapped_column(Float, default=0.0)
     data_version_id: Mapped[str] = mapped_column(String(36), ForeignKey("data_versions.id", ondelete="CASCADE"), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class FundamentalsPitORM(Base):
@@ -483,7 +503,7 @@ class FundamentalsPitORM(Base):
     effective_from: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
     effective_to: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
     data_version_id: Mapped[str] = mapped_column(String(36), ForeignKey("data_versions.id", ondelete="CASCADE"), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class UniverseMembershipORM(Base):
@@ -496,7 +516,7 @@ class UniverseMembershipORM(Base):
     start_date: Mapped[str] = mapped_column(String(16), index=True)
     end_date: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
     data_version_id: Mapped[str] = mapped_column(String(36), ForeignKey("data_versions.id", ondelete="CASCADE"), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class OmsOrderORM(Base):
@@ -512,8 +532,8 @@ class OmsOrderORM(Base):
     status: Mapped[str] = mapped_column(String(16), default="accepted", index=True)
     rejection_reason: Mapped[str | None] = mapped_column(String(512), nullable=True)
     meta_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class OmsFillORM(Base):
@@ -525,7 +545,7 @@ class OmsFillORM(Base):
     quantity: Mapped[float] = mapped_column(Float)
     fill_price: Mapped[float] = mapped_column(Float)
     cost: Mapped[float] = mapped_column(Float, default=0.0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class RestrictedListORM(Base):
@@ -536,7 +556,7 @@ class RestrictedListORM(Base):
     symbol: Mapped[str] = mapped_column(String(64), index=True)
     reason: Mapped[str] = mapped_column(String(256), default="")
     active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class AuditLogORM(Base):
@@ -548,7 +568,7 @@ class AuditLogORM(Base):
     entity_type: Mapped[str] = mapped_column(String(64), index=True)
     entity_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class ModelRegistryORM(Base):
@@ -560,7 +580,7 @@ class ModelRegistryORM(Base):
     stage: Mapped[str] = mapped_column(String(16), default="staging", index=True)
     promoted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class OpsKillSwitchORM(Base):
@@ -571,7 +591,7 @@ class OpsKillSwitchORM(Base):
     scope: Mapped[str] = mapped_column(String(64), index=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     reason: Mapped[str] = mapped_column(String(512), default="")
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class VirtualSide(str, enum.Enum):
@@ -602,7 +622,7 @@ class VirtualPortfolio(Base):
     name: Mapped[str] = mapped_column(String(128), default="Paper Portfolio")
     initial_capital: Mapped[float] = mapped_column(Float)
     current_cash: Mapped[float] = mapped_column(Float)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
 
@@ -636,7 +656,7 @@ class VirtualOrder(Base):
     fill_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     slippage_bps: Mapped[float] = mapped_column(Float, default=5.0)
     commission: Mapped[float] = mapped_column(Float, default=0.0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     signal_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
@@ -650,7 +670,7 @@ class VirtualTrade(Base):
     side: Mapped[str] = mapped_column(String(8), index=True)
     quantity: Mapped[float] = mapped_column(Float)
     price: Mapped[float] = mapped_column(Float)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     pnl_realized: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
@@ -663,7 +683,7 @@ class ChartDrawing(Base):
     tool_type: Mapped[str] = mapped_column(String(32), index=True)
     coordinates: Mapped[dict] = mapped_column(JSON, default=dict)
     style: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class ChartTemplate(Base):
@@ -673,7 +693,7 @@ class ChartTemplate(Base):
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(128), index=True)
     layout_config: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class PortfolioORM(Base):
@@ -686,7 +706,7 @@ class PortfolioORM(Base):
     benchmark_symbol: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     currency: Mapped[str] = mapped_column(String(8), default="USD")
     starting_cash: Mapped[float] = mapped_column(Float, default=0.0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class PortfolioHoldingORM(Base):
@@ -703,7 +723,7 @@ class PortfolioHoldingORM(Base):
     purchase_date: Mapped[str] = mapped_column(String(16), default="")
     notes: Mapped[str] = mapped_column(Text, default="")
     lot_id: Mapped[str] = mapped_column(String(64), default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class PortfolioTransactionORM(Base):
@@ -719,7 +739,7 @@ class PortfolioTransactionORM(Base):
     fees: Mapped[float] = mapped_column(Float, default=0.0)
     lot_id: Mapped[str] = mapped_column(String(64), default="")
     notes: Mapped[str] = mapped_column(Text, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class UserLayoutORM(Base):
@@ -729,4 +749,4 @@ class UserLayoutORM(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     user_key: Mapped[str] = mapped_column(String(64), index=True)
     layouts_json: Mapped[list] = mapped_column(JSON, default=list)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)

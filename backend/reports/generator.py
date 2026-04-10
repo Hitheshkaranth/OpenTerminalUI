@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -99,7 +99,7 @@ def generate_xlsx_report(rows: list[dict[str, Any]], title: str = "Report") -> b
     wb = Workbook()
     ws = wb.active
     ws.title = "data"
-    ws.append([title, datetime.utcnow().isoformat()])
+    ws.append([title, datetime.now(timezone.utc).isoformat()])
     ws.append([])
     if rows:
         headers = sorted({k for row in rows for k in row.keys()})
@@ -129,7 +129,7 @@ def generate_pdf_report(rows: list[dict[str, Any]], title: str = "Portfolio Repo
     c.drawString(2 * cm, y, title)
     y -= 0.8 * cm
     c.setFont("Helvetica", 9)
-    c.drawString(2 * cm, y, f"Generated: {datetime.utcnow().isoformat()} UTC")
+    c.drawString(2 * cm, y, f"Generated: {datetime.now(timezone.utc).isoformat()} UTC")
     y -= 0.8 * cm
 
     if not rows:

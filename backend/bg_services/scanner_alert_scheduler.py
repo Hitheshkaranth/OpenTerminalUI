@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from backend.alerts.scanner_rules import process_scanner_tick
@@ -77,7 +77,7 @@ class ScannerAlertSchedulerService:
                 db2.close()
             scanned += 1
 
-        self._last_run_at = datetime.utcnow().isoformat()
+        self._last_run_at = datetime.now(timezone.utc).isoformat()
         self._last_scanned_symbols = scanned
 
     def status_snapshot(self) -> dict[str, Any]:

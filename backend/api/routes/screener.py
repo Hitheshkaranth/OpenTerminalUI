@@ -7,13 +7,17 @@ import re
 from typing import Any, List, Optional
 
 import pandas as pd
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy.orm import Session
 
 from backend.api.deps import fetch_stock_snapshot_coalesced
+from backend.api.deps import get_db
+from backend.core import formula_engine
 from backend.core.models import ScreenerRunRequest, ScreenerRunResponse
 from backend.core.screener import ScreenerEngine, Rule
 from backend.equity.screener_v2 import FactorEngine, FactorSpec
+from backend.models import SavedFormulaORM
 from backend.services.screener_scan_service import FMPScreenerAdapter, NSEScreenerAdapter, merge_scan_rows
 from backend.services.materialized_store import load_screener_df, upsert_screener_rows
 
@@ -98,6 +102,46 @@ class ScreenerScanRequest(BaseModel):
                 raise ValueError(f"Unsupported market '{market}'.")
             normalized.append(market_upper)
         return normalized or ["NSE", "NYSE", "NASDAQ"]
+
+
+class CustomFormulaRunRequest(BaseModel):
+    formula: str = Field(min_length=1)
+    universe: str = "nifty200"
+    sort: str = "desc"
+    limit: int = Field(default=50, ge=1, le=200)
+    filter_expr: str | None = None
+
+    @field_validator("universe")
+    @classmethod
+    def validate_universe(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"nifty50", "nifty100", "nifty200", "nifty500", "all"}:
+            raise ValueError("Universe must be one of nifty50, nifty100, nifty200, nifty500 or all.")
+        return normalized
+
+    @field_validator("sort")
+    @classmethod
+    def validate_sort(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"asc", "desc"}:
+            raise ValueError("Sort must be 'asc' or 'desc'.")
+        return normalized
+
+
+class SavedFormulaCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    formula: str = Field(min_length=1)
+    description: str = Field(default="", max_length=2000)
+
+
+def _saved_formula_to_dict(row: SavedFormulaORM) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "name": row.name,
+        "formula": row.formula,
+        "description": row.description or "",
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+    }
 
 
 SCAN_FIELD_MAP: dict[str, list[str]] = {
@@ -357,6 +401,61 @@ def _load_universe(universe: str) -> List[str]:
     except Exception:
         return ["RELIANCE"]
 
+
+def _load_custom_formula_universe(universe: str) -> list[str]:
+    all_symbols = _load_universe("nse_eq")
+    if universe == "nifty50":
+        return all_symbols[:50]
+    if universe == "nifty100":
+        return all_symbols[:100]
+    if universe == "nifty200":
+        return all_symbols[:200]
+    if universe == "nifty500":
+        return all_symbols[:500]
+    return all_symbols
+
+
+def _to_optional_number(value: Any) -> float | None:
+    number = _to_num(value)
+    return number if number is not None else None
+
+
+def _normalize_formula_row(row: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(row)
+    normalized["symbol"] = str(row.get("ticker") or row.get("symbol") or "").upper() or None
+    normalized["name"] = row.get("company_name") or row.get("company") or normalized["symbol"]
+    normalized["sector"] = row.get("sector")
+    normalized["pe"] = _to_optional_number(row.get("pe"))
+    normalized["pb"] = _to_optional_number(row.get("pb") if "pb" in row else row.get("pb_calc"))
+    normalized["ps"] = _to_optional_number(row.get("ps") if "ps" in row else row.get("ps_calc"))
+    normalized["ev_ebitda"] = _to_optional_number(row.get("ev_ebitda"))
+    normalized["roe"] = _to_optional_number(row.get("roe") if "roe" in row else row.get("roe_pct"))
+    normalized["roa"] = _to_optional_number(row.get("roa") if "roa" in row else row.get("roa_pct"))
+    normalized["roce"] = _to_optional_number(row.get("roce"))
+    normalized["debt_equity"] = _to_optional_number(row.get("debt_equity") if "debt_equity" in row else row.get("debt_to_equity"))
+    normalized["current_ratio"] = _to_optional_number(row.get("current_ratio"))
+    normalized["revenue_growth"] = _to_optional_number(row.get("revenue_growth") if "revenue_growth" in row else row.get("rev_growth_pct"))
+    normalized["eps_growth"] = _to_optional_number(row.get("eps_growth") if "eps_growth" in row else row.get("eps_growth_pct"))
+    normalized["net_profit_growth"] = _to_optional_number(row.get("net_profit_growth"))
+    normalized["dividend_yield"] = _to_optional_number(row.get("dividend_yield") if "dividend_yield" in row else row.get("div_yield_pct"))
+    normalized["market_cap"] = _to_optional_number(row.get("market_cap"))
+    normalized["price"] = _to_optional_number(row.get("price") if "price" in row else row.get("current_price"))
+    normalized["volume"] = _to_optional_number(row.get("volume") if "volume" in row else row.get("avg_volume_10d"))
+    normalized["turnover"] = _to_optional_number(row.get("turnover"))
+    normalized["net_profit_margin"] = _to_optional_number(row.get("net_profit_margin") if "net_profit_margin" in row else row.get("net_margin_pct"))
+    normalized["operating_margin"] = _to_optional_number(row.get("operating_margin") if "operating_margin" in row else row.get("op_margin_pct"))
+    normalized["ebitda_margin"] = _to_optional_number(row.get("ebitda_margin"))
+    normalized["free_cash_flow"] = _to_optional_number(row.get("free_cash_flow") if "free_cash_flow" in row else row.get("fcf"))
+    normalized["promoter_holding"] = _to_optional_number(row.get("promoter_holding"))
+    normalized["fii_holding"] = _to_optional_number(row.get("fii_holding") if "fii_holding" in row else row.get("fii_holding_change_qoq"))
+    normalized["dii_holding"] = _to_optional_number(row.get("dii_holding") if "dii_holding" in row else row.get("dii_holding_change_qoq"))
+    normalized["high_52w"] = _to_optional_number(row.get("high_52w") if "high_52w" in row else row.get("fifty_two_week_high"))
+    normalized["low_52w"] = _to_optional_number(row.get("low_52w") if "low_52w" in row else row.get("fifty_two_week_low"))
+    normalized["beta"] = _to_optional_number(row.get("beta"))
+    normalized["book_value"] = _to_optional_number(row.get("book_value"))
+    normalized["face_value"] = _to_optional_number(row.get("face_value"))
+    return normalized
+
 @router.post("/screener/run", response_model=ScreenerRunResponse)
 async def run_screener(request: ScreenerRunRequest) -> ScreenerRunResponse:
     all_tickers = _load_universe(request.universe)
@@ -454,6 +553,85 @@ async def run_multimarket_scan(request: ScreenerScanRequest) -> dict[str, Any]:
             "warnings": warnings,
         },
     }
+
+
+@router.post("/screener/custom-formula")
+async def run_custom_formula_screener(request: CustomFormulaRunRequest) -> dict[str, Any]:
+    valid_formula, formula_error = formula_engine.validate(request.formula)
+    if not valid_formula:
+        raise HTTPException(status_code=400, detail=formula_error)
+
+    if request.filter_expr:
+        valid_filter, filter_error = formula_engine.validate_filter(request.filter_expr)
+        if not valid_filter:
+            raise HTTPException(status_code=400, detail=filter_error)
+
+    tickers = _load_custom_formula_universe(request.universe)
+    warnings: list[dict[str, str]] = []
+    df, _ = await _hydrate_missing_screener_rows(tickers, warnings, refresh_cap=40)
+    if df.empty:
+        return {"results": [], "formula": request.formula, "count": 0, "meta": {"warnings": warnings}}
+
+    records = df.where(pd.notnull(df), None).to_dict(orient="records")
+    computed_rows: list[dict[str, Any]] = []
+    for record in records:
+        row = _normalize_formula_row(record)
+        try:
+            if request.filter_expr and not formula_engine.evaluate_filter(request.filter_expr, row):
+                continue
+        except Exception:
+            continue
+
+        try:
+            computed_value = formula_engine.evaluate(request.formula, row)
+        except Exception:
+            continue
+        if pd.isna(computed_value):
+            continue
+        row["computed_value"] = computed_value
+        computed_rows.append(row)
+
+    reverse = request.sort != "asc"
+    computed_rows.sort(key=lambda row: float(row.get("computed_value") or 0), reverse=reverse)
+    out = computed_rows[: request.limit]
+    return {
+        "results": out,
+        "formula": request.formula,
+        "count": len(out),
+        "meta": {"warnings": warnings},
+    }
+
+
+@router.get("/screener/saved-formulas")
+def list_saved_formulas(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+    rows = db.query(SavedFormulaORM).order_by(SavedFormulaORM.created_at.desc(), SavedFormulaORM.id.desc()).all()
+    return [_saved_formula_to_dict(row) for row in rows]
+
+
+@router.post("/screener/saved-formulas")
+def create_saved_formula(payload: SavedFormulaCreateRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
+    valid_formula, error_message = formula_engine.validate(payload.formula)
+    if not valid_formula:
+        raise HTTPException(status_code=400, detail=error_message)
+    row = SavedFormulaORM(
+        name=payload.name.strip(),
+        formula=payload.formula.strip(),
+        description=payload.description.strip(),
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _saved_formula_to_dict(row)
+
+
+@router.delete("/screener/saved-formulas/{formula_id}")
+def delete_saved_formula(formula_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+    row = db.query(SavedFormulaORM).filter(SavedFormulaORM.id == formula_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Saved formula not found")
+    db.delete(row)
+    db.commit()
+    return {"status": "deleted", "id": formula_id}
 
 
 @router.post("/screener/run-v2")

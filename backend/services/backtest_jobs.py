@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import math
 import random
 from uuid import uuid4
@@ -76,7 +76,7 @@ class BacktestJobService:
             if row is None:
                 return
             row.status = "running"
-            row.updated_at = datetime.utcnow().isoformat()
+            row.updated_at = datetime.now(timezone.utc).isoformat()
             db.commit()
 
             await ws_manager.broadcast_to_all({"type": "backtest_progress", "run_id": run_id, "progress": 10, "status": "fetching data"})
@@ -149,7 +149,7 @@ class BacktestJobService:
             row.logs = market_note + strategy_out.stdout + (f"\nSTDERR:\n{strategy_out.stderr}" if strategy_out.stderr else "")
             row.status = "done"
             row.error = ""
-            row.updated_at = datetime.utcnow().isoformat()
+            row.updated_at = datetime.now(timezone.utc).isoformat()
             db.commit()
 
             await ws_manager.broadcast_to_all({"type": "backtest_progress", "run_id": run_id, "progress": 100, "status": "done"})
@@ -158,7 +158,7 @@ class BacktestJobService:
             if row is not None:
                 row.status = "failed"
                 row.error = str(exc)
-                row.updated_at = datetime.utcnow().isoformat()
+                row.updated_at = datetime.now(timezone.utc).isoformat()
                 db.commit()
         finally:
             db.close()
@@ -207,7 +207,7 @@ class BacktestJobService:
 
     def _build_synthetic_frame(self, start: str | None, end: str | None, seed_key: str) -> pd.DataFrame:
         start_date = (start or "2024-01-01").strip()
-        end_date = (end or datetime.utcnow().strftime("%Y-%m-%d")).strip()
+        end_date = (end or datetime.now(timezone.utc).strftime("%Y-%m-%d")).strip()
         try:
             start_dt = datetime.fromisoformat(start_date).date()
             end_dt = datetime.fromisoformat(end_date).date()

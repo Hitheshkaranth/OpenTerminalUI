@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { fetchCryptoSearch, searchSymbols, type SearchSymbolItem } from "../../api/client";
 import { CountryFlag } from "../common/CountryFlag";
+import { NotificationBell } from "../notifications/NotificationBell";
 import { useNavigationHistory } from "../../hooks/useNavigationHistory";
 import { inferRecentSecurityAssetClass, inferRecentSecurityMarket, useRecentSecurities } from "../../hooks/useRecentSecurities";
 import { useMarketStatus, useTopBarTickers } from "../../hooks/useStocks";
@@ -388,6 +389,7 @@ export function TopBar({ hideTickerLoader = false, hideMarketMarquee = false }: 
           <CountryFlag countryCode={selectedCountry} size="sm" />
           <span>{selectedMarket}</span>
         </div>
+        <NotificationBell />
         <Link
           to="/"
           className="inline-flex h-7 shrink-0 items-center border-l border-terminal-border pl-2"

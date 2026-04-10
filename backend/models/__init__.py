@@ -12,6 +12,7 @@ from backend.models.core import (
     ScanPresetORM,
     ScanResultORM,
     ScanRunORM,
+    SavedFormulaORM,
     UserScreenORM,
     BacktestRun,
     CorpActionORM,
@@ -64,6 +65,8 @@ from backend.portfolio_backtests.models import PortfolioBacktestJob
 from backend.experiments.models import Experiment, ExperimentArtifact
 from backend.instruments.models import InstrumentMaster
 from backend.models.user import RefreshToken, User, UserRole
+from backend.models.journal import JournalEntry
+from backend.models.notification import Notification
 
 __all__ = [
     "Holding",
@@ -84,6 +87,7 @@ __all__ = [
     "ScanRunORM",
     "ScanResultORM",
     "ScanAlertRuleORM",
+    "SavedFormulaORM",
     "UserScreenORM",
     "OmsOrderORM",
     "OmsFillORM",
@@ -127,8 +131,10 @@ __all__ = [
     "User",
     "UserRole",
     "RefreshToken",
+    "Notification",
     "PortfolioBacktestJob",
     "Experiment",
     "ExperimentArtifact",
     "InstrumentMaster",
+    "JournalEntry",
 ]

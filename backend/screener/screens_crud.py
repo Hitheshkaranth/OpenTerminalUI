@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -14,7 +14,7 @@ def create_screen(
     user_id: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     row = UserScreenORM(
         id=str(uuid4()),
         user_id=user_id,
@@ -60,7 +60,7 @@ def update_screen(db: Session, user_id: str, screen_id: str, payload: dict[str, 
         row.viz_config = payload["viz_config"]
     if "is_public" in payload:
         row.is_public = bool(payload.get("is_public"))
-    row.updated_at = datetime.utcnow()
+    row.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(row)
     return to_dict(row)
@@ -80,7 +80,7 @@ def publish_screen(db: Session, user_id: str, screen_id: str) -> dict[str, Any] 
     if row is None:
         return None
     row.is_public = True
-    row.updated_at = datetime.utcnow()
+    row.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(row)
     return to_dict(row)
@@ -101,8 +101,8 @@ def fork_screen(db: Session, user_id: str, source_id: str) -> dict[str, Any] | N
         viz_config=source.viz_config,
         is_public=False,
         upvotes=0,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
     db.add(forked)
     db.commit()

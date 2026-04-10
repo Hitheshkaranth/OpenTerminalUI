@@ -13,7 +13,7 @@ import type {
 } from "../../../types";
 
 export type ScreenerView = "table" | "charts" | "treemap" | "scatter" | "scorecard" | "split";
-export type ScreenerTab = "library" | "custom" | "saved" | "public";
+export type ScreenerTab = "library" | "custom" | "formula" | "saved" | "public";
 
 type ScreenerContextValue = {
   loading: boolean;
