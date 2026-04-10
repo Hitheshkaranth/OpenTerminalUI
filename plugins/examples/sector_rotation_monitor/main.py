@@ -5,7 +5,7 @@ from backend.plugins.base import Plugin, PluginContext
 
 class PluginImpl(Plugin):
     name = "sector_rotation_monitor"
-    version = "0.1.1"
+    version = "0.2.0"
 
     async def on_init(self, context: PluginContext):
         context.log("Sector rotation monitor initialized")

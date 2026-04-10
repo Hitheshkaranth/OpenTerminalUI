@@ -28,7 +28,7 @@ beforeEach(() => {
   writeTextMock.mockResolvedValue(undefined);
   vi.stubGlobal("__BUILD_DATE__", "2026-03-11T00:00:00.000Z");
   vi.stubGlobal("__GIT_COMMIT__", "abcdef1234567");
-  vi.stubGlobal("__APP_VERSION__", "0.1.1");
+  vi.stubGlobal("__APP_VERSION__", "0.2.0");
 
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
