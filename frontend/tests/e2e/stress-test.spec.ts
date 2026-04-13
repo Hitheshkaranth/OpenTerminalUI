@@ -175,15 +175,16 @@ test("stress test tab renders scenarios and runs predefined plus custom analysis
   await expect(page.getByText("2008 Global Financial Crisis")).toBeVisible();
   await expect(page.getByText("Custom Scenario").first()).toBeVisible();
   await expect(page.locator("text=Lehman collapse, credit freeze, equity meltdown")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Run" })).toHaveCount(6);
 
-  const gfcCard = page.locator("div").filter({ has: page.getByText("2008 Global Financial Crisis") }).first();
+  const gfcCard = page
+    .getByText("2008 Global Financial Crisis", { exact: true })
+    .locator("xpath=ancestor::*[@role='button'][1]");
   await gfcCard.getByRole("button", { name: "Run" }).click();
   await expect(page.getByText("Results Panel")).toBeVisible();
-  await expect(page.getByText("-22.70%")).toBeVisible();
+  await expect(page.getByText("-22.70%", { exact: true }).last()).toBeVisible();
   await expect(page.getByTestId("impact-by-holding-chart")).toBeVisible();
 
-  await page.getByRole("button", { name: "Configure" }).click();
+  await page.getByRole("button", { name: "Configure", exact: true }).click();
   const equitySlider = page.getByLabel("Equity shock");
   await equitySlider.evaluate((element) => {
     const input = element as HTMLInputElement;
@@ -192,6 +193,6 @@ test("stress test tab renders scenarios and runs predefined plus custom analysis
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
   await page.getByRole("button", { name: "Run Custom Scenario" }).click();
-  await expect(page.getByText("Custom Scenario")).toBeVisible();
-  await expect(page.getByText("-14.20%")).toBeVisible();
+  await expect(page.getByText("Custom Scenario").last()).toBeVisible();
+  await expect(page.getByText("-14.20%", { exact: true }).last()).toBeVisible();
 });

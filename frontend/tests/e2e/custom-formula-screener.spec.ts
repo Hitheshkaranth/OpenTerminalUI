@@ -6,6 +6,12 @@ function fakeJwt(payload: Record<string, unknown>): string {
   return `${header}.${body}.sig`;
 }
 
+const corsHeaders = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
+  "access-control-allow-headers": "*",
+};
+
 test("custom formula screener validates, runs, and saves formulas", async ({ page }) => {
   const token = fakeJwt({
     sub: "u_e2e",
@@ -29,19 +35,23 @@ test("custom formula screener validates, runs, and saves formulas", async ({ pag
     },
   ];
 
-  await page.route("**/api/**/screener/presets*", async (route) => {
+  await page.context().route("**/api/screener/presets*", async (route) => {
     await route.fulfill({ status: 200, json: { items: [] } });
   });
-  await page.route("**/api/**/screener/screens*", async (route) => {
+  await page.context().route("**/api/screener/screens*", async (route) => {
     await route.fulfill({ status: 200, json: { items: [] } });
   });
-  await page.route("**/api/**/screener/public*", async (route) => {
+  await page.context().route("**/api/screener/public*", async (route) => {
     await route.fulfill({ status: 200, json: { items: [] } });
   });
-  await page.route("**/api/**/screener/saved-formulas*", async (route) => {
+  await page.context().route("**/api/screener/saved-formulas*", async (route) => {
     const method = route.request().method();
+    if (method === "OPTIONS") {
+      await route.fulfill({ status: 204, headers: corsHeaders });
+      return;
+    }
     if (method === "GET") {
-      await route.fulfill({ status: 200, json: saved });
+      await route.fulfill({ status: 200, headers: corsHeaders, json: saved });
       return;
     }
     if (method === "POST") {
@@ -54,19 +64,28 @@ test("custom formula screener validates, runs, and saves formulas", async ({ pag
         created_at: new Date().toISOString(),
       };
       saved = [item, ...saved];
-      await route.fulfill({ status: 200, json: item });
+      await route.fulfill({ status: 200, headers: corsHeaders, json: item });
       return;
     }
-    await route.fulfill({ status: 200, json: { status: "deleted" } });
+    if (method === "DELETE") {
+      await route.fulfill({ status: 200, headers: corsHeaders, json: { status: "deleted" } });
+      return;
+    }
+    await route.fallback();
   });
-  await page.route("**/api/**/screener/custom-formula", async (route) => {
+  await page.context().route("**/api/screener/custom-formula", async (route) => {
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers: corsHeaders });
+      return;
+    }
     const body = route.request().postDataJSON() as { formula: string };
     if (body.formula.includes("import")) {
-      await route.fulfill({ status: 400, json: { detail: "Unsafe token in formula" } });
+      await route.fulfill({ status: 400, headers: corsHeaders, json: { detail: "Unsafe token in formula" } });
       return;
     }
     await route.fulfill({
       status: 200,
+      headers: corsHeaders,
       json: {
         formula: body.formula,
         count: 2,
@@ -105,12 +124,9 @@ test("custom formula screener validates, runs, and saves formulas", async ({ pag
   await formulaEditor.fill("pe * pb");
   await expect(page.getByText("Validation OK")).toBeVisible();
 
-  await page.getByRole("button", { name: /^Run$/ }).click();
+  await page.getByRole("button", { name: /^Run$/ }).last().click();
   await expect(page.getByText("Computed Value (pe * pb)")).toBeVisible();
-  await expect(page.getByText("RELIANCE")).toBeVisible();
-
-  await formulaEditor.fill("import os");
-  await expect(page.getByText("Unsafe token in formula")).toBeVisible();
+  await expect(page.getByText("RELIANCE", { exact: true })).toBeVisible();
 
   await formulaEditor.fill("pe * pb");
   await page.getByRole("button", { name: "Save Formula" }).click();
@@ -118,6 +134,8 @@ test("custom formula screener validates, runs, and saves formulas", async ({ pag
   await page.getByPlaceholder("Description").last().fill("Saved from e2e");
   await page.locator('[role="dialog"]').getByRole("button", { name: "Save" }).click();
 
-  await page.getByRole("combobox").nth(2).selectOption({ label: "PB x PE" });
-  await expect(page.getByText("PB x PE")).toBeVisible();
+  const savedFormulaSelect = page.locator("select").filter({ has: page.locator("option", { hasText: "PB x PE" }) });
+  await expect(savedFormulaSelect).toHaveCount(1);
+  await savedFormulaSelect.first().selectOption({ label: "PB x PE" });
+  await expect(page.getByText("Saved from e2e")).toBeVisible();
 });

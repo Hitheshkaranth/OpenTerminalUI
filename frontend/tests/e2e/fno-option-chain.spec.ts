@@ -1,13 +1,32 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { expect, test } from "@playwright/test";
+import { expect, test, type Route } from "@playwright/test";
 
 type FixtureShape = {
   expiries: Record<string, unknown>;
   summary: Record<string, unknown>;
   chain: Record<string, unknown>;
 };
+
+const corsHeaders = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET,OPTIONS",
+  "access-control-allow-headers": "*",
+};
+
+async function fulfillJson(route: Route, body: Record<string, unknown>) {
+  if (route.request().method() === "OPTIONS") {
+    await route.fulfill({ status: 204, headers: corsHeaders });
+    return;
+  }
+  await route.fulfill({
+    status: 200,
+    headers: corsHeaders,
+    contentType: "application/json",
+    body: JSON.stringify(body),
+  });
+}
 
 function makeJwt(payload: Record<string, unknown>): string {
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -33,17 +52,14 @@ test("fno option chain table renders with mocked backend data", async ({ page })
   const fixturePath = path.resolve(process.cwd(), "tests/e2e/fixtures/fno-option-chain.json");
   const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf-8")) as FixtureShape;
 
-  await page.route("**/api/**", async (route) => {
-    const pathname = new URL(route.request().url()).pathname;
-    if (pathname.includes("/fno/chain/") && pathname.endsWith("/expiries")) {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fixture.expiries) });
-    } else if (pathname.includes("/fno/chain/") && pathname.endsWith("/summary")) {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fixture.summary) });
-    } else if (pathname.includes("/fno/chain/")) {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fixture.chain) });
-    } else {
-      await route.continue();
-    }
+  await page.context().route("**/api/fno/chain/*/expiries*", async (route) => {
+    await fulfillJson(route, fixture.expiries);
+  });
+  await page.context().route("**/api/fno/chain/*/summary*", async (route) => {
+    await fulfillJson(route, fixture.summary);
+  });
+  await page.context().route("**/api/fno/chain/*", async (route) => {
+    await fulfillJson(route, fixture.chain);
   });
 
   await page.goto("/fno");
@@ -56,6 +72,7 @@ test("fno option chain table renders with mocked backend data", async ({ page })
   await expect(page.locator("label", { hasText: "Expiry" }).first()).toBeVisible();
   await expect(page.getByText("Strike Range")).toBeVisible();
   await expect(page.getByRole("button", { name: /All/i })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Expiry" })).toHaveValue("2026-03-27");
 
   // Accept any valid terminal state: mocked data loaded, backend error, or empty.
   // Route mocks may not intercept reliably across CI runners / proxy configs.
