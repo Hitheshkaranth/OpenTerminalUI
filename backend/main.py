@@ -55,6 +55,7 @@ _prefetch_enabled = (
 async def lifespan(app: FastAPI):
     global _prefetch_worker, _instruments_loader, _news_ingestor, _pcr_snapshot_service, _scanner_alert_scheduler
     validate_runtime_secrets()
+    init_db()
 
     from backend.api.deps import get_unified_fetcher
     fetcher = await get_unified_fetcher()

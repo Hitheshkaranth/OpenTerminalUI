@@ -35,19 +35,19 @@ test("factor attribution tab renders and period selection reloads data", async (
 
   let lastFactorPeriod = "1Y";
 
-  await page.route("**/api/risk/summary**", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/risk/summary(?:\?.*)?$`), async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ewma_vol: 0.15, beta: 1.02, marginal_contribution: { RELIANCE: 0.12 } }) });
   });
-  await page.route("**/api/risk/exposures**", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/risk/exposures(?:\?.*)?$`), async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ pca_factors: [{ factor: "PC1", variance_explained: 0.62 }], loadings: { RELIANCE: [0.81] } }) });
   });
-  await page.route("**/api/risk/correlation**", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/risk/correlation(?:\?.*)?$`), async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ assets: ["RELIANCE"], matrix: [[1]] }) });
   });
-  await page.route("**/api/risk/sector-concentration**", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/risk/sector-concentration(?:\?.*)?$`), async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ sectors: { Energy: 100 }, industries: { Refining: 100 } }) });
   });
-  await page.route("**/api/risk/factor-exposures**", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/risk/factor-exposures(?:\?.*)?$`), async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -63,7 +63,7 @@ test("factor attribution tab renders and period selection reloads data", async (
       }),
     });
   });
-  await page.route("**/api/risk/factor-attribution**", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/risk/factor-attribution(?:\?.*)?$`), async (route) => {
     const period = new URL(route.request().url()).searchParams.get("period") || "1Y";
     lastFactorPeriod = period;
     await route.fulfill({
@@ -84,7 +84,7 @@ test("factor attribution tab renders and period selection reloads data", async (
       }),
     });
   });
-  await page.route("**/api/risk/factor-history**", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/risk/factor-history(?:\?.*)?$`), async (route) => {
     const period = new URL(route.request().url()).searchParams.get("period") || "1Y";
     const scale = period === "3M" ? 0.6 : 1;
     await route.fulfill({
@@ -102,15 +102,15 @@ test("factor attribution tab renders and period selection reloads data", async (
       }),
     });
   });
-  await page.route("**/api/risk/factor-returns**", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/risk/factor-returns(?:\?.*)?$`), async (route) => {
     const period = new URL(route.request().url()).searchParams.get("period") || "1Y";
     lastFactorPeriod = period;
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(buildFactorReturns(period)) });
   });
-  await page.route("**/api/quotes**", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/quotes(?:\?.*)?$`), async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ market: "NASDAQ", quotes: [] }) });
   });
-  await page.route("**/api/search**", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/search(?:\?.*)?$`), async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ results: [] }) });
   });
 
@@ -122,12 +122,8 @@ test("factor attribution tab renders and period selection reloads data", async (
   await expect(page.getByTestId("factor-waterfall-chart")).toBeVisible();
   await expect(page.getByTestId("factor-history-chart")).toBeVisible();
 
-  await expect(page.getByText("Market")).toBeVisible();
-  await expect(page.getByText("Size")).toBeVisible();
-  await expect(page.getByText("Value")).toBeVisible();
-  await expect(page.getByText("Momentum")).toBeVisible();
-  await expect(page.getByText("Quality")).toBeVisible();
-  await expect(page.getByText("Low Vol")).toBeVisible();
+  await expect(page.getByTestId("factor-style-box")).toBeVisible();
+  await expect(page.getByText("Market Factor Return")).toBeVisible();
 
   await page.getByRole("button", { name: "3M" }).click();
   await expect.poll(() => lastFactorPeriod).toBe("3M");

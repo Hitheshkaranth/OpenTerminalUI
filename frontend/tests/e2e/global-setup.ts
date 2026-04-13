@@ -1,3 +1,6 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { chromium, type FullConfig } from "@playwright/test";
 
 function makeJwt(payload: Record<string, unknown>): string {
@@ -7,6 +10,10 @@ function makeJwt(payload: Record<string, unknown>): string {
 
 export default async function globalSetup(config: FullConfig) {
   const firstProjectBaseUrl = config.projects[0]?.use?.baseURL;
+  const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  const repoRoot = path.resolve(currentDir, "..", "..", "..");
+  const storageStatePath =
+    process.env.PLAYWRIGHT_AUTH_STATE_PATH || path.join(repoRoot, "playwright", ".auth", "user.json");
   const browser = await chromium.launch({ args: ["--disable-gpu"] });
   const accessToken = makeJwt({
     sub: "e2e-user",
@@ -19,6 +26,7 @@ export default async function globalSetup(config: FullConfig) {
   const page = await context.newPage();
 
   try {
+    await fs.mkdir(path.dirname(storageStatePath), { recursive: true });
     await page.addInitScript(
       ([at, rt]) => {
         localStorage.setItem("ot-access-token", at);
@@ -30,8 +38,11 @@ export default async function globalSetup(config: FullConfig) {
     if (typeof firstProjectBaseUrl === "string") {
       await page.goto(firstProjectBaseUrl, { waitUntil: "domcontentloaded" });
     }
+    await context.storageState({ path: storageStatePath });
   } finally {
     await context.close();
     await browser.close();
   }
+
+  await fs.access(storageStatePath);
 }

@@ -1,10 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 test("alerts builder creates and tests a multi-condition alert", async ({ page }) => {
+  const context = page.context();
   const alerts: Array<Record<string, unknown>> = [];
   const history = { page: 1, page_size: 10, total: 0, history: [] as Array<Record<string, unknown>> };
 
-  await page.route("**/api/alerts**", async (route) => {
+  await context.route(/http:\/\/127\.0\.0\.1:\d+\/api\/alerts(?:\/.*)?(?:\?.*)?$/, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const pathname = url.pathname;
@@ -74,6 +75,7 @@ test("alerts builder creates and tests a multi-condition alert", async ({ page }
   await page.getByLabel("Condition operator 2").selectOption("above");
   await page.getByLabel("Condition value 2").fill("70");
   await page.getByRole("button", { name: "AND" }).click();
+  await page.getByRole("checkbox", { name: "Webhook" }).check();
   await page.getByLabel("Webhook URL").fill("https://example.com/hook");
   await page.getByRole("button", { name: "Save" }).click();
 

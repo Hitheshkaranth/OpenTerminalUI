@@ -1,0 +1,103 @@
+
+[1m[46m RUN [49m[22m [36mv3.2.4 [39m[90mC:/Users/hithe/Documents/SIDE_QUESTS/OpenTerminalUI/frontend[39m
+
+ [32m✓[39m src/__tests__/ChartWorkstationPage.toolbar.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 1776[2mms[22m[39m
+   [33m[2m✓[22m[39m ChartWorkstationPage shell workflow[2m > [22mdrives timeframe changes from the shell against the active pane [33m 373[2mms[22m[39m
+   [33m[2m✓[22m[39m ChartWorkstationPage shell workflow[2m > [22mmaximizes the active pane and restores saved workspace defaults [33m 401[2mms[22m[39m
+   [33m[2m✓[22m[39m ChartWorkstationPage shell workflow[2m > [22mduplicates workspaces with fresh pane scopes and restores snapshots without reusing old slot ids [33m 408[2mms[22m[39m
+ [32m✓[39m src/__tests__/launchpadTemplates.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 905[2mms[22m[39m
+   [33m[2m✓[22m[39m Launchpad workspace templates[2m > [22mopens the gallery, applies a template, saves the current layout, and deletes a custom template [33m 903[2mms[22m[39m
+ [32m✓[39m src/__tests__/ChartShellToolbar.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 711[2mms[22m[39m
+   [33m[2m✓[22m[39m ChartShellToolbar[2m > [22mrenders the active pane summary and comfortable desktop controls [33m 655[2mms[22m[39m
+ [32m✓[39m src/__tests__/About.revamp.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 363[2mms[22m[39m
+ [32m✓[39m src/__tests__/ChartPanelVolumeProfile.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 511[2mms[22m[39m
+ [32m✓[39m src/__tests__/Account.revamp.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 639[2mms[22m[39m
+ [32m✓[39m src/__tests__/ForexPage.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 304[2mms[22m[39m
+   [33m[2m✓[22m[39m ForexPage[2m > [22mrenders the cross-rates workflow, pair detail, heatmap, and central bank monitor [33m 302[2mms[22m[39m
+ [32m✓[39m src/__tests__/HomePage.revamp.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 353[2mms[22m[39m
+ [32m✓[39m src/__tests__/CryptoWorkspace.advancedTabs.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 746[2mms[22m[39m
+   [33m[2m✓[22m[39m CryptoWorkspace advanced tabs[2m > [22mrenders heatmap, derivatives, defi, and correlation tabs [33m 744[2mms[22m[39m
+ [32m✓[39m src/__tests__/ScreenerSavedScreens.workflow.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 321[2mms[22m[39m
+ [32m✓[39m src/__tests__/ModelLabPages.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 221[2mms[22m[39m
+ [32m✓[39m src/__tests__/PortfolioLabPages.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 194[2mms[22m[39m
+ [32m✓[39m src/__tests__/indicatorSettingsUx.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 308[2mms[22m[39m
+ [32m✓[39m src/__tests__/Home.components.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 183[2mms[22m[39m
+ [32m✓[39m src/__tests__/CryptoWorkspace.commandCenter.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 232[2mms[22m[39m
+ [32m✓[39m src/__tests__/Watchlist.contextMenu.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 233[2mms[22m[39m
+ [32m✓[39m src/__tests__/CryptoOverview.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 153[2mms[22m[39m
+ [32m✓[39m src/__tests__/InsiderActivityPage.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 190[2mms[22m[39m
+ [32m✓[39m src/__tests__/OptionChainRender.performance.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 199[2mms[22m[39m
+ [32m✓[39m src/__tests__/useAlerts.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 184[2mms[22m[39m
+ [32m✓[39m src/__tests__/SecurityHub.tabSync.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 205[2mms[22m[39m
+[90mstdout[2m | src/__tests__/RendererCore.performance.test.ts[2m > [22m[2mRenderer core performance budgets[2m > [22m[2mstays within the 2ms median budget for %i charts with rich overlays
+[22m[39m{"suite":"renderer-core-performance","chartCount":2,"medianMs":3.34,"p95Ms":12.15}
+
+[90mstdout[2m | src/__tests__/RendererCore.performance.test.ts[2m > [22m[2mRenderer core performance budgets[2m > [22m[2mstays within the 4ms median budget for %i charts with rich overlays
+[22m[39m{"suite":"renderer-core-performance","chartCount":4,"medianMs":3.08,"p95Ms":5.52}
+
+[90mstdout[2m | src/__tests__/RendererCore.performance.test.ts[2m > [22m[2mRenderer core performance budgets[2m > [22m[2mstays within the 8ms median budget for %i charts with rich overlays
+[22m[39m{"suite":"renderer-core-performance","chartCount":8,"medianMs":6.55,"p95Ms":8.4}
+
+ [32m✓[39m src/__tests__/RendererCore.performance.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 253[2mms[22m[39m
+ [32m✓[39m src/__tests__/BreakoutScanner.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 172[2mms[22m[39m
+ [32m✓[39m src/__tests__/CommandPalette.shortcuts.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 176[2mms[22m[39m
+ [32m✓[39m src/__tests__/R6-229-residuals.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 160[2mms[22m[39m
+ [32m✓[39m src/__tests__/CommandBar.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 164[2mms[22m[39m
+ [32m✓[39m src/__tests__/TradingChart.drawings.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 120[2mms[22m[39m
+ [32m✓[39m src/__tests__/ScreenerResultsTable.routes.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 387[2mms[22m[39m
+   [33m[2m✓[22m[39m Screener results routing[2m > [22mroutes a selected result into chart, research, and news flows [33m 382[2mms[22m[39m
+ [32m✓[39m src/__tests__/DrawingObjectTree.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 224[2mms[22m[39m
+ [32m✓[39m src/__tests__/VolumeProfile.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 192[2mms[22m[39m
+ [32m✓[39m src/__tests__/navigationHistory.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 130[2mms[22m[39m
+ [32m✓[39m src/__tests__/ChartAlertComposer.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 114[2mms[22m[39m
+ [32m✓[39m src/__tests__/ETFAnalyticsPage.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 197[2mms[22m[39m
+ [32m✓[39m src/__tests__/CrosshairSyncContext.perf.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 114[2mms[22m[39m
+ [32m✓[39m src/__tests__/DenseTable.reorder.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 108[2mms[22m[39m
+ [32m✓[39m src/__tests__/TradingChart.realtime.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 63[2mms[22m[39m
+ [32m✓[39m src/__tests__/CommandPalette.navigation.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 68[2mms[22m[39m
+ [32m✓[39m src/__tests__/ChartEngine.updateGuard.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 83[2mms[22m[39m
+ [32m✓[39m src/__tests__/Home.mission-control.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32m✓[39m src/__tests__/launchpadContextPersistence.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m src/__tests__/IconRail.keyboard.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 57[2mms[22m[39m
+ [32m✓[39m src/__tests__/CrosshairSyncContext.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 49[2mms[22m[39m
+ [32m✓[39m src/__tests__/commanding.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/__tests__/useIndicators.panes.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+ [32m✓[39m src/__tests__/AuthContext.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32m✓[39m src/__tests__/FreshnessBadge.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+ [32m✓[39m src/__tests__/ChartSyncContext.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m src/__tests__/launchpadWatchlistPanel.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 45[2mms[22m[39m
+ [32m✓[39m src/__tests__/chartAlerts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/__tests__/settingsStore.recentSecurities.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m src/__tests__/TradingChart.exports.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/__tests__/drawingEngine.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/__tests__/volatilityIndicators.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/__tests__/indicatorLibrary.deteministic.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/__tests__/drawingTemplates.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/__tests__/indicatorCatalog.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/__tests__/rendererCore.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/__tests__/chartWorkstationPage.links.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/__tests__/workstationPersistence.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/__tests__/trendIndicators.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/__tests__/ChartExport.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/__tests__/customJsIndicators.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/__tests__/vwapIndicators.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/__tests__/chartWorkstationStore.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/__tests__/workspaceTemplateStore.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/__tests__/useRealtimeChartAggregation.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/__tests__/rafBatcher.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/pages/__tests__/PositionSizerPage.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/__tests__/chartDataService.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/__tests__/contextOverlays.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/__tests__/momentumIndicators.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/__tests__/replayUtils.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/__tests__/candlePresentation.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/__tests__/alternativeChartTransforms.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/__tests__/comparisonSeries.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/__tests__/CommoditiesPage.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/__tests__/alertsStore.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/__tests__/symbolLinkContext.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 3[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m78 passed[39m[22m[90m (78)[39m
+[2m      Tests [22m [1m[32m243 passed[39m[22m[90m (243)[39m
+[2m   Start at [22m 20:11:20
+[2m   Duration [22m 82.64s[2m (transform 3.49s, setup 18.99s, collect 45.33s, tests 12.26s, environment 63.34s, prepare 10.57s)[22m

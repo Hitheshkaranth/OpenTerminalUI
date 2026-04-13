@@ -29,7 +29,9 @@ function makeSeries(interval: string, symbol: string) {
 
 test.describe("Multi-timeframe dashboard", () => {
   test.beforeEach(async ({ page }) => {
-    await page.route("**/api/search**", async (route) => {
+    const context = page.context();
+
+    await context.route(/http:\/\/127\.0\.0\.1:\d+\/api\/search(?:\?.*)?$/, async (route) => {
       const url = new URL(route.request().url());
       const q = (url.searchParams.get("q") || "").toUpperCase();
       const symbol = q.includes("TCS") ? "TCS" : "RELIANCE";
@@ -55,8 +57,8 @@ test.describe("Multi-timeframe dashboard", () => {
       });
     };
 
-    await page.route("**/api/chart/**", fulfillChart);
-    await page.route("**/api/v3/chart/**", fulfillChart);
+    await context.route(/http:\/\/127\.0\.0\.1:\d+\/api\/chart\/[^?]+(?:\?.*)?$/, fulfillChart);
+    await context.route(/http:\/\/127\.0\.0\.1:\d+\/api\/v3\/chart\/[^?]+(?:\?.*)?$/, fulfillChart);
 
     await page.goto("/equity/mta", { waitUntil: "domcontentloaded" });
   });
@@ -71,7 +73,7 @@ test.describe("Multi-timeframe dashboard", () => {
     await expect(page.getByTestId("mta-interval-execution")).toHaveText("1H");
 
     await page.getByTestId("mta-symbol-input").fill("TCS");
-    await page.getByText("TCS").click();
+    await page.locator(".ticker-dropdown-results").getByText("TCS", { exact: true }).click();
     await expect(page.locator('[data-testid^="mta-panel-"] >> text=TCS')).toHaveCount(4);
 
     await page.getByTestId("mta-preset-day-trade").click();
@@ -95,4 +97,3 @@ test.describe("Multi-timeframe dashboard", () => {
     expect((secondBox?.y ?? 0) > (firstBox?.y ?? 0) + 20).toBeTruthy();
   });
 });
-

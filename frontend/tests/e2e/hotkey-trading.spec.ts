@@ -28,7 +28,7 @@ test("ctrl+t opens paper hotkey trading widget and submits a mock buy order", as
 
   let orderCount = 0;
 
-  await page.route("**/api/paper/portfolios", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/paper/portfolios(?:\?.*)?$`), async (route) => {
     if (route.request().method() !== "GET") return route.fallback();
     await route.fulfill({
       json: {
@@ -37,7 +37,7 @@ test("ctrl+t opens paper hotkey trading widget and submits a mock buy order", as
     });
   });
 
-  await page.route("**/api/paper/portfolios/paper-1/positions", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/paper/portfolios/paper-1/positions(?:\?.*)?$`), async (route) => {
     await route.fulfill({
       json: {
         items: [{ id: "pos-1", symbol: "NSE:RELIANCE", quantity: 5, avg_entry_price: 2480, mark_price: 2500, unrealized_pnl: 100 }],
@@ -45,7 +45,7 @@ test("ctrl+t opens paper hotkey trading widget and submits a mock buy order", as
     });
   });
 
-  await page.route("**/api/paper/portfolios/paper-1/orders", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/paper/portfolios/paper-1/orders(?:\?.*)?$`), async (route) => {
     await route.fulfill({
       json: {
         items: [
@@ -64,7 +64,7 @@ test("ctrl+t opens paper hotkey trading widget and submits a mock buy order", as
     });
   });
 
-  await page.route("**/api/depth/RELIANCE**", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/depth/RELIANCE(?:\?.*)?$`), async (route) => {
     await route.fulfill({
       json: {
         symbol: "RELIANCE",
@@ -89,7 +89,7 @@ test("ctrl+t opens paper hotkey trading widget and submits a mock buy order", as
     });
   });
 
-  await page.route("**/api/paper/orders", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/paper/orders(?:\?.*)?$`), async (route) => {
     orderCount += 1;
     await route.fulfill({
       json: {
@@ -112,12 +112,14 @@ test("ctrl+t opens paper hotkey trading widget and submits a mock buy order", as
   await expect(widget).toBeVisible();
   await expect(widget.getByText("Paper")).toBeVisible();
   await expect(widget.getByTestId("hotkey-symbol")).toContainText("RELIANCE");
+  await expect(widget.locator("select")).toHaveValue("paper-1");
 
   await widget.getByLabel("Quantity").fill("10");
+  await expect(widget.getByRole("button", { name: /BUY/i })).toBeEnabled();
   await widget.getByRole("button", { name: /BUY/i }).click();
 
   await expect(widget.getByText(/BUY 10/i)).toBeVisible();
-  await expect(widget.getByText(/2500\.00/)).toBeVisible();
+  await expect(widget.locator("div").filter({ hasText: /^2,500\.00$/ }).first()).toBeVisible();
   await expect(widget.getByRole("button", { name: /SELL \(S\)/i })).toBeVisible();
 
   await page.keyboard.press(process.platform === "darwin" ? "Meta+T" : "Control+T");

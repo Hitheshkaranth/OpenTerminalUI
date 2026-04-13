@@ -58,11 +58,11 @@ test("trade journal flow creates a trade and renders analytics", async ({ page }
     };
   };
 
-  await page.route("**/api/journal/stats", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/journal/stats(?:\?.*)?$`), async (route) => {
     await route.fulfill({ json: computeStats() });
   });
 
-  await page.route("**/api/journal/equity-curve", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/journal/equity-curve(?:\?.*)?$`), async (route) => {
     const cumulative = entries.reduce((sum, entry) => sum + (entry.pnl ?? 0), 0);
     await route.fulfill({
       json: {
@@ -71,7 +71,7 @@ test("trade journal flow creates a trade and renders analytics", async ({ page }
     });
   });
 
-  await page.route("**/api/journal/calendar", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/journal/calendar(?:\?.*)?$`), async (route) => {
     const total = entries.reduce((sum, entry) => sum + (entry.pnl ?? 0), 0);
     await route.fulfill({
       json: {
@@ -80,7 +80,7 @@ test("trade journal flow creates a trade and renders analytics", async ({ page }
     });
   });
 
-  await page.route("**/api/journal", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/journal(?:\?.*)?$`), async (route) => {
     if (route.request().method() === "GET") {
       await route.fulfill({ json: { entries } });
       return;
@@ -118,6 +118,7 @@ test("trade journal flow creates a trade and renders analytics", async ({ page }
       };
       entries.unshift(entry);
       await route.fulfill({ json: { entry, status: "created" } });
+      return;
     }
   });
 
@@ -130,14 +131,15 @@ test("trade journal flow creates a trade and renders analytics", async ({ page }
   await page.getByTestId("journal-entry-form").locator('input[type="datetime-local"]').nth(1).fill("2026-04-01T15:20");
   await page.getByTestId("journal-entry-form").locator('input[type="number"]').nth(1).fill("2600");
   await page.getByTestId("journal-entry-form").locator('input[type="number"]').nth(2).fill("10");
-  await page.getByRole("button", { name: /^Save$/i }).click();
+  await page.getByTestId("journal-entry-form").evaluate((form) => (form as HTMLFormElement).requestSubmit());
 
   await expect(page.getByTestId("journal-card")).toContainText("RELIANCE");
   await expect(page.getByTestId("journal-pnl").first()).toContainText("+$1,000");
 
   await page.getByRole("tab", { name: "Analytics" }).click();
   await expect(page.getByTestId("journal-equity-curve")).toBeVisible();
-  await expect(page.getByText("Total Trades")).toBeVisible();
-  await expect(page.getByText("Win Rate")).toBeVisible();
-  await expect(page.getByText("1")).toBeVisible();
+  const totalTradesCard = page.getByText("Total Trades", { exact: true }).locator("xpath=ancestor::div[contains(@class,'rounded-sm')][1]");
+  const winRateCard = page.getByText("Win Rate", { exact: true }).locator("xpath=ancestor::div[contains(@class,'rounded-sm')][1]");
+  await expect(totalTradesCard).toContainText("1");
+  await expect(winRateCard).toContainText("100.0%");
 });

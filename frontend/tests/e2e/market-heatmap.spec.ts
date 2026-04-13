@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 test("market heatmap renders, drills, and navigates", async ({ page }) => {
-  await page.route("**/api/heatmap/treemap**", async (route) => {
+  const context = page.context();
+
+  await context.route(/http:\/\/127\.0\.0\.1:\d+\/api\/heatmap\/treemap(?:\?.*)?$/, async (route) => {
     await route.fulfill({
       json: {
         market: "IN",
@@ -139,13 +141,13 @@ test("market heatmap renders, drills, and navigates", async ({ page }) => {
   await expect(page.getByTestId("heatmap-period-1w")).toHaveClass(/text-terminal-accent/);
 
   await page.locator('[data-testid="heatmap-rect"]').first().hover();
-  await expect(page.getByText("Reliance Industries")).toBeVisible();
+  await expect(page.locator("div").filter({ hasText: /^Reliance Industries$/ }).last()).toBeVisible();
 
-  await page.getByText("Energy").click();
-  await expect(page.getByRole("button", { name: "Energy" })).toBeVisible();
+  await page.getByTestId("market-heatmap-svg").getByText("Energy").click();
+  await expect(page.getByRole("button", { name: "Energy", exact: true })).toBeVisible();
 
-  await page.unroute("**/api/heatmap/treemap**");
-  await page.route("**/api/stocks/RELIANCE*", async (route) => {
+  await context.unroute(/http:\/\/127\.0\.0\.1:\d+\/api\/heatmap\/treemap(?:\?.*)?$/);
+  await context.route(/http:\/\/127\.0\.0\.1:\d+\/api\/stocks\/RELIANCE(?:\?.*)?$/, async (route) => {
     await route.fulfill({
       json: {
         ticker: "RELIANCE",

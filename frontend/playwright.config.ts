@@ -10,6 +10,7 @@ const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const chromiumLaunchArgs = ["--disable-gpu"];
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(currentDir, "..");
+const authStatePath = process.env.PLAYWRIGHT_AUTH_STATE_PATH || path.join(repoRoot, "playwright", ".auth", "user.json");
 const sqlitePath = path.join(repoRoot, "data", "playwright-e2e.db").replace(/\\/g, "/");
 const sqliteUrl = process.env.OPENTERMINALUI_SQLITE_URL || `sqlite:///${sqlitePath}`;
 const databaseUrl = process.env.DATABASE_URL || sqliteUrl.replace("sqlite:///", "sqlite+aiosqlite:///");
@@ -28,6 +29,7 @@ export default defineConfig({
     trace: "on-first-retry",
     navigationTimeout: 45_000,
     actionTimeout: 15_000,
+    storageState: authStatePath,
   },
   webServer: useExistingServer
     ? undefined
@@ -50,6 +52,7 @@ export default defineConfig({
         env: {
           VITE_API_BASE_URL: `http://127.0.0.1:${e2eBackendPort}/api`,
           VITE_PROXY_TARGET: `http://127.0.0.1:${e2eBackendPort}`,
+          PLAYWRIGHT_AUTH_STATE_PATH: authStatePath,
         },
         reuseExistingServer: true,
         timeout: 120_000,

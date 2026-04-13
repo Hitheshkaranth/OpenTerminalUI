@@ -34,6 +34,7 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     _ensure_news_sentiment_columns()
     _ensure_backtest_columns()
+    _ensure_alerts_columns()
 
 
 def _ensure_news_sentiment_columns() -> None:
@@ -75,3 +76,28 @@ def _ensure_backtest_columns() -> None:
                 if col in existing:
                     continue
                 conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {col} {ddl}"))
+
+
+def _ensure_alerts_columns() -> None:
+    columns_to_add = {
+        "conditions": "JSON NOT NULL DEFAULT '[]'",
+        "logic": "VARCHAR(5) NOT NULL DEFAULT 'AND'",
+        "delivery_channels": "JSON NOT NULL DEFAULT '[\"in_app\"]'",
+        "delivery_config": "JSON NOT NULL DEFAULT '{}'",
+        "cooldown_minutes": "INTEGER NOT NULL DEFAULT 0",
+        "last_triggered_at": "DATETIME",
+        "expiry_date": "DATETIME",
+        "max_triggers": "INTEGER NOT NULL DEFAULT 0",
+        "trigger_count": "INTEGER NOT NULL DEFAULT 0",
+        "last_triggered_value": "REAL",
+        "last_notification_error": "VARCHAR(512)",
+    }
+    inspector = inspect(engine)
+    if not inspector.has_table("alerts"):
+        return
+    existing = {str(column["name"]) for column in inspector.get_columns("alerts")}
+    with engine.begin() as conn:
+        for col, ddl in columns_to_add.items():
+            if col in existing:
+                continue
+            conn.execute(text(f"ALTER TABLE alerts ADD COLUMN {col} {ddl}"))

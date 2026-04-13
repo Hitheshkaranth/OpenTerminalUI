@@ -30,6 +30,30 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export { AuthContext as AuthContextRef };
 const ACCESS_TOKEN_KEY = "ot-access-token";
 const REFRESH_TOKEN_KEY = "ot-refresh-token";
+const E2E_AUTO_LOGIN_ENABLED = import.meta.env.VITE_E2E_AUTO_LOGIN === "1";
+
+function encodeJwtPayload(payload: Record<string, unknown>): string {
+  const encoded = btoa(JSON.stringify(payload))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+  return `x.${encoded}.y`;
+}
+
+function getE2eAuthTokens(): { accessToken: string; refreshToken: string } {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return {
+    accessToken: encodeJwtPayload({
+      sub: "e2e-user",
+      email: "e2e@example.com",
+      role: "trader",
+      exp: nowSeconds + 3600,
+    }),
+    refreshToken: encodeJwtPayload({
+      exp: nowSeconds + 7200,
+    }),
+  };
+}
 
 function parseJwtExp(token: string | null): number | null {
   if (!token) return null;
@@ -126,8 +150,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    const storedAccessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-    const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    let storedAccessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+    let storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (!storedAccessToken && E2E_AUTO_LOGIN_ENABLED) {
+      const e2eTokens = getE2eAuthTokens();
+      storedAccessToken = e2eTokens.accessToken;
+      storedRefreshToken = e2eTokens.refreshToken;
+      localStorage.setItem(ACCESS_TOKEN_KEY, storedAccessToken);
+      localStorage.setItem(REFRESH_TOKEN_KEY, storedRefreshToken);
+    }
     const storedUser = parseJwtUser(storedAccessToken);
     const accessExp = parseJwtExp(storedAccessToken);
     const now = Math.floor(Date.now() / 1000);

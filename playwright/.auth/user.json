@@ -1,0 +1,18 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://127.0.0.1:4173",
+      "localStorage": [
+        {
+          "name": "ot-access-token",
+          "value": "x.eyJzdWIiOiJlMmUtdXNlciIsImVtYWlsIjoiZTJlQGV4YW1wbGUuY29tIiwicm9sZSI6InRyYWRlciIsImV4cCI6MTc3NTg4NTg2OX0.y"
+        },
+        {
+          "name": "ot-refresh-token",
+          "value": "x.eyJleHAiOjE3NzU4ODk0Njl9.y"
+        }
+      ]
+    }
+  ]
+}

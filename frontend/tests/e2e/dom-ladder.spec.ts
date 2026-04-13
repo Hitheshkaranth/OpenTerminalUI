@@ -40,11 +40,11 @@ const depthPayload = {
 };
 
 test("dom ladder renders and supports cumulative and auto-center controls", async ({ page }) => {
-  await page.route("**/api/depth/**", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/depth/RELIANCE(?:\?.*)?$`), async (route) => {
     await route.fulfill({ json: depthPayload });
   });
 
-  await page.route("**/api/stocks/**", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/stocks/RELIANCE(?:\?.*)?$`), async (route) => {
     await route.fulfill({
       json: {
         ticker: "RELIANCE",
@@ -55,7 +55,7 @@ test("dom ladder renders and supports cumulative and auto-center controls", asyn
     });
   });
 
-  await page.route("**/api/tape/RELIANCE/recent**", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/tape/RELIANCE/recent(?:\?.*)?$`), async (route) => {
     await route.fulfill({
       json: {
         trades: [
@@ -66,7 +66,7 @@ test("dom ladder renders and supports cumulative and auto-center controls", asyn
     });
   });
 
-  await page.route("**/api/tape/RELIANCE/summary**", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/tape/RELIANCE/summary(?:\?.*)?$`), async (route) => {
     await route.fulfill({
       json: {
         total_volume: 325,
@@ -80,17 +80,15 @@ test("dom ladder renders and supports cumulative and auto-center controls", asyn
     });
   });
 
-  await page.goto("/equity/dom", { waitUntil: "networkidle" });
+  await page.goto("/equity/dom", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByText("DOM Ladder")).toBeVisible();
+  await expect(page.getByText("DOM Ladder", { exact: true })).toBeVisible();
   await expect(page.locator('[data-testid="dom-row"]').first()).toBeVisible();
 
-  const bidCell = page.locator('[data-testid="dom-bid-cell"]').filter({ hasText: "120" }).first();
-  const askCell = page.locator('[data-testid="dom-ask-cell"]').filter({ hasText: "110" }).first();
-  await expect(bidCell).toBeVisible();
-  await expect(askCell).toBeVisible();
+  await expect(page.locator('[data-price="99.95"]').getByTestId("dom-bid-qty")).toHaveText("120");
+  await expect(page.locator('[data-price="100.05"]').getByTestId("dom-ask-qty")).toHaveText("110");
 
-  await expect(page.getByText("10.0 bps")).toBeVisible();
+  await expect(page.getByText("10.0 bps", { exact: true })).toBeVisible();
 
   const bidBefore = page.locator('[data-price="99.9"]').getByTestId("dom-bid-qty");
   await expect(bidBefore).toHaveText("170");

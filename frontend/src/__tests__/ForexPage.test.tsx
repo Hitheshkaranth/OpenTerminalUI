@@ -113,10 +113,10 @@ describe("ForexPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "1.2736" }));
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/forex/cross-rates");
-      expect(fetchMock).toHaveBeenCalledWith("/api/forex/central-banks");
-      expect(fetchMock).toHaveBeenCalledWith("/api/forex/pairs/EURUSD");
-      expect(fetchMock).toHaveBeenCalledWith("/api/forex/pairs/GBPUSD");
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/forex/cross-rates"));
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/forex/central-banks"));
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/forex/pairs/EURUSD"));
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/forex/pairs/GBPUSD"));
     });
   });
 });

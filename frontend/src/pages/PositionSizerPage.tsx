@@ -584,7 +584,7 @@ export function PositionSizerPage() {
               <InfoCard label="Risk % of Account" value={`${formatPercent(inputs.accountSize > 0 ? (result.maxRisk / inputs.accountSize) * 100 : 0)}%`} />
               <InfoCard
                 label="Risk:Reward Ratio"
-                value={result.riskRewardRatio != null ? `1 : ${formatNumber(result.riskRewardRatio, 2)}` : "N/A"}
+                value={result.riskRewardRatio != null ? `1 : ${result.riskRewardRatio.toFixed(2)}` : "N/A"}
                 testId="position-sizer-rr"
               />
               <InfoCard
@@ -640,7 +640,7 @@ export function PositionSizerPage() {
                     ["Position Value", formatCurrency(result.positionValue)],
                     ["Max Risk", formatCurrency(result.maxRisk)],
                     ["Potential Profit", result.potentialProfit != null ? formatCurrency(result.potentialProfit) : "N/A"],
-                    ["R:R Ratio", result.riskRewardRatio != null ? `1:${formatNumber(result.riskRewardRatio, 2)}` : "N/A"],
+                    ["R:R Ratio", result.riskRewardRatio != null ? `1:${result.riskRewardRatio.toFixed(2)}` : "N/A"],
                   ].map(([metric, value]) => (
                     <tr key={metric} className="border-b border-terminal-border/40">
                       <td className="px-2 py-2 text-terminal-muted">{metric}</td>

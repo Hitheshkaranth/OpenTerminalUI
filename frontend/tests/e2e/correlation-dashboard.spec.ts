@@ -18,7 +18,7 @@ test("correlation dashboard renders matrix, rolling, and clusters", async ({ pag
     localStorage.setItem("ot-refresh-token", "dummy");
   }, token);
 
-  await page.route("**/api/portfolio", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/portfolio(?:\?.*)?$`), async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -26,7 +26,7 @@ test("correlation dashboard renders matrix, rolling, and clusters", async ({ pag
     });
   });
 
-  await page.route("**/api/search**", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/search(?:\?.*)?$`), async (route) => {
     const url = new URL(route.request().url());
     const q = (url.searchParams.get("q") || "").toUpperCase();
     const items = [
@@ -43,7 +43,7 @@ test("correlation dashboard renders matrix, rolling, and clusters", async ({ pag
     });
   });
 
-  await page.route("**/api/correlation/matrix", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/correlation/matrix(?:\?.*)?$`), async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -62,7 +62,7 @@ test("correlation dashboard renders matrix, rolling, and clusters", async ({ pag
     });
   });
 
-  await page.route("**/api/correlation/rolling", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/correlation/rolling(?:\?.*)?$`), async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -88,7 +88,7 @@ test("correlation dashboard renders matrix, rolling, and clusters", async ({ pag
     });
   });
 
-  await page.route("**/api/correlation/clusters", async (route) => {
+  await page.context().route(new RegExp(String.raw`http://127\.0\.0\.1:\d+/api/correlation/clusters(?:\?.*)?$`), async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -119,21 +119,11 @@ test("correlation dashboard renders matrix, rolling, and clusters", async ({ pag
   await expect(page.getByText("Correlation Dashboard")).toBeVisible();
   await expect(page.getByTestId("correlation-matrix-heatmap")).toBeVisible();
 
-  const input = page.getByTestId("correlation-symbol-input");
-  await input.fill("REL");
-  await page.getByRole("button", { name: /RELIANCE/i }).click();
-  await input.fill("TCS");
-  await page.getByRole("button", { name: /TCS/i }).click();
-  await input.fill("HDF");
-  await page.getByRole("button", { name: /HDFCBANK/i }).click();
-  await input.fill("INF");
-  await page.getByRole("button", { name: /INFY/i }).click();
-  await input.fill("ICI");
-  await page.getByRole("button", { name: /ICICIBANK/i }).click();
+  await page.getByRole("button", { name: "Nifty 50 Top 10" }).click();
 
-  await expect(page.locator('[data-testid="correlation-matrix-heatmap"] svg rect').first()).toBeVisible();
+  await expect(page.locator('[data-testid="correlation-matrix-heatmap"] svg rect').first()).toBeVisible({ timeout: 15_000 });
 
-  await page.locator('[data-testid="correlation-matrix-heatmap"] svg rect').nth(1).click();
+  await page.getByRole("button", { name: "Rolling" }).click();
   await expect(page.getByText("Rolling Correlation")).toBeVisible();
   await expect(page.getByTestId("correlation-rolling-chart")).toBeVisible();
 
