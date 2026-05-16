@@ -5,7 +5,8 @@ from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, Request
 from backend.services.ai_service import AIQueryService, get_ai_query_service
 
-router = APIRouter(prefix="/api/ai", tags=["ai"])
+# Mounted under the global "/api" prefix in main.py, so this resolves to /api/ai.
+router = APIRouter(prefix="/ai", tags=["ai"])
 
 @router.post("/query", response_model=Dict[str, Any])
 async def ai_query(

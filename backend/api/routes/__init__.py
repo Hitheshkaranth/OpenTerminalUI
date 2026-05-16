@@ -23,6 +23,7 @@ __all__ = [
     "search",
     "news",
     "emotion",
+    "ai_insights",
     "paper",
     "portfolios",
     "crypto",

@@ -29,7 +29,9 @@ import {
   fetchRiskSummary,
   fetchSectorConcentration,
 } from "../api/quantClient";
+import { fetchRiskInsights } from "../api/client";
 import { StressTestPanel } from "../components/risk/StressTestPanel";
+import { AiInsightCard } from "../components/terminal/AiInsightCard";
 import { TerminalButton } from "../components/terminal/TerminalButton";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { useStockStore } from "../store/stockStore";
@@ -327,6 +329,17 @@ export function RiskDashboardPage() {
 
       {tab === "overview" ? (
         <>
+          <AiInsightCard
+            title="AI Risk Insights"
+            description={`${mode === "ticker" ? storeTicker : "Portfolio"} · Gemma reading of volatility, concentration, and correlation`}
+            fetcher={() =>
+              fetchRiskInsights(mode === "ticker" ? `${storeTicker} and peers` : "the portfolio", {
+                ...(summary && typeof summary === "object" ? summary : {}),
+                correlation_assets: correlation?.assets,
+                factor_exposures: factorExposures?.exposures,
+              })
+            }
+          />
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             <TerminalPanel title="STATISTICAL RISK METRICS" subtitle={mode === "ticker" ? `Analysis for ${storeTicker} + Peers` : "Total Portfolio Attribution"}>
               <div className="space-y-4 p-1 text-xs">

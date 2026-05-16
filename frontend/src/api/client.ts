@@ -1767,6 +1767,58 @@ export async function fetchStockEmotion(
   return data;
 }
 
+export type AiInsightSection = {
+  title: string;
+  tone: "positive" | "negative" | "neutral";
+  points: string[];
+};
+
+export type AiInsight = {
+  engine: string;
+  model: string;
+  summary: string;
+  sections: AiInsightSection[];
+  generated_at?: string;
+  ticker?: string;
+  company_name?: string;
+};
+
+// Local LLM insight calls are slow; allow well beyond the 30s axios default.
+const AI_INSIGHT_TIMEOUT = 280000;
+
+export async function fetchStockBriefing(ticker: string, market?: string): Promise<AiInsight> {
+  const symbol = ticker.trim().toUpperCase();
+  const { data } = await api.get<AiInsight>(`/ai/briefing/${encodeURIComponent(symbol)}`, {
+    params: { market },
+    timeout: AI_INSIGHT_TIMEOUT,
+  });
+  return data;
+}
+
+export async function explainBacktest(
+  strategy: string,
+  metrics: Record<string, unknown>,
+): Promise<AiInsight> {
+  const { data } = await api.post<AiInsight>(
+    "/ai/backtest-explain",
+    { strategy, metrics },
+    { timeout: AI_INSIGHT_TIMEOUT },
+  );
+  return data;
+}
+
+export async function fetchRiskInsights(
+  scope: string,
+  metrics: Record<string, unknown>,
+): Promise<AiInsight> {
+  const { data } = await api.post<AiInsight>(
+    "/ai/risk-insights",
+    { scope, metrics },
+    { timeout: AI_INSIGHT_TIMEOUT },
+  );
+  return data;
+}
+
 export type QuarterlyReportApiItem = {
   id: string;
   symbol: string;

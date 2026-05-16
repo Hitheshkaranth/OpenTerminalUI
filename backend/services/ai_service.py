@@ -8,28 +8,41 @@ from typing import Any, Dict, List, Optional
 import httpx
 from backend.config.settings import get_settings
 from backend.api.deps import get_unified_fetcher
+from backend.services.lm_studio_client import (
+    LMStudioError,
+    get_lm_studio_client,
+    parse_json_response,
+)
 
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """
 You are an expert financial AI assistant for OpenTerminalUI.
-Your task is to parse user natural language queries and determine the intent.
+Parse the user's natural-language query and classify its intent.
+
 Available intents:
-1. screener_results: For queries about finding stocks based on filters (e.g., "tech stocks PE < 20").
-2. data_table: For lookups or comparisons of data (e.g., "compare AAPL and MSFT revenue", "what is RELIANCE PE").
-3. chart_command: For navigation to charts (e.g., "show AAPL 6 month chart").
-4. text_answer: For general questions or analysis.
+1. screener_results - finding stocks by filters (e.g. "tech stocks PE < 20 ROE > 15").
+2. data_table - lookups or comparisons of specific tickers (e.g. "compare AAPL and MSFT").
+3. chart_command - navigate to a chart (e.g. "show AAPL 6 month chart").
+4. text_answer - general questions or analysis.
 
-You must return a JSON object with the following structure:
-{
-  "intent": "intent_name",
-  "params": { ... },
-  "explanation": "A brief explanation of what you found or are doing."
-}
+Return ONLY a JSON object, no prose, no code fences:
+{"intent": "intent_name", "params": { ... }, "explanation": "brief explanation"}
 
-For 'chart_command', include 'ticker' and 'range'.
-For 'data_table', include 'tickers' (list) and 'metrics' (list).
-For 'screener_results', include 'filters' as a dictionary of key-value pairs.
+For 'chart_command': params has "ticker" and "range".
+For 'data_table': params has "tickers" (list) and "metrics" (list).
+For 'screener_results': params has "filters" - a list of {"field","op","value"} -
+  and optionally "markets" (list of NSE/NYSE/NASDAQ) and "limit" (int).
+  Valid filter fields: market_cap, pe_ratio, pb_ratio, ps_ratio, dividend_yield,
+  revenue_growth_yoy, earnings_growth_yoy, roe, roa, debt_to_equity, current_ratio,
+  beta, avg_volume_10d, price_change_1d, price_change_1w, price_change_1m,
+  price_change_3m, price_change_6m, price_change_1y, sector, industry, country, exchange.
+  Valid ops: gte, gt, lte, lt, eq, neq, contains.
+  Example: "cheap tech stocks under PE 20" ->
+  {"intent":"screener_results","params":{"filters":[
+    {"field":"pe_ratio","op":"lt","value":20},
+    {"field":"sector","op":"contains","value":"Tech"}]},
+   "explanation":"Technology stocks with P/E below 20"}
 """
 
 class AIQueryService:
@@ -46,7 +59,7 @@ class AIQueryService:
         # 1. Classify Intent using LLM
         try:
             llm_response = await self._call_llm(query_text)
-            intent_data = json.loads(llm_response)
+            intent_data = parse_json_response(llm_response)
         except Exception as e:
             logger.error(f"AI classification error: {e}")
             return {"type": "text_answer", "data": f"Error processing query: {str(e)}", "explanation": "Error"}
@@ -82,18 +95,16 @@ class AIQueryService:
             }
 
         if intent == "screener_results":
-            # Mocking screener execution based on filters for now
-            # In a real scenario, this would translate params['filters'] into a DB/screener engine query
-            filters = params.get("filters", {})
-            mock_screener_data = [
-                {"symbol": "AAPL", "price": 175.50, "pe": 28.5, "sector": "Technology"},
-                {"symbol": "MSFT", "price": 420.10, "pe": 35.2, "sector": "Technology"},
-                {"symbol": "NVDA", "price": 890.00, "pe": 65.0, "sector": "Technology"}
-            ]
+            rows = await self._run_screener(params)
             return {
                 "type": "screener_results",
-                "data": mock_screener_data,
-                "explanation": explanation or f"Found stocks matching your criteria: {filters}"
+                "data": rows,
+                "explanation": (
+                    explanation or f"Found {len(rows)} stocks matching your criteria."
+                ) if rows else (
+                    f"{explanation} (no stocks matched, or filters were not understood)."
+                    if explanation else "No stocks matched your criteria."
+                ),
             }
 
         # Fallback to text
@@ -104,10 +115,70 @@ class AIQueryService:
         }
 
     async def _call_llm(self, query: str) -> str:
-        if self.settings.ai_provider == "openai":
+        # Prefer the locally hosted Gemma model via LM Studio; no API key needed.
+        if self.settings.lm_studio_enabled:
+            try:
+                return await self._call_lmstudio(query)
+            except Exception as exc:  # noqa: BLE001 - fall through to other providers
+                logger.warning(f"LM Studio call failed, falling back: {exc}")
+        if self.settings.ai_provider == "openai" and self.settings.openai_api_key:
             return await self._call_openai(query)
-        else:
-            return await self._call_ollama(query)
+        return await self._call_ollama(query)
+
+    async def _call_lmstudio(self, query: str) -> str:
+        client = get_lm_studio_client()
+        if not await client.health():
+            raise LMStudioError("LM Studio is not reachable")
+        return await client.chat(
+            [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": query},
+            ],
+            temperature=0.1,
+            max_tokens=400,
+        )
+
+    async def _run_screener(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Execute the real multi-market screener from LLM-extracted filters."""
+        from backend.api.routes.screener import (
+            SCAN_ALLOWED_FIELDS,
+            SCAN_ALLOWED_OPS,
+            ScreenerScanRequest,
+            run_multimarket_scan,
+        )
+
+        raw_filters = params.get("filters")
+        if not isinstance(raw_filters, list):
+            return []
+        valid_filters: List[Dict[str, Any]] = []
+        for entry in raw_filters:
+            if not isinstance(entry, dict):
+                continue
+            field = str(entry.get("field", "")).strip().lower()
+            op = str(entry.get("op", "")).strip().lower()
+            if field in SCAN_ALLOWED_FIELDS and op in SCAN_ALLOWED_OPS:
+                valid_filters.append({"field": field, "op": op, "value": entry.get("value")})
+        if not valid_filters:
+            return []
+
+        markets = [str(m).strip().upper() for m in (params.get("markets") or []) if str(m).strip()]
+        try:
+            limit = max(1, min(50, int(params.get("limit") or 25)))
+        except (TypeError, ValueError):
+            limit = 25
+
+        try:
+            request = ScreenerScanRequest(
+                markets=markets or ["NSE", "NYSE", "NASDAQ"],
+                filters=valid_filters,
+                limit=limit,
+            )
+            result = await run_multimarket_scan(request)
+            rows = result.get("rows", []) if isinstance(result, dict) else []
+            return rows if isinstance(rows, list) else []
+        except Exception as exc:  # noqa: BLE001 - screener failures degrade to empty
+            logger.error(f"AI screener execution failed: {exc}")
+            return []
 
     async def _call_openai(self, query: str) -> str:
         if not self.settings.openai_api_key:

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { fetchQuotesBatch, getHistory } from "../api/client";
+import { fetchQuotesBatch, fetchStockBriefing, getHistory } from "../api/client";
+import { AiInsightCard } from "../components/terminal/AiInsightCard";
 import { OverviewPanel } from "../components/analysis/OverviewPanel";
 import { PeersComparison } from "../components/analysis/PeersComparison";
 import { PromoterHoldingsCard } from "../components/analysis/PromoterHoldingsCard";
@@ -567,6 +568,11 @@ export function StockDetailPage() {
               momPct={returnsData?.["1m"] ?? null}
               qoqPct={returnsData?.["3m"] ?? null}
               yoyPct={returnsData?.["1y"] ?? null}
+            />
+            <AiInsightCard
+              title="AI Investment Briefing"
+              description={`${ticker} · Gemma-synthesized bull/bear thesis from fundamentals and news`}
+              fetcher={() => fetchStockBriefing(ticker, selectedMarket)}
             />
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
               <PromoterHoldingsCard ticker={ticker} />

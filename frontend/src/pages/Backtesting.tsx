@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import type { Bar } from "oakscriptjs";
 
 import {
+  explainBacktest,
   fetchActiveDataVersion,
   fetchBacktestJobResult,
   fetchBacktestJobStatus,
@@ -12,6 +13,7 @@ import {
   type SearchSymbolItem,
   type BacktestJobResult,
 } from "../api/client";
+import { AiInsightCard } from "../components/terminal/AiInsightCard";
 import {
   ChartTabPanel,
   ComparePanel,
@@ -1523,6 +1525,28 @@ export function BacktestingPage() {
         </TerminalPanel>
         <TerminalPanel title="Backtest Performance" subtitle="Model result summary"><div className="space-y-2"><div className={`text-5xl font-bold tracking-tight ${returnClass}`}>{result?.result ? fmtPct(result.result.total_return) : "-"}</div><div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-terminal-text"><div className="text-terminal-muted">Initial Capital</div><div>{fmtMoney(initialCapital)}</div><div className="text-terminal-muted">Final Equity</div><div>{fmtMoney(finalEquity)}</div><div className="text-terminal-muted">Net P/L</div><div className={pnlAmount >= 0 ? "text-terminal-pos" : "text-terminal-neg"}>{fmtMoney(pnlAmount)}</div><div className="text-terminal-muted">Cash Left</div><div>{fmtMoney(endingCash)}</div><div className="text-terminal-muted">Sharpe</div><div>{result?.result ? result.result.sharpe.toFixed(2) : "-"}</div><div className="text-terminal-muted">Max Drawdown</div><div>{result?.result ? fmtPct(result.result.max_drawdown) : "-"}</div><div className="text-terminal-muted">Trades</div><div>{trades.length}</div><div className="text-terminal-muted">Total Qty</div><div>{totalTradeQty.toFixed(2)}</div></div><div className="border-t border-terminal-border/40 pt-2"><div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-terminal-text"><div className="text-terminal-muted">Win Rate</div><div>{(Number(analyticsSummary.win_rate) || 0).toFixed(2)}%</div><div className="text-terminal-muted">Profit Factor</div><div>{(Number(analyticsSummary.profit_factor) || 0).toFixed(2)}</div><div className="text-terminal-muted">Expectancy</div><div>{fmtMoney(Number(analyticsSummary.expectancy) || 0)}</div>{result?.result && (result.result.max_intraday_drawdown ?? 0) < 0 && (<><div className="text-terminal-muted">Max Intraday DD</div><div>{fmtPct(result.result.max_intraday_drawdown ?? 0)}</div><div className="text-terminal-muted">Avg Hold (Min)</div><div>{(result.result.average_hold_time_minutes || 0).toFixed(1)}m</div><div className="text-terminal-muted">Trades / Day</div><div>{(result.result.trades_per_day || 0).toFixed(1)}</div><div className="text-terminal-muted">Win Rate (AM/PM)</div><div>{(result.result.win_rate_morning || 0).toFixed(1)}% / {(result.result.win_rate_afternoon || 0).toFixed(1)}%</div></>)}</div></div></div></TerminalPanel>
       </div>
+
+      {result?.result && (
+        <AiInsightCard
+          title="AI Backtest Analysis"
+          description={`${activePreset?.label || strategyMode} · Gemma assessment of return, risk, and overfitting`}
+          fetcher={() =>
+            explainBacktest(activePreset?.label || String(strategyMode), {
+              total_return: result?.result?.total_return,
+              sharpe: result?.result?.sharpe,
+              max_drawdown: result?.result?.max_drawdown,
+              max_intraday_drawdown: result?.result?.max_intraday_drawdown,
+              trades: trades.length,
+              win_rate_pct: Number(analyticsSummary.win_rate) || 0,
+              profit_factor: Number(analyticsSummary.profit_factor) || 0,
+              expectancy: Number(analyticsSummary.expectancy) || 0,
+              net_pnl: pnlAmount,
+              initial_capital: initialCapital,
+              final_equity: finalEquity,
+            })
+          }
+        />
+      )}
 
       {proWorkspaceEnabled ? (
         <TerminalPanel title="Backtest Pro Workspace" subtitle="Mosaic terminal mode (Cmd/Ctrl+K)">

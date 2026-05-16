@@ -845,28 +845,59 @@ export function CommandBar({ onExecute }: Props) {
                   </div>
                 )}
 
-                {aiResult.type === 'screener_results' && aiResult.data && (
+                {aiResult.type === 'screener_results' && Array.isArray(aiResult.data) && aiResult.data.length > 0 && (
                   <div className="mt-2 overflow-x-auto rounded border border-terminal-border">
-                    <table className="w-full text-left text-[10px] font-mono leading-tight">
+                    <table className="w-full text-left text-[11px] font-mono leading-tight">
                       <thead className="bg-terminal-bg-accent text-terminal-muted border-b border-terminal-border">
                         <tr>
-                          {Object.keys(aiResult.data[0] || {}).map(key => (
-                            <th key={key} className="px-2 py-1 uppercase tracking-wider">{key}</th>
-                          ))}
+                          <th className="px-2 py-1 uppercase tracking-wider">Symbol</th>
+                          <th className="px-2 py-1 uppercase tracking-wider">Sector</th>
+                          <th className="px-2 py-1 text-right uppercase tracking-wider">Mkt Cap</th>
+                          <th className="px-2 py-1 text-right uppercase tracking-wider">P/E</th>
+                          <th className="px-2 py-1 text-right uppercase tracking-wider">ROE</th>
+                          <th className="px-2 py-1 text-right uppercase tracking-wider">1Y %</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-terminal-border/20">
-                        {aiResult.data.map((row: any, i: number) => (
-                          <tr key={i} className="hover:bg-terminal-accent/10">
-                            {Object.values(row).map((val: any, j: number) => (
-                              <td key={j} className={`px-2 py-1 ${j === 0 ? 'font-bold text-terminal-accent' : 'text-terminal-text'}`}>
-                                {typeof val === 'number' ? val.toFixed(2) : val}
+                        {aiResult.data.map((row: any, i: number) => {
+                          const pick = (...keys: string[]) => {
+                            for (const k of keys) {
+                              const v = row?.[k];
+                              if (v !== undefined && v !== null && v !== "") return v;
+                            }
+                            return undefined;
+                          };
+                          const num = (v: any) => (typeof v === "number" && Number.isFinite(v) ? v.toFixed(2) : "-");
+                          const compact = (v: any) => {
+                            if (typeof v !== "number" || !Number.isFinite(v)) return "-";
+                            const a = Math.abs(v);
+                            if (a >= 1e12) return `${(v / 1e12).toFixed(1)}T`;
+                            if (a >= 1e9) return `${(v / 1e9).toFixed(1)}B`;
+                            if (a >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
+                            return v.toFixed(0);
+                          };
+                          const chg1y = pick("price_change_1y", "returns_1y");
+                          return (
+                            <tr key={i} className="hover:bg-terminal-accent/10">
+                              <td className="px-2 py-1 font-bold text-terminal-accent">{pick("symbol", "ticker") ?? "-"}</td>
+                              <td className="px-2 py-1 text-terminal-text">{pick("sector") ?? "-"}</td>
+                              <td className="px-2 py-1 text-right">{compact(pick("market_cap", "mcap"))}</td>
+                              <td className="px-2 py-1 text-right">{num(pick("pe_ratio", "pe"))}</td>
+                              <td className="px-2 py-1 text-right">{num(pick("roe", "roe_pct"))}</td>
+                              <td className={`px-2 py-1 text-right ${typeof chg1y === "number" && chg1y < 0 ? "text-terminal-neg" : "text-terminal-pos"}`}>
+                                {typeof chg1y === "number" ? `${chg1y.toFixed(1)}%` : "-"}
                               </td>
-                            ))}
-                          </tr>
-                        ))}
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
+                  </div>
+                )}
+
+                {aiResult.type === 'screener_results' && (!Array.isArray(aiResult.data) || aiResult.data.length === 0) && (
+                  <div className="rounded border border-terminal-border bg-terminal-bg p-2 text-xs text-terminal-muted">
+                    No matching stocks. Try simpler criteria, e.g. "tech stocks with PE under 25".
                   </div>
                 )}
 
