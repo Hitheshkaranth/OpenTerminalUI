@@ -38,34 +38,39 @@ OpenTerminalUI is a self-hosted, full-stack financial terminal that combines rea
 ## Screenshots
 
 <p align="center">
-  <img src="assets/Enhanced_Home_Screen.png" alt="Home Dashboard" width="900" />
+  <img src="assets/screenshots/home.png" alt="Home Dashboard" width="900" />
 </p>
 <p align="center"><em>Home dashboard with market context, system health, portfolio sparkline, and workspace launch grid.</em></p>
 
 <p align="center">
-  <img src="assets/Advanced_Workstation_6_Charts.png" alt="Chart Workstation" width="900" />
+  <img src="assets/screenshots/chart-workstation.png" alt="Chart Workstation" width="900" />
 </p>
 <p align="center"><em>Multi-panel chart workstation with synchronized crosshairs, technical indicators, and drawing tools.</em></p>
 
 <p align="center">
-  <img src="assets/Stock_Screen.png" alt="Stock Detail" width="900" />
+  <img src="assets/screenshots/stock-detail.png" alt="Stock Detail" width="900" />
 </p>
-<p align="center"><em>Stock detail page with real-time quotes, multi-timeframe charting, and fundamental analysis tabs.</em></p>
+<p align="center"><em>Stock detail / security hub with quotes, fundamental snapshot, and analysis tabs.</em></p>
 
 <p align="center">
-  <img src="assets/Enhanced_Fundamental_Analysis.png" alt="Security Hub" width="900" />
+  <img src="assets/screenshots/news-sentiment.png" alt="News & Sentiment" width="900" />
 </p>
-<p align="center"><em>Security hub with deep fundamental analysis, financials, ownership, estimates, peers, and ESG scoring.</em></p>
+<p align="center"><em>News &amp; Sentiment workspace with the AI Emotion Indicator powered by a local Gemma model via LM Studio.</em></p>
 
 <p align="center">
-  <img src="assets/Advanced_Portfolio_Monitoring.png" alt="Portfolio Analytics" width="900" />
+  <img src="assets/screenshots/screener.png" alt="Advanced Screener" width="900" />
 </p>
-<p align="center"><em>Portfolio analytics with allocation breakdown, benchmark overlay, correlation heatmap, and risk metrics.</em></p>
+<p align="center"><em>Advanced screener with query builder, custom formula engine, and saved formula library.</em></p>
 
 <p align="center">
-  <img src="assets/Backtesting_Models_Simulations.png" alt="Backtesting Lab" width="900" />
+  <img src="assets/screenshots/backtesting.png" alt="Backtesting Lab" width="900" />
 </p>
-<p align="center"><em>Backtesting workspace with equity curves, Monte Carlo simulation, parameter sensitivity, and walk-forward analysis.</em></p>
+<p align="center"><em>Backtesting workspace with strategy presets, performance summary, and AI backtest analysis.</em></p>
+
+<p align="center">
+  <img src="assets/screenshots/risk-dashboard.png" alt="Risk Dashboard" width="900" />
+</p>
+<p align="center"><em>Risk dashboard with statistical risk metrics, factor exposures, and AI Risk Insights powered by Gemma.</em></p>
 
 ## Features
 
