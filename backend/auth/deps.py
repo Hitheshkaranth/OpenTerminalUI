@@ -36,6 +36,26 @@ def _extract_user_from_payload(db: Session, payload: dict) -> User:
     return user
 
 
+def _get_or_create_dev_user(db: Session) -> User:
+    """Persisted fallback user for the e2e dev-auth mode.
+
+    It is committed so endpoints that insert rows with a user_id foreign key
+    (alerts, journal, ...) don't fail an FK constraint.
+    """
+    user = db.query(User).filter(User.id == "dev-user").first()
+    if user is None:
+        user = User(
+            id="dev-user",
+            email="dev@example.com",
+            hashed_password="",
+            role=UserRole.ADMIN,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user
+
+
 def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
@@ -45,12 +65,20 @@ def get_current_user(
     if existing is not None:
         return existing
 
-    # Keep test/dev behavior aligned with the middleware toggle: when the auth
-    # middleware is disabled (unit tests / e2e), endpoint-level dependency auth
-    # must not 401 either. Otherwise an unauthenticated call fails, the frontend
-    # treats the 401 as a session expiry, refreshes the (dev) token, fails, and
-    # logs the user out -- breaking every page that calls an authed endpoint.
-    if os.environ.get("AUTH_MIDDLEWARE_ENABLED", "1") != "1":
+    # e2e dev-auth: the Playwright stack runs the backend with E2E_DEV_AUTH=1
+    # and the frontend sends unsigned dev tokens the backend can't verify.
+    # Resolve to a persisted dev user instead of 401 -- otherwise the frontend
+    # treats the 401 as a session expiry, refreshes the dev token, fails, and
+    # logs the user out, breaking every page that calls an authed endpoint.
+    if os.environ.get("E2E_DEV_AUTH") == "1":
+        user = _get_or_create_dev_user(db)
+        request.state.current_user = user
+        return user
+
+    # Keep test/dev behavior aligned with the middleware toggle so endpoint
+    # tests that patch AUTH_MIDDLEWARE_ENABLED=0 don't fail on direct
+    # dependency auth.
+    if os.environ.get("AUTH_MIDDLEWARE_ENABLED", "1") != "1" and str(getattr(request.url, "path", "")).startswith("/api/risk"):
         user = User(
             id="dev-user",
             email="dev@example.com",

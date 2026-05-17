@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
@@ -505,7 +505,20 @@ export function EquityLayout() {
       rightRailStorageKey="ot:shell:equity:right-rail"
       rightRailContent={<EquityRightRail />}
     >
-      <Outlet />
+      {/* Suspense lives inside the shell so navigating between lazy equity
+          pages only swaps the content area -- the terminal shell (command
+          bar, top bar, ticker tape) stays mounted instead of remounting. */}
+      <Suspense
+        fallback={
+          <div className="flex min-h-[50vh] items-center justify-center p-4">
+            <div className="rounded-sm border border-terminal-border bg-terminal-panel px-4 py-3 text-xs text-terminal-muted">
+              Loading workspace...
+            </div>
+          </div>
+        }
+      >
+        <Outlet />
+      </Suspense>
     </TerminalShell>
   );
 }

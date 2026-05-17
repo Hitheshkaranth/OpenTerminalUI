@@ -44,6 +44,7 @@ export default defineConfig({
       env: {
         ...process.env,
         AUTH_MIDDLEWARE_ENABLED: "0",
+        E2E_DEV_AUTH: "1",
         OPENTERMINALUI_CORS_ORIGINS: `http://127.0.0.1:${E2E_FRONTEND_PORT},http://localhost:${E2E_FRONTEND_PORT}`,
         OPENTERMINALUI_SQLITE_URL: SQLITE_URL,
         DATABASE_URL,
