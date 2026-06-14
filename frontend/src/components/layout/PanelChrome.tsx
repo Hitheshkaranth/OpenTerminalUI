@@ -174,7 +174,7 @@ export function PanelHeader({
   };
 
   return (
-    <header {...rest} className={`border-b border-terminal-border ${className}`.trim()}>
+    <header {...rest} className={`shrink-0 border-b border-terminal-border ${className}`.trim()}>
       <div className="flex items-center justify-between gap-2 px-2 py-1">
         <div className="flex min-w-0 items-center gap-2">
           <button

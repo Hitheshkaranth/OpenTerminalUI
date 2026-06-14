@@ -45,14 +45,22 @@ class TaxLotRealizeRequest(BaseModel):
 @router.get("/portfolio")
 async def get_portfolio(db: Session = Depends(get_db)) -> dict[str, object]:
     holdings = db.query(Holding).all()
-    sem = asyncio.Semaphore(16)
+    sem = asyncio.Semaphore(32)
+    # Bound per-holding live-quote enrichment so a single slow/blocked upstream
+    # (e.g. NSE returning 403 for cloud IPs) cannot stall the whole endpoint past
+    # the client's 30s timeout. On timeout the holding still renders with its cost
+    # basis; only the live price is omitted.
+    snapshot_timeout_s = 8.0
 
     async def _snapshot_for(ticker: str) -> dict[str, object]:
         async with sem:
             try:
                 snap_task = asyncio.create_task(fetch_stock_snapshot_coalesced(ticker))
                 class_task = asyncio.create_task(market_classifier.classify(ticker))
-                snap, classification = await asyncio.gather(snap_task, class_task, return_exceptions=True)
+                snap, classification = await asyncio.wait_for(
+                    asyncio.gather(snap_task, class_task, return_exceptions=True),
+                    timeout=snapshot_timeout_s,
+                )
                 payload = snap if isinstance(snap, dict) else {}
                 if not isinstance(classification, Exception):
                     payload["_classification"] = classification.model_dump()

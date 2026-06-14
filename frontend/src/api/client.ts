@@ -35,3 +35,4 @@ export * from "./portfolioLab";
 export * from "./quantClient";
 export * from "./factors";
 export * from "./savedViews";
+export * from "./pairs";

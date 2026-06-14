@@ -131,7 +131,7 @@ function VisibilityMount({
   }, [panelId]);
 
   return (
-    <div ref={hostRef} className="h-full min-h-0">
+    <div ref={hostRef} className="min-h-0 flex-1 overflow-auto">
       {visible || focused ? children : <PanelBody>Panel paused while out of view.</PanelBody>}
     </div>
   );
@@ -346,7 +346,7 @@ export function LaunchpadWorkspace({ toolbarActions }: { toolbarActions?: ReactN
                   if (draggingPanelId && draggingPanelId !== panel.id) reorderPanels(draggingPanelId, panel.id);
                   setDraggingPanelId(null);
                 }}
-                className={`min-h-[160px] min-w-0 overflow-hidden ${focusedPanelId === panel.id ? "ring-1 ring-terminal-accent/70" : ""}`}
+                className={`flex h-full min-h-0 min-w-0 flex-col overflow-hidden ${focusedPanelId === panel.id ? "ring-1 ring-terminal-accent/70" : ""}`}
                 tabIndex={0}
                 onFocus={() => setFocusedPanelId(panel.id)}
                 data-launchpad-panel-id={panel.id}

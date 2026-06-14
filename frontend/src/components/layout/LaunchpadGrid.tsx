@@ -64,7 +64,7 @@ export function LaunchpadGrid({ panels, renderPanel, onLayoutChange }: Launchpad
         }}
       >
         {panels.map((panel) => (
-          <div key={panel.id} className="min-h-0 min-w-0">
+          <div key={panel.id} className="h-full min-h-0 min-w-0 overflow-hidden">
             {renderPanel(panel)}
           </div>
         ))}

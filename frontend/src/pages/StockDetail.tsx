@@ -382,8 +382,8 @@ export function StockDetailPage() {
 
   return (
     <div className="relative h-full space-y-3 overflow-y-auto px-3 py-2">
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_220px]">
-        <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_220px]">
+        <div className="min-w-0 space-y-3">
           <div className="inline-flex items-center gap-2 rounded border border-terminal-border bg-terminal-panel px-2 py-1 text-xs">
             <CountryFlag
               countryCode={stockClassification?.country_code || stockForOverview?.country_code}

@@ -450,6 +450,8 @@ type Props = {
   };
   onRequestCreateAlert?: (draft: ChartAlertDraft) => void;
   onAddToPortfolio?: (symbol: string, priceHint?: number) => void;
+  /** Hide the heavy overlay toolbars (replay/export/context controls) for small embeds like Launchpad panels. */
+  compact?: boolean;
 };
 
 export function TradingChart({
@@ -470,6 +472,7 @@ export function TradingChart({
   preMarketLevels,
   market = "IN",
   panelId,
+  compact = false,
   crosshairSyncGroupId = "chart-workstation",
   comparisonSeries = [],
   comparisonMode: comparisonModeProp,
@@ -2249,6 +2252,8 @@ export function TradingChart({
     >
       <ChartCanvas ref={chartRef} />
       <ChartAccessibilityLayer summary={accessibleOhlcSummary} rows={accessibleRows} formatTime={formatInspectorTime} />
+      {!compact && (
+      <>
       <div className="absolute left-2 top-2 z-[6] flex max-h-20 max-w-[calc(100%-1rem)] flex-wrap items-center gap-1 overflow-auto rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[10px] text-terminal-text sm:max-h-none">
         <button
           type="button"
@@ -2548,7 +2553,9 @@ export function TradingChart({
           <option value="indexedTo100">Index 100</option>
         </select>
       </div>
-      {(surfaceSettings.marketStatusVisible || surfaceSettings.sessionOverlayVisible) &&
+      </>
+      )}
+      {!compact && (surfaceSettings.marketStatusVisible || surfaceSettings.sessionOverlayVisible) &&
       (marketContext || sessionContext) ? (
         <div
           className="pointer-events-none absolute left-1/2 top-12 z-[6] flex -translate-x-1/2 items-center gap-2 rounded border border-terminal-border bg-terminal-panel/95 px-3 py-1 text-[10px] text-terminal-text"

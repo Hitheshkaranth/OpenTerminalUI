@@ -83,6 +83,7 @@ const ModelGovernancePage = lazyWithRetry(() => import("./pages/ModelGovernance"
 const AlgorithmFrameworkLab = lazyWithRetry(() => import("./pages/AlgorithmFrameworkLab").then((m) => ({ default: m.AlgorithmFrameworkLab })));
 const PortfolioOptimizer = lazyWithRetry(() => import("./pages/PortfolioOptimizer").then((m) => ({ default: m.PortfolioOptimizer })));
 const StatisticalLab = lazyWithRetry(() => import("./pages/StatisticalLab").then((m) => ({ default: m.StatisticalLab })));
+const PairTradingLabPage = lazyWithRetry(() => import("./pages/PairTradingLabPage").then((m) => ({ default: m.PairTradingLabPage })));
 
 const PortfolioLabPage = lazyWithRetry(() => import("./pages/PortfolioLab").then((m) => ({ default: m.PortfolioLabPage })));
 const PortfolioLabDetailPage = lazyWithRetry(() => import("./pages/PortfolioLabDetail").then((m) => ({ default: m.PortfolioLabDetailPage })));
@@ -151,6 +152,7 @@ function App() {
             <Route path="risk" element={<RiskDashboardPage />} />
             <Route path="correlation" element={<CorrelationDashboardPage />} />
             <Route path="stat-lab" element={<StatisticalLab />} />
+            <Route path="pair-trading" element={<PairTradingLabPage />} />
             <Route path="oms" element={<OmsCompliancePage />} />
             <Route path="ops" element={<OpsDashboardPage />} />
             <Route path="plugins" element={<PluginsPage />} />

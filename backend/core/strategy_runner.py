@@ -149,6 +149,54 @@ STRATEGY_CATALOG: list[dict[str, Any]] = [
         },
         "default_allocation": 0.7,
     },
+    {
+        "key": "awesome_oscillator",
+        "label": "Awesome Oscillator",
+        "category": "momentum",
+        "description": "Momentum oscillator using the difference between two moving averages of median price.",
+        "default_context": {"fast": 5, "slow": 34},
+        "default_allocation": 0.8,
+    },
+    {
+        "key": "heikin_ashi",
+        "label": "Heikin-Ashi Momentum",
+        "category": "trend",
+        "description": "Trend-following model using consecutive bullish/bearish Heikin-Ashi candles.",
+        "default_context": {"confirm": 2},
+        "default_allocation": 0.75,
+    },
+    {
+        "key": "parabolic_sar",
+        "label": "Parabolic SAR",
+        "category": "trend",
+        "description": "Trend-following stop and reverse model based on acceleration factors.",
+        "default_context": {"af_step": 0.02, "af_max": 0.2},
+        "default_allocation": 0.85,
+    },
+    {
+        "key": "dual_thrust",
+        "label": "Dual Thrust (ORB)",
+        "category": "breakout",
+        "description": "Range-based breakout model using historical volatility and opening prices.",
+        "default_context": {"lookback": 4, "k1": 0.5, "k2": 0.5},
+        "default_allocation": 0.9,
+    },
+    {
+        "key": "shooting_star",
+        "label": "Shooting Star Reversal",
+        "category": "pattern",
+        "description": "Candlestick pattern recognition for trend reversal detection.",
+        "default_context": {"body_ratio": 0.3, "wick_ratio": 2.0, "trend_lookback": 10},
+        "default_allocation": 0.5,
+    },
+    {
+        "key": "bollinger_pattern",
+        "label": "Bollinger W/M Pattern",
+        "category": "mean_reversion",
+        "description": "Mean-reversion model detecting W-bottom and M-top pattern exits from bands.",
+        "default_context": {"period": 20, "std_dev": 2.0},
+        "default_allocation": 0.65,
+    },
 ]
 
 
@@ -339,6 +387,195 @@ def _generate_premarket_orb_signals(frame: pd.DataFrame, ctx: dict[str, Any]) ->
     return out.fillna(0).astype(int)
 
 
+def _generate_awesome_oscillator_signals(frame: pd.DataFrame, ctx: dict[str, Any]) -> pd.Series:
+    fast = int(ctx.get("fast", 5))
+    slow = int(ctx.get("slow", 34))
+    if fast <= 0 or slow <= 0 or fast >= slow:
+        raise ValueError("AO params invalid: fast/slow must be positive and fast < slow")
+    high = frame["high"].astype(float)
+    low = frame["low"].astype(float)
+    median_price = (high + low) / 2.0
+    ao = median_price.rolling(fast).mean() - median_price.rolling(slow).mean()
+    out = pd.Series(0, index=frame.index, dtype=int)
+    out.loc[ao > 0] = 1
+    out.loc[ao < 0] = -1
+    out.iloc[:slow - 1] = 0
+    return out.fillna(0).astype(int)
+
+
+def _generate_heikin_ashi_signals(frame: pd.DataFrame, ctx: dict[str, Any]) -> pd.Series:
+    confirm = int(ctx.get("confirm", 2))
+    if confirm <= 0:
+        raise ValueError("confirm must be positive")
+    o = frame["open"].astype(float)
+    h = frame["high"].astype(float)
+    l = frame["low"].astype(float)
+    c = frame["close"].astype(float)
+    ha_close = (o + h + l + c) / 4.0
+    ha_open = pd.Series(0.0, index=frame.index)
+    if not frame.empty:
+        ha_open.iloc[0] = (o.iloc[0] + c.iloc[0]) / 2.0
+        for i in range(1, len(frame)):
+            ha_open.iloc[i] = (ha_open.iloc[i - 1] + ha_close.iloc[i - 1]) / 2.0
+
+    bullish = (ha_close > ha_open).astype(int)
+    bearish = (ha_close < ha_open).astype(int)
+    consecutive_bullish = bullish.rolling(confirm).sum() == confirm
+    consecutive_bearish = bearish.rolling(confirm).sum() == confirm
+
+    out = pd.Series(0, index=frame.index, dtype=int)
+    out.loc[consecutive_bullish] = 1
+    out.loc[consecutive_bearish] = -1
+    return out.fillna(0).astype(int)
+
+
+def _generate_parabolic_sar_signals(frame: pd.DataFrame, ctx: dict[str, Any]) -> pd.Series:
+    af_step = float(ctx.get("af_step", 0.02))
+    af_max = float(ctx.get("af_max", 0.2))
+    if af_step <= 0 or af_max <= 0:
+        raise ValueError("SAR params must be positive")
+    high = frame["high"].astype(float)
+    low = frame["low"].astype(float)
+    close = frame["close"].astype(float)
+    sar = pd.Series(0.0, index=frame.index)
+    if len(frame) < 2:
+        return pd.Series(0, index=frame.index, dtype=int)
+
+    uptrend = True
+    sar.iloc[0] = low.iloc[0]
+    ep = high.iloc[0]
+    af = af_step
+
+    for i in range(1, len(frame)):
+        prev_sar = sar.iloc[i - 1]
+        if uptrend:
+            sar.iloc[i] = prev_sar + af * (ep - prev_sar)
+            if i > 1:
+                sar.iloc[i] = min(sar.iloc[i], low.iloc[i - 1], low.iloc[i - 2])
+            else:
+                sar.iloc[i] = min(sar.iloc[i], low.iloc[i - 1])
+
+            if low.iloc[i] < sar.iloc[i]:
+                uptrend = False
+                sar.iloc[i] = ep
+                ep = low.iloc[i]
+                af = af_step
+            else:
+                if high.iloc[i] > ep:
+                    ep = high.iloc[i]
+                    af = min(af + af_step, af_max)
+        else:
+            sar.iloc[i] = prev_sar + af * (ep - prev_sar)
+            if i > 1:
+                sar.iloc[i] = max(sar.iloc[i], high.iloc[i - 1], high.iloc[i - 2])
+            else:
+                sar.iloc[i] = max(sar.iloc[i], high.iloc[i - 1])
+
+            if high.iloc[i] > sar.iloc[i]:
+                uptrend = True
+                sar.iloc[i] = ep
+                ep = high.iloc[i]
+                af = af_step
+            else:
+                if low.iloc[i] < ep:
+                    ep = low.iloc[i]
+                    af = min(af + af_step, af_max)
+
+    out = pd.Series(0, index=frame.index, dtype=int)
+    out.loc[close > sar] = 1
+    out.loc[close < sar] = -1
+    out.iloc[0] = 0
+    return out.fillna(0).astype(int)
+
+
+def _generate_dual_thrust_signals(frame: pd.DataFrame, ctx: dict[str, Any]) -> pd.Series:
+    lookback = int(ctx.get("lookback", 4))
+    k1 = float(ctx.get("k1", 0.5))
+    k2 = float(ctx.get("k2", 0.5))
+    if lookback <= 0:
+        raise ValueError("lookback must be positive")
+    high = frame["high"].astype(float)
+    low = frame["low"].astype(float)
+    close = frame["close"].astype(float)
+    open_price = frame["open"].astype(float)
+
+    hh = high.rolling(lookback).max()
+    lc = close.rolling(lookback).min()
+    hc = close.rolling(lookback).max()
+    ll = low.rolling(lookback).min()
+
+    r = pd.concat([hh - lc, hc - ll], axis=1).max(axis=1).shift(1)
+    buy_line = open_price + k1 * r
+    sell_line = open_price - k2 * r
+
+    out = pd.Series(0, index=frame.index, dtype=int)
+    for i in range(len(frame)):
+        if pd.isna(buy_line.iloc[i]):
+            continue
+        c = close.iloc[i]
+        if c > buy_line.iloc[i]:
+            out.iloc[i] = 1
+        elif c < sell_line.iloc[i]:
+            out.iloc[i] = -1
+        elif i > 0:
+            out.iloc[i] = out.iloc[i - 1]
+    return out.fillna(0).astype(int)
+
+
+def _generate_shooting_star_signals(frame: pd.DataFrame, ctx: dict[str, Any]) -> pd.Series:
+    body_ratio = float(ctx.get("body_ratio", 0.3))
+    wick_ratio = float(ctx.get("wick_ratio", 2.0))
+    trend_lookback = int(ctx.get("trend_lookback", 10))
+
+    o = frame["open"].astype(float)
+    h = frame["high"].astype(float)
+    l = frame["low"].astype(float)
+    c = frame["close"].astype(float)
+
+    real_body = (c - o).abs()
+    candle_range = (h - l).replace(0, np.nan)
+    upper_wick = h - pd.concat([o, c], axis=1).max(axis=1)
+    lower_wick = pd.concat([o, c], axis=1).min(axis=1) - l
+    rolling_mean = c.rolling(trend_lookback).mean()
+
+    shooting_star = (
+        (upper_wick >= wick_ratio * real_body) &
+        (real_body <= body_ratio * candle_range) &
+        (lower_wick <= 0.1 * candle_range) &
+        (c > rolling_mean)
+    )
+    hammer = (
+        (lower_wick >= wick_ratio * real_body) &
+        (real_body <= body_ratio * candle_range) &
+        (upper_wick <= 0.1 * candle_range) &
+        (c < rolling_mean)
+    )
+
+    out = pd.Series(0, index=frame.index, dtype=int)
+    out.loc[shooting_star] = -1
+    out.loc[hammer] = 1
+    return out.fillna(0).astype(int)
+
+
+def _generate_bollinger_pattern_signals(frame: pd.DataFrame, ctx: dict[str, Any]) -> pd.Series:
+    period = int(ctx.get("period", 20))
+    std_dev = float(ctx.get("std_dev", 2.0))
+    close = frame["close"].astype(float)
+    sma = close.rolling(period).mean()
+    rstd = close.rolling(period).std()
+    upper = sma + (std_dev * rstd)
+    lower = sma - (std_dev * rstd)
+
+    prev_close = close.shift(1)
+    prev_upper = upper.shift(1)
+    prev_lower = lower.shift(1)
+
+    out = pd.Series(0, index=frame.index, dtype=int)
+    out.loc[(prev_close < prev_lower) & (close > lower)] = 1
+    out.loc[(prev_close > prev_upper) & (close < upper)] = -1
+    return out.fillna(0).astype(int)
+
+
 def _generate_pure_jump_markov_vol_signals(frame: pd.DataFrame, ctx: dict[str, Any]) -> pd.Series:
     signals, _diagnostics = generate_pjv_signals(frame, ctx)
     return signals.fillna(0).astype(int)
@@ -354,6 +591,12 @@ EXAMPLE_STRATEGY_MAP: dict[str, Any] = {
     "ichimoku_cloud": _generate_ichimoku_signals,
     "triple_ema": _generate_triple_ema_signals,
     "premarket_orb_breakout": _generate_premarket_orb_signals,
+    "awesome_oscillator": _generate_awesome_oscillator_signals,
+    "heikin_ashi": _generate_heikin_ashi_signals,
+    "parabolic_sar": _generate_parabolic_sar_signals,
+    "dual_thrust": _generate_dual_thrust_signals,
+    "shooting_star": _generate_shooting_star_signals,
+    "bollinger_pattern": _generate_bollinger_pattern_signals,
     "pure_jump_markov_vol": _generate_pure_jump_markov_vol_signals,
 }
 

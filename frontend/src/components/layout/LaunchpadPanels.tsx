@@ -324,6 +324,7 @@ export function LaunchpadChartPanel({ panel }: PanelProps) {
           mode="candles"
           timeframe="1D"
           panelId={panel.id}
+          compact
           crosshairSyncGroupId={linkGroup === "none" ? `solo-${panel.id}` : `launchpad-linked-${linkGroup}`}
         />
       </div>

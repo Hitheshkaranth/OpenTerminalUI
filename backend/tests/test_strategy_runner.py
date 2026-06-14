@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import pytest
 
-from backend.core.strategy_runner import StrategyRunner
+from backend.core.strategy_runner import StrategyRunner, get_strategy_catalog
 
 
 def _frame() -> pd.DataFrame:
@@ -78,3 +79,38 @@ def generate_signals(df, context):
 """
     with pytest.raises(ValueError):
         StrategyRunner(timeout_seconds=0.2).run(code, _frame(), {})
+
+
+@pytest.mark.parametrize("strategy_key", [
+    "awesome_oscillator",
+    "heikin_ashi",
+    "parabolic_sar",
+    "dual_thrust",
+    "shooting_star",
+    "bollinger_pattern"
+])
+def test_new_strategies_run(strategy_key: str) -> None:
+    # (a) assert key is in catalog
+    catalog = get_strategy_catalog()
+    assert any(s["key"] == strategy_key for s in catalog)
+
+    # (b) build synthetic OHLCV (200 rows)
+    n = 200
+    t = np.linspace(0, 10, n)
+    close = 100 + 10 * np.sin(t) + 0.5 * t
+    df = pd.DataFrame({
+        "open": close - 0.5,
+        "high": close + 1.0,
+        "low": close - 1.0,
+        "close": close,
+        "volume": np.random.randint(100, 1000, n)
+    }, index=pd.date_range("2026-01-01", periods=n))
+
+    # (c) run StrategyRunner().run
+    runner = StrategyRunner()
+    strategy_info = next(s for s in catalog if s["key"] == strategy_key)
+    out = runner.run(f"example:{strategy_key}", df, strategy_info["default_context"])
+
+    assert len(out.signals) == n
+    assert out.signals.index.equals(df.index)
+    assert set(out.signals.unique()).issubset({-1, 0, 1})
