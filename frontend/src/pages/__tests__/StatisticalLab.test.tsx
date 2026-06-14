@@ -15,6 +15,10 @@ vi.mock("../../api/statlab", () => ({
   postCointegration: vi.fn(),
   postStationarity: vi.fn(),
   postDecomposition: vi.fn(),
+  postRegression: vi.fn(),
+  postAutocorrelation: vi.fn(),
+  postCausality: vi.fn(),
+  postRegimes: vi.fn(),
 }));
 
 vi.mock("recharts", () => {
@@ -31,6 +35,12 @@ vi.mock("recharts", () => {
     Tooltip: Stub,
     Legend: Stub,
     ReferenceLine: Stub,
+    BarChart: Stub,
+    Bar: Stub,
+    ScatterChart: Stub,
+    Scatter: Stub,
+    ZAxis: Stub,
+    Cell: Stub,
   };
 });
 

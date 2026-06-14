@@ -10,5 +10,8 @@ def list_methods() -> dict:
         ],
         "decomposition_methods": [
             {"id": "stl", "label": "STL Decomposition"}
-        ]
+        ],
+        "regression_methods": [{"id": "capm", "label": "CAPM / Factor OLS"}],
+        "causality_methods":  [{"id": "granger", "label": "Granger Causality"}],
+        "regime_methods":     [{"id": "markov", "label": "Markov Switching (2-state)"}],
     }

@@ -2,4 +2,8 @@ from .forecasting import forecast_series
 from .cointegration import cointegration_analysis
 from .stationarity import stationarity_tests
 from .decomposition import decompose_series
+from .regression import factor_regression
+from .autocorrelation import autocorrelation_analysis
+from .causality import granger_causality
+from .regimes import regime_detection
 from .registry import list_methods

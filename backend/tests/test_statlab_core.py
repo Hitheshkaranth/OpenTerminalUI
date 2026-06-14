@@ -6,6 +6,10 @@ from backend.core.statlab import (
     cointegration_analysis,
     stationarity_tests,
     decompose_series,
+    factor_regression,
+    autocorrelation_analysis,
+    granger_causality,
+    regime_detection,
     list_methods
 )
 
@@ -29,11 +33,33 @@ def synthetic_data():
         ar1.append(0.5 * ar1[-1] + np.random.normal(0, 1))
     ar1_series = pd.Series(10 + np.array(ar1), index=dates, name="AR1")
     
+    # Granger Causality synthetic
+    # Lead is random walk, Follow depends on Lead's prior return
+    lead_ret = np.random.normal(0.001, 0.01, 500)
+    lead = pd.Series(100 * np.exp(np.cumsum(lead_ret)), index=dates, name="LEAD")
+    follow_ret = np.zeros(500)
+    follow_ret[0] = np.random.normal(0, 0.01)
+    for i in range(1, 500):
+        # Follow return = 0.8 * Lead return (lag 1) + noise
+        follow_ret[i] = 0.8 * lead_ret[i-1] + np.random.normal(0, 0.005)
+    follow = pd.Series(100 * np.exp(np.cumsum(follow_ret)), index=dates, name="FOLLOW")
+
+    # Regime detection synthetic
+    # Low vol (0.005) then High vol (0.03)
+    regime_ret = np.concatenate([
+        np.random.normal(0.0002, 0.005, 250),
+        np.random.normal(-0.001, 0.03, 250)
+    ])
+    regime_series = pd.Series(100 * np.exp(np.cumsum(regime_ret)), index=dates, name="REGIME")
+
     return {
         "rw": rw,
         "a": a,
         "b": b,
-        "ar1": ar1_series
+        "ar1": ar1_series,
+        "lead": lead,
+        "follow": follow,
+        "regime": regime_series
     }
 
 def test_forecast_series(synthetic_data):
@@ -98,10 +124,56 @@ def test_decompose_series(synthetic_data):
     assert "seasonal" in first_pt
     assert "resid" in first_pt
 
+def test_factor_regression(synthetic_data):
+    bench = synthetic_data["rw"]
+    # asset with returns ≈ 0.0002 + 1.4*bench_ret + noise
+    bench_ret = bench.pct_change().dropna()
+    asset_ret = 0.0002 + 1.4 * bench_ret + np.random.normal(0, 0.005, len(bench_ret))
+    asset = pd.Series(100 * np.exp(np.cumsum(asset_ret)), index=bench_ret.index, name="ASSET")
+    
+    res = factor_regression(asset, bench)
+    assert 1.1 < res["beta"] < 1.7
+    assert 0 <= res["r_squared"] <= 1
+    assert len(res["rolling_beta"]) > 0
+    assert len(res["scatter"]) > 0
+    assert len(res["fit_line"]) == 2
+
+def test_autocorrelation_analysis(synthetic_data):
+    ar1 = synthetic_data["ar1"]
+    res = autocorrelation_analysis(ar1)
+    assert len(res["acf"]) > 0
+    assert res["acf"][0]["lag"] == 0
+    assert len(res["pacf"]) > 0
+    assert len(res["ljung_box"]) > 0
+
+def test_granger_causality(synthetic_data):
+    lead = synthetic_data["lead"]
+    follow = synthetic_data["follow"]
+    
+    # Test: Lead leads Follow? (granger_causality(target, source))
+    # Wait, the tool granger_causality(a, b) does both A->B and B->A.
+    res = granger_causality(follow, lead)
+    # b_to_a means lead to follow (since a=follow, b=lead)
+    # My implementation:
+    # data_a_to_b = df.iloc[:, [1, 0]] => target=B(lead), source=A(follow)
+    # data_b_to_a = df.iloc[:, [0, 1]] => target=A(follow), source=B(lead)
+    assert res["b_to_a"]["significant"] is True
+    assert res["b_to_a"]["min_pvalue"] < 0.05
+
+def test_regime_detection(synthetic_data):
+    regime = synthetic_data["regime"]
+    res = regime_detection(regime)
+    assert res["current_regime"] in {"HIGH-VOL", "LOW-VOL"}
+    assert len(res["series"]) > 0
+    assert res["high_vol_regime"]["ann_vol_pct"] >= res["low_vol_regime"]["ann_vol_pct"]
+
 def test_list_methods():
     res = list_methods()
     assert "forecast_methods" in res
     assert len(res["forecast_methods"]) >= 2
+    assert "regression_methods" in res
+    assert "causality_methods" in res
+    assert "regime_methods" in res
 
 def test_degenerate_input():
     short_series = pd.Series(np.random.randn(10))
@@ -113,3 +185,11 @@ def test_degenerate_input():
         decompose_series(short_series)
     with pytest.raises(ValueError):
         cointegration_analysis(short_series, short_series)
+    with pytest.raises(ValueError):
+        factor_regression(short_series, short_series)
+    with pytest.raises(ValueError):
+        autocorrelation_analysis(short_series)
+    with pytest.raises(ValueError):
+        granger_causality(short_series, short_series)
+    with pytest.raises(ValueError):
+        regime_detection(short_series)

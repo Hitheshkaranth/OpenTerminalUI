@@ -110,3 +110,81 @@ def test_insufficient_data(mock_price_data):
         response = client.post("/api/statlab/forecast", json=payload)
         assert response.status_code == 400
         assert "Insufficient price data" in response.json()["detail"]
+
+
+def test_post_regression(mock_price_data):
+    payload = {
+        "ticker": "AAPL",
+        "benchmark": "MSFT",
+        "lookback_days": 730,
+        "rolling_window": 63
+    }
+    response = client.post("/api/statlab/regression", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ticker"] == "AAPL"
+    assert data["benchmark_ticker"] == "MSFT"
+    assert "beta" in data
+    assert "alpha_annual" in data
+    assert "r_squared" in data
+    assert "rolling_beta" in data
+
+
+def test_post_autocorrelation(mock_price_data):
+    payload = {
+        "ticker": "AAPL",
+        "nlags": 20,
+        "use_returns": True,
+        "lookback_days": 730
+    }
+    response = client.post("/api/statlab/autocorrelation", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ticker"] == "AAPL"
+    assert "acf" in data
+    assert "pacf" in data
+    assert "ljung_box" in data
+    assert len(data["acf"]) > 0
+
+
+def test_post_causality(mock_price_data):
+    payload = {
+        "ticker_a": "AAPL",
+        "ticker_b": "MSFT",
+        "max_lag": 5,
+        "lookback_days": 730
+    }
+    response = client.post("/api/statlab/causality", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ticker_a"] == "AAPL"
+    assert data["ticker_b"] == "MSFT"
+    assert "a_to_b" in data
+    assert "b_to_a" in data
+    assert "lead" in data
+
+
+def test_pair_column_order_is_request_order(mock_price_data):
+    # yfinance returns columns alphabetically, not in requested order. Request the
+    # pair "reversed" relative to the mock's column order and confirm the series are
+    # mapped back to the requested ticker_a/ticker_b (not positionally swapped).
+    payload = {"ticker_a": "MSFT", "ticker_b": "AAPL", "max_lag": 3}
+    response = client.post("/api/statlab/causality", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name_a"] == "MSFT"
+    assert data["name_b"] == "AAPL"
+
+
+def test_post_regimes(mock_price_data):
+    payload = {
+        "ticker": "AAPL",
+        "lookback_days": 1095
+    }
+    response = client.post("/api/statlab/regimes", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ticker"] == "AAPL"
+    assert "current_regime" in data
+    assert "series" in data
+    assert "high_vol_regime" in data
