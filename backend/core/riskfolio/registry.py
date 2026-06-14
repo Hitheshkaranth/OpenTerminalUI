@@ -21,6 +21,14 @@ def list_methods() -> dict:
             {"id": "Classic", "label": "Mean-Risk (Classic)"},
             {"id": "HRP", "label": "Hierarchical Risk Parity"},
             {"id": "HERC", "label": "Hierarchical Equal Risk Contribution"},
-            {"id": "BL", "label": "Black-Litterman"}
+            {"id": "BL", "label": "Black-Litterman"},
+            {"id": "RP", "label": "Risk Parity (ERC)"},
+            {"id": "NCO", "label": "Nested Clustered Optimization"}
+        ],
+        "covariance_methods": [
+            {"id": "sample", "label": "Sample"},
+            {"id": "ledoit_wolf", "label": "Ledoit-Wolf Shrinkage"},
+            {"id": "ewma", "label": "EWMA"},
+            {"id": "gerber", "label": "Gerber Statistic"}
         ]
     }

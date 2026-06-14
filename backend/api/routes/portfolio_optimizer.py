@@ -12,6 +12,7 @@ from backend.core import backtester
 from backend.core.riskfolio import (
     bl_implied_returns,
     bl_posterior_returns,
+    cluster_assets,
     efficient_frontier,
     hrp_weights,
     list_methods,
@@ -32,7 +33,7 @@ class OptimizeRequest(BaseModel):
     tickers: list[str] = Field(..., min_length=2)
     start: str | None = None
     end: str | None = None
-    model: str = "Classic"           # Classic | HRP | HERC | BL
+    model: str = "Classic"           # Classic | HRP | HERC | BL | RP | NCO
     objective: str = "max_sharpe"    # min_risk | max_sharpe | max_return | utility
     risk_measure: str = "MV"         # MV | MAD | CVaR | CDaR | MDD | ULCER
     confidence: float = Field(0.95, ge=0.5, le=0.999)
@@ -42,6 +43,7 @@ class OptimizeRequest(BaseModel):
     max_weight: float = 1.0
     target_return: float | None = None
     views: list[ViewModel] | None = None
+    cov_method: str = "sample"
 
 
 class RiskReportRequest(BaseModel):
@@ -97,7 +99,8 @@ async def optimize(req: OptimizeRequest):
             min_weight=req.min_weight,
             max_weight=req.max_weight,
             target_return=req.target_return,
-            views=[v.model_dump() for v in req.views] if req.views else None
+            views=[v.model_dump() for v in req.views] if req.views else None,
+            cov_method=req.cov_method
         )
 
         front = await asyncio.to_thread(
@@ -108,12 +111,16 @@ async def optimize(req: OptimizeRequest):
             min_weight=req.min_weight,
             max_weight=req.max_weight,
             risk_measure=req.risk_measure,
-            confidence=req.confidence
+            confidence=req.confidence,
+            cov_method=req.cov_method
         )
+
+        clusters = await asyncio.to_thread(cluster_assets, returns)
 
         return {
             **res,
             "frontier": front,
+            "clusters": clusters,
             "selected_point": {
                 "risk": res["metrics"]["volatility"],
                 "return": res["metrics"]["expected_return"]

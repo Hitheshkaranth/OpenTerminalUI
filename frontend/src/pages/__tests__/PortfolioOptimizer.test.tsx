@@ -11,6 +11,7 @@ vi.mock("../../api/portfolioOptimizer", () => ({
     objectives: [{ id: "min_risk", label: "Minimum Risk" }],
     risk_measures: [{ id: "MV", label: "Mean Variance" }],
     models: [{ id: "Classic", label: "Classic" }],
+    covariance_methods: [{ id: "sample", label: "Sample" }],
   })),
   runOptimize: vi.fn(async () => ({
     weights: { RELIANCE: 1.0 },

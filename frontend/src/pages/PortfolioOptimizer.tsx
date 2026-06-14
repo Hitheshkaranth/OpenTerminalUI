@@ -36,6 +36,7 @@ export function PortfolioOptimizer() {
   const [model, setModel] = useState("");
   const [objective, setObjective] = useState("");
   const [riskMeasure, setRiskMeasure] = useState("");
+  const [covMethod, setCovMethod] = useState("sample");
   const [confidence, setConfidence] = useState(0.95);
   const [riskFreeRate, setRiskFreeRate] = useState(0.0);
   const [riskAversion, setRiskAversion] = useState(2);
@@ -58,8 +59,9 @@ export function PortfolioOptimizer() {
       if (!model && methods.models.length > 0) setModel(methods.models[0].id);
       if (!objective && methods.objectives.length > 0) setObjective(methods.objectives[0].id);
       if (!riskMeasure && methods.risk_measures.length > 0) setRiskMeasure(methods.risk_measures[0].id);
+      if (!covMethod && methods.covariance_methods.length > 0) setCovMethod(methods.covariance_methods[0].id);
     }
-  }, [methods, model, objective, riskMeasure]);
+  }, [methods, model, objective, riskMeasure, covMethod]);
 
   const handleRunOptimize = () => {
     const req: OptimizeRequest = {
@@ -69,6 +71,7 @@ export function PortfolioOptimizer() {
       model,
       objective,
       risk_measure: riskMeasure,
+      cov_method: covMethod,
       confidence,
       risk_free_rate: riskFreeRate,
       risk_aversion: riskAversion,
@@ -89,6 +92,7 @@ export function PortfolioOptimizer() {
 
   const result = optimizeMutation.data;
   const isHRP = model === "HRP" || model === "HERC";
+  const isRP = model === "RP";
 
   return (
     <div className="flex h-full flex-col overflow-auto bg-terminal-bg text-terminal-text p-4">
@@ -177,9 +181,24 @@ export function PortfolioOptimizer() {
               </div>
 
               <div className="flex flex-col">
+                <label className="text-[10px] text-terminal-muted uppercase">Covariance Estimator</label>
+                <select
+                  className="bg-terminal-bg border border-terminal-border rounded px-2 py-1 text-xs text-terminal-text focus:border-terminal-accent outline-none"
+                  value={covMethod}
+                  onChange={(e) => setCovMethod(e.target.value)}
+                >
+                  {methods?.covariance_methods.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col">
                 <label className="text-[10px] text-terminal-muted uppercase">Objective</label>
                 <select
-                  disabled={isHRP}
+                  disabled={isHRP || isRP}
                   className="bg-terminal-bg border border-terminal-border rounded px-2 py-1 text-xs text-terminal-text focus:border-terminal-accent outline-none disabled:opacity-50"
                   value={objective}
                   onChange={(e) => setObjective(e.target.value)}
@@ -195,7 +214,7 @@ export function PortfolioOptimizer() {
               <div className="flex flex-col">
                 <label className="text-[10px] text-terminal-muted uppercase">Risk Measure</label>
                 <select
-                  disabled={isHRP}
+                  disabled={isHRP || isRP}
                   className="bg-terminal-bg border border-terminal-border rounded px-2 py-1 text-xs text-terminal-text focus:border-terminal-accent outline-none disabled:opacity-50"
                   value={riskMeasure}
                   onChange={(e) => setRiskMeasure(e.target.value)}
@@ -211,6 +230,11 @@ export function PortfolioOptimizer() {
               {isHRP && (
                 <div className="text-[10px] text-terminal-accent italic">
                   * Objective & Risk Measure are auto-managed by {model}
+                </div>
+              )}
+              {isRP && (
+                <div className="text-[10px] text-terminal-accent italic">
+                  * Risk Parity equalizes risk contributions across assets.
                 </div>
               )}
             </div>
@@ -391,6 +415,45 @@ export function PortfolioOptimizer() {
                   </div>
                 </TerminalPanel>
               </div>
+
+              {/* Cluster Structure */}
+              {!!result?.clusters?.groups?.length && (
+                <TerminalPanel title="Cluster Structure" subtitle="Hierarchical asset grouping">
+                  <div className="space-y-3 p-1">
+                    {result.clusters.groups.map((group, i) => {
+                      const accents = [
+                        "text-terminal-accent border-terminal-accent",
+                        "text-orange-500 border-orange-500",
+                        "text-terminal-pos border-terminal-pos",
+                        "text-terminal-neg border-terminal-neg",
+                      ];
+                      const accentClass = accents[i % accents.length];
+                      
+                      const sortedSymbols = [...group.symbols].sort((a, b) => {
+                        const idxA = result.clusters?.leaf_order.indexOf(a) ?? 0;
+                        const idxB = result.clusters?.leaf_order.indexOf(b) ?? 0;
+                        return idxA - idxB;
+                      });
+
+                      return (
+                        <div key={group.id} className="flex items-center gap-3">
+                          <div className={`w-8 font-bold text-[10px] uppercase ${accentClass.split(' ')[0]}`}>C{group.id}</div>
+                          <div className="flex flex-wrap gap-1">
+                            {sortedSymbols.map((sym) => (
+                              <span
+                                key={sym}
+                                className="px-2 py-0.5 border border-terminal-border rounded text-[10px] bg-terminal-bg text-terminal-text"
+                              >
+                                {sym}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </TerminalPanel>
+              )}
 
               {/* Asset Metrics Table */}
               <TerminalPanel title="Per-Asset Metrics" subtitle="Individual Performance">

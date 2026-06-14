@@ -44,6 +44,10 @@ def test_get_methods():
     assert "objectives" in data
     assert "risk_measures" in data
     assert "models" in data
+    assert "covariance_methods" in data
+    assert any(m["id"] == "RP" for m in data["models"])
+    assert any(m["id"] == "NCO" for m in data["models"])
+    assert len(data["covariance_methods"]) > 0
 
 def test_optimize_classic_min_risk(mock_price_data):
     payload = {
@@ -62,6 +66,9 @@ def test_optimize_classic_min_risk(mock_price_data):
     assert "sharpe" in data["metrics"]
     assert "frontier" in data
     assert len(data["frontier"]) > 0
+    assert "clusters" in data
+    assert "groups" in data["clusters"]
+    assert "leaf_order" in data["clusters"]
     assert "selected_point" in data
     assert "risk" in data["selected_point"]
     assert "return" in data["selected_point"]
@@ -70,6 +77,33 @@ def test_optimize_hrp(mock_price_data):
     payload = {
         "tickers": ["AAPL", "MSFT", "GOOGL", "AMZN", "META"],
         "model": "HRP"
+    }
+    response = client.post("/api/portfolio-optimizer/optimize", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "weights" in data
+    assert sum(data["weights"].values()) == pytest.approx(1.0, abs=1e-5)
+    assert "clusters" in data
+
+def test_optimize_rp(mock_price_data):
+    payload = {
+        "tickers": ["AAPL", "MSFT", "GOOGL", "AMZN", "META"],
+        "model": "RP"
+    }
+    response = client.post("/api/portfolio-optimizer/optimize", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "weights" in data
+    assert sum(data["weights"].values()) == pytest.approx(1.0, abs=1e-5)
+    assert "clusters" in data
+    assert "groups" in data["clusters"]
+    assert "leaf_order" in data["clusters"]
+
+def test_optimize_classic_cov_method(mock_price_data):
+    payload = {
+        "tickers": ["AAPL", "MSFT", "GOOGL", "AMZN", "META"],
+        "model": "Classic",
+        "cov_method": "ledoit_wolf"
     }
     response = client.post("/api/portfolio-optimizer/optimize", json=payload)
     assert response.status_code == 200

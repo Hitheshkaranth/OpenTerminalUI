@@ -4,17 +4,18 @@ from scipy.optimize import minimize, linprog
 from .risk_measures import risk_report
 from .hrp import hrp_weights
 from .black_litterman import bl_posterior_returns
+from .covariance import estimate_covariance
 
 def optimize_portfolio(returns, *, model="Classic", objective="max_sharpe", risk_measure="MV",
                        confidence=0.95, rf=0.0, risk_aversion=2.0, min_weight=0.0, max_weight=1.0,
-                       target_return=None, views=None, periods_per_year=252) -> dict:
+                       target_return=None, views=None, periods_per_year=252, cov_method="sample") -> dict:
     """
     Mean-risk optimization using scipy.
     """
     symbols = returns.columns.tolist()
     n = len(symbols)
     mu = returns.mean().values
-    cov = returns.cov().values
+    cov = estimate_covariance(returns, cov_method)
     
     # Handle BL model
     if model == "BL":
@@ -39,6 +40,16 @@ def optimize_portfolio(returns, *, model="Classic", objective="max_sharpe", risk
 
     if model in ["HRP", "HERC"]:
         weights_dict = hrp_weights(returns, risk_measure=risk_measure)
+        w = np.array([weights_dict[sym] for sym in symbols])
+    elif model == "RP":
+        from .risk_parity import risk_parity_weights
+        weights_dict = risk_parity_weights(returns, cov_method=cov_method, 
+                                           min_weight=min_weight, max_weight=max_weight)
+        w = np.array([weights_dict[sym] for sym in symbols])
+    elif model == "NCO":
+        from .nco import nco_weights
+        weights_dict = nco_weights(returns, objective=objective, risk_measure=risk_measure,
+                                   cov_method=cov_method, min_weight=min_weight, max_weight=max_weight)
         w = np.array([weights_dict[sym] for sym in symbols])
     else:
         # Classic Optimization
@@ -127,7 +138,7 @@ def _solve_classic(returns, mu, cov, objective, risk_measure, confidence, rf,
     return res.x
 
 def efficient_frontier(returns, *, points=20, rf=0.0, min_weight=0.0, max_weight=1.0,
-                       risk_measure="MV", confidence=0.95, periods_per_year=252) -> list[dict]:
+                       risk_measure="MV", confidence=0.95, periods_per_year=252, cov_method="sample") -> list[dict]:
     """
     Compute efficient frontier points.
     """
@@ -136,13 +147,15 @@ def efficient_frontier(returns, *, points=20, rf=0.0, min_weight=0.0, max_weight
     # Min risk portfolio
     min_risk_res = optimize_portfolio(returns, objective="min_risk", risk_measure=risk_measure,
                                      min_weight=min_weight, max_weight=max_weight, 
-                                     confidence=confidence, periods_per_year=periods_per_year)
+                                     confidence=confidence, periods_per_year=periods_per_year,
+                                     cov_method=cov_method)
     min_ret = min_risk_res["metrics"]["expected_return"]
     
     # Max return portfolio (subject to bounds)
     max_ret_res = optimize_portfolio(returns, objective="max_return", risk_measure=risk_measure,
                                     min_weight=min_weight, max_weight=max_weight,
-                                    confidence=confidence, periods_per_year=periods_per_year)
+                                    confidence=confidence, periods_per_year=periods_per_year,
+                                    cov_method=cov_method)
     max_ret = max_ret_res["metrics"]["expected_return"]
     
     if max_ret <= min_ret:
@@ -158,7 +171,8 @@ def efficient_frontier(returns, *, points=20, rf=0.0, min_weight=0.0, max_weight
         try:
             res = optimize_portfolio(returns, objective="min_risk", risk_measure=risk_measure,
                                      target_return=tr, min_weight=min_weight, max_weight=max_weight,
-                                     confidence=confidence, periods_per_year=periods_per_year)
+                                     confidence=confidence, periods_per_year=periods_per_year,
+                                     cov_method=cov_method)
             frontier.append({
                 "risk": res["metrics"]["volatility"],
                 "return": res["metrics"]["expected_return"],
