@@ -18,6 +18,7 @@ from backend.api.routes.insider import router as insider_router
 from backend.api.routes.journal import router as journal_router
 from backend.api.routes.notifications import router as notifications_router
 from backend.api.routes.portfolio_optimizer import router as portfolio_optimizer_router
+from backend.api.routes.statlab import router as statlab_router
 from backend.api.routes.stress_test import router as stress_test_router
 from backend.api.routes.tape import router as tape_router
 from backend.api.routes.watchlists import router as watchlists_router
@@ -96,5 +97,8 @@ api_router.include_router(framework_router)
 
 # Portfolio Optimizer API
 api_router.include_router(portfolio_optimizer_router)
+
+# Statlab API
+api_router.include_router(statlab_router)
 
 __all__ = ["api_router"]

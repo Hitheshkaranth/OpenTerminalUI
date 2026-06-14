@@ -40,6 +40,7 @@ export function Sidebar() {
     { label: "Alerts", path: "/equity/alerts", key: "A" },
     { label: "Risk", path: "/equity/risk", key: "R" },
     { label: "Correlation", path: "/equity/correlation", key: "CR", hint: "Risk" },
+    { label: "Stat Lab", path: "/equity/stat-lab", key: "SL", hint: "Quant" },
     { label: "OMS", path: "/equity/oms", key: "O" },
     { label: "Ops", path: "/equity/ops", key: "K" },
     { label: "Plugins", path: "/equity/plugins", key: "PL" },

@@ -111,6 +111,7 @@ const NAV_CARD_SECTIONS: Array<{ title: string; cards: NavCard[] }> = [
       { label: "Portfolio Lab", to: "/equity/portfolio/lab", badge: "PL" },
       { label: "Model Compare", to: "/backtesting/model-lab/compare", badge: "MC" },
       { label: "Blends", to: "/equity/portfolio/lab/blends", badge: "BL" },
+      { label: "Stat Lab", to: "/equity/stat-lab", badge: "SL" },
     ],
   },
   {
