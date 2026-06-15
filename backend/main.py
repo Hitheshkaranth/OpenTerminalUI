@@ -4,6 +4,7 @@ import asyncio
 import os
 import sys
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -136,8 +137,8 @@ async def healthz() -> dict[str, object]:
         "cache": cache_health,
         "marketdata_hub": {
             "status": "ok" if hub.is_running else "stopped",
-            "clients": len(hub.clients),
-            "subscriptions": sum(len(s) for s in hub.subscriptions.values()),
+            "clients": hub.client_count,
+            "subscriptions": hub.subscription_count,
         },
         "unified_fetcher": {
             "initialized": fetcher is not None,
@@ -151,12 +152,12 @@ def metrics_lite() -> dict[str, object]:
     hub = get_marketdata_hub()
     from backend.bg_services.scanner_alert_scheduler import get_scanner_alert_scheduler_service
     scanner_service = get_scanner_alert_scheduler_service()
-    scanner_status = scanner_service.get_status() if scanner_service else {}
+    scanner_status = scanner_service.status_snapshot() if scanner_service else {}
 
     return {
-        "ws_clients": len(hub.clients),
-        "ws_subscriptions": sum(len(s) for s in hub.subscriptions.values()),
-        "scanner_alert_last_run": scanner_status.get("last_run"),
+        "ws_clients": hub.client_count,
+        "ws_subscriptions": hub.subscription_count,
+        "scanner_alert_last_run": scanner_status.get("last_run_at"),
         "scanner_alert_last_status": scanner_status.get("last_status"),
         "scanner_alert_scanned_symbols": scanner_status.get("last_scanned_symbols"),
         "last_kite_stream_status": hub.kite_stream_status(),

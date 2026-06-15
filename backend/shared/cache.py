@@ -62,6 +62,21 @@ class MultiTierCache:
             self._db_conn.close()
             self._db_conn = None
 
+    async def health(self) -> dict[str, Any]:
+        """Report availability of each cache tier (used by /healthz)."""
+        l2 = "disabled"
+        if self._redis is not None:
+            try:
+                await self._redis.ping()
+                l2 = "ok"
+            except Exception:
+                l2 = "error"
+        return {
+            "l1_memory": {"status": "ok", "entries": len(self._l1_cache)},
+            "l2_redis": l2,
+            "l3_sqlite": "ok" if self._db_conn is not None else "unavailable",
+        }
+
     def _get_l1(self, key: str) -> Optional[Any]:
         if key in self._l1_cache:
             expiry, value = self._l1_cache[key]

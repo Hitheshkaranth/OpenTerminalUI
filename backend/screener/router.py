@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -178,7 +179,24 @@ async def _hydrate_missing_universe_rows(universe: str, market: str = "IN", refr
                 "altman_z_score": None,
             }
 
-    rows = [row for row in await asyncio.gather(*(_fetch_row(sym) for sym in missing)) if row is not None]
+    # Cold-cache hydration hits live providers one symbol at a time, and some
+    # fallbacks (e.g. NSE) block server traffic and retry slowly. Bound the
+    # whole pass with a deadline so a brand-new install never hangs the request:
+    # we upsert whatever resolved in time and let later calls warm the rest.
+    deadline = float(os.getenv("SCREENER_HYDRATE_TIMEOUT", "20"))
+    tasks = [asyncio.create_task(_fetch_row(sym)) for sym in missing]
+    done, pending = await asyncio.wait(tasks, timeout=deadline)
+    for task in pending:
+        task.cancel()
+
+    rows: list[dict[str, Any]] = []
+    for task in done:
+        try:
+            row = task.result()
+        except Exception:
+            row = None
+        if row is not None:
+            rows.append(row)
     if rows:
         upsert_screener_rows(rows)
         _engine._cache.clear()

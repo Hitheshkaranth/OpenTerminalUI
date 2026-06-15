@@ -100,6 +100,18 @@ class MarketDataHub:
         self._bus.register_local_listener(self._on_bus_message)
         self._market_status_task: asyncio.Task | None = None
 
+    @property
+    def is_running(self) -> bool:
+        return self._running
+
+    @property
+    def client_count(self) -> int:
+        return len(self._connections)
+
+    @property
+    def subscription_count(self) -> int:
+        return sum(len(symbols) for symbols in self._connections.values())
+
     async def start(self) -> None:
         async with self._lock:
             if self._running:
