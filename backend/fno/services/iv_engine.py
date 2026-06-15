@@ -7,6 +7,7 @@ from sqlalchemy import text
 
 from backend.fno.services.option_chain_fetcher import get_option_chain_fetcher
 from backend.shared.db import engine
+from backend.shared.sql_compat import autoincrement_pk
 
 
 class IVEngine:
@@ -20,9 +21,9 @@ class IVEngine:
         with engine.begin() as conn:
             conn.execute(
                 text(
-                    """
+                    f"""
                     CREATE TABLE IF NOT EXISTS iv_snapshots (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        {autoincrement_pk(conn)},
                         snapshot_date TEXT NOT NULL,
                         symbol TEXT NOT NULL,
                         atm_iv REAL NOT NULL,

@@ -8,6 +8,7 @@ from sqlalchemy import text
 from backend.fno.services.oi_analyzer import get_oi_analyzer
 from backend.fno.services.option_chain_fetcher import get_option_chain_fetcher
 from backend.shared.db import engine
+from backend.shared.sql_compat import autoincrement_pk
 
 
 class PCRTracker:
@@ -47,9 +48,9 @@ class PCRTracker:
         with engine.begin() as conn:
             conn.execute(
                 text(
-                    """
+                    f"""
                     CREATE TABLE IF NOT EXISTS pcr_snapshots (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        {autoincrement_pk(conn)},
                         snapshot_date TEXT NOT NULL,
                         symbol TEXT NOT NULL,
                         pcr_oi REAL NOT NULL,

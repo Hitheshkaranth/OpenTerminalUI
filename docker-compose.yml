@@ -12,7 +12,7 @@ services:
       FINNHUB_API_KEY: "${FINNHUB_API_KEY:-}"
       JWT_SECRET_KEY: "${JWT_SECRET_KEY:-}"
       CACHE_SIGNING_KEY: "${CACHE_SIGNING_KEY:-}"
-      DATABASE_URL: "${DATABASE_URL:-sqlite+aiosqlite:////data/openterminal.db}"
+      DATABASE_URL: "${DATABASE_URL:-postgresql://openterminalui:openterminalui@postgres:5432/openterminalui}"
       KITE_API_KEY: "${KITE_API_KEY:-}"
       KITE_API_SECRET: "${KITE_API_SECRET:-}"
       KITE_ACCESS_TOKEN: "${KITE_ACCESS_TOKEN:-}"
@@ -25,6 +25,11 @@ services:
       LM_STUDIO_ENABLED: "${LM_STUDIO_ENABLED:-true}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     volumes:
       - openterminalui_data:/data
     develop:
@@ -49,15 +54,20 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    profiles: ["postgres"]
     environment:
       POSTGRES_DB: "${POSTGRES_DB:-openterminalui}"
       POSTGRES_USER: "${POSTGRES_USER:-openterminalui}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-openterminalui}"
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - openterminalui_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-openterminalui} -d ${POSTGRES_DB:-openterminalui}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     restart: unless-stopped
 
 volumes:

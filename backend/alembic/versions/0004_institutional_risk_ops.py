@@ -63,7 +63,7 @@ def upgrade() -> None:
             sa.Column("name", sa.String(length=128), nullable=False),
             sa.Column("description", sa.String(length=512), nullable=False, server_default=""),
             sa.Column("source", sa.String(length=64), nullable=False, server_default="internal"),
-            sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+            sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.false()),
             sa.Column("created_at", sa.DateTime(), nullable=False),
             sa.Column("metadata_json", sa.JSON(), nullable=False),
         )
@@ -202,7 +202,7 @@ def upgrade() -> None:
             sa.Column("id", sa.String(length=36), primary_key=True),
             sa.Column("symbol", sa.String(length=64), nullable=False),
             sa.Column("reason", sa.String(length=256), nullable=False, server_default=""),
-            sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+            sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.true()),
             sa.Column("created_at", sa.DateTime(), nullable=False),
             sa.UniqueConstraint("symbol", name="uq_restricted_symbol"),
         )
@@ -251,7 +251,7 @@ def upgrade() -> None:
             "ops_kill_switches",
             sa.Column("id", sa.String(length=36), primary_key=True),
             sa.Column("scope", sa.String(length=64), nullable=False),
-            sa.Column("enabled", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+            sa.Column("enabled", sa.Boolean(), nullable=False, server_default=sa.false()),
             sa.Column("reason", sa.String(length=512), nullable=False, server_default=""),
             sa.Column("updated_at", sa.DateTime(), nullable=False),
             sa.UniqueConstraint("scope", name="uq_kill_switch_scope"),

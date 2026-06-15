@@ -28,7 +28,11 @@ pytest-cov
 pytest-asyncio
 openpyxl
 reportlab
-empyrical
+# empyrical-reloaded: maintained drop-in for the abandoned `empyrical` package.
+# The original's bundled versioneer.py calls configparser.SafeConfigParser,
+# removed in Python 3.12, so it fails to build on modern interpreters.
+# Imports under the same `empyrical` namespace.
+empyrical-reloaded
 pyarrow
 hmmlearn
 optuna

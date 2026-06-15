@@ -329,7 +329,7 @@ OpenTerminalUI is a self-hosted, full-stack financial terminal that combines rea
                            |
 +--------------------------+------------------------+
 |                  PERSISTENCE                      |
-|   SQLite (default) | PostgreSQL 16 (production)  |
+|   PostgreSQL 16 (default) | SQLite (opt-in)      |
 |   Redis (cache + pub/sub + sessions)             |
 +---------------------------------------------------+
 ```
@@ -386,15 +386,18 @@ docker compose up --build
 
 Open `http://localhost:8000` when the build completes.
 
-**Docker Compose profiles:**
+**Database backend:**
 
 ```bash
-# Default: Backend + Frontend + Redis (SQLite)
+# Default: Backend + Frontend + Redis + PostgreSQL 16
 docker compose up --build
 
-# With PostgreSQL for production workloads
-docker compose --profile postgres up --build
+# To use SQLite instead, set in your .env:
+#   DATABASE_URL=sqlite+aiosqlite:////data/openterminal.db
 ```
+
+If host port 5432 or 8000 is already in use, set `POSTGRES_PORT` / `APP_PORT`
+in `.env` (see `.env.example`).
 
 ### Option 2: Local Development
 
@@ -431,7 +434,7 @@ The platform runs without API keys using fallback providers. Add keys to unlock 
 | `KITE_ACCESS_TOKEN` | Zerodha Kite session token |
 | `JWT_SECRET_KEY` | JWT signing key for authentication |
 | `CACHE_SIGNING_KEY` | Cache integrity signing key |
-| `DATABASE_URL` | Database connection (default: SQLite) |
+| `DATABASE_URL` | Database connection (Docker default: PostgreSQL; set a `sqlite+aiosqlite://` URL to use SQLite) |
 | `REDIS_URL` | Redis connection for caching and pub/sub |
 | `OPENTERMINALUI_CORS_ORIGINS` | Allowed CORS origins |
 | `OPENTERMINALUI_PREFETCH_ENABLED` | Enable background data prefetch |

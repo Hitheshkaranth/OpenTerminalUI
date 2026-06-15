@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from backend.db.base import get_sync_database_url
+from backend.shared.sql_compat import bool_default, timestamp_type
 from backend.shared.sqlite_utils import configure_sqlite_connection
 
 database_url = get_sync_database_url()
@@ -82,7 +83,7 @@ def _ensure_backtest_columns() -> None:
 def _ensure_fundamentals_pit_columns() -> None:
     columns_to_add = {
         "fiscal_period": "VARCHAR(32) NOT NULL DEFAULT ''",
-        "release_date_estimated": "BOOLEAN NOT NULL DEFAULT 0",
+        "release_date_estimated": bool_default(engine, False),
         "source": "VARCHAR(32) NOT NULL DEFAULT ''",
         "market": "VARCHAR(8) NOT NULL DEFAULT ''",
     }
@@ -104,8 +105,8 @@ def _ensure_alerts_columns() -> None:
         "delivery_channels": "JSON NOT NULL DEFAULT '[\"in_app\"]'",
         "delivery_config": "JSON NOT NULL DEFAULT '{}'",
         "cooldown_minutes": "INTEGER NOT NULL DEFAULT 0",
-        "last_triggered_at": "DATETIME",
-        "expiry_date": "DATETIME",
+        "last_triggered_at": timestamp_type(engine),
+        "expiry_date": timestamp_type(engine),
         "max_triggers": "INTEGER NOT NULL DEFAULT 0",
         "trigger_count": "INTEGER NOT NULL DEFAULT 0",
         "last_triggered_value": "REAL",

@@ -11,6 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.services.lm_studio_client import LMStudioError, get_lm_studio_client, parse_json_response
+from backend.shared.sql_compat import autoincrement_pk
 
 _CATALYST_WORDS = {
     "earnings",
@@ -68,9 +69,9 @@ _NEGATIVE_WORDS = {
 def ensure_conviction_table(db: Session) -> None:
     db.execute(
         text(
-            """
+            f"""
             CREATE TABLE IF NOT EXISTS stock_conviction_records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                {autoincrement_pk(db.get_bind())},
                 symbol TEXT NOT NULL,
                 market TEXT NOT NULL,
                 record_date TEXT NOT NULL,

@@ -1,6 +1,6 @@
 """add PIT fundamental release metadata
 
-Revision ID: 0008_pit_fundamentals_release_metadata
+Revision ID: 0008_pit_fundamentals_release
 Revises: 0007_alerts_v2_delivery
 Create Date: 2026-05-17
 """
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0008_pit_fundamentals_release_metadata"
+revision = "0008_pit_fundamentals_release"
 down_revision = "0007_alerts_v2_delivery"
 branch_labels = None
 depends_on = None

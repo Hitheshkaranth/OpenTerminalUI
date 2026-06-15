@@ -1,7 +1,7 @@
 """add saved workspace views
 
 Revision ID: 0011_saved_views
-Revises: 0008_pit_fundamentals_release_metadata
+Revises: 0008_pit_fundamentals_release
 Create Date: 2026-05-17
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 revision = "0011_saved_views"
-down_revision = "0008_pit_fundamentals_release_metadata"
+down_revision = "0008_pit_fundamentals_release"
 branch_labels = None
 depends_on = None
 
