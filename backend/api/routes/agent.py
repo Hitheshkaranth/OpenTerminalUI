@@ -31,7 +31,7 @@ async def create_run(payload: Dict[str, Any], user=Depends(get_current_user)) ->
         "context": payload.get("context") or {},
         "provider": payload.get("provider"),
         "model": payload.get("model"),
-        "user_id": getattr(user, "id", "unknown"),
+        "user_id": getattr(user, "id", None),
     }
     return {"run_id": run_id}
 
