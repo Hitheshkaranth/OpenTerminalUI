@@ -5,6 +5,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from backend.core.backtest_metrics import compute_performance_metrics, compute_scenario_projections
+
 
 def _equity_frame(equity_curve: list[dict]) -> pd.DataFrame:
     if not equity_curve:
@@ -332,4 +334,6 @@ def compute_full_analytics(
         "rolling_metrics": compute_rolling_metrics(equity_curve, window=rolling_window),
         "return_distribution": compute_return_distribution(equity_curve, bins=histogram_bins),
         "trade_analytics": compute_trade_analytics(trades, equity_curve),
+        "performance_metrics": compute_performance_metrics(equity_curve),
+        "scenario_projections": compute_scenario_projections(equity_curve),
     }

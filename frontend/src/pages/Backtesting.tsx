@@ -34,6 +34,7 @@ import {
 import type { Surface3DPoint } from "../components/backtesting/panels/Backtesting3D";
 import { ParameterSensitivityHeatmap } from "../components/backtesting/panels/ParameterSensitivityHeatmap";
 import { WalkForwardTimeline } from "../components/backtesting/panels/WalkForwardTimeline";
+import { PerformanceMetricsPanel } from "../components/backtesting/panels/PerformanceMetricsPanel";
 import { MosaicWorkspace } from "../components/backtesting/workspace/MosaicWorkspace";
 import type { PanelRendererMap } from "../components/backtesting/workspace/PanelRegistry";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
@@ -55,6 +56,7 @@ type VizTab =
   | "drawdown"
   | "monthly"
   | "rolling"
+  | "metrics"
   | "trades"
   | "compare"
   | "surface3d";
@@ -77,6 +79,13 @@ type Analytics = {
     scatter: { entry_date: string; exit_date: string; pnl: number; return_pct: number; holding_days: number }[];
     streaks: { max_win_streak: number; max_loss_streak: number; current_streak: number; current_streak_type: string };
     summary: Record<string, number>;
+  };
+  performance_metrics?: Record<string, number>;
+  scenario_projections?: {
+    annual_return_mean: number;
+    annual_volatility: number;
+    current_equity: number;
+    scenarios: { label: string; return_pct: number; projected_equity: number }[];
   };
 };
 
@@ -146,6 +155,7 @@ const VIZ_TABS: { key: VizTab; label: string; icon: string }[] = [
   { key: "drawdown", label: "Drawdown", icon: "" },
   { key: "monthly", label: "Monthly Returns", icon: "" },
   { key: "rolling", label: "Rolling Metrics", icon: "" },
+  { key: "metrics", label: "Metrics", icon: "" },
   { key: "trades", label: "Trade Analysis", icon: "" },
   { key: "compare", label: "Compare", icon: "CMP" },
   { key: "surface3d", label: "3D Surface", icon: "3D" },
@@ -413,7 +423,7 @@ export function BacktestingPage() {
     if (typeof filters.start === "string") setStart(filters.start);
     if (typeof filters.end === "string") setEnd(filters.end);
     if (typeof filters.strategyMode === "string") setStrategyMode(filters.strategyMode);
-    if (tabs.activeTab === "chart" || tabs.activeTab === "equity" || tabs.activeTab === "drawdown" || tabs.activeTab === "monthly" || tabs.activeTab === "rolling" || tabs.activeTab === "trades" || tabs.activeTab === "compare" || tabs.activeTab === "surface3d") setActiveTab(tabs.activeTab);
+    if (tabs.activeTab === "chart" || tabs.activeTab === "equity" || tabs.activeTab === "drawdown" || tabs.activeTab === "monthly" || tabs.activeTab === "rolling" || tabs.activeTab === "metrics" || tabs.activeTab === "trades" || tabs.activeTab === "compare" || tabs.activeTab === "surface3d") setActiveTab(tabs.activeTab);
   }, []);
   const [compareStrategies, setCompareStrategies] = useState<string[]>([]);
   const [compareResults, setCompareResults] = useState<Map<string, CompareState>>(new Map());
@@ -1361,6 +1371,14 @@ export function BacktestingPage() {
     <RollingMetricsPanel rows={resolvedAnalytics?.rolling_metrics || []} />
   );
 
+  const renderMetricsTab = () => (
+    <PerformanceMetricsPanel
+      metrics={resolvedAnalytics?.performance_metrics}
+      scenarios={resolvedAnalytics?.scenario_projections}
+      fmtMoney={fmtMoney}
+    />
+  );
+
   const renderTradesTab = () => (
     <TradesPanel tradeAnalytics={resolvedAnalytics?.trade_analytics || null} fmtMoney={fmtMoney} />
   );
@@ -1457,6 +1475,7 @@ export function BacktestingPage() {
     if (activeTab === "drawdown") return renderDrawdownTab();
     if (activeTab === "monthly") return renderMonthlyTab();
     if (activeTab === "rolling") return renderRollingTab();
+    if (activeTab === "metrics") return renderMetricsTab();
     if (activeTab === "trades") return renderTradesTab();
     if (activeTab === "compare") return renderCompareTab();
     return renderSurface3DTab();
@@ -1483,6 +1502,7 @@ export function BacktestingPage() {
       else if (normalized.includes("drawdown")) setActiveTab("drawdown");
       else if (normalized.includes("monthly")) setActiveTab("monthly");
       else if (normalized.includes("rolling")) setActiveTab("rolling");
+      else if (normalized.includes("metrics")) setActiveTab("metrics");
       else if (normalized.includes("trade")) setActiveTab("trades");
       else if (normalized.includes("compare")) setActiveTab("compare");
       else if (normalized.includes("surface")) setActiveTab("surface3d");
