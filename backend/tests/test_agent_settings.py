@@ -20,7 +20,8 @@ def test_agent_defaults(monkeypatch):
         monkeypatch.delenv(var, raising=False)
     s = _fresh_settings()
     assert s.agent_provider == "openrouter"
-    assert s.agent_model == "anthropic/claude-opus-4-8"
+    # Default is a free OpenRouter model (the key may be restricted to free tier).
+    assert s.agent_model == "openai/gpt-oss-20b:free"
     assert s.openrouter_base_url == "https://openrouter.ai/api/v1"
     assert s.openrouter_api_key is None
     assert s.agent_max_steps == 12
