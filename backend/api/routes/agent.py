@@ -42,6 +42,10 @@ async def stream_run(run_id: str, user=Depends(get_current_user)) -> StreamingRe
     if spec is None:
         raise HTTPException(status_code=404, detail="run not found")
 
+    if spec.get("user_id") != getattr(user, "id", None):
+        _PENDING[run_id] = spec  # restore; this caller doesn't own the run
+        raise HTTPException(status_code=403, detail="forbidden")
+
     settings = get_settings()
     provider = get_llm_provider(provider=spec["provider"], model=spec["model"])
     registry = build_default_registry()

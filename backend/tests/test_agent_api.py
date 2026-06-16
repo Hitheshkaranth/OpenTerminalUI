@@ -60,3 +60,18 @@ def test_stream_unknown_run_404(monkeypatch):
     client = _build_client(monkeypatch)
     r = client.get("/api/agent/runs/does-not-exist/stream")
     assert r.status_code == 404
+
+
+def test_stream_rejects_other_user(monkeypatch):
+    from fastapi import FastAPI
+    import backend.api.routes.agent as ar
+    from backend.auth.deps import get_current_user as gcu
+
+    client = _build_client(monkeypatch)
+    run_id = client.post("/api/agent/runs", json={"prompt": "hi"}).json()["run_id"]
+
+    # Re-point the SAME app's auth override to a different user, then stream.
+    app = client.app
+    app.dependency_overrides[gcu] = lambda: type("U", (), {"id": "someone_else"})()
+    r = client.get(f"/api/agent/runs/{run_id}/stream")
+    assert r.status_code == 403
