@@ -38,6 +38,13 @@ class AppSettings(BaseModel):
     lm_studio_model: str = "google/gemma-4-26b-a4b"
     lm_studio_enabled: bool = True
     lm_studio_timeout_seconds: float = 240.0
+    # Agent framework (multi-provider LLM)
+    agent_provider: str = "openrouter"  # openrouter | openai | lmstudio
+    agent_model: str = "anthropic/claude-opus-4-8"
+    agent_max_steps: int = 12
+    agent_timeout_seconds: float = 120.0
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_api_key: str | None = None
     price_cache_ttl_seconds: int = 60
     fundamentals_cache_ttl_seconds: int = 1800
 
@@ -220,6 +227,34 @@ def get_settings() -> AppSettings:
         lm_studio_timeout_seconds=float(
             _env("OPENTERMINALUI_LM_STUDIO_TIMEOUT_SECONDS")
             or app_cfg.get("lm_studio_timeout_seconds", 30.0)
+        ),
+        agent_provider=(
+            _env("OPENTERMINALUI_AGENT_PROVIDER")
+            or _env("AGENT_PROVIDER")
+            or app_cfg.get("agent_provider", "openrouter")
+        ),
+        agent_model=(
+            _env("OPENTERMINALUI_AGENT_MODEL")
+            or _env("AGENT_MODEL")
+            or app_cfg.get("agent_model", "anthropic/claude-opus-4-8")
+        ),
+        agent_max_steps=int(
+            _env("OPENTERMINALUI_AGENT_MAX_STEPS")
+            or str(app_cfg.get("agent_max_steps", 12))
+        ),
+        agent_timeout_seconds=float(
+            _env("OPENTERMINALUI_AGENT_TIMEOUT_SECONDS")
+            or str(app_cfg.get("agent_timeout_seconds", 120.0))
+        ),
+        openrouter_base_url=(
+            _env("OPENTERMINALUI_OPENROUTER_BASE_URL")
+            or _env("OPENROUTER_BASE_URL")
+            or app_cfg.get("openrouter_base_url", "https://openrouter.ai/api/v1")
+        ),
+        openrouter_api_key=(
+            _env("OPENTERMINALUI_OPENROUTER_API_KEY")
+            or _env("OPENROUTER_API_KEY")
+            or app_cfg.get("openrouter_api_key")
         ),
         price_cache_ttl_seconds=int(
             _env("OPENTERMINALUI_PRICE_CACHE_TTL_SECONDS")
