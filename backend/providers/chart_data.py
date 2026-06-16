@@ -502,11 +502,13 @@ class ChartDataProvider:
             "1d": "daily",
         }
         mode = fmp_interval_map.get(interval, "daily")
+        # Stable API: ticker is a `symbol` query param; daily uses historical-price-eod/full
+        # (intraday historical-chart is premium-tier and will 402 -> handled upstream).
         if mode == "daily":
-            url = f"https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}"
+            url = "https://financialmodelingprep.com/stable/historical-price-eod/full"
         else:
-            url = f"https://financialmodelingprep.com/api/v3/historical-chart/{mode}/{ticker}"
-        params: dict[str, str] = {"apikey": self.fmp_key}
+            url = f"https://financialmodelingprep.com/stable/historical-chart/{mode}"
+        params: dict[str, str] = {"apikey": self.fmp_key, "symbol": ticker}
         if start:
             params["from"] = start.strftime("%Y-%m-%d")
         if end:

@@ -129,8 +129,8 @@ class MarketClassifier:
         for cand in candidates:
             try:
                 resp = await self._http.get(
-                    f"https://financialmodelingprep.com/api/v3/profile/{cand}",
-                    params={"apikey": self._fmp_key},
+                    "https://financialmodelingprep.com/stable/profile",
+                    params={"symbol": cand, "apikey": self._fmp_key},
                 )
                 resp.raise_for_status()
                 payload = resp.json()
