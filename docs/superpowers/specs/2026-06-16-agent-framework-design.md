@@ -31,8 +31,9 @@ This document captures the **full target architecture**. Implementation is
 | Model/provider config | **Multi-provider abstraction** (OpenRouter / OpenAI / LM Studio interchangeable), **BYO key per user**, encrypted at rest; server config fallback | OpenRouter & OpenAI are OpenAI-compatible → one base impl; LM Studio reused for local tasks. |
 | Tool catalog | **Hybrid**: curated typed core (~18 tools) **+** dynamic meta-tool over a whitelist of read-only routes | Keeps tool-def context small while reaching the long tail of domains. |
 | Orchestration engine | **Lightweight native tool-calling loop** (no LangGraph/MCP dependency in v1) | Clean httpx/FastAPI codebase, security-sensitive; native OpenAI-compatible function-calling suffices. |
-| Home UX | **Chat thread + live artifact canvas** (SSE-streamed) | Feels like a financial Claude/Cursor; reuses existing table/chart/card components. |
-| Home placement | **Home (`/`) becomes the Agent Console**; current Home content moves to a "Markets" dashboard tab | Default chosen on "proceed"; revisit if undesired. |
+| Console UX | **Chat thread + live artifact canvas** (SSE-streamed) | Feels like a financial Claude/Cursor; reuses existing table/chart/card components. |
+| Console placement | **Global, invokable from any screen** — a keyboard-invokable slide-over panel mounted in the app shell; a full-page version is reachable from Home | The agent is an ambient co-pilot available everywhere, not a single route. |
+| Screen context | The console captures the **current screen's context** (route, active symbol, selection) and injects it into the run | "Value this" on a StockDetail page just works without retyping the ticker. |
 | Build order | **Phased** (read-only → soft writes/meta-tool/persistence → order HITL) | Large scope; each phase ships value and gets its own plan. |
 
 ---
@@ -129,16 +130,32 @@ mock `default_user` is replaced).
 
 ---
 
-## 5. Frontend — Home / Agent Console
+## 5. Frontend — Global Agent Console
 
-- **Route:** Home (`/`) hosts the console; current Home content → "Markets" tab.
+The console is **globally available on every screen**, not a single route.
+
+- **Mount point:** a top-level `AgentConsole` mounted once in the app shell
+  (`App.tsx` layout), so it overlays the current page regardless of route. State
+  lives in a Zustand store so a run survives navigation between screens.
+- **Invocation:** keyboard hotkey (e.g. `Ctrl/Cmd+K` or a dedicated chord, honoring
+  the platform's keyboard-first requirement) **and** a persistent launcher button in
+  the shell chrome. Toggling open/closed does not interrupt an in-flight run.
+- **Form factor:** a **slide-over panel** (right-docked drawer) over the current
+  screen. A **full-page version** is reachable from Home for an expansive workspace;
+  both render the same chat + artifact components. Current Home content moves to a
+  "Markets" dashboard tab.
+- **Screen context:** on open, the console reads the active route's context provider
+  (current symbol, selected rows, timeframe) and offers it to the run, so prompts
+  like "value this" or "compare these" resolve against what the user is looking at.
+  Each screen exposes its context via a small `useScreenContext()` contract.
 - **Left — chat thread:** streamed tokens, collapsible tool-step trace
   ("ran `screen_stocks` → 18 results"), inline **approval cards** for orders.
 - **Right — artifact canvas:** typed renderers keyed off `artifact` events, reusing
   existing components — `TerminalTable`/`DataGrid` (screener results), existing chart
   component (chart artifacts), valuation/risk cards, and a new **OrderConfirmCard**
-  that calls `/approve`.
-- **Transport:** SSE via fetch-stream into a Zustand store. Must honor the project's
+  that calls `/approve`. In the slide-over form factor the canvas stacks below the
+  chat; in full-page it sits side-by-side.
+- **Transport:** SSE via fetch-stream into the Zustand store. Must honor the project's
   React infinite-loop rules: module-level stable empty refs, `useMemo` on
   `chartPointsToBars()` calls, functional `setState` bail-outs.
 - **Settings → Agent tab:** provider (OpenRouter/OpenAI/LM Studio), model picker
@@ -148,7 +165,8 @@ mock `default_user` is replaced).
 
 ## 6. Data flow (example: "find cheap quality midcaps and propose a position")
 
-1. Frontend `POST /api/agent/runs` → run created → opens SSE.
+1. Frontend `POST /api/agent/runs` with the user prompt **+ current screen context**
+   (route, active symbol, selection) → run created → opens SSE.
 2. Orchestrator calls LLM with tool defs → LLM emits `screen_stocks(filters)`.
 3. Registry runs `screener.engine` → results → `artifact: screener_table` event.
 4. LLM calls `value_stock` / `get_risk_metrics` on top names → more artifacts.
@@ -191,8 +209,10 @@ mock `default_user` is replaced).
 ## 9. Phasing (each phase = its own plan → implementation cycle)
 
 - **Phase 1 — Agent core, read-only.** Provider abstraction (OpenRouter first),
-  orchestrator loop, ~10 read tools, SSE, Home chat+artifacts MVP, Settings model
-  config. Delivers "determining stocks" end-to-end. *(First implementation plan.)*
+  orchestrator loop, ~10 read tools, SSE, **global slide-over console mounted in the
+  app shell** (hotkey + launcher) with screen-context injection, Settings model
+  config. Delivers "determining stocks" end-to-end from any screen. *(First
+  implementation plan.)*
 - **Phase 2 — Soft writes + dynamic meta-tool + persistence/history + full config UI.**
 - **Phase 3 — Order HITL.** `propose_order`, approval cards, OMS integration, risk
   guardrails, audit linkage.
