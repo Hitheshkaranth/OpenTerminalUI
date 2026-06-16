@@ -161,6 +161,30 @@ The console is **globally available on every screen**, not a single route.
 - **Settings → Agent tab:** provider (OpenRouter/OpenAI/LM Studio), model picker
   (OpenRouter catalog fetch), BYO key entry, per-tool enable toggles, risk limits.
 
+### 5.1 Design language — blend with the existing terminal, modern feel
+
+The console must read as a native part of OpenTerminalUI, not a bolted-on chatbot.
+
+- **Tokens, not new styles:** consume the existing theme tokens
+  (`frontend/src/styles/terminal-theme.css`, `frontend/src/theme/terminal.ts`) for
+  color, spacing, radius, and elevation. No new palette — the agent inherits the
+  active theme (incl. dense mode) automatically.
+- **Typography:** follow the standardized type system — compact **monospace** for
+  data/numbers in artifacts and tool traces, **sans-serif** for chat prose and
+  headings. Reuse the same scale used by panels and tables.
+- **Component reuse over reinvention:** artifacts render through existing
+  `TerminalTable`/`DataGrid`, chart, and panel-chrome components so tables, headers,
+  selection, and density behave identically to the rest of the app.
+- **Modern, restrained motion:** the slide-over uses a smooth, GPU-friendly
+  transform/opacity transition; streamed tokens and tool-step rows fade/expand
+  subtly. Motion is quick and non-distracting (respects `prefers-reduced-motion`).
+- **Chrome:** the launcher and panel header match the shell's existing iconography
+  and density; approval cards reuse the platform's button/badge styles so an Approve
+  action looks like every other primary action in the terminal.
+- **Accessibility:** keyboard-first (focus trap in the panel, full keyboard nav of
+  artifacts), visible focus rings from the token set, adequate contrast in both
+  light/dark and dense modes.
+
 ---
 
 ## 6. Data flow (example: "find cheap quality midcaps and propose a position")
