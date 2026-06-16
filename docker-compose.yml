@@ -25,6 +25,8 @@ services:
       LM_STUDIO_BASE_URL: "${LM_STUDIO_BASE_URL:-http://host.docker.internal:1234/v1}"
       LM_STUDIO_MODEL: "${LM_STUDIO_MODEL:-google/gemma-4-26b-a4b}"
       LM_STUDIO_ENABLED: "${LM_STUDIO_ENABLED:-true}"
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+      OPENROUTER_BASE_URL: "${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
