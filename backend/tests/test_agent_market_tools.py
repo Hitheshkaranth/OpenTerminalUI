@@ -11,13 +11,26 @@ async def test_screen_stocks_calls_engine(monkeypatch):
         def run(self, config):
             captured["query"] = config.query
             captured["limit"] = config.limit
-            return {"rows": [{"ticker": "AAPL", "pe_ratio": 18}], "total": 1}
+            return {
+                "results": [{"ticker": "AAPL", "company": "Apple", "pe": 18, "roe": 30}],
+                "total_results": 1,
+                "query_parsed": "pe < 20",
+            }
+
+    async def fake_hydrate(universe, market):
+        captured["hydrated"] = (universe, market)
+        return 3
 
     monkeypatch.setattr(mt, "ScreenerEngine", lambda: FakeEngine())
-    out = await mt.screen_stocks({"query": "pe_ratio < 20", "limit": 5})
+    monkeypatch.setattr(mt, "_hydrate_missing_universe_rows", fake_hydrate)
+    out = await mt.screen_stocks({"query": "pe_ratio < 20", "limit": 5, "market": "US", "universe": "sp_500"})
     assert captured["query"] == "pe_ratio < 20"
     assert captured["limit"] == 5
-    assert out["rows"][0]["ticker"] == "AAPL"
+    # The tool must hydrate before running, else the materialized store is empty.
+    assert captured["hydrated"] == ("sp_500", "US")
+    assert out["count"] == 1
+    assert out["results"][0]["ticker"] == "AAPL"
+    assert out["results"][0]["roe"] == 30
 
 
 @pytest.mark.asyncio
