@@ -154,6 +154,10 @@ async def _hydrate_missing_universe_rows(universe: str, market: str = "IN", refr
                 return None
             if not snap:
                 return None
+            # Map the fundamentals the snapshot already carries. Previously these
+            # were stored as None, so the screener's enrich step defaulted them —
+            # making margin/growth filters match nothing and ROE match everything
+            # (e.g. the Buffett preset returned 0 rows).
             return {
                 "ticker": sym,
                 "company_name": snap.get("company_name"),
@@ -162,15 +166,16 @@ async def _hydrate_missing_universe_rows(universe: str, market: str = "IN", refr
                 "current_price": snap.get("current_price"),
                 "market_cap": snap.get("market_cap"),
                 "pe": snap.get("pe"),
-                "pb_calc": None,
-                "ps_calc": None,
-                "ev_ebitda": None,
-                "roe_pct": None,
-                "roa_pct": None,
-                "op_margin_pct": None,
-                "net_margin_pct": None,
-                "rev_growth_pct": None,
-                "eps_growth_pct": None,
+                "pb_calc": snap.get("pb"),
+                "ps_calc": snap.get("ps"),
+                "ev_ebitda": snap.get("ev_ebitda"),
+                "roe_pct": snap.get("roe_pct"),
+                "roa_pct": snap.get("roa_pct"),
+                "op_margin_pct": snap.get("op_margin_pct"),
+                "net_margin_pct": snap.get("net_margin_pct"),
+                "rev_growth_pct": snap.get("rev_growth_pct"),
+                "eps_growth_pct": snap.get("eps_growth_pct"),
+                "dividend_yield": snap.get("div_yield_pct"),
                 "beta": snap.get("beta"),
                 "market": market,
                 "exchange": snap.get("exchange"),

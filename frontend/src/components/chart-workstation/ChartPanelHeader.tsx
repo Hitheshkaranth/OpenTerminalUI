@@ -114,7 +114,7 @@ export function ChartPanelHeader({
         </div>
       </div>
 
-      <div className="flex min-w-0 items-center gap-1 overflow-x-auto md:flex-1 md:justify-between md:overflow-visible">
+      <div className="flex min-w-0 items-center gap-1 overflow-x-auto md:flex-1 md:justify-between">
         <div className="flex min-w-0 items-center gap-1">
           <TerminalDropdown
             label={`L-${linkGroup === "off" ? "OFF" : linkGroup}`}
