@@ -33,4 +33,5 @@ ARTIFACT_KINDS = {
     "screen_stocks": "screener_table",
     "compare_stocks": "compare_table",
     "get_stock_snapshot": "snapshot_card",
+    "search_research": "research_list",
 }
