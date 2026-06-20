@@ -30,16 +30,41 @@ class Orchestrator:
         self.max_steps = max_steps
         self.system_prompt = system_prompt
 
+    @staticmethod
+    def _context_directive(ctx: dict[str, Any]) -> str:
+        """Turn the screen context into an explicit instruction so the agent
+        defaults to the stock the user currently has open."""
+        symbol = str(ctx.get("symbol") or "").strip().upper()
+        market = str(ctx.get("market") or "").strip().upper()
+        parts = [f"Current screen context: {json.dumps(ctx)}"]
+        if symbol:
+            hint = f"The user currently has {symbol} open"
+            if market:
+                hint += f" on {market}"
+            parts.append(
+                hint + ". Treat " + symbol + " as the default subject when the user refers to "
+                '"this stock"/"it" or gives an ambiguous or partial company name without an '
+                "explicit ticker. Resolve company names to the ticker for the user's market "
+                + (f"({market}) " if market else "")
+                + "before claiming a stock is unavailable."
+            )
+        elif market:
+            parts.append(
+                f"Resolve company names on the user's market ({market}) before claiming a "
+                "stock is unavailable."
+            )
+        return "\n".join(parts)
+
     async def run(
         self, user_prompt: str, *, screen_context: dict[str, Any] | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         messages: list[LLMMessage | AssistantMessage] = [
             LLMMessage(role="system", content=self.system_prompt),
         ]
-        if screen_context is not None:
+        if screen_context:
             messages.append(LLMMessage(
                 role="system",
-                content="Current screen context: " + json.dumps(screen_context),
+                content=self._context_directive(screen_context),
             ))
         messages.append(LLMMessage(role="user", content=user_prompt))
 

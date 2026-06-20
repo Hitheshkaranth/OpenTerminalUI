@@ -2,9 +2,26 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from typing import Any
 
 import httpx
+
+# Harmony/control tokens that reasoning models (e.g. gpt-oss) sometimes leak into
+# message content, e.g. "<|channel|>commentary". Strip them so they never reach
+# the UI as part of the answer.
+_HARMONY_TOKEN_RE = re.compile(r"<\|[^|>]*\|>")
+# A leading channel marker like "commentary"/"analysis"/"final" left behind after
+# the control tokens are removed.
+_CHANNEL_LEAD_RE = re.compile(r"^\s*(?:commentary|analysis|final)\b[:.]?\s*", re.IGNORECASE)
+
+
+def _clean_content(content: str | None) -> str | None:
+    if not content:
+        return content
+    cleaned = _HARMONY_TOKEN_RE.sub("", content)
+    cleaned = _CHANNEL_LEAD_RE.sub("", cleaned)
+    return cleaned.strip() or content
 
 from backend.services.llm.base import (
     AssistantMessage, LLMError, LLMMessage, ToolCall, ToolDef,
@@ -112,4 +129,4 @@ class OpenAICompatibleProvider:
         # Fall back to it so non-tool turns don't surface as empty responses.
         if not (content or "").strip() and not calls:
             content = message.get("reasoning") or content
-        return AssistantMessage(content=content, tool_calls=calls)
+        return AssistantMessage(content=_clean_content(content), tool_calls=calls)

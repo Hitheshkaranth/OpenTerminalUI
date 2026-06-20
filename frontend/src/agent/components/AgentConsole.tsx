@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 
 import "../agentConsole.css";
+import { useStockStore } from "../../store/stockStore";
 import { useAgentStore } from "../agentStore";
+import { buildScreenContext } from "../screenContext";
 import { ArtifactCanvas } from "./ArtifactCanvas";
 import { ChatThread } from "./ChatThread";
 
@@ -15,6 +17,9 @@ export function AgentConsole() {
   const setOpen = useAgentStore((s) => s.setOpen);
   const toggleDebate = useAgentStore((s) => s.toggleDebate);
   const startRun = useAgentStore((s) => s.startRun);
+  // Subscribe to the active ticker so the context chip re-renders on symbol change.
+  useStockStore((s) => s.ticker);
+  const contextSymbol = buildScreenContext().symbol;
   const [draft, setDraft] = useState("");
 
   useEffect(() => {
@@ -68,6 +73,14 @@ export function AgentConsole() {
           >
             Debate
           </button>
+          {contextSymbol ? (
+            <span
+              title={`Default subject: ${contextSymbol} (the stock you have open)`}
+              className="rounded border border-terminal-accent/50 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-terminal-accent"
+            >
+              ▦ {contextSymbol}
+            </span>
+          ) : null}
         </div>
         <button
           type="button"
@@ -89,7 +102,13 @@ export function AgentConsole() {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-          placeholder={debate ? "Enter a ticker for multi-agent debate…" : "Ask the agent to find or analyze stocks…"}
+          placeholder={
+            debate
+              ? `Enter a ticker for multi-agent debate${contextSymbol ? ` (default ${contextSymbol})` : ""}…`
+              : contextSymbol
+                ? `Ask about ${contextSymbol} or any stock…`
+                : "Ask the agent to find or analyze stocks…"
+          }
           aria-label="Agent prompt"
           style={{
             flex: 1, background: "var(--ot-color-canvas-elevated)",

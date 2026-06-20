@@ -11,6 +11,7 @@ export type AgentEvent =
 export interface RunContext {
   route?: string;
   symbol?: string;
+  market?: string;
 }
 
 export interface RunRequest {
