@@ -5,6 +5,7 @@ import logging
 from typing import Any, AsyncGenerator
 
 from backend.agent import events
+from backend.agent.playbook import GENERALIST_SYSTEM_PROMPT
 from backend.agent.tools.registry import ToolRegistry
 from backend.services.llm.base import (
     AssistantMessage, LLMError, LLMMessage,
@@ -12,13 +13,7 @@ from backend.services.llm.base import (
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = (
-    "You are the OpenTerminalUI financial analysis agent. Help the user analyze and "
-    "determine stocks using the provided tools. Call tools to fetch real data before "
-    "making claims. When you have enough information, give a concise, structured answer "
-    "with concrete tickers and the reasoning behind them. This session is read-only: "
-    "you cannot place orders or modify any data."
-)
+SYSTEM_PROMPT = GENERALIST_SYSTEM_PROMPT
 
 
 class Orchestrator:
