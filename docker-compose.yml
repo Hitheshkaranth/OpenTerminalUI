@@ -31,6 +31,7 @@ services:
       AGENT_MODEL: "${AGENT_MODEL:-openai/gpt-oss-20b:free}"
       AGENT_FALLBACK_MODELS: "${AGENT_FALLBACK_MODELS:-openai/gpt-oss-20b:free,qwen/qwen3-coder:free,meta-llama/llama-3.3-70b-instruct:free}"
       AGENT_DEBATE_ENABLED: "${AGENT_DEBATE_ENABLED:-true}"
+      AGENT_STRATEGY_LOOP_ENABLED: "${AGENT_STRATEGY_LOOP_ENABLED:-true}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

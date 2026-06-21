@@ -15,7 +15,7 @@ load_local_env()
 
 class AppSettings(BaseModel):
     app_name: str = "OpenTerminalUI API"
-    app_version: str = "0.2.0"
+    app_version: str = "0.5.0"
     cors_origins: list[str] = Field(
         default_factory=lambda: [
             "http://localhost:5173",

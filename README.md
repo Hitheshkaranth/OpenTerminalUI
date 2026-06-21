@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.4.0-0f172a" alt="Version 0.4.0" />
+  <img src="https://img.shields.io/badge/version-0.5.0-0f172a" alt="Version 0.5.0" />
   <img src="https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white" alt="Python 3.11" />
   <img src="https://img.shields.io/badge/node-22-339933?logo=node.js&logoColor=white" alt="Node 22" />
   <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI" />
@@ -52,12 +52,17 @@ OpenTerminalUI is a self-hosted, full-stack financial terminal that combines rea
 <p align="center">
   <img src="assets/screenshots/market-view.png" alt="Market View" width="900" />
 </p>
-<p align="center"><em>Full-screen market view — candlestick price action with volume, multi-timeframe, and indicator overlays.</em></p>
+<p align="center"><em>Full-screen market view (AAPL, NASDAQ) — candlestick price action with volume, multi-timeframe, and indicator overlays.</em></p>
 
 <p align="center">
-  <img src="assets/screenshots/stock-detail.png" alt="Security Hub" width="900" />
+  <img src="assets/screenshots/stock-detail.png" alt="Security Hub (US)" width="900" />
 </p>
-<p align="center"><em>Security Hub — quotes, fundamentals, price chart, analysis tabs, and the AI Catalyst &amp; Conviction panel.</em></p>
+<p align="center"><em>Security Hub for a US name (AAPL) — quotes, fundamentals, price chart, analysis tabs, and the AI Catalyst &amp; Conviction panel.</em></p>
+
+<p align="center">
+  <img src="assets/screenshots/security-hub-india.png" alt="Security Hub (India)" width="900" />
+</p>
+<p align="center"><em>Security Hub for an Indian name (RELIANCE, NSE) — the same workflow across markets, with India fundamentals and sector context.</em></p>
 
 <p align="center">
   <img src="assets/screenshots/financial-analysis.png" alt="Financial Analysis" width="900" />
@@ -133,6 +138,18 @@ OpenTerminalUI is a self-hosted, full-stack financial terminal that combines rea
 </p>
 <p align="center"><em>Watchlists with live quotes, heatmap view, and one-click routing to charts, screener, and backtests.</em></p>
 
+### AI Research Agent
+
+<p align="center">
+  <img src="assets/screenshots/ai-agent.png" alt="AI Research Agent" width="420" />
+</p>
+<p align="center"><em>The tool-using research agent (<code>Ctrl/Cmd&nbsp;+&nbsp;J</code>) — a screen-aware verdict on AAPL backed by a live snapshot card it fetched itself.</em></p>
+
+<p align="center">
+  <img src="assets/screenshots/strategy-lab.png" alt="Strategy Lab agent" width="420" />
+</p>
+<p align="center"><em>Strategy Lab — the agent proposes a strategy, backtests it, changes one variable to iterate, then runs out-of-sample validation and reports an honest verdict (here, "not a validated edge" at p&nbsp;=&nbsp;0.25).</em></p>
+
 ## Features
 
 ### Terminal Shell
@@ -193,6 +210,7 @@ OpenTerminalUI is a self-hosted, full-stack financial terminal that combines rea
 - **Tool-Using Agentic Loop** &mdash; the agent autonomously calls read-only tools &mdash; screener, full stock snapshot, multi-ticker compare, and research-knowledge-base search (RAG) &mdash; and reasons over the results
 - **Screen-Aware Context** &mdash; defaults to the stock you currently have open and your selected market, so "tell me about this stock" resolves to the right ticker/exchange without re-typing it
 - **Multi-Agent Debate Mode** &mdash; an analyst team (fundamental / sentiment / technical) feeds a bull-vs-bear debate that a portfolio manager resolves into a `BUY / HOLD / SELL` decision with a conviction score
+- **Strategy Lab (idea &rarr; tested result loop)** &mdash; a bounded, read-only research loop that proposes a strategy, backtests it, changes one variable to iterate toward a target metric, then runs **mandatory out-of-sample validation** (permutation + multi-window robustness) and reports an honest verdict &mdash; refusing to call a curve-fit result an edge. Flag-gated and capped on rounds and wall-clock
 - **Beautifully Rendered Output** &mdash; answers render as styled markdown (headings, tables, lists), stock snapshots as crafted cards (logo, price, valuation/quality/growth metrics), and debates as a phase stepper with bull/bear cards and a decision banner with conviction meter
 - **Provider-Flexible** &mdash; runs against OpenRouter, OpenAI, or a local **LM Studio** model, with an automatic free-model fallback chain
 - **Read-Only & Resilient** &mdash; the agent never places orders or mutates data, and degrades gracefully on rate limits, empty completions, or unavailable data sources

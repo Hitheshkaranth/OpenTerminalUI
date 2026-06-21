@@ -19,6 +19,8 @@ const EMAIL = process.env.SHOT_EMAIL || "karanth.hithesh@gmail.com";
 const PASSWORD = process.env.SHOT_PASSWORD || "Flyvi12#";
 const OUT_DIR = path.resolve(process.cwd(), "..", "assets", "screenshots");
 const TICKER = "ICICIBANK"; // an actual holding in the account
+const TICKER_US = "AAPL"; // a US holding (NASDAQ) for cross-market coverage
+const TICKER_IN = "RELIANCE"; // an India holding (NSE) for cross-market coverage
 const WORKSTATION_TICKERS = ["RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK", "ITC"];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -127,9 +129,12 @@ async function captureBacktesting(page) {
 
 const PAGES = [
   { name: "home", url: "/", settle: 9000 },
-  { name: "market-view", url: `/equity/security?ticker=${TICKER}&tab=chart`, settle: 14000 },
-  { name: "stock-detail", url: `/equity/security?ticker=${TICKER}`, settle: 10000 },
-  { name: "financial-analysis", url: `/equity/security?ticker=${TICKER}&tab=financials`, settle: 12000 },
+  // US (NASDAQ) coverage
+  { name: "market-view", url: `/equity/security?ticker=${TICKER_US}&tab=chart`, settle: 14000 },
+  { name: "stock-detail", url: `/equity/security?ticker=${TICKER_US}`, settle: 11000 },
+  { name: "financial-analysis", url: `/equity/security?ticker=${TICKER_US}&tab=financials`, settle: 12000 },
+  // India (NSE) coverage
+  { name: "security-hub-india", url: `/equity/security?ticker=${TICKER_IN}`, settle: 11000 },
   { name: "screener", url: "/equity/screener", settle: 12000 },
   { name: "factor-dashboard", url: "/equity/factors", settle: 11000 },
   { name: "portfolio", url: "/equity/portfolio", settle: 16000, fullPage: true },
@@ -143,6 +148,63 @@ const PAGES = [
   { name: "watchlist", url: "/equity/watchlist", settle: 10000 },
   { name: "commodities", url: "/equity/commodities", settle: 9000 },
 ];
+
+// Drives the AI Research Agent console (Ctrl/Cmd+J slide-over): opens it, submits a
+// real research prompt, waits for the streamed answer + artifact card, then captures
+// the panel. STRATEGY=1 flips on the "Strategy Lab" toggle (needs the flag + new build).
+async function captureAgent(page, { name, prompt, ticker, market, strategy = false }) {
+  try {
+    await page.setViewportSize({ width: 1680, height: 1050 });
+    const url = ticker ? `/equity/security?ticker=${ticker}` : "/";
+    await page.goto(`${BASE}${url}`, { waitUntil: "domcontentloaded", timeout: 45000 });
+    await page.waitForTimeout(6000);
+    // The panel is always in the DOM (a slide-over translated off-screen when
+    // closed), so open-state must be read from aria-hidden, not visibility.
+    const panel = page.locator('[aria-label="Agent Console"]').first();
+    const isOpen = async () => (await panel.getAttribute("aria-hidden").catch(() => "true")) === "false";
+    for (let i = 0; i < 3 && !(await isOpen()); i += 1) {
+      const launcher = page.getByRole("button", { name: /^agent$/i }).first();
+      if (await launcher.count()) {
+        await launcher.click({ timeout: 5000 }).catch(() => {});
+      } else {
+        await page.keyboard.press(process.platform === "darwin" ? "Meta+j" : "Control+j").catch(() => {});
+      }
+      await page.waitForTimeout(1200);
+    }
+    if (strategy) {
+      const stratBtn = page.locator('[aria-label="Toggle strategy lab mode"]').first();
+      if (await stratBtn.count()) await stratBtn.click({ timeout: 4000 }).catch(() => {});
+    }
+    const input = page.locator('[aria-label="Agent prompt"]').first();
+    await input.waitFor({ state: "visible", timeout: 8000 });
+    await input.scrollIntoViewIfNeeded().catch(() => {});
+    await input.click({ timeout: 5000, force: true });
+    await input.fill(prompt);
+    await input.press("Enter");
+    // Let the agent stream tool calls, artifact cards and the final answer. The
+    // strategy loop runs several backtests + LLM turns, so it needs much longer;
+    // poll for the final verdict instead of a fixed wait when possible.
+    if (strategy) {
+      const deadline = Date.now() + 180000;
+      while (Date.now() < deadline) {
+        const body = await page.textContent("body").catch(() => "");
+        if (/validated edge|Strategy Lab result|DECISION:/i.test(body || "")) break;
+        await page.waitForTimeout(4000);
+      }
+      await page.waitForTimeout(4000);
+    } else {
+      await page.waitForTimeout(32000);
+    }
+    if (await panel.count()) {
+      await panel.screenshot({ path: path.join(OUT_DIR, `${name}.png`) });
+    } else {
+      await page.screenshot({ path: path.join(OUT_DIR, `${name}.png`), fullPage: false });
+    }
+    console.log("  captured", name);
+  } catch (err) {
+    console.error("  FAILED", name, "-", err.message);
+  }
+}
 
 async function main() {
   await fs.mkdir(OUT_DIR, { recursive: true });
@@ -187,6 +249,23 @@ async function main() {
   }
   if (want("chart-workstation")) await captureWorkstation(page);
   if (want("backtesting")) await captureBacktesting(page);
+  if (want("ai-agent")) {
+    await captureAgent(page, {
+      name: "ai-agent",
+      ticker: TICKER_US,
+      market: "US",
+      prompt: "Analyze AAPL: valuation, quality and momentum. Give a tight verdict with the numbers.",
+    });
+  }
+  if (want("strategy-lab")) {
+    await captureAgent(page, {
+      name: "strategy-lab",
+      ticker: TICKER_US,
+      market: "US",
+      strategy: true,
+      prompt: "AAPL",
+    });
+  }
 
   await context.close();
   await browser.close();
