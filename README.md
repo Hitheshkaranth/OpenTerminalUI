@@ -217,7 +217,8 @@ OpenTerminalUI is a self-hosted, full-stack financial terminal that combines rea
 - **Multi-Agent Debate Mode** &mdash; an analyst team (fundamental / sentiment / technical) feeds a bull-vs-bear debate that a portfolio manager resolves into a `BUY / HOLD / SELL` decision with a conviction score
 - **Strategy Lab (idea &rarr; tested result loop)** &mdash; a bounded, read-only research loop that proposes a strategy, backtests it, changes one variable to iterate toward a target metric, then runs **mandatory out-of-sample validation** (permutation + multi-window robustness) and reports an honest verdict &mdash; refusing to call a curve-fit result an edge. Flag-gated and capped on rounds and wall-clock
 - **Beautifully Rendered Output** &mdash; answers render as styled markdown (headings, tables, lists), stock snapshots as crafted cards (logo, price, valuation/quality/growth metrics), and debates as a phase stepper with bull/bear cards and a decision banner with conviction meter
-- **Provider-Flexible** &mdash; runs against OpenRouter, OpenAI, or a local **LM Studio** model, with an automatic free-model fallback chain
+- **Provider-Flexible** &mdash; runs against OpenRouter, OpenAI, or a local **LM Studio** model, with an automatic free-model fallback chain and per-phase model routing
+- **MCP Server** &mdash; the read-only agent tools (screener, snapshot, compare, technicals, backtests, research search) are also exposed over the Model Context Protocol for use by external MCP clients
 - **Read-Only & Resilient** &mdash; the agent never places orders or mutates data, and degrades gracefully on rate limits, empty completions, or unavailable data sources
 
 ### Futures & Options (F&O)
