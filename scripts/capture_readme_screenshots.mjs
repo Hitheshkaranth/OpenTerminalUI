@@ -127,32 +127,53 @@ async function captureBacktesting(page) {
   }
 }
 
+// The screener renders an empty score table until a scan is run, so navigate,
+// trigger the scan (RUN SCAN / Run), and wait for rows before capturing.
+async function captureScreener(page) {
+  try {
+    await page.setViewportSize({ width: 1680, height: 1050 });
+    await page.goto(`${BASE}/equity/screener`, { waitUntil: "domcontentloaded", timeout: 45000 });
+    await page.waitForTimeout(7000);
+    const runBtn = page.getByRole("button", { name: /run scan|^run$|run action/i }).first();
+    if (await runBtn.count()) {
+      await runBtn.scrollIntoViewIfNeeded().catch(() => {});
+      await runBtn.click({ timeout: 5000, force: true }).catch(() => {});
+    }
+    await page.waitForTimeout(9000); // let results hydrate + render
+    await page.screenshot({ path: path.join(OUT_DIR, "screener.png"), fullPage: false });
+    console.log("  captured screener");
+  } catch (err) {
+    console.error("  FAILED screener -", err.message);
+  }
+}
+
 const PAGES = [
   { name: "home", url: "/", settle: 9000 },
   // US (NASDAQ) coverage
   { name: "market-view", url: `/equity/security?ticker=${TICKER_US}&tab=chart`, settle: 14000 },
   { name: "stock-detail", url: `/equity/security?ticker=${TICKER_US}`, settle: 11000 },
-  { name: "financial-analysis", url: `/equity/security?ticker=${TICKER_US}&tab=financials`, settle: 12000 },
+  { name: "financial-analysis", url: `/equity/security?ticker=${TICKER_US}&tab=financials`, settle: 17000 },
   // India (NSE) coverage
-  { name: "security-hub-india", url: `/equity/security?ticker=${TICKER_IN}`, settle: 11000 },
-  { name: "screener", url: "/equity/screener", settle: 12000 },
+  { name: "security-hub-india", url: `/equity/security?ticker=${TICKER_IN}`, settle: 12000 },
   { name: "factor-dashboard", url: "/equity/factors", settle: 11000 },
   { name: "portfolio", url: "/equity/portfolio", settle: 16000, fullPage: true },
-  { name: "portfolio-lab", url: "/equity/portfolio/lab", settle: 11000 },
-  { name: "model-lab", url: "/backtesting/model-lab", settle: 11000 },
+  { name: "portfolio-lab", url: "/equity/portfolio/lab", settle: 13000 },
+  { name: "model-lab", url: "/backtesting/model-lab", settle: 13000 },
   { name: "risk-dashboard", url: "/equity/risk", settle: 12000 },
   { name: "cockpit", url: "/equity/cockpit", settle: 12000 },
-  { name: "news-sentiment", url: "/equity/news", settle: 14000 },
+  // News + sentiment works for US names here (NSE news is unavailable in this env).
+  { name: "news-sentiment", url: `/equity/news?ticker=${TICKER_US}`, settle: 15000 },
   { name: "intelligence-timeline", url: "/equity/intelligence-timeline", settle: 11000 },
-  { name: "fno-option-chain", url: "/fno", settle: 13000 },
+  // US options have a live chain here; NSE F&O (NIFTY) is unavailable in this env.
+  { name: "fno-option-chain", url: `/fno?symbol=${TICKER_US}`, settle: 16000 },
   { name: "watchlist", url: "/equity/watchlist", settle: 10000 },
   { name: "commodities", url: "/equity/commodities", settle: 9000 },
 ];
 
-// Drives the AI Research Agent console (Ctrl/Cmd+J slide-over): opens it, submits a
-// real research prompt, waits for the streamed answer + artifact card, then captures
-// the panel. STRATEGY=1 flips on the "Strategy Lab" toggle (needs the flag + new build).
-async function captureAgent(page, { name, prompt, ticker, market, strategy = false }) {
+// Drives the AI Research Agent console (Ctrl/Cmd+J slide-over): opens it, optionally
+// flips on Debate or Strategy Lab mode, submits a real prompt, waits for the streamed
+// answer (polling for the mode's terminal text), then captures the panel.
+async function captureAgent(page, { name, prompt, ticker, market, strategy = false, debate = false }) {
   try {
     await page.setViewportSize({ width: 1680, height: 1050 });
     const url = ticker ? `/equity/security?ticker=${ticker}` : "/";
@@ -175,26 +196,33 @@ async function captureAgent(page, { name, prompt, ticker, market, strategy = fal
       const stratBtn = page.locator('[aria-label="Toggle strategy lab mode"]').first();
       if (await stratBtn.count()) await stratBtn.click({ timeout: 4000 }).catch(() => {});
     }
+    if (debate) {
+      const debateBtn = page.locator('[aria-label="Toggle multi-agent debate mode"]').first();
+      if (await debateBtn.count()) await debateBtn.click({ timeout: 4000 }).catch(() => {});
+    }
     const input = page.locator('[aria-label="Agent prompt"]').first();
     await input.waitFor({ state: "visible", timeout: 8000 });
     await input.scrollIntoViewIfNeeded().catch(() => {});
     await input.click({ timeout: 5000, force: true });
     await input.fill(prompt);
     await input.press("Enter");
-    // Let the agent stream tool calls, artifact cards and the final answer. The
-    // strategy loop runs several backtests + LLM turns, so it needs much longer;
-    // poll for the final verdict instead of a fixed wait when possible.
-    if (strategy) {
-      const deadline = Date.now() + 180000;
-      while (Date.now() < deadline) {
-        const body = await page.textContent("body").catch(() => "");
-        if (/validated edge|Strategy Lab result|DECISION:/i.test(body || "")) break;
-        await page.waitForTimeout(4000);
-      }
+    // Free-tier model latency is highly variable, so poll for completion rather
+    // than waiting a fixed time: the console shows "Thinking…" while a turn is
+    // pending. Wait until it clears and the mode's terminal text is present.
+    const terminal = strategy
+      ? /validated edge|Strategy Lab result/i
+      : debate
+        ? /DECISION:|CONVICTION/i
+        : /\b(Valuation|verdict|Risk|Snapshot|P\/E|ROE)\b/i;
+    const deadline = Date.now() + (debate ? 300000 : strategy ? 220000 : 120000);
+    await page.waitForTimeout(6000);
+    while (Date.now() < deadline) {
+      const text = (await panel.textContent().catch(() => "")) || "";
+      const thinking = /Thinking…|Thinking\.\.\./.test(text);
+      if (!thinking && terminal.test(text)) break;
       await page.waitForTimeout(4000);
-    } else {
-      await page.waitForTimeout(32000);
     }
+    await page.waitForTimeout(4000);
     if (await panel.count()) {
       await panel.screenshot({ path: path.join(OUT_DIR, `${name}.png`) });
     } else {
@@ -249,12 +277,22 @@ async function main() {
   }
   if (want("chart-workstation")) await captureWorkstation(page);
   if (want("backtesting")) await captureBacktesting(page);
+  if (want("screener")) await captureScreener(page);
   if (want("ai-agent")) {
     await captureAgent(page, {
       name: "ai-agent",
       ticker: TICKER_US,
       market: "US",
       prompt: "Analyze AAPL: valuation, quality and momentum. Give a tight verdict with the numbers.",
+    });
+  }
+  if (want("agent-debate")) {
+    await captureAgent(page, {
+      name: "agent-debate",
+      ticker: TICKER_US,
+      market: "US",
+      debate: true,
+      prompt: "AAPL",
     });
   }
   if (want("strategy-lab")) {

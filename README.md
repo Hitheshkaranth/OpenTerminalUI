@@ -72,7 +72,7 @@ OpenTerminalUI is a self-hosted, full-stack financial terminal that combines rea
 <p align="center">
   <img src="assets/screenshots/fno-option-chain.png" alt="F&O Option Chain" width="900" />
 </p>
-<p align="center"><em>Futures &amp; Options — live option chain with Greeks, OI build-up, and PCR signals.</em></p>
+<p align="center"><em>Futures &amp; Options (AAPL, US) — live option chain with Greeks, OI build-up, and PCR signals; the same workflow covers NSE F&amp;O.</em></p>
 
 <p align="center">
   <img src="assets/screenshots/commodities.png" alt="Commodities" width="900" />
@@ -144,6 +144,11 @@ OpenTerminalUI is a self-hosted, full-stack financial terminal that combines rea
   <img src="assets/screenshots/ai-agent.png" alt="AI Research Agent" width="420" />
 </p>
 <p align="center"><em>The tool-using research agent (<code>Ctrl/Cmd&nbsp;+&nbsp;J</code>) — a screen-aware verdict on AAPL backed by a live snapshot card it fetched itself.</em></p>
+
+<p align="center">
+  <img src="assets/screenshots/agent-debate.png" alt="Multi-agent debate" width="420" />
+</p>
+<p align="center"><em>Multi-agent debate — an analyst team (fundamental / sentiment / technical) each returns an evidence-backed verdict, which feeds a bull-vs-bear debate and a portfolio-manager decision.</em></p>
 
 <p align="center">
   <img src="assets/screenshots/strategy-lab.png" alt="Strategy Lab agent" width="420" />
