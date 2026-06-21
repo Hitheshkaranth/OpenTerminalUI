@@ -101,6 +101,46 @@ function fmtPct(v: unknown) {
   return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
 }
 
+// Map a metric label coming back from the financials API onto the field key the
+// financials tables read. The API returns a transposed matrix — one row per
+// metric, keyed by fiscal-period date — so it must be pivoted into one row per
+// period before the DenseTable columns (revenue / netIncome / eps / …) resolve.
+const STATEMENT_METRIC_FIELD: Record<string, string> = {
+  "revenue": "revenue",
+  "total revenue": "revenue",
+  "cost of revenue": "costOfRevenue",
+  "gross profit": "grossProfit",
+  "operating income": "operatingIncome",
+  "ebitda": "ebitda",
+  "net income": "netIncome",
+  "eps": "eps",
+  "diluted eps": "eps",
+};
+
+function normalizeStatementRows(statement: Record<string, unknown>): Array<Record<string, unknown>> {
+  const rows = ((statement as { rows?: unknown }).rows ||
+    (statement as { income_statement?: unknown }).income_statement ||
+    (statement as { statements?: unknown }).statements ||
+    []) as Array<Record<string, unknown>>;
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  // Already period-shaped (one row per period with named fields): use as-is.
+  if (!("metric" in rows[0])) return rows;
+  // Transposed (one row per metric, keyed by period date): pivot to periods.
+  const dates = new Set<string>();
+  for (const row of rows) {
+    for (const key of Object.keys(row)) if (key !== "metric") dates.add(key);
+  }
+  const sorted = Array.from(dates).sort().reverse();
+  return sorted.map((date) => {
+    const out: Record<string, unknown> = { date };
+    for (const row of rows) {
+      const field = STATEMENT_METRIC_FIELD[String(row.metric ?? "").trim().toLowerCase()];
+      if (field && row[date] != null) out[field] = row[date];
+    }
+    return out;
+  });
+}
+
 export function SecurityHubPage() {
   const navigate = useNavigate();
   const { ticker: tickerParam } = useParams();
@@ -237,21 +277,8 @@ export function SecurityHubPage() {
   const dividendYield = stock.dividend_yield;
   const logoUrl = String(stock.logo || stock.image || stock.logo_url || stock.company_logo || "").trim();
 
-  const financialRows = useMemo(() => {
-    const periods = ((annual as { rows?: Array<Record<string, unknown>> }).rows ||
-      (annual as { income_statement?: Array<Record<string, unknown>> }).income_statement ||
-      (annual as { statements?: Array<Record<string, unknown>> }).statements ||
-      []) as Array<Record<string, unknown>>;
-    return periods.slice(0, 12);
-  }, [annual]);
-
-  const quarterlyRows = useMemo(() => {
-    const periods = ((quarterly as { rows?: Array<Record<string, unknown>> }).rows ||
-      (quarterly as { income_statement?: Array<Record<string, unknown>> }).income_statement ||
-      (quarterly as { statements?: Array<Record<string, unknown>> }).statements ||
-      []) as Array<Record<string, unknown>>;
-    return periods.slice(0, 16);
-  }, [quarterly]);
+  const financialRows = useMemo(() => normalizeStatementRows(annual).slice(0, 12), [annual]);
+  const quarterlyRows = useMemo(() => normalizeStatementRows(quarterly).slice(0, 16), [quarterly]);
 
   return (
     <div className="h-full min-h-0 overflow-auto p-2">
@@ -407,7 +434,7 @@ export function SecurityHubPage() {
                   columns={[
                     { key: "date", title: "Quarter", type: "text", frozen: true, width: 120, sortable: true, getValue: (r) => r.date || r.fiscalDateEnding || r.period },
                     { key: "revenue", title: "Revenue", type: "large-number", align: "right", sortable: true, getValue: (r) => r.revenue || r.totalRevenue },
-                    { key: "ebitda", title: "EBITDA", type: "large-number", align: "right", sortable: true, getValue: (r) => r.ebitda },
+                    { key: "operatingIncome", title: "Operating Income", type: "large-number", align: "right", sortable: true, getValue: (r) => r.operatingIncome ?? r.ebitda },
                     { key: "netIncome", title: "Net Income", type: "large-number", align: "right", sortable: true, getValue: (r) => r.netIncome || r.net_income },
                   ]}
                   rowKey={(row, idx) => `q-${String(row.date || row.fiscalDateEnding || idx)}`}
