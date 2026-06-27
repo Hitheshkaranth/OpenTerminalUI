@@ -4,6 +4,7 @@ import {
   fetchPublicScreensV3,
   fetchSavedScreensV3,
   fetchScreenerPresetsV3,
+  fetchScreenerUniversesV3,
   runScreenerV3,
 } from "../../../api/client";
 import type {
@@ -32,6 +33,7 @@ type ScreenerContextValue = {
   setQuery: (query: string) => void;
   universe: string;
   setUniverse: (universe: string) => void;
+  universes: Array<{ id: string; name: string }>;
   view: ScreenerView;
   setView: (view: ScreenerView) => void;
   result: ScreenerRunResponseV3 | null;
@@ -55,6 +57,7 @@ export function ScreenerProvider({ children }: { children: React.ReactNode }) {
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [query, setQuery] = useState("Market Capitalization > 500 AND ROE > 15 AND Debt to equity < 0.5");
   const [universe, setUniverse] = useState("nse_500");
+  const [universes, setUniverses] = useState<Array<{ id: string; name: string }>>([]);
   const [view, setView] = useState<ScreenerView>("table");
   const [result, setResult] = useState<ScreenerRunResponseV3 | null>(null);
   const [selectedRow, setSelectedRow] = useState<Record<string, unknown> | null>(null);
@@ -72,14 +75,18 @@ export function ScreenerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshScreens = useCallback(async () => {
-    const [presetItems, savedItems, publicItems] = await Promise.all([
+    const [presetItems, savedItems, publicItems, universeItems] = await Promise.all([
       fetchScreenerPresetsV3(),
       fetchSavedScreensV3(),
       fetchPublicScreensV3(),
+      fetchScreenerUniversesV3().catch(() => [] as Array<{ id: string; name: string }>),
     ]);
     setPresets(presetItems);
     setSavedScreens(savedItems);
     setPublicScreens(publicItems);
+    if (universeItems.length > 0) {
+      setUniverses(universeItems);
+    }
     if (!selectedPresetId && presetItems.length > 0) {
       setSelectedPresetId(presetItems[0].id);
       setQuery(presetItems[0].query);
@@ -126,7 +133,6 @@ export function ScreenerProvider({ children }: { children: React.ReactNode }) {
           sort_by: "composite_score",
           sort_order: "desc",
           include_sparklines: true,
-          include_scores: ["value", "momentum", "quality", "low_vol", "composite"],
         });
         setResult(data);
         if (data.results.length > 0) {
@@ -169,6 +175,7 @@ export function ScreenerProvider({ children }: { children: React.ReactNode }) {
       setQuery,
       universe,
       setUniverse,
+      universes,
       view,
       setView,
       result,
@@ -189,6 +196,7 @@ export function ScreenerProvider({ children }: { children: React.ReactNode }) {
       selectedPresetId,
       query,
       universe,
+      universes,
       view,
       result,
       selectedRow,

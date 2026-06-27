@@ -288,11 +288,10 @@ export function ResultsTable() {
           {
             key: "score",
             header: "Score",
-            renderCell: (row) => {
-              const scores = (row.scores as Record<string, unknown>) || {};
-              const raw = scores.quality_score as { value?: number } | undefined;
-              return <ScoreBadge value={raw?.value ?? 0} max={100} label="Q" />;
-            },
+            align: "right",
+            sortable: true,
+            sortValue: (row) => factorScore(row, "quality"),
+            renderCell: (row) => <ScoreBadge value={factorScore(row, "quality")} max={100} label="Q" />,
           },
         ]}
       />

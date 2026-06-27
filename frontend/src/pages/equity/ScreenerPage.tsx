@@ -151,7 +151,7 @@ function ScreenerWorkspace() {
         )}
 
         {view === "table" || view === "split" ? <ResultsTable /> : null}
-        {view !== "table" ? <ScreenVizLoader screenId={selectedPresetId} vizData={(result?.viz_data || {}) as Record<string, unknown>} /> : null}
+        {view !== "table" ? <ScreenVizLoader screenId={selectedPresetId} view={view} vizData={(result?.viz_data || {}) as Record<string, unknown>} rows={(result?.results || []) as Array<Record<string, unknown>>} /> : null}
         {selectedRow && mobileDetailOpen ? (
           <div className="xl:hidden">
             <CompanyDetailDrawer />

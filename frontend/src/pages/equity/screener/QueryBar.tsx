@@ -16,6 +16,8 @@ export function QueryBar() {
     savedScreens,
     tab,
     universe,
+    setUniverse,
+    universes,
   } = useScreenerContext();
   const activePreset = presets.find((preset) => preset.id === selectedPresetId) ?? null;
   const activeSavedScreen = savedScreens.find((screen) => screen.id === activeSavedScreenId) ?? null;
@@ -30,7 +32,24 @@ export function QueryBar() {
       title="Query"
       subtitle={activeLabel}
       actions={(
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1">
+          <TerminalInput
+            as="select"
+            className="h-7 py-0 text-[11px]"
+            value={universe}
+            onChange={(event) => setUniverse(event.target.value)}
+            title="Screening universe"
+          >
+            {universes.length > 0 ? (
+              universes.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))
+            ) : (
+              <option value={universe}>{universe}</option>
+            )}
+          </TerminalInput>
           <TerminalButton variant="default" size="sm" onClick={() => void run({ query, preset_id: activeSavedScreen ? null : selectedPresetId })} disabled={loading}>
             {loading ? "Running" : "Run"}
           </TerminalButton>
