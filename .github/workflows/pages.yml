@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - 'docs/site/**'
+      - 'frontend/public/landing/**'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -29,6 +30,6 @@ jobs:
           enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/site
+          path: frontend/public/landing
       - id: deployment
         uses: actions/deploy-pages@v4
