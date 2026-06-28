@@ -5,6 +5,7 @@ import { AgentConsole } from "./agent/components/AgentConsole";
 import { AgentLauncher } from "./agent/components/AgentLauncher";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { RootRedirect } from "./components/RootRedirect";
 import { TerminalBackground } from "./components/TerminalBackground";
 import { ThemeRuntime } from "./components/layout/ThemeRuntime";
 import { lazyWithRetry } from "./utils/lazyWithRetry";
@@ -117,7 +118,7 @@ function App() {
         <ErrorBoundary>
           <Suspense fallback={RouteLoadingFallback}>
             <Routes>
-          <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+          <Route path="/" element={<RootRedirect />} />
           <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />

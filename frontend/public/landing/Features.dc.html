@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{ --accent:#ff6b00; }
+  *{ box-sizing:border-box; }
+  ::selection{ background:rgba(255,107,0,.22); }
+  html{ scroll-behavior:smooth; }
+  body{ margin:0; background:#07090d; }
+  @keyframes otReveal{ from{opacity:0; transform:translateY(26px)} to{opacity:1; transform:translateY(0)} }
+  @media (prefers-reduced-motion: reduce){ *{ animation:none !important; } }
+</style>
+</helmet>
+
+<div style="background:#07090d; color:#e8ecf2; font-family:'Space Grotesk',system-ui,sans-serif; -webkit-font-smoothing:antialiased; overflow-x:hidden; position:relative; min-height:100vh;">
+  <div style="position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;"><canvas id="ot-market-canvas" style="position:absolute; inset:0; width:100%; height:100%;"></canvas></div>
+  <div style="position:relative; z-index:1;">
+
+  <div style="position:absolute; top:0; left:50%; transform:translateX(-50%); width:1100px; max-width:140%; height:420px; background:radial-gradient(ellipse at center, rgba(255,107,0,.07), transparent 64%); pointer-events:none;"></div>
+
+  <!-- NAV -->
+  <nav style="position:sticky; top:0; z-index:50; display:flex; align-items:center; justify-content:space-between; padding:18px 32px; background:rgba(7,9,13,.72); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid rgba(255,255,255,.06);">
+    <a href="index.html" style="display:flex; align-items:center; text-decoration:none;"><img src="assets/logo.png" alt="OpenTerminalUI" style="height:22px; width:auto; display:block; filter:brightness(0) invert(1);" /></a>
+    <div style="display:flex; align-items:center; gap:26px; font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#8b94a3;">
+      <a href="index.html" style="color:inherit; text-decoration:none;">Home</a>
+      <a href="Features.dc.html" style="color:#e8ecf2; text-decoration:none;">Features</a>
+      <a href="Docs.dc.html" style="color:inherit; text-decoration:none;">Docs</a>
+      <a href="Roadmap.dc.html" style="color:inherit; text-decoration:none;">Roadmap</a>
+      <a href="https://github.com/Hitheshkaranth/OpenTerminalUI" style="display:inline-flex; align-items:center; gap:7px; padding:7px 15px; border-radius:999px; background:#e8ecf2; color:#07090d; text-decoration:none; font-weight:600;">GitHub ↗</a>
+    </div>
+  </nav>
+
+  <!-- HEADER -->
+  <header style="position:relative; max-width:1180px; margin:0 auto; padding:84px 32px 36px;">
+    <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.26em; text-transform:uppercase; color:#6a7488; margin-bottom:26px;">Instrument index</div>
+    <h1 style="margin:0; font-weight:700; font-size:clamp(46px,7vw,104px); line-height:0.9; letter-spacing:-.04em; color:#f3f6fa;">Every function<br/><span style="color:var(--accent,#ff6b00);">on the desk.</span></h1>
+    <p style="margin:30px 0 0; font-size:18px; line-height:1.6; color:#8b94a3; max-width:560px;">From a keyboard-driven shell to a quant research stack — the complete catalog of what ships inside OpenTerminalUI, all open source and self-hosted.</p>
+  </header>
+
+  <!-- SHOWCASE -->
+  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:32px 32px 16px;">
+    <div style="display:grid; grid-template-columns:1.45fr 1fr; gap:14px;">
+      <div style="border:1px solid rgba(255,255,255,.09); border-radius:16px; overflow:hidden; background:#0d1117;"><div style="display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.06);"><span style="width:8px; height:8px; border-radius:50%; background:#ff5f56;"></span><span style="width:8px; height:8px; border-radius:50%; background:#ffbd2e;"></span><span style="width:8px; height:8px; border-radius:50%; background:#27c93f;"></span><span style="margin-left:8px; font-family:'Fira Code',monospace; font-size:11px; color:#6a7488;">otui ▸ market · AAPL NASDAQ</span></div><img src="assets/screenshots/market-view.png" alt="Market view" loading="lazy" style="display:block; width:100%;" /></div>
+      <div style="border:1px solid rgba(255,255,255,.09); border-radius:16px; overflow:hidden; background:#0d1117;"><div style="display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.06);"><span style="width:8px; height:8px; border-radius:50%; background:#ff5f56;"></span><span style="width:8px; height:8px; border-radius:50%; background:#ffbd2e;"></span><span style="width:8px; height:8px; border-radius:50%; background:#27c93f;"></span><span style="margin-left:8px; font-family:'Fira Code',monospace; font-size:11px; color:#6a7488;">otui ▸ F&amp;O · option chain</span></div><img src="assets/screenshots/fno-option-chain.png" alt="Option chain" loading="lazy" style="display:block; width:100%;" /></div>
+    </div>
+  </section>
+
+  <!-- CATALOG -->
+  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:48px 32px 90px;">
+    <div style="display:flex; align-items:baseline; gap:16px; border-bottom:1px solid rgba(255,255,255,.1); padding-bottom:18px; margin-bottom:8px;">
+      <span style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent,#ff6b00);">∑</span>
+      <span style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:#6a7488;">Twelve modules</span>
+    </div>
+
+    <sc-for list="{{ modules }}" as="m" hint-placeholder-count="12">
+      <div style="display:grid; grid-template-columns:0.4fr 1fr; gap:30px; padding:32px 0; border-bottom:1px solid rgba(255,255,255,.07);">
+        <div>
+          <div style="font-family:'Fira Code',monospace; font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:#5b6472; margin-bottom:10px;">{{ m.id }}</div>
+          <h3 style="margin:0; font-weight:600; font-size:25px; line-height:1.06; letter-spacing:-.02em; color:#f3f6fa;">{{ m.title }}</h3>
+        </div>
+        <ul style="margin:0; padding:0; list-style:none; display:grid; grid-template-columns:1fr 1fr; gap:9px 28px; align-self:center;">
+          <sc-for list="{{ m.items }}" as="it" hint-placeholder-count="6">
+            <li style="display:flex; gap:10px; font-size:14.5px; color:#9aa3b2; line-height:1.45;"><span style="color:var(--accent,#ff6b00);">—</span>{{ it }}</li>
+          </sc-for>
+        </ul>
+      </div>
+    </sc-for>
+  </section>
+
+  <!-- CTA -->
+  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:20px 32px 110px;">
+    <div style="position:relative; border:1px solid rgba(255,107,0,.2); border-radius:22px; overflow:hidden; background:radial-gradient(120% 150% at 50% 0%, rgba(255,107,0,.16), transparent 58%), #0b0e14; padding:72px 40px; text-align:center;">
+      <h2 style="margin:0; font-weight:700; font-size:clamp(32px,4.6vw,60px); line-height:1.0; letter-spacing:-.03em; color:#f3f6fa;">See it running.</h2>
+      <div style="display:flex; gap:13px; justify-content:center; margin-top:30px; flex-wrap:wrap;">
+        <a href="Docs.dc.html" style-hover="transform:translateY(-2px);" style="display:inline-flex; align-items:center; gap:9px; padding:14px 28px; border-radius:999px; background:var(--accent,#ff6b00); color:#0a0d12; font-weight:600; font-size:14px; text-decoration:none; transition:transform .25s;">Install guide →</a>
+        <a href="index.html" style-hover="border-color:rgba(255,255,255,.4);" style="display:inline-flex; align-items:center; gap:9px; padding:14px 28px; border-radius:999px; border:1px solid rgba(255,255,255,.16); color:#e8ecf2; font-weight:500; font-size:14px; text-decoration:none; transition:border-color .25s;">Back to home</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer style="border-top:1px solid rgba(255,255,255,.07);">
+    <div style="max-width:1180px; margin:0 auto; padding:30px 32px; display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap; font-family:'Fira Code',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5b6472;">
+      <span>OpenTerminalUI</span>
+      <div style="display:flex; gap:22px;">
+        <a href="index.html" style="color:inherit; text-decoration:none;">Home</a>
+        <a href="Features.dc.html" style="color:inherit; text-decoration:none;">Features</a>
+        <a href="Docs.dc.html" style="color:inherit; text-decoration:none;">Docs</a>
+        <a href="Roadmap.dc.html" style="color:inherit; text-decoration:none;">Roadmap</a>
+      </div>
+      <span>MIT · © 2026</span>
+    </div>
+  </footer>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:900},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#ff6b00&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#ff6b00&quot;,&quot;#3fbaff&quot;,&quot;#2ec27e&quot;,&quot;#a78bfa&quot;],&quot;section&quot;:&quot;Theme&quot;}}">
+class Component extends DCLogic {
+  componentDidMount(){
+    if (this.props.accent) document.documentElement.style.setProperty('--accent', this.props.accent);
+    this.initMarket();
+    if (!('IntersectionObserver' in window)) return;
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting){ e.target.style.animation = 'otReveal .8s cubic-bezier(.16,1,.3,1) both'; io.unobserve(e.target); }
+      });
+    }, { threshold: 0.06, rootMargin: '0px 0px -4% 0px' });
+    document.querySelectorAll('[data-reveal]').forEach((el) => io.observe(el));
+  }
+  componentDidUpdate(prev){
+    if (this.props.accent && this.props.accent !== prev.accent){
+      document.documentElement.style.setProperty('--accent', this.props.accent);
+    }
+  }
+  initMarket(){
+    const c = document.getElementById('ot-market-canvas');
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    let W = 0, H = 0, series = []; const STEP = 9;
+    const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const setup = () => { W = c.clientWidth; H = c.clientHeight; c.width = Math.max(1, W * DPR); c.height = Math.max(1, H * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); };
+    const build = () => { const COUNT = W < 700 ? 5 : 9; const N = Math.ceil(W / STEP) + 4; series = []; for (let s = 0; s < COUNT; s++){ const baseY = ((s + 0.5) / COUNT) * H; const amp = (H / COUNT) * 0.46; const accent = s % 3 === 1; const pts = []; let v = 0; for (let i = 0; i < N; i++){ v += (Math.random() - 0.5) * 0.9; v = Math.max(-1, Math.min(1, v * 0.96)); pts.push(v); } series.push({ baseY, amp, pts, accent, drift: 0, speed: 0.16 + Math.random() * 0.14 }); } };
+    setup(); build();
+    this._mktResize = () => { setup(); build(); };
+    window.addEventListener('resize', this._mktResize, { passive: true });
+    const plot = (sr, shift) => { ctx.beginPath(); for (let i = 0; i < sr.pts.length; i++){ const x = i * STEP - shift; const y = sr.baseY - sr.pts[i] * sr.amp; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.strokeStyle = sr.accent ? 'rgba(255,130,40,0.34)' : 'rgba(150,185,235,0.14)'; ctx.lineWidth = sr.accent ? 1.7 : 1.1; ctx.stroke(); };
+    if (reduce){ ctx.clearRect(0, 0, W, H); for (const sr of series) plot(sr, 0); return; }
+    const frame = () => { ctx.clearRect(0, 0, W, H); for (const sr of series){ sr.drift += sr.speed; if (sr.drift >= STEP){ sr.drift -= STEP; sr.pts.shift(); let last = sr.pts[sr.pts.length - 1]; last += (Math.random() - 0.5) * 0.9; last = Math.max(-1, Math.min(1, last * 0.96)); sr.pts.push(last); } plot(sr, sr.drift); } this._mktRaf = requestAnimationFrame(frame); };
+    frame();
+  }
+
+  renderVals(){
+    return {
+      modules: [
+        { id: 'MOD-01', title: 'Terminal shell', items: ['GO bar symbol lookup (Ctrl+G)', 'Command palette, 25+ functions', 'Function keys F1–F9', 'Ticker tape & status bar', 'Terminal Noir / classic / light', 'Desktop & mobile layouts'] },
+        { id: 'MOD-02', title: 'Charting', items: ['9 synced panels, crosshair link', '70+ technical indicators', 'Multi-timeframe 1m → 1M', 'Drawing tools, volume profile', 'Renko, Kagi, P&F, Line Break', 'OpenScript, PNG/SVG/CSV export'] },
+        { id: 'MOD-03', title: 'Equity research', items: ['8-tab Security Hub', 'P/E, P/B, ROE, ROA, growth', 'Earnings calendar & surprises', 'Shareholding, analyst estimates', 'Insider & cluster-buy monitor', 'Trade journal with equity curve'] },
+        { id: 'MOD-04', title: 'Screener & picking', items: ['Query builder + formula engine', '15+ visualization modes', 'Multi-factor composite scoring', 'Ranked ideas, factor dashboard', 'Catalyst & conviction engine', '“Why ranked” explanations'] },
+        { id: 'MOD-05', title: 'AI research agent', items: ['Conversational console (Ctrl+J)', 'Tool-using agentic loop', 'Screen-aware context', 'Multi-agent debate mode', 'Strategy Lab, out-of-sample', 'MCP server, read-only'] },
+        { id: 'MOD-06', title: 'Futures & options', items: ['Full chain with live Greeks', 'IV analysis & term structure', 'Multi-leg strategy builder', 'OI analysis & PCR tracking', 'Options-flow scanner, heatmaps', 'Futures analytics & expiry'] },
+        { id: 'MOD-07', title: 'Portfolio & risk', items: ['Multi-portfolio & attribution', 'VaR, CVaR, EWMA, PCA', '6 stress scenarios + Monte Carlo', 'Correlation deep dive', 'Tax-lot & dividend tracker', 'Paper trading with TCA'] },
+        { id: 'MOD-08', title: 'Backtesting & labs', items: ['16+ strategy templates', 'Pair Trading Lab (cointegration)', 'Vectorized realistic execution', 'Walk-forward & sweeps', 'Monte Carlo, tear-sheets', 'Portfolio Lab: 200 assets'] },
+        { id: 'MOD-09', title: 'Cross-asset & macro', items: ['Commodities, term structure', 'Forex + central-bank monitor', 'Crypto workspace, ETF analytics', 'Mutual funds, SIP, bonds', 'Yield curve & inversion', 'Economics calendar, RRG'] },
+        { id: 'MOD-10', title: 'Alerts & scanner', items: ['Multi-condition AND/OR builder', 'Email, webhook, Slack, Telegram', 'Cooldowns, expiry, limits', 'WebSocket push notifications', 'Breakout confidence scoring', 'Full history with dedup'] },
+        { id: 'MOD-11', title: 'News & sentiment', items: ['Ticker & market-wide feeds', 'Bullish / bearish / neutral', 'AI Emotion Indicator (Gemma)', '0–100 fear/greed index', 'Runs on your machine', 'FinBERT fallback offline'] },
+        { id: 'MOD-12', title: 'Plugins & data', items: ['Extensible plugin API', 'Sandboxed Python, OpenScript', 'Multi-provider WebSocket', 'Provider waterfall failover', 'L1 SQLite + L2 Redis cache', 'Candle aggregation, pub/sub'] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

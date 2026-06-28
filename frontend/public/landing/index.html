@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{ --accent:#ff6b00; }
+  *{ box-sizing:border-box; }
+  ::selection{ background:rgba(255,107,0,.22); }
+  html{ scroll-behavior:smooth; }
+  body{ margin:0; background:#07090d; }
+  @keyframes otBlink{ 0%,49%{opacity:1} 50%,100%{opacity:0} }
+  @keyframes otHead{ 0%{transform:translateX(0)} 50%{transform:translateX(14px)} 100%{transform:translateX(0)} }
+  @keyframes otPlay{ 0%{left:0%} 46%{left:100%} 50%{left:100%} 96%{left:0%} 100%{left:0%} }
+  @keyframes otPulse{ 0%,100%{opacity:.4; transform:scale(.85)} 50%{opacity:1; transform:scale(1.2)} }
+  @keyframes otReveal{ from{opacity:0; transform:translateY(28px)} to{opacity:1; transform:translateY(0)} }
+  .ot-comfort *{ animation:none !important; }
+  @media (prefers-reduced-motion: reduce){ *{ animation:none !important; } }
+</style>
+</helmet>
+
+<div id="ot-root" style="background:#07090d; color:#e8ecf2; font-family:'Space Grotesk',system-ui,sans-serif; -webkit-font-smoothing:antialiased; overflow-x:hidden; position:relative; min-height:100vh;">
+  <div style="position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;"><canvas id="ot-market-canvas" style="position:absolute; inset:0; width:100%; height:100%;"></canvas></div>
+  <div style="position:relative; z-index:1;">
+
+  <!-- NAV -->
+  <nav style="position:sticky; top:0; z-index:50; display:flex; align-items:center; justify-content:space-between; padding:18px 32px; background:rgba(7,9,13,.72); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid rgba(255,255,255,.06);">
+    <a href="#top" style="display:flex; align-items:center; text-decoration:none;"><img src="assets/logo.png" alt="OpenTerminalUI" style="height:22px; width:auto; display:block; filter:brightness(0) invert(1);" /></a>
+    <div style="display:flex; align-items:center; gap:26px; font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#8b94a3;">
+      <a href="Features.dc.html" style="color:inherit; text-decoration:none;">Features</a>
+      <a href="Docs.dc.html" style="color:inherit; text-decoration:none;">Docs</a>
+      <a href="Roadmap.dc.html" style="color:inherit; text-decoration:none;">Roadmap</a>
+      <button onClick="{{ toggleMotion }}" style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#8b94a3; background:transparent; border:1px solid rgba(255,255,255,.12); border-radius:999px; padding:5px 12px; cursor:pointer;">Motion · {{ motionLabel }}</button>
+      <a href="https://github.com/Hitheshkaranth/OpenTerminalUI" style="display:inline-flex; align-items:center; gap:7px; padding:7px 15px; border-radius:999px; border:1px solid rgba(255,255,255,.16); color:#e8ecf2; text-decoration:none; font-weight:500;">GitHub ↗</a>
+      <a href="/login" style="display:inline-flex; align-items:center; gap:7px; padding:7px 15px; border-radius:999px; background:var(--accent,#ff6b00); color:#07090d; text-decoration:none; font-weight:600;">Launch Terminal →</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <header id="top" style="position:relative; min-height:92vh; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:80px 32px 60px; overflow:hidden;">
+    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:1100px; max-width:140%; height:560px; background:radial-gradient(ellipse at center, rgba(255,107,0,.08), transparent 62%); pointer-events:none;"></div>
+    <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.28em; text-transform:uppercase; color:#6a7488; margin-bottom:30px; position:relative;">Build now · Rewind history · Watch it live</div>
+    <h1 style="position:relative; margin:0; font-weight:700; font-size:clamp(52px,11vw,160px); line-height:0.86; letter-spacing:-.04em; color:#f3f6fa;">
+      <span style="position:absolute; inset:0; color:rgba(255,107,0,.14); animation:otHead 9s ease-in-out infinite; pointer-events:none;">Strategy<br/>through time</span>
+      Strategy<br/>through time
+    </h1>
+    <p style="position:relative; margin:38px 0 0; font-size:18px; line-height:1.6; color:#8b94a3; max-width:520px;">Write the logic, replay it against years of market history, then watch it run live — backtests, signals, risk and analytics on one self-hosted desk.</p>
+    <div style="position:relative; display:flex; gap:13px; margin-top:38px; flex-wrap:wrap; justify-content:center;">
+      <a href="/login" style-hover="transform:translateY(-2px);" style="display:inline-flex; align-items:center; gap:9px; padding:14px 26px; border-radius:999px; background:var(--accent,#ff6b00); color:#0a0d12; font-weight:600; font-size:14px; text-decoration:none; transition:transform .25s;">Launch the terminal →</a>
+      <a href="https://github.com/Hitheshkaranth/OpenTerminalUI" style-hover="border-color:rgba(255,255,255,.4);" style="display:inline-flex; align-items:center; gap:9px; padding:14px 26px; border-radius:999px; border:1px solid rgba(255,255,255,.16); color:#e8ecf2; font-weight:500; font-size:14px; text-decoration:none; transition:border-color .25s;">★ Star on GitHub</a>
+    </div>
+
+    <!-- PAST <<< REWIND >>> NOW scrubber -->
+    <div style="position:relative; width:min(680px,90%); margin-top:64px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:#6a7488; margin-bottom:14px;">
+        <span>Past</span>
+        <span style="color:#8b94a3;">&laquo; Rewind &nbsp;·&nbsp; Replay &raquo;</span>
+        <span style="display:inline-flex; align-items:center; gap:7px; color:var(--accent,#ff6b00);"><span style="width:7px; height:7px; border-radius:50%; background:var(--accent,#ff6b00); box-shadow:0 0 8px var(--accent,#ff6b00); animation:otPulse 1.8s ease-in-out infinite;"></span>Now · Live</span>
+      </div>
+      <div style="position:relative; height:2px; background:linear-gradient(90deg, rgba(255,255,255,.04), rgba(255,255,255,.18), rgba(255,107,0,.6)); border-radius:2px;">
+        <div data-motion style="position:absolute; top:50%; left:0; transform:translate(-50%,-50%); animation:otPlay 7s cubic-bezier(.5,0,.5,1) infinite;">
+          <div style="width:13px; height:13px; border-radius:50%; background:#f3f6fa; box-shadow:0 0 0 4px rgba(243,246,250,.12), 0 0 14px rgba(255,107,0,.5);"></div>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-top:12px; font-family:'Fira Code',monospace; font-size:10px; letter-spacing:.1em; color:#4f5868;">
+        <span>2019</span><span>2021</span><span>2023</span><span>2025</span><span style="color:#7a8497;">TODAY</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- HOOK -->
+  <section data-reveal style="position:relative; max-width:980px; margin:0 auto; padding:120px 32px; text-align:center;">
+    <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:#6a7488; margin-bottom:26px;">Before live, every strategy faces one question</div>
+    <h2 style="margin:0; font-weight:600; font-size:clamp(34px,5.4vw,72px); line-height:1.02; letter-spacing:-.03em; color:#f3f6fa;">What would your strategy<br/>have <span style="color:var(--accent,#ff6b00);">actually done?</span></h2>
+    <p style="margin:30px auto 0; max-width:520px; font-size:18px; line-height:1.6; color:#8b94a3;">Not a hunch. A vectorized answer — with slippage, fills and fees — across every bar of history you can replay.</p>
+  </section>
+
+  <!-- BUILD THE LOGIC -->
+  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:40px 32px 100px;">
+    <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent,#ff6b00); margin-bottom:18px;">Logic before proof</div>
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:30px; flex-wrap:wrap; margin-bottom:42px;">
+      <h2 style="margin:0; font-weight:600; font-size:clamp(30px,4vw,52px); line-height:1.0; letter-spacing:-.03em; color:#f3f6fa;">Build the logic.</h2>
+      <p style="margin:0; max-width:360px; font-size:16px; line-height:1.55; color:#8b94a3;">Set context, conditions, capital, risk and exits — then let history answer.</p>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px;">
+      <sc-for list="{{ buildCards }}" as="c" hint-placeholder-count="8">
+        <div style="border:1px solid rgba(255,255,255,.07); border-radius:14px; background:linear-gradient(165deg,#0e121a,#0a0d13); padding:22px; min-height:128px; display:flex; flex-direction:column; justify-content:space-between;">
+          <div style="font-family:'Fira Code',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5b6472;">{{ c.tag }}</div>
+          <div>
+            <div style="font-size:17px; font-weight:600; color:#eef1f5; margin-bottom:5px;">{{ c.title }}</div>
+            <div style="font-size:13px; color:#7e8798; line-height:1.45;">{{ c.sub }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- RUN IT THROUGH HISTORY / LIVE -->
+  <section id="history" data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:40px 32px 100px;">
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap; margin-bottom:30px;">
+      <h2 style="margin:0; font-weight:600; font-size:clamp(28px,3.8vw,50px); line-height:1.0; letter-spacing:-.03em; color:#f3f6fa; max-width:18ch;">Run it through history.<br/>Or watch it live.</h2>
+      <div style="display:inline-flex; padding:4px; border:1px solid rgba(255,255,255,.1); border-radius:999px; background:#0c1016; gap:4px;">
+        <button onClick="{{ setHistory }}" style="font-family:'Fira Code',monospace; font-size:12px; letter-spacing:.04em; padding:8px 18px; border:0; border-radius:999px; cursor:pointer; background:{{ histBg }}; color:{{ histFg }};">Replay</button>
+        <button onClick="{{ setLive }}" style="font-family:'Fira Code',monospace; font-size:12px; letter-spacing:.04em; padding:8px 18px; border:0; border-radius:999px; cursor:pointer; background:{{ liveBg }}; color:{{ liveFg }};">Live</button>
+      </div>
+    </div>
+
+    <div style="border:1px solid rgba(255,255,255,.08); border-radius:18px; background:linear-gradient(180deg,#0d1118,#0a0d13); overflow:hidden;">
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 22px; border-bottom:1px solid rgba(255,255,255,.06); flex-wrap:wrap; gap:12px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span style="font-family:'Fira Code',monospace; font-size:12px; color:#eef1f5;">sma_cross · NIFTY 50</span>
+          <span style="font-family:'Fira Code',monospace; font-size:11px; color:#5b6472;">{{ chartRange }}</span>
+        </div>
+        <span style="display:inline-flex; align-items:center; gap:7px; font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:{{ modeColor }};"><span style="width:7px; height:7px; border-radius:50%; background:{{ modeColor }}; box-shadow:0 0 8px {{ modeColor }};"></span>{{ modeLabel }}</span>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 280px;">
+        <div style="position:relative; padding:18px 8px 18px 18px; min-height:300px;">
+          <canvas id="ot-equity" style="display:block; width:100%; height:300px;"></canvas>
+        </div>
+        <div style="border-left:1px solid rgba(255,255,255,.06); display:grid; grid-template-rows:repeat(4,1fr);">
+          <sc-for list="{{ chartStats }}" as="s" hint-placeholder-count="4">
+            <div style="padding:20px 24px; border-bottom:1px solid rgba(255,255,255,.06); display:flex; flex-direction:column; justify-content:center;">
+              <div style="font-family:'Fira Code',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5b6472; margin-bottom:7px;">{{ s.label }}</div>
+              <div data-count-to="{{ s.value }}" data-count-prefix="{{ s.prefix }}" data-count-suffix="{{ s.suffix }}" data-count-dec="{{ s.dec }}" style="font-family:'Fira Code',monospace; font-size:26px; font-weight:500; color:{{ s.color }};">{{ s.display }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTROL -->
+  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:40px 32px 100px;">
+    <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent,#ff6b00); margin-bottom:18px;">Risk above action</div>
+    <div style="display:grid; grid-template-columns:0.85fr 1.15fr; gap:56px; align-items:center;">
+      <div>
+        <h2 style="margin:0 0 18px; font-weight:600; font-size:clamp(30px,4vw,52px); line-height:1.0; letter-spacing:-.03em; color:#f3f6fa;">Control above action.</h2>
+        <p style="margin:0; font-size:17px; line-height:1.6; color:#8b94a3;">Protect long and short setups, pause new entries on a volatility spike, and resume every live strategy together — desk-wide, in one move.</p>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <sc-for list="{{ controls }}" as="ct" hint-placeholder-count="5">
+          <div style="display:flex; align-items:center; gap:16px; border:1px solid rgba(255,255,255,.07); border-radius:12px; background:#0c1016; padding:16px 20px;">
+            <span style="width:9px; height:9px; border-radius:50%; background:{{ ct.color }}; box-shadow:0 0 9px {{ ct.color }}; flex-shrink:0;"></span>
+            <div style="font-size:15px; font-weight:600; color:#eef1f5; min-width:200px;">{{ ct.title }}</div>
+            <div style="font-size:14px; color:#7e8798;">{{ ct.sub }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <!-- ANALYTICS -->
+  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:40px 32px 100px;">
+    <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent,#ff6b00); margin-bottom:18px;">Performance rollup</div>
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap; margin-bottom:30px;">
+      <h2 style="margin:0; font-weight:600; font-size:clamp(28px,3.8vw,50px); line-height:1.0; letter-spacing:-.03em; color:#f3f6fa;">Analytics across every level.</h2>
+      <div style="display:inline-flex; padding:4px; border:1px solid rgba(255,255,255,.1); border-radius:999px; background:#0c1016; gap:4px;">
+        <button onClick="{{ tabStrat }}" style="font-family:'Fira Code',monospace; font-size:12px; padding:8px 16px; border:0; border-radius:999px; cursor:pointer; background:{{ tA.bg }}; color:{{ tA.fg }};">Strategy</button>
+        <button onClick="{{ tabPort }}" style="font-family:'Fira Code',monospace; font-size:12px; padding:8px 16px; border:0; border-radius:999px; cursor:pointer; background:{{ tB.bg }}; color:{{ tB.fg }};">Portfolio</button>
+        <button onClick="{{ tabDesk }}" style="font-family:'Fira Code',monospace; font-size:12px; padding:8px 16px; border:0; border-radius:999px; cursor:pointer; background:{{ tC.bg }}; color:{{ tC.fg }};">Desk</button>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px;">
+      <sc-for list="{{ rollup }}" as="r" hint-placeholder-count="8">
+        <div style="border:1px solid rgba(255,255,255,.07); border-radius:14px; background:linear-gradient(165deg,#0e121a,#0a0d13); padding:22px;">
+          <div style="font-family:'Fira Code',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5b6472; margin-bottom:10px;">{{ r.label }}</div>
+          <div style="font-family:'Fira Code',monospace; font-size:24px; font-weight:500; color:{{ r.color }};">{{ r.value }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- PRODUCT PROOF -->
+  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:40px 32px 100px;">
+    <div style="text-align:center; max-width:680px; margin:0 auto 40px;">
+      <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent,#ff6b00); margin-bottom:18px;">Product proof</div>
+      <h2 style="margin:0; font-weight:600; font-size:clamp(28px,3.8vw,50px); line-height:1.0; letter-spacing:-.03em; color:#f3f6fa;">The workspace behind the motion.</h2>
+      <p style="margin:22px 0 0; font-size:17px; line-height:1.6; color:#8b94a3;">Strategy rules, history replay, live activity, analytics and risk control — tied into one working surface, open source and self-hosted.</p>
+    </div>
+    <div style="border:1px solid rgba(255,255,255,.1); border-radius:16px; overflow:hidden; background:#0d1117; box-shadow:0 50px 110px -50px rgba(0,0,0,.9);">
+      <div style="display:flex; align-items:center; gap:8px; padding:11px 16px; background:rgba(255,255,255,.03); border-bottom:1px solid rgba(255,255,255,.06);"><span style="width:9px; height:9px; border-radius:50%; background:#ff5f56;"></span><span style="width:9px; height:9px; border-radius:50%; background:#ffbd2e;"></span><span style="width:9px; height:9px; border-radius:50%; background:#27c93f;"></span><span style="margin-left:10px; font-family:'Fira Code',monospace; font-size:11px; color:#6a7488;">otui ▸ home · mission control</span></div>
+      <img src="assets/screenshots/home.png" alt="OpenTerminalUI workspace overview" loading="lazy" style="display:block; width:100%;" />
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:26px;">
+      <span style="font-family:'Fira Code',monospace; font-size:12px; color:#8b94a3;"><span style="color:var(--accent,#ff6b00);">1</span> Build strategy</span>
+      <span style="color:#3a414e;">·</span>
+      <span style="font-family:'Fira Code',monospace; font-size:12px; color:#8b94a3;"><span style="color:var(--accent,#ff6b00);">2</span> Run history</span>
+      <span style="color:#3a414e;">·</span>
+      <span style="font-family:'Fira Code',monospace; font-size:12px; color:#8b94a3;"><span style="color:var(--accent,#ff6b00);">3</span> Watch live</span>
+      <span style="color:#3a414e;">·</span>
+      <span style="font-family:'Fira Code',monospace; font-size:12px; color:#8b94a3;"><span style="color:var(--accent,#ff6b00);">4</span> Read analytics</span>
+      <span style="color:#3a414e;">·</span>
+      <span style="font-family:'Fira Code',monospace; font-size:12px; color:#8b94a3;"><span style="color:var(--accent,#ff6b00);">5</span> Control risk</span>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:20px 32px 120px;">
+    <div style="position:relative; border:1px solid rgba(255,107,0,.2); border-radius:22px; overflow:hidden; background:radial-gradient(120% 150% at 50% 0%, rgba(255,107,0,.16), transparent 58%), #0b0e14; padding:84px 40px; text-align:center;">
+      <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:#6a7488; margin-bottom:22px;">Ready to start</div>
+      <h2 style="margin:0; font-weight:700; font-size:clamp(34px,5vw,68px); line-height:1.0; letter-spacing:-.03em; color:#f3f6fa;">Start with a strategy<br/>you can <span style="color:var(--accent,#ff6b00);">inspect.</span></h2>
+      <p style="margin:22px auto 0; max-width:480px; font-size:17px; line-height:1.6; color:#8b94a3;">Replay market history on virtual capital and keep every live decision traceable — before real money is involved.</p>
+      <div style="display:flex; gap:13px; justify-content:center; margin-top:34px; flex-wrap:wrap;">
+        <a href="https://github.com/Hitheshkaranth/OpenTerminalUI" style-hover="transform:translateY(-2px);" style="display:inline-flex; align-items:center; gap:9px; padding:15px 30px; border-radius:999px; background:var(--accent,#ff6b00); color:#0a0d12; font-weight:600; font-size:14px; text-decoration:none; transition:transform .25s;">Get OpenTerminalUI →</a>
+        <a href="Docs.dc.html" style-hover="border-color:rgba(255,255,255,.4);" style="display:inline-flex; align-items:center; gap:9px; padding:15px 30px; border-radius:999px; border:1px solid rgba(255,255,255,.16); color:#e8ecf2; font-weight:500; font-size:14px; text-decoration:none; transition:border-color .25s;">Read the docs</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer style="border-top:1px solid rgba(255,255,255,.07);">
+    <div style="max-width:1180px; margin:0 auto; padding:30px 32px; display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap; font-family:'Fira Code',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5b6472;">
+      <span>OpenTerminalUI</span>
+      <div style="display:flex; gap:22px;">
+        <a href="Features.dc.html" style="color:inherit; text-decoration:none;">Features</a>
+        <a href="Docs.dc.html" style="color:inherit; text-decoration:none;">Docs</a>
+        <a href="Roadmap.dc.html" style="color:inherit; text-decoration:none;">Roadmap</a>
+        <a href="https://github.com/Hitheshkaranth/OpenTerminalUI" style="color:inherit; text-decoration:none;">GitHub</a>
+      </div>
+      <span>MIT · © 2026</span>
+    </div>
+  </footer>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:900},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#ff6b00&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#ff6b00&quot;,&quot;#3fbaff&quot;,&quot;#2ec27e&quot;,&quot;#a78bfa&quot;],&quot;section&quot;:&quot;Theme&quot;}}">
+class Component extends DCLogic {
+  state = { mode: 'history', tab: 'strat', comfort: false };
+
+  constructor(props){
+    super(props);
+    this.reduce = false; this.eqRaf = null;
+  }
+
+  componentDidMount(){
+    this.reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    if (this.props.accent) document.documentElement.style.setProperty('--accent', this.props.accent);
+    this.initReveal();
+    this.initMarket();
+    this.drawEquity(true);
+    this.onResize = () => this.drawEquity(false);
+    window.addEventListener('resize', this.onResize, { passive: true });
+  }
+  componentDidUpdate(prev){
+    if (this.props.accent && this.props.accent !== prev.accent){
+      document.documentElement.style.setProperty('--accent', this.props.accent);
+    }
+  }
+  componentWillUnmount(){
+    if (this.eqRaf) cancelAnimationFrame(this.eqRaf);
+    if (this.onResize) window.removeEventListener('resize', this.onResize);
+  }
+
+  initReveal(){
+    if (!('IntersectionObserver' in window)) return;
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting){
+          e.target.style.animation = 'otReveal .9s cubic-bezier(.16,1,.3,1) both';
+          this.runCounters(e.target);
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+    document.querySelectorAll('[data-reveal]').forEach((el) => io.observe(el));
+  }
+
+  runCounters(scope){
+    const els = scope.querySelectorAll('[data-count-to]');
+    els.forEach((el) => this.animateCount(el));
+  }
+  animateCount(el){
+    const to = parseFloat(el.getAttribute('data-count-to')) || 0;
+    const pre = el.getAttribute('data-count-prefix') || '';
+    const suf = el.getAttribute('data-count-suffix') || '';
+    const dec = parseInt(el.getAttribute('data-count-dec') || '0', 10);
+    const fmt = (n) => pre + n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }) + suf;
+    if (this.reduce || this.state.comfort){ el.textContent = fmt(to); return; }
+    const dur = 1100; const t0 = performance.now();
+    const step = (t) => {
+      const p = Math.min(1, (t - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmt(to * e);
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  initMarket(){
+    const c = document.getElementById('ot-market-canvas');
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    let W = 0, H = 0, series = []; const STEP = 9;
+    const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || this.state.comfort;
+    const setup = () => { W = c.clientWidth; H = c.clientHeight; c.width = Math.max(1, W * DPR); c.height = Math.max(1, H * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); };
+    const build = () => { const COUNT = W < 700 ? 5 : 9; const N = Math.ceil(W / STEP) + 4; series = []; for (let s = 0; s < COUNT; s++){ const baseY = ((s + 0.5) / COUNT) * H; const amp = (H / COUNT) * 0.46; const accent = s % 3 === 1; const pts = []; let v = 0; for (let i = 0; i < N; i++){ v += (Math.random() - 0.5) * 0.9; v = Math.max(-1, Math.min(1, v * 0.96)); pts.push(v); } series.push({ baseY, amp, pts, accent, drift: 0, speed: 0.16 + Math.random() * 0.14 }); } };
+    setup(); build();
+    this._mktResize = () => { setup(); build(); };
+    window.addEventListener('resize', this._mktResize, { passive: true });
+    const plot = (sr, shift) => { ctx.beginPath(); for (let i = 0; i < sr.pts.length; i++){ const x = i * STEP - shift; const y = sr.baseY - sr.pts[i] * sr.amp; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.strokeStyle = sr.accent ? 'rgba(255,130,40,0.34)' : 'rgba(150,185,235,0.14)'; ctx.lineWidth = sr.accent ? 1.7 : 1.1; ctx.stroke(); };
+    if (reduce){ ctx.clearRect(0, 0, W, H); for (const sr of series) plot(sr, 0); return; }
+    const frame = () => { ctx.clearRect(0, 0, W, H); for (const sr of series){ sr.drift += sr.speed; if (sr.drift >= STEP){ sr.drift -= STEP; sr.pts.shift(); let last = sr.pts[sr.pts.length - 1]; last += (Math.random() - 0.5) * 0.9; last = Math.max(-1, Math.min(1, last * 0.96)); sr.pts.push(last); } plot(sr, sr.drift); } this._mktRaf = requestAnimationFrame(frame); };
+    frame();
+  }
+
+  drawEquity(animate){
+    const c = document.getElementById('ot-equity');
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    const W = c.clientWidth, H = c.clientHeight;
+    c.width = Math.max(1, W * DPR); c.height = Math.max(1, H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    const live = this.state.mode === 'live';
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#ff6b00';
+    const seed = live ? 7 : 3;
+    let rnd = seed;
+    const rand = () => { rnd = (rnd * 9301 + 49297) % 233280; return rnd / 233280; };
+    const N = 90;
+    const pts = [];
+    let v = 0; const drift = live ? 0.16 : 0.12;
+    for (let i = 0; i < N; i++){
+      v += drift + (rand() - 0.45) * 1.4;
+      if (live && i > N * 0.6) v += (rand() - 0.5) * 0.6;
+      pts.push(v);
+    }
+    let mn = Math.min.apply(null, pts), mx = Math.max.apply(null, pts);
+    const padX = 14, padY = 18;
+    const x = (i) => padX + (i / (N - 1)) * (W - padX * 2);
+    const y = (val) => padY + (1 - (val - mn) / (mx - mn || 1)) * (H - padY * 2);
+
+    // gridlines
+    const drawGrid = () => {
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1;
+      for (let g = 0; g <= 4; g++){
+        const gy = padY + (g / 4) * (H - padY * 2);
+        ctx.beginPath(); ctx.moveTo(padX, gy); ctx.lineTo(W - padX, gy); ctx.stroke();
+      }
+    };
+    const render = (prog) => {
+      ctx.clearRect(0, 0, W, H);
+      drawGrid();
+      const last = Math.max(1, Math.floor(prog * (N - 1)));
+      // area
+      ctx.beginPath(); ctx.moveTo(x(0), y(pts[0]));
+      for (let i = 1; i <= last; i++) ctx.lineTo(x(i), y(pts[i]));
+      ctx.lineTo(x(last), H - padY); ctx.lineTo(x(0), H - padY); ctx.closePath();
+      const grad = ctx.createLinearGradient(0, padY, 0, H);
+      grad.addColorStop(0, 'rgba(255,107,0,0.18)'); grad.addColorStop(1, 'rgba(255,107,0,0)');
+      ctx.fillStyle = grad; ctx.fill();
+      // line
+      ctx.beginPath(); ctx.moveTo(x(0), y(pts[0]));
+      for (let i = 1; i <= last; i++) ctx.lineTo(x(i), y(pts[i]));
+      ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+      // head dot
+      ctx.beginPath(); ctx.arc(x(last), y(pts[last]), 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#f3f6fa'; ctx.fill();
+      ctx.beginPath(); ctx.arc(x(last), y(pts[last]), 7, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,107,0,0.4)'; ctx.lineWidth = 1.5; ctx.stroke();
+    };
+    if (this.eqRaf) cancelAnimationFrame(this.eqRaf);
+    if (!animate || this.reduce || this.state.comfort){ render(1); return; }
+    const t0 = performance.now(); const dur = 1200;
+    const step = (t) => {
+      const p = Math.min(1, (t - t0) / dur);
+      render(1 - Math.pow(1 - p, 3));
+      if (p < 1) this.eqRaf = requestAnimationFrame(step);
+    };
+    this.eqRaf = requestAnimationFrame(step);
+  }
+
+  setMode(m){ this.setState({ mode: m }, () => this.drawEquity(true)); }
+  toggleMotion(){
+    const next = !this.state.comfort;
+    this.setState({ comfort: next });
+    const root = document.getElementById('ot-root');
+    if (root) root.classList.toggle('ot-comfort', next);
+  }
+
+  histStats(){
+    if (this.state.mode === 'live'){
+      return [
+        { label: 'Open PnL', value: 612, prefix: '+$', suffix: '', dec: 0, color: '#2ec27e', display: '+$612' },
+        { label: 'ROI', value: 6.12, prefix: '+', suffix: '%', dec: 2, color: '#2ec27e', display: '+6.12%' },
+        { label: 'Win rate', value: 60.0, prefix: '', suffix: '%', dec: 1, color: '#eef1f5', display: '60.0%' },
+        { label: 'Open trades', value: 9, prefix: '', suffix: '', dec: 0, color: '#eef1f5', display: '9' }
+      ];
+    }
+    return [
+      { label: 'Net PnL', value: 2418, prefix: '+$', suffix: '', dec: 0, color: '#2ec27e', display: '+$2,418' },
+      { label: 'ROI', value: 24.18, prefix: '+', suffix: '%', dec: 2, color: '#2ec27e', display: '+24.18%' },
+      { label: 'Win rate', value: 56.4, prefix: '', suffix: '%', dec: 1, color: '#eef1f5', display: '56.4%' },
+      { label: 'Trades', value: 41, prefix: '', suffix: '', dec: 0, color: '#eef1f5', display: '41' }
+    ];
+  }
+
+  rollupStats(){
+    const sets = {
+      strat: ['$10,000','+$1,940','+19.40%','55%','44','1.74','$44.00','$21.30'],
+      port:  ['$50,000','+$9,260','+18.52%','57%','188','1.81','$49.00','$96.40'],
+      desk:  ['$250,000','+$41,800','+16.72%','56%','742','1.69','$56.00','$402.10']
+    };
+    const labels = ['Capital base','Net PnL','ROI','Win rate','Trades closed','Profit factor','Expectancy','Fees total'];
+    const vals = sets[this.state.tab];
+    return labels.map((l, i) => ({
+      label: l, value: vals[i],
+      color: (i === 1 || i === 2) ? '#2ec27e' : '#eef1f5'
+    }));
+  }
+
+  tabStyle(name){
+    const on = this.state.tab === name;
+    return { bg: on ? '#e8ecf2' : 'transparent', fg: on ? '#07090d' : '#8b94a3' };
+  }
+
+  renderVals(){
+    const histOn = this.state.mode === 'history';
+    return {
+      motionLabel: this.state.comfort ? 'Comfort' : 'Full',
+      toggleMotion: () => this.toggleMotion(),
+      setHistory: () => this.setMode('history'),
+      setLive: () => this.setMode('live'),
+      histBg: histOn ? '#e8ecf2' : 'transparent', histFg: histOn ? '#07090d' : '#8b94a3',
+      liveBg: !histOn ? 'var(--accent)' : 'transparent', liveFg: !histOn ? '#0a0d12' : '#8b94a3',
+      modeLabel: histOn ? 'Replay · 2024' : 'Live · streaming',
+      modeColor: histOn ? '#7a8497' : '#ff6b00',
+      chartRange: histOn ? 'Jan – Dec 2024 · 1D' : 'Today · 15m',
+      chartStats: this.histStats(),
+      tabStrat: () => this.setState({ tab: 'strat' }),
+      tabPort: () => this.setState({ tab: 'port' }),
+      tabDesk: () => this.setState({ tab: 'desk' }),
+      tA: this.tabStyle('strat'), tB: this.tabStyle('port'), tC: this.tabStyle('desk'),
+      rollup: this.rollupStats(),
+      buildCards: [
+        { tag: 'Market context', title: 'Universe & symbol', sub: 'Pick the index, basket or ticker' },
+        { tag: 'Timing', title: 'Interval & trigger', sub: '1m to 1D, bar-close or tick' },
+        { tag: 'Capital', title: 'Budget & stake', sub: 'Per-trade sizing & allocation' },
+        { tag: 'Exit targets', title: 'Take-profit & stop', sub: 'Fixed, ATR or trailing' },
+        { tag: 'Engine mode', title: 'Rules or score', sub: 'Boolean gate or weighted score' },
+        { tag: 'Direction', title: 'Long or short', sub: 'One side or both' },
+        { tag: 'Entry conditions', title: 'Indicators & thresholds', sub: '70+ signals to combine' },
+        { tag: 'Decision logic', title: 'AND · OR · score', sub: 'Compose how signals resolve' }
+      ],
+      controls: [
+        { color: '#2ec27e', title: 'All strategies live', sub: 'Desk running normally' },
+        { color: '#ff6b00', title: 'Fast drawdown detected', sub: 'Pause new long entries' },
+        { color: '#ffbd2e', title: 'Volatility spike', sub: 'Widen stops, pause shorts' },
+        { color: '#ff5d5d', title: 'Manual risk halt', sub: 'Stop new entries desk-wide' },
+        { color: '#7a8497', title: 'Cooldown ended', sub: 'Entries resume on schedule' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

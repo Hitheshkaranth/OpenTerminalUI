@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{ --accent:#ff6b00; }
+  *{ box-sizing:border-box; }
+  ::selection{ background:rgba(255,107,0,.22); }
+  html{ scroll-behavior:smooth; }
+  body{ margin:0; background:#07090d; }
+  @keyframes otPulse{ 0%,100%{opacity:.4; transform:scale(.85)} 50%{opacity:1; transform:scale(1.2)} }
+  @keyframes otReveal{ from{opacity:0; transform:translateY(22px)} to{opacity:1; transform:translateY(0)} }
+  @media (prefers-reduced-motion: reduce){ *{ animation:none !important; } }
+</style>
+</helmet>
+
+<div style="background:#07090d; color:#e8ecf2; font-family:'Space Grotesk',system-ui,sans-serif; -webkit-font-smoothing:antialiased; overflow-x:hidden; position:relative; min-height:100vh;">
+  <div style="position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;"><canvas id="ot-market-canvas" style="position:absolute; inset:0; width:100%; height:100%;"></canvas></div>
+  <div style="position:relative; z-index:1;">
+
+  <div style="position:absolute; top:0; left:50%; transform:translateX(-50%); width:1000px; max-width:140%; height:400px; background:radial-gradient(ellipse at center, rgba(255,107,0,.06), transparent 64%); pointer-events:none;"></div>
+
+  <!-- NAV -->
+  <nav style="position:sticky; top:0; z-index:50; display:flex; align-items:center; justify-content:space-between; padding:18px 32px; background:rgba(7,9,13,.72); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid rgba(255,255,255,.06);">
+    <a href="index.html" style="display:flex; align-items:center; text-decoration:none;"><img src="assets/logo.png" alt="OpenTerminalUI" style="height:22px; width:auto; display:block; filter:brightness(0) invert(1);" /></a>
+    <div style="display:flex; align-items:center; gap:26px; font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#8b94a3;">
+      <a href="index.html" style="color:inherit; text-decoration:none;">Home</a>
+      <a href="Features.dc.html" style="color:inherit; text-decoration:none;">Features</a>
+      <a href="Docs.dc.html" style="color:inherit; text-decoration:none;">Docs</a>
+      <a href="Roadmap.dc.html" style="color:#e8ecf2; text-decoration:none;">Roadmap</a>
+      <a href="https://github.com/Hitheshkaranth/OpenTerminalUI" style="display:inline-flex; align-items:center; gap:7px; padding:7px 15px; border-radius:999px; background:#e8ecf2; color:#07090d; text-decoration:none; font-weight:600;">GitHub ↗</a>
+    </div>
+  </nav>
+
+  <!-- HEADER -->
+  <header style="position:relative; max-width:1180px; margin:0 auto; padding:80px 32px 30px;">
+    <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.26em; text-transform:uppercase; color:#6a7488; margin-bottom:24px;">Roadmap</div>
+    <h1 style="margin:0; font-weight:700; font-size:clamp(44px,6.4vw,92px); line-height:0.9; letter-spacing:-.04em; color:#f3f6fa;">Built in <span style="color:var(--accent,#ff6b00);">the open.</span></h1>
+    <p style="margin:26px 0 0; font-size:18px; line-height:1.6; color:#8b94a3; max-width:560px;">What's shipped, what's in flight, and what's next. The full picture lives in the repo — issues and pull requests welcome.</p>
+  </header>
+
+  <!-- SHIPPED -->
+  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:36px 32px 0;">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+      <span style="font-family:'Fira Code',monospace; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:#2ec27e;">Shipped</span>
+      <span style="flex:1; height:1px; background:rgba(46,194,126,.18);"></span>
+      <span style="font-family:'Fira Code',monospace; font-size:11px; color:#5b6472;">19 milestones</span>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
+      <sc-for list="{{ shipped }}" as="s" hint-placeholder-count="19">
+        <div style="display:flex; gap:10px; border:1px solid rgba(46,194,126,.14); border-radius:10px; background:#0a1410; padding:13px 16px; font-size:14px; color:#aab4c2;"><span style="color:#2ec27e;">✓</span>{{ s }}</div>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- IN PROGRESS + NEXT -->
+  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:40px 32px 0; display:grid; grid-template-columns:1fr 1fr; gap:18px;">
+    <div>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+        <span style="font-family:'Fira Code',monospace; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent,#ff6b00);">In progress</span>
+        <span style="flex:1; height:1px; background:rgba(255,107,0,.18);"></span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <sc-for list="{{ progress }}" as="p" hint-placeholder-count="3">
+          <div style="border:1px solid rgba(255,107,0,.16); border-radius:12px; background:#13100a; padding:16px 18px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><span style="width:7px; height:7px; border-radius:50%; background:var(--accent,#ff6b00); animation:otPulse 2s ease-in-out infinite;"></span><span style="font-size:15px; font-weight:600; color:#eef1f5;">{{ p.title }}</span></div>
+            <p style="margin:0; font-size:13.5px; line-height:1.5; color:#8b94a3;">{{ p.sub }}</p>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+        <span style="font-family:'Fira Code',monospace; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:#3fbaff;">Next up</span>
+        <span style="flex:1; height:1px; background:rgba(63,186,255,.18);"></span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <sc-for list="{{ next }}" as="n" hint-placeholder-count="4">
+          <div style="border:1px solid rgba(255,255,255,.08); border-radius:12px; background:#0a0f16; padding:16px 18px;">
+            <div style="font-size:15px; font-weight:600; color:#eef1f5; margin-bottom:6px;">{{ n.title }}</div>
+            <p style="margin:0; font-size:13.5px; line-height:1.5; color:#8b94a3;">{{ n.sub }}</p>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:56px 32px 110px;">
+    <div style="position:relative; border:1px solid rgba(255,107,0,.2); border-radius:22px; overflow:hidden; background:radial-gradient(120% 150% at 50% 0%, rgba(255,107,0,.16), transparent 58%), #0b0e14; padding:72px 40px; text-align:center;">
+      <h2 style="margin:0; font-weight:700; font-size:clamp(32px,4.6vw,58px); line-height:1.0; letter-spacing:-.03em; color:#f3f6fa;">Shape what ships next.</h2>
+      <p style="margin:20px auto 0; max-width:460px; font-size:17px; line-height:1.6; color:#8b94a3;">Open an issue, propose a feature, or send a pull request. Contributions welcome.</p>
+      <div style="display:flex; gap:13px; justify-content:center; margin-top:30px; flex-wrap:wrap;">
+        <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/issues" style-hover="transform:translateY(-2px);" style="display:inline-flex; align-items:center; gap:9px; padding:14px 28px; border-radius:999px; background:var(--accent,#ff6b00); color:#0a0d12; font-weight:600; font-size:14px; text-decoration:none; transition:transform .25s;">Open an issue →</a>
+        <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/CONTRIBUTING.md" style-hover="border-color:rgba(255,255,255,.4);" style="display:inline-flex; align-items:center; gap:9px; padding:14px 28px; border-radius:999px; border:1px solid rgba(255,255,255,.16); color:#e8ecf2; font-weight:500; font-size:14px; text-decoration:none; transition:border-color .25s;">Contributing guide</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer style="border-top:1px solid rgba(255,255,255,.07);">
+    <div style="max-width:1180px; margin:0 auto; padding:30px 32px; display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap; font-family:'Fira Code',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5b6472;">
+      <span>OpenTerminalUI</span>
+      <div style="display:flex; gap:22px;">
+        <a href="index.html" style="color:inherit; text-decoration:none;">Home</a>
+        <a href="Features.dc.html" style="color:inherit; text-decoration:none;">Features</a>
+        <a href="Docs.dc.html" style="color:inherit; text-decoration:none;">Docs</a>
+        <a href="Roadmap.dc.html" style="color:inherit; text-decoration:none;">Roadmap</a>
+      </div>
+      <span>MIT · © 2026</span>
+    </div>
+  </footer>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:900},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#ff6b00&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#ff6b00&quot;,&quot;#3fbaff&quot;,&quot;#2ec27e&quot;,&quot;#a78bfa&quot;],&quot;section&quot;:&quot;Theme&quot;}}">
+class Component extends DCLogic {
+  componentDidMount(){
+    if (this.props.accent) document.documentElement.style.setProperty('--accent', this.props.accent);
+    this.initMarket();
+    if (!('IntersectionObserver' in window)) return;
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting){ e.target.style.animation = 'otReveal .7s cubic-bezier(.16,1,.3,1) both'; io.unobserve(e.target); }
+      });
+    }, { threshold: 0.05, rootMargin: '0px 0px -3% 0px' });
+    document.querySelectorAll('[data-reveal]').forEach((el) => io.observe(el));
+  }
+  componentDidUpdate(prev){
+    if (this.props.accent && this.props.accent !== prev.accent){
+      document.documentElement.style.setProperty('--accent', this.props.accent);
+    }
+  }
+  initMarket(){
+    const c = document.getElementById('ot-market-canvas');
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    let W = 0, H = 0, series = []; const STEP = 9;
+    const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const setup = () => { W = c.clientWidth; H = c.clientHeight; c.width = Math.max(1, W * DPR); c.height = Math.max(1, H * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); };
+    const build = () => { const COUNT = W < 700 ? 5 : 9; const N = Math.ceil(W / STEP) + 4; series = []; for (let s = 0; s < COUNT; s++){ const baseY = ((s + 0.5) / COUNT) * H; const amp = (H / COUNT) * 0.46; const accent = s % 3 === 1; const pts = []; let v = 0; for (let i = 0; i < N; i++){ v += (Math.random() - 0.5) * 0.9; v = Math.max(-1, Math.min(1, v * 0.96)); pts.push(v); } series.push({ baseY, amp, pts, accent, drift: 0, speed: 0.16 + Math.random() * 0.14 }); } };
+    setup(); build();
+    this._mktResize = () => { setup(); build(); };
+    window.addEventListener('resize', this._mktResize, { passive: true });
+    const plot = (sr, shift) => { ctx.beginPath(); for (let i = 0; i < sr.pts.length; i++){ const x = i * STEP - shift; const y = sr.baseY - sr.pts[i] * sr.amp; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.strokeStyle = sr.accent ? 'rgba(255,130,40,0.34)' : 'rgba(150,185,235,0.14)'; ctx.lineWidth = sr.accent ? 1.7 : 1.1; ctx.stroke(); };
+    if (reduce){ ctx.clearRect(0, 0, W, H); for (const sr of series) plot(sr, 0); return; }
+    const frame = () => { ctx.clearRect(0, 0, W, H); for (const sr of series){ sr.drift += sr.speed; if (sr.drift >= STEP){ sr.drift -= STEP; sr.pts.shift(); let last = sr.pts[sr.pts.length - 1]; last += (Math.random() - 0.5) * 0.9; last = Math.max(-1, Math.min(1, last * 0.96)); sr.pts.push(last); } plot(sr, sr.drift); } this._mktRaf = requestAnimationFrame(frame); };
+    frame();
+  }
+
+  renderVals(){
+    return {
+      shipped: [
+        'Terminal Noir shell + theme tokens', 'GO command bar + ticker tape', 'Launchpad workspace ecosystem',
+        'Security Hub tabbed workspace', 'DenseTable high-density grid', 'Chart sync + volume profile',
+        'Multi-portfolio backend + manager UI', 'Multi-market screener + formula mode', 'News sentiment + trend charts',
+        'Economic Data Terminal', 'AI Research Copilot (NLQ engine)', 'US options support (Greeks + IV rank)',
+        'Sector Rotation (RRG) map', 'Redis quote bus broadcasting', 'Multi-watchlist + treemap heatmap',
+        'Intraday backtesting (vectorized)', 'Bloomberg-style keyboard navigation', 'Advanced reporting (PDF export)',
+        'Multi-agent debate research console'
+      ],
+      progress: [
+        { title: 'UX acceptance parity', sub: 'Full parity and hardening across all Section 3 UX acceptance details.' },
+        { title: 'Feature-pack hardening', sub: 'Parity and hardening for the remaining Section 4 feature packs.' },
+        { title: 'Deeper test coverage', sub: 'Additional chart, portfolio, and scanner test coverage.' }
+      ],
+      next: [
+        { title: 'Chart context actions', sub: 'Broaden context actions across all chart surfaces.' },
+        { title: 'Expanded portfolio analytics', sub: 'Alpha, beta, tracking error, up/down capture.' },
+        { title: 'Scanner scheduling', sub: 'Market-open scheduler semantics for scanner alerts.' },
+        { title: 'Performance pass', sub: 'Chunk splitting and a smaller initial load footprint.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
