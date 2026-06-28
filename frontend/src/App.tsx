@@ -8,6 +8,9 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { RootRedirect } from "./components/RootRedirect";
 import { TerminalBackground } from "./components/TerminalBackground";
 import { ThemeRuntime } from "./components/layout/ThemeRuntime";
+import { LoginPage } from "./pages/LoginPage";
+import { ForgotAccessPage } from "./pages/Auth/ForgotAccessPage";
+import { RegisterPage } from "./pages/Auth/RegisterPage";
 import { lazyWithRetry } from "./utils/lazyWithRetry";
 
 const EquityLayout = lazyWithRetry(() => import("./equity/EquityLayout").then((m) => ({ default: m.EquityLayout })));
@@ -16,9 +19,6 @@ const FnoLayout = lazyWithRetry(() => import("./fno/FnoLayout").then((m) => ({ d
 const AccountLayout = lazyWithRetry(() => import("./pages/AccountLayout").then((m) => ({ default: m.AccountLayout })));
 
 const HomePage = lazyWithRetry(() => import("./pages/HomePage").then((m) => ({ default: m.HomePage })));
-const LoginPage = lazyWithRetry(() => import("./pages/LoginPage").then((m) => ({ default: m.LoginPage })));
-const RegisterPage = lazyWithRetry(() => import("./pages/Auth/RegisterPage").then((m) => ({ default: m.RegisterPage })));
-const ForgotAccessPage = lazyWithRetry(() => import("./pages/Auth/ForgotAccessPage").then((m) => ({ default: m.ForgotAccessPage })));
 
 const StockDetailPage = lazyWithRetry(() => import("./pages/StockDetail").then((m) => ({ default: m.StockDetailPage })));
 const SecurityHubPage = lazyWithRetry(() => import("./pages/SecurityHub").then((m) => ({ default: m.SecurityHubPage })));

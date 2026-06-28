@@ -103,6 +103,62 @@ async def test_complete_falls_back_to_reasoning_when_content_empty():
 
 
 @pytest.mark.asyncio
+async def test_complete_parses_legacy_choice_text():
+    resp = {"choices": [{"text": "Plain text completion"}]}
+    provider = OpenAICompatibleProvider(
+        base_url="https://x/api/v1", api_key=None, model="m",
+        transport=_mock_transport({}, resp),
+    )
+    out = await provider.complete([LLMMessage(role="user", content="hi")])
+    assert out.content == "Plain text completion"
+
+
+@pytest.mark.asyncio
+async def test_complete_parses_gemini_candidate_text():
+    resp = {"candidates": [{"content": {"parts": [{"text": "Gemini native text"}]}}]}
+    provider = OpenAICompatibleProvider(
+        base_url="https://x/api/v1", api_key=None, model="gemini",
+        transport=_mock_transport({}, resp),
+    )
+    out = await provider.complete([LLMMessage(role="user", content="hi")])
+    assert out.content == "Gemini native text"
+
+
+@pytest.mark.asyncio
+async def test_complete_parses_gemini_candidate_function_call():
+    resp = {
+        "candidates": [{
+            "content": {
+                "parts": [{
+                    "functionCall": {
+                        "name": "get_quote",
+                        "args": {"ticker": "AAPL"},
+                    }
+                }]
+            }
+        }]
+    }
+    provider = OpenAICompatibleProvider(
+        base_url="https://x/api/v1", api_key=None, model="gemini",
+        transport=_mock_transport({}, resp),
+    )
+    out = await provider.complete([LLMMessage(role="user", content="quote")])
+    assert out.tool_calls[0].name == "get_quote"
+    assert out.tool_calls[0].arguments == {"ticker": "AAPL"}
+
+
+@pytest.mark.asyncio
+async def test_complete_surfaces_error_payload_message():
+    resp = {"error": {"message": "quota exceeded"}}
+    provider = OpenAICompatibleProvider(
+        base_url="https://x/api/v1", api_key=None, model="m",
+        transport=_mock_transport({}, resp),
+    )
+    with pytest.raises(LLMError, match="quota exceeded"):
+        await provider.complete([LLMMessage(role="user", content="hi")])
+
+
+@pytest.mark.asyncio
 async def test_reasoning_not_used_when_tool_call_present():
     # A tool-calling turn legitimately has null content; reasoning must NOT override it.
     resp = {"choices": [{"message": {"content": None, "reasoning": "thinking...", "tool_calls": [
