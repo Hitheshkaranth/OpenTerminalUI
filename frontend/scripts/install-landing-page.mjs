@@ -15,7 +15,11 @@ if (!existsSync(distRoot)) {
   throw new Error("Frontend dist directory does not exist. Run vite build first.");
 }
 
-copyLandingFile("index.html");
+const isE2EBuild = process.env.VITE_E2E_AUTO_LOGIN === "1";
+
+if (!isE2EBuild) {
+  copyLandingFile("index.html");
+}
 copyLandingFile("Docs.dc.html");
 copyLandingFile("Features.dc.html");
 copyLandingFile("Roadmap.dc.html");
