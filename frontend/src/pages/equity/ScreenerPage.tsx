@@ -165,7 +165,7 @@ function ScreenerWorkspace() {
 
             <div className="grid grid-cols-3 gap-2 text-xs md:min-w-[420px]">
               <div className="rounded-md border border-terminal-border bg-terminal-bg/70 p-3">
-                <div className="font-sans text-[11px] text-terminal-muted">Results</div>
+                <div className="font-sans text-[11px] text-terminal-muted">Matches</div>
                 <div className="mt-1 text-xl font-semibold text-terminal-text">{resultCount.toLocaleString("en-IN")}</div>
               </div>
               <div className="rounded-md border border-terminal-border bg-terminal-bg/70 p-3">
