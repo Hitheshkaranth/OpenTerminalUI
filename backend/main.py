@@ -165,6 +165,40 @@ def metrics_lite() -> dict[str, object]:
 
 
 _frontend_dist = Path(__file__).resolve().parents[1] / "frontend" / "dist"
+_frontend_app_entry_paths = {
+    "login",
+    "register",
+    "forgot-access",
+    "home",
+    "stocks",
+    "security",
+    "commodities",
+    "forex",
+    "hotlists",
+    "dashboard",
+    "screener",
+    "compare",
+    "portfolio",
+    "portfolio-lab",
+    "mutual-funds",
+    "watchlist",
+    "news",
+    "alerts",
+    "paper",
+    "risk",
+    "correlation",
+    "oms",
+    "ops",
+    "settings",
+    "plugins",
+    "saved-views",
+    "cockpit",
+    "model-lab",
+    "equity",
+    "fno",
+    "backtesting",
+    "account",
+}
 
 
 @app.get("/{full_path:path}", include_in_schema=False)
@@ -174,8 +208,17 @@ def spa_entry(full_path: str) -> FileResponse:
     requested = _frontend_dist / full_path
     if full_path and requested.exists() and requested.is_file():
         return FileResponse(requested)
+    if full_path and requested.exists() and requested.is_dir():
+        directory_index = requested / "index.html"
+        if directory_index.exists():
+            return FileResponse(directory_index)
     if full_path and (Path(full_path).suffix or full_path.startswith("assets/")):
         raise HTTPException(status_code=404, detail="Static asset not found")
+    first_segment = full_path.split("/", 1)[0] if full_path else ""
+    if first_segment in _frontend_app_entry_paths:
+        app_file = _frontend_dist / "app.html"
+        if app_file.exists():
+            return FileResponse(app_file)
     index_file = _frontend_dist / "index.html"
     if index_file.exists():
         return FileResponse(index_file)

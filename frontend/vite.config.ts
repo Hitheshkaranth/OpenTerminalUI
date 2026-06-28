@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { execSync } from "node:child_process";
+import { resolve } from "node:path";
 
 function resolveGitCommit(): string {
   try {
@@ -41,6 +42,10 @@ export default defineConfig({
     sourcemap: false,
     chunkSizeWarningLimit: 750,
     rollupOptions: {
+      input: {
+        index: resolve(__dirname, "index.html"),
+        app: resolve(__dirname, "app.html"),
+      },
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
