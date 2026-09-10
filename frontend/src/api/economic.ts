@@ -5,8 +5,8 @@ import type {
 } from "../types";
 
 export async function fetchEconomicCalendar(from: string, to: string): Promise<EconomicEvent[]> {
-  const { data } = await api.get<{ items: EconomicEvent[] }>("/economics/calendar", { params: { from, to } });
-  return Array.isArray(data?.items) ? data.items : [];
+  const { data } = await api.get<EconomicEvent[] | { items: EconomicEvent[] }>("/economics/calendar", { params: { from, to } });
+  return Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
 }
 
 export async function fetchMacroIndicators(country = "IN"): Promise<MacroIndicatorsResponse> {

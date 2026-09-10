@@ -118,4 +118,7 @@ api_router.include_router(portfolio_optimizer_router)
 # Statlab API
 api_router.include_router(statlab_router)
 
+from backend.api.routes.economics import router as economics_router
+api_router.include_router(economics_router)
+
 __all__ = ["api_router"]

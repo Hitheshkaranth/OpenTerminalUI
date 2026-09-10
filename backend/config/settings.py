@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 from backend.config.env import load_local_env
 
@@ -28,6 +28,7 @@ class AppSettings(BaseModel):
     redis_url: str = "redis://localhost:6379/0"
     redis_quote_channels_ttl: int = 300
     redis_max_connections: int = 50
+    fxmacrodata_api_key: SecretStr | None = Field(default=None, exclude=True)
     fred_api_key: str | None = None
     fmp_api_key: str | None = None
     finnhub_api_key: str | None = None
@@ -216,6 +217,10 @@ def get_settings() -> AppSettings:
         redis_max_connections=int(
             _env("OPENTERMINALUI_REDIS_MAX_CONNECTIONS")
             or app_cfg.get("redis_max_connections", 50)
+        ),
+        fxmacrodata_api_key=(
+            _env("OPENTERMINALUI_FXMACRODATA_API_KEY")
+            or _env("FXMACRODATA_API_KEY")
         ),
         fred_api_key=(
             _env("OPENTERMINALUI_FRED_API_KEY")

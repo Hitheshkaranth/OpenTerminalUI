@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { FXMacroDataExplorer } from "./FXMacroDataExplorer";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -11,22 +12,22 @@ import {
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area } from "recharts";
 
-import { fetchEconomicCalendar, fetchMacroIndicators } from "../../api/client";
+import { fetchEconomicCalendar, fetchMacroIndicators } from "../../api/economic";
 import { TerminalPanel } from "../../components/terminal/TerminalPanel";
 import { EconomicEvent, MacroIndicator } from "../../types";
 
 export function EconomicTerminal() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [view, setView] = useState<"calendar" | "macro">((searchParams.get("tab") as any) || "calendar");
+  const [view, setView] = useState<"calendar" | "macro" | "data">((searchParams.get("tab") as any) || "calendar");
 
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab === "calendar" || tab === "macro") {
+    if (tab === "calendar" || tab === "macro" || tab === "data") {
       setView(tab as any);
     }
   }, [searchParams]);
 
-  const handleSetView = (newView: "calendar" | "macro") => {
+  const handleSetView = (newView: "calendar" | "macro" | "data") => {
     setView(newView);
     setSearchParams({ tab: newView });
   };
@@ -37,19 +38,19 @@ export function EconomicTerminal() {
   // Filters
   const [filters, setFilters] = useState({
     countries: [] as string[],
-    impacts: ["high", "medium", "low"],
+    impacts: ["high", "medium", "low", "unknown"],
     categories: [] as string[]
   });
 
   const startDate = format(startOfMonth(currentMonth), "yyyy-MM-dd");
   const endDate = format(endOfMonth(currentMonth), "yyyy-MM-dd");
 
-  const { data: events, isLoading: loadingEvents } = useQuery({
+  const { data: events, isLoading: loadingEvents, isError: eventsUnavailable } = useQuery({
     queryKey: ["econ-calendar", startDate, endDate],
     queryFn: () => fetchEconomicCalendar(startDate, endDate)
   });
 
-  const { data: macro, isLoading: loadingMacro } = useQuery({
+  const { data: macro, isLoading: loadingMacro, isError: macroUnavailable } = useQuery({
     queryKey: ["macro-indicators"],
     queryFn: () => fetchMacroIndicators(),
     refetchInterval: 600_000
@@ -90,13 +91,16 @@ export function EconomicTerminal() {
             >
               <LayoutGrid size={14} /> MACRO DASHBOARD
             </button>
+            <button onClick={() => handleSetView("data")} className="px-4 py-1 text-xs font-bold">DATA EXPLORER</button>
           </div>
         </div>
+        <a href="https://fxmacrodata.com/?utm_source=openterminalui&amp;utm_medium=integration&amp;utm_campaign=open_source_integrations&amp;utm_content=app" target="_blank" rel="noopener noreferrer" className="text-xs underline">FXMacroData · UTC</a>
       </div>
 
       <div className="flex-grow min-h-0 overflow-auto">
-        {view === "calendar" ? (
+        {view === "data" ? <FXMacroDataExplorer /> : view === "calendar" ? (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-4 h-full">
+            {(eventsUnavailable || (!loadingEvents && !events?.length)) && <p role="status">Calendar data unavailable for this window.</p>}
             {/* Calendar Main View */}
             <div className="lg:col-span-3 flex flex-col gap-4 h-full">
               <div className="flex items-center justify-between">
@@ -111,7 +115,7 @@ export function EconomicTerminal() {
                 </div>
 
                 <div className="flex gap-2">
-                  {["high", "medium", "low"].map(impact => (
+                  {["high", "medium", "low", "unknown"].map(impact => (
                     <label key={impact} className="flex items-center gap-1 text-[10px] uppercase cursor-pointer">
                       <input
                         type="checkbox"
@@ -134,9 +138,9 @@ export function EconomicTerminal() {
                   <div key={d} className="bg-terminal-bg-accent p-2 text-center text-[10px] font-bold text-terminal-muted">{d}</div>
                 ))}
                 {days.map((day, idx) => {
-                  const dayEvents = filteredEvents.filter(ev => isSameDay(new Date(ev.date), day));
+                  const dayEvents = filteredEvents.filter(ev => ev.date === format(day, "yyyy-MM-dd"));
                   const isUpcoming = dayEvents.some(ev => {
-                    const evDate = new Date(`${ev.date}T${ev.time || '00:00:00'}`);
+                    const evDate = new Date(ev.announcement_datetime_utc || `${ev.date}T${ev.time}Z`);
                     return isWithinInterval(evDate, { start: new Date(), end: addHours(new Date(), 24) });
                   });
 
@@ -179,7 +183,7 @@ export function EconomicTerminal() {
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-terminal-text">{selectedEvent.event_name}</h3>
-                      <p className="text-[10px] text-terminal-muted">{selectedEvent.country} | {selectedEvent.date} {selectedEvent.time}</p>
+                      <p className="text-[10px] text-terminal-muted">{selectedEvent.country} | {selectedEvent.date} {selectedEvent.time} UTC{selectedEvent.release_time_assumed ? " (time assumed)" : ""}</p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 border-t border-terminal-border pt-4">
@@ -203,7 +207,7 @@ export function EconomicTerminal() {
 
                     <div className="mt-4 p-2 rounded border border-terminal-border/50 bg-terminal-accent/5 italic text-[10px] text-terminal-muted">
                       <Info size={12} className="inline mr-1" />
-                      Pro Tip: Watch for deviations from forecast for high volatility.
+                      Forecast is market consensus when supplied. Missing values remain unavailable.
                     </div>
                   </div>
                 ) : (
@@ -217,20 +221,21 @@ export function EconomicTerminal() {
         ) : (
           /* Macro Dashboard View */
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {(macroUnavailable || (!loadingMacro && !Object.keys(macro || {}).length)) && <p role="status">Macro observations are unavailable.</p>}
             {macro && Object.entries(macro).map(([region, indicators]) => (
               <TerminalPanel key={region} title={`${region.toUpperCase()} MACRO`}>
                 <div className="flex flex-col gap-3 p-1">
                   {Object.entries(indicators as Record<string, MacroIndicator>).map(([name, data]) => {
-                    const isImproving = name.includes('unemployment') ? data.value < data.last_value : data.value > data.last_value;
-                    const isFlat = data.value === data.last_value;
+                    const isImproving = data.last_value !== null && (name.includes('unemployment') ? data.value < data.last_value : data.value > data.last_value);
+                    const isFlat = data.last_value === null || data.value === data.last_value;
 
                     return (
                       <div key={name} className="group rounded border border-terminal-border bg-terminal-bg p-3 transition-colors hover:border-terminal-accent/50">
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <div className="text-[10px] font-bold text-terminal-muted uppercase tracking-tighter">{name.replace('_', ' ')}</div>
+                            <div className="text-[10px] font-bold text-terminal-muted uppercase tracking-tighter">{data.label || name.replace('_', ' ')}</div>
                             <div className="flex items-baseline gap-2">
-                              <span className="text-lg font-mono font-bold text-terminal-text">{data.value}%</span>
+                              <span className="text-lg font-mono font-bold text-terminal-text">{data.value} {data.unit || ""}</span>
                               {!isFlat && (
                                 <span className={isImproving ? "text-terminal-pos" : "text-terminal-neg"}>
                                   {isImproving ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
