@@ -29,8 +29,17 @@ _WS_ORIGIN_ALLOWLIST = frozenset(
 
 
 def _validate_ws_origin(header: str | None) -> bool:
-    """Check that the WebSocket Origin header is in the allowlist."""
-    if not header:
+    """Check that the WebSocket Origin header is in the allowlist.
+
+    A missing Origin is allowed. This check defends against cross-site WebSocket
+    hijacking, which only a browser can be tricked into, and browsers always send
+    Origin on the handshake. Non-browser clients (scripts, CLIs, the test suite)
+    send none, and a non-browser attacker can spoof the header anyway, so rejecting
+    headerless clients breaks them without adding protection.
+    """
+    if header is None:
+        return True
+    if not header.strip():
         return False
     origin = header.strip()
     if origin in _WS_ORIGIN_ALLOWLIST:

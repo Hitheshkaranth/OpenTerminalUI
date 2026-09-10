@@ -173,3 +173,24 @@ def auth_exempt_path(path: str) -> bool:
     # No longer exempted here; auth is enforced via env-var check in deps.
 
     return False
+
+
+# Routes of the public API (backend/api/routes/public_api.py), which authenticates
+# with an X-API-Key header rather than a JWT. Keep in sync with that router.
+_API_KEY_ROUTE_PREFIXES = (
+    "/api/v1/quote/",
+    "/api/v1/ohlcv/",
+    "/api/v1/fundamentals/",
+    "/api/v1/watchlist/",
+    "/api/v1/portfolio",
+)
+
+
+def api_key_auth_path(path: str) -> bool:
+    """Return True for routes authenticated by X-API-Key instead of a bearer token.
+
+    These paths are NOT exempt from auth: public_api.router declares
+    ``Depends(get_api_key_user)``, which validates the key and rejects missing or
+    revoked ones. This only tells the JWT middleware to defer to that dependency.
+    """
+    return path.startswith(_API_KEY_ROUTE_PREFIXES)

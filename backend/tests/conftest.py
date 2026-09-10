@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 import pytest
+
+
+# Auth rate limits (5 logins/minute) would otherwise 429 the suite, which logs in
+# once per test. Must be set before any module that builds the limiter is imported.
+os.environ.setdefault("RATE_LIMIT_ENABLED", "0")
 
 
 # Ensure `import backend...` works even when pytest is launched from `backend/`.

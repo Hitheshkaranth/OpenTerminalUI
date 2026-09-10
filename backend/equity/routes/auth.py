@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import secrets
 from datetime import datetime, timezone
@@ -19,7 +20,10 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Rate limiter: 5 requests per minute on login, 3 per hour on forgot-access.
-limiter = Limiter(key_func=get_remote_address)
+# Set RATE_LIMIT_ENABLED=0 to switch it off (the test suite does this, since it
+# logs in far more often than a real client would).
+_RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
+limiter = Limiter(key_func=get_remote_address, enabled=_RATE_LIMIT_ENABLED)
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
