@@ -19,11 +19,12 @@ export function ChartSyncProvider({ children }: { children: ReactNode }) {
   const [event, setEvent] = useState<SyncPayload | null>(null);
   const publishBatchRef = useRef<ReturnType<typeof createRafBatcher<SyncPayload>> | null>(null);
 
-  if (!publishBatchRef.current) {
+  useEffect(() => {
+    if (publishBatchRef.current) return;
     publishBatchRef.current = createRafBatcher<SyncPayload>((next) => {
       setEvent(next);
     });
-  }
+  }, []);
 
   useEffect(
     () => () => {

@@ -1,5 +1,7 @@
 import axios from "axios";
 
+import { getTokenHeader } from "../lib/csrf";
+
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
   timeout: 30000,
@@ -38,6 +40,12 @@ api.interceptors.request.use((config) => {
     config.headers = config.headers || {};
     (config.headers as Record<string, string>).Authorization = `Bearer ${token}`;
   }
+  if (["POST", "PUT", "DELETE", "PATCH"].includes((config.method || "").toUpperCase())) {
+    const csrfHeaders = getTokenHeader();
+    if (config.headers) {
+      Object.assign(config.headers, csrfHeaders);
+    }
+  }
   return config;
 });
 
@@ -60,6 +68,17 @@ api.interceptors.response.use(
         }
       } catch {
         refreshInFlight = null;
+      }
+    }
+    if (status === 403 && config && !config.__isRetry) {
+      const method = String((config as { method?: string }).method || "");
+      if (["POST", "PUT", "DELETE", "PATCH"].includes(method.toUpperCase())) {
+        config.__isRetry = true;
+        const csrfHeaders = getTokenHeader();
+        if (config.headers) {
+          Object.assign(config.headers, csrfHeaders);
+        }
+        return api.request(config);
       }
     }
     return Promise.reject(error);

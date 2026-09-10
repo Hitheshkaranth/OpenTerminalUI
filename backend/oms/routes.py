@@ -9,7 +9,9 @@ from sqlalchemy.orm import Session
 
 from backend.api.deps import fetch_stock_snapshot_coalesced, get_db
 from backend.auth.deps import get_current_user
+from backend.config.constants import DEFAULT_MAX_ADV_PCT, DEFAULT_MAX_POSITION_NOTIONAL
 from backend.models import OmsOrderORM, RestrictedListORM, User
+from backend.models.api_response import ApiResponse
 from backend.oms.service import create_fill, create_order, log_audit, pre_trade_checks
 
 router = APIRouter()
@@ -21,8 +23,8 @@ class OmsOrderRequest(BaseModel):
     quantity: float = Field(gt=0)
     order_type: str = "market"
     limit_price: float | None = None
-    max_position_notional: float = 5_000_000
-    max_adv_pct: float = 0.1
+    max_position_notional: float = Field(default=DEFAULT_MAX_POSITION_NOTIONAL, ge=1000)
+    max_adv_pct: float = Field(default=DEFAULT_MAX_ADV_PCT, gt=0.0, le=1.0)
     simulate_fill: bool = True
 
 

@@ -10,7 +10,7 @@ import type {
 
 export async function explainBacktest(
   runId: string,
-  context?: Record<string, any>,
+  context?: Record<string, unknown>,
 ): Promise<InsightData> {
   const { data } = await api.post<InsightData>(`/v1/ai/explain-backtest/${encodeURIComponent(runId)}`, context);
   return data;
@@ -18,7 +18,7 @@ export async function explainBacktest(
 
 export async function fetchRiskInsights(
   runId: string,
-  context?: Record<string, any>,
+  context?: Record<string, unknown>,
 ): Promise<InsightData> {
   const { data } = await api.post<InsightData>(`/v1/ai/risk-insights/${encodeURIComponent(runId)}`, context);
   return data;

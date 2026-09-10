@@ -7,7 +7,7 @@ export async function fetchCockpitSummary() {
 }
 
 // Portfolio Backtests
-export async function createPortfolioBacktestJob(payload: any) {
+export async function createPortfolioBacktestJob(payload: Record<string, unknown>) {
   const { data } = await api.post("/portfolio-backtests/jobs", payload);
   return data;
 }
@@ -88,7 +88,7 @@ export async function fetchFactorReturns(period: string = "1Y") {
 }
 
 // Experiments Registry
-export async function createExperiment(payload: any) {
+export async function createExperiment(payload: Record<string, unknown>) {
   const { data } = await api.post("/experiments", payload);
   return data;
 }

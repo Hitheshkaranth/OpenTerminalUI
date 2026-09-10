@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse
 from backend.api.deps import shutdown_unified_fetcher
 from backend.alerts import get_alert_evaluator_service
 from backend.auth.middleware import AuthMiddleware
+from backend.auth.csrf import CsrfProtectMiddleware
 from backend.adapters.registry import get_adapter_registry
 from backend.bg_services.instruments_loader import get_instruments_loader
 from backend.bg_services.news_ingestor import get_news_ingestor
@@ -102,14 +103,22 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
 
+# SECURITY FIX: Explicit CORS configuration instead of allowing all methods/headers.
+# Only the HTTP methods actually used by the API are permitted.
+_ALLOWED_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+_ALLOWED_HEADERS = ["Content-Type", "Authorization", "X-CSRF-Token", "Accept", "Origin"]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=_ALLOWED_METHODS,
+    allow_headers=_ALLOWED_HEADERS,
 )
 app.add_middleware(AuthMiddleware)
+
+# CSRF protection for state-changing requests.
+app.add_middleware(CsrfProtectMiddleware)
 
 from backend.api.router import api_router
 

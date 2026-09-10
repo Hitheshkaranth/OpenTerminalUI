@@ -8,6 +8,7 @@ from typing import Any
 import httpx
 
 from backend.adapters.base import DataAdapter, FuturesContract, Instrument, OHLCV, OptionChain, QuoteResponse
+from backend.shared.circuit_breaker import CircuitBreaker
 
 ALPACA_DATA_URL = "https://data.alpaca.markets/v2"
 ALPACA_TRADING_URL = "https://paper-api.alpaca.markets/v2"
@@ -79,6 +80,7 @@ class AlpacaAdapter(DataAdapter):
         self.secret_key = (secret_key if secret_key is not None else os.getenv("ALPACA_SECRET_KEY", "")).strip()
         self.feed = (feed if feed is not None else os.getenv("ALPACA_FEED", "iex")).strip().lower() or "iex"
         self.adjustment = (adjustment if adjustment is not None else os.getenv("ALPACA_ADJUSTMENT", "raw")).strip().lower() or "raw"
+        self._circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=60.0, success_threshold=2)
 
     @property
     def _enabled(self) -> bool:
@@ -103,8 +105,15 @@ class AlpacaAdapter(DataAdapter):
         attempt = 0
         while attempt < max_attempts:
             attempt += 1
-            async with httpx.AsyncClient(base_url=base_url, timeout=15.0, trust_env=False) as client:
-                resp = await client.get(path, params=params, headers=self._headers())
+            try:
+                async with self._circuit_breaker():
+                    async with httpx.AsyncClient(base_url=base_url, timeout=15.0, trust_env=False) as client:
+                        resp = await client.get(path, params=params, headers=self._headers())
+            except Exception:
+                if attempt >= max_attempts:
+                    return {}
+                await asyncio.sleep(min(1.5 * attempt, 5.0))
+                continue
             if resp.status_code == 429 and attempt < max_attempts:
                 await asyncio.sleep(min(1.5 * attempt, 5.0))
                 continue

@@ -289,6 +289,9 @@ export function CommandPalette() {
       <div
         className="mx-auto max-w-2xl rounded border border-terminal-border bg-terminal-panel shadow-2xl"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command Palette"
       >
         <div className="border-b border-terminal-border px-3 py-2 text-xs uppercase tracking-[0.14em] text-terminal-muted">
           Command Palette
@@ -318,11 +321,16 @@ export function CommandPalette() {
           tone="ui"
           className="h-11 rounded-none border-0 border-b border-terminal-border bg-terminal-bg px-3 text-sm text-terminal-text focus:border-terminal-accent"
           placeholder="Type function code, alias, or ticker..."
+          aria-label="Search commands and symbols"
+          aria-autocomplete="list"
+          aria-controls="command-palette-list"
+          aria-activedescendant={`command-palette-item-${selected}`}
         />
-        <div className="max-h-[52vh] overflow-auto py-1">
+        <div id="command-palette-list" className="max-h-[52vh] overflow-auto py-1" role="listbox" aria-label="Command results">
           {items.map((item, idx) => (
             <button
               key={item.id}
+              id={`command-palette-item-${idx}`}
               type="button"
               className={`grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 px-3 py-2 text-left ${
                 idx === selected ? "bg-terminal-accent/12" : "hover:bg-terminal-bg/70"

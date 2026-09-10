@@ -635,7 +635,7 @@ export function CommandBar({ onExecute }: Props) {
         navigate(result.data.url);
       }
     } catch (err) {
-      setAiResult({ type: "text_answer", data: "Error connecting to AI service.", explanation: "Connection error" });
+      setAiResult({ type: "text_answer", data: { text: "Error connecting to AI service." }, explanation: "Connection error" });
     } finally {
       setThinking(false);
     }
@@ -885,12 +885,12 @@ export function CommandBar({ onExecute }: Props) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-terminal-border/50">
-                        {aiResult.data.map((row: any, i: number) => (
-                          <tr key={i} className="hover:bg-terminal-accent/5">
-                            <td className="px-2 py-1 font-bold text-terminal-accent">{row.symbol}</td>
-                            <td className="px-2 py-1 text-right">{row.last?.toFixed(2)}</td>
-                            <td className={`px-2 py-1 text-right ${row.changePct >= 0 ? 'text-terminal-pos' : 'text-terminal-neg'}`}>
-                              {row.changePct?.toFixed(2)}%
+{(aiResult.data as unknown as { symbol: string; last?: number; changePct?: number }[]).map((row, i: number) => (
+                           <tr key={i} className="hover:bg-terminal-accent/5">
+                             <td className="px-2 py-1 font-bold text-terminal-accent">{row.symbol}</td>
+                             <td className="px-2 py-1 text-right">{(row.last ?? 0).toFixed(2)}</td>
+                             <td className={`px-2 py-1 text-right ${((row.changePct ?? 0) >= 0 ? 'text-terminal-pos' : 'text-terminal-neg')}`}>
+                               {(row.changePct ?? 0).toFixed(2)}%
                             </td>
                           </tr>
                         ))}

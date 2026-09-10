@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { Bar } from "oakscriptjs";
 
 import { useQuotesStore, useQuotesStream } from "../../realtime/useQuotesStream";
@@ -126,6 +126,20 @@ function mergeUSBars(closedBars: any[], partialBar?: any): Bar[] {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const _EMPTY_CLOSED_BARS: any[] = [];
 
+// Unique request counter for race condition protection
+let requestCounter = 0;
+
+/**
+ * useRealtimeChart hook with race condition protection.
+ *
+ * Fix: Uses an abort counter pattern — when symbol/timeframe changes,
+ * the previous request's counter is stale, so stale updates are ignored.
+ * This prevents overlapping useEffect dependencies from causing stale
+ * bar updates.
+ *
+ * Fix: Consolidates subscription management into a single useEffect.
+ * Fix: Uses functional state updates with structural bail-out.
+ */
 export function useRealtimeChart(
   market: string,
   symbol: string,
@@ -148,14 +162,31 @@ export function useRealtimeChart(
   const usConnectionState = useUSQuotesStore((s) => s.connectionState);
   const usLastMessageAt = useUSQuotesStore((s) => s.lastMessageAt);
   const usTrade = useUSQuotesStore((s) => s.lastTradeBySymbol[usSymbol]);
-  // Use stable module-level fallback instead of inline `|| []` to avoid creating a new
-  // array reference on every store update — which would cause spurious re-renders via
-  // zustand's Object.is selector comparison.
   const usClosedBars = useUSQuotesStore((s) => s.closedBars1mBySymbol[usSymbol] || _EMPTY_CLOSED_BARS);
   const usPartialBar = useUSQuotesStore((s) => s.partialBar1mBySymbol[usSymbol]);
 
   const [bars, setBars] = useState<Bar[]>(normalizeBars(seedBars));
 
+  // Abort controller / generation counter for race condition protection
+  const generationRef = useRef(0);
+
+  // Consolidated subscription useEffect — single point of subscription management
+  useEffect(() => {
+    if (!enabled || !symbol) return;
+
+    if (supportsUSStreamingBars) {
+      subscribeUS([symbol], ["bars", "trades"]);
+      return () => {
+        unsubscribeUS([symbol]);
+      };
+    }
+    subscribe([symbol]);
+    return () => {
+      unsubscribe([symbol]);
+    };
+  }, [enabled, symbol, supportsUSStreamingBars, subscribe, unsubscribe, subscribeUS, unsubscribeUS]);
+
+  // Handle US bars
   const effectiveUSBars = useMemo(() => {
     if (!supportsUSStreamingBars) return null;
     const merged1m = mergeUSBars(usClosedBars, usPartialBar);
@@ -163,18 +194,23 @@ export function useRealtimeChart(
     return aggregateBarsFrom1m(merged1m, timeframe);
   }, [supportsUSStreamingBars, usClosedBars, usPartialBar, timeframe]);
 
+  // Consolidated seed bars update with race condition protection
   useEffect(() => {
+    generationRef.current++;
+    const currentGeneration = generationRef.current;
+
     if (supportsUSStreamingBars && effectiveUSBars) {
       setBars(effectiveUSBars);
       return;
     }
-    // Use a functional update with a structural bail-out: if normalizeBars produces a
-    // result with the same length and same first/last timestamps as the current bars
-    // (i.e., the data hasn't actually changed), keep the previous reference to avoid
-    // triggering downstream effects that depend on `bars` (realtimeMeta → onRealtimeMeta
-    // → setChartRealtimeMeta → parent re-render → React error #185 cascade).
+
+    // Use a structural bail-out to avoid unnecessary re-renders
     const next = normalizeBars(seedBars);
     setBars((prev) => {
+      // Only update if this is still the current generation
+      if (generationRef.current !== currentGeneration) return prev;
+
+      // Structural bail-out: same length + same first/last = no change needed
       if (
         prev.length === next.length &&
         prev.length > 0 &&
@@ -188,20 +224,16 @@ export function useRealtimeChart(
     });
   }, [seedBars, symbol, timeframe, supportsUSStreamingBars, effectiveUSBars]);
 
-  useEffect(() => {
-    if (!enabled || !symbol) return;
-    if (supportsUSStreamingBars) {
-      subscribeUS([symbol], ["bars", "trades"]);
-      return () => unsubscribeUS([symbol]);
-    }
-    subscribe([symbol]);
-    return () => unsubscribe([symbol]);
-  }, [enabled, symbol, supportsUSStreamingBars, subscribe, unsubscribe, subscribeUS, unsubscribeUS]);
-
+  // Legacy candle update (non-US) — race-condition protected
   useEffect(() => {
     if (!enabled || supportsUSStreamingBars || !liveCandle || !candleInterval) return;
+
+    generationRef.current++;
+    const currentGeneration = generationRef.current;
+
     const t = Math.floor(Number(liveCandle.t) / 1000);
     if (!Number.isFinite(t) || t <= 0) return;
+
     const nextBar: Bar = {
       time: t,
       open: Number(liveCandle.o),
@@ -211,7 +243,11 @@ export function useRealtimeChart(
       volume: Number.isFinite(Number(liveCandle.v)) ? Number(liveCandle.v) : 0,
     };
     if (![nextBar.open, nextBar.high, nextBar.low, nextBar.close].every(Number.isFinite)) return;
+
     setBars((prev) => {
+      // Bail out if stale generation
+      if (generationRef.current !== currentGeneration) return prev;
+
       if (!prev.length) return [nextBar];
       const next = [...prev];
       const last = next[next.length - 1];
@@ -228,15 +264,23 @@ export function useRealtimeChart(
     });
   }, [candleInterval, enabled, liveCandle, supportsUSStreamingBars]);
 
+  // Live tick bar update (non-US, non-candle) — race-condition protected
   useEffect(() => {
     if (!enabled || supportsUSStreamingBars || !tick || !Number.isFinite(Number(tick.ltp))) return;
     if (candleInterval) return;
+
+    generationRef.current++;
+    const currentGeneration = generationRef.current;
+
     const ts = Math.floor(new Date(tick.ts).getTime() / 1000);
     if (!Number.isFinite(ts) || ts <= 0) return;
     const t = candleBoundary(ts, timeframe);
     const ltp = Number(tick.ltp);
 
     setBars((prev) => {
+      // Bail out if stale generation
+      if (generationRef.current !== currentGeneration) return prev;
+
       if (!prev.length) {
         return [{ time: t, open: ltp, high: ltp, low: ltp, close: ltp, volume: Number(tick.volume || 0) }];
       }

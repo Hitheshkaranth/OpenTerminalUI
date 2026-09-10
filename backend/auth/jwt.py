@@ -6,11 +6,12 @@ from typing import Any
 
 from jose import JWTError, jwt
 
+from backend.config.constants import DEFAULT_ACCESS_TOKEN_TTL_MINUTES, DEFAULT_REFRESH_TOKEN_TTL_DAYS
 from backend.config.security import get_jwt_secret
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_TTL_MINUTES = 15
-REFRESH_TOKEN_TTL_DAYS = 7
+ACCESS_TOKEN_TTL_MINUTES = DEFAULT_ACCESS_TOKEN_TTL_MINUTES
+REFRESH_TOKEN_TTL_DAYS = DEFAULT_REFRESH_TOKEN_TTL_DAYS  # SECURITY: reduced from 7 to 1 day to limit the window for stolen refresh tokens.
 
 
 def _secret() -> str:

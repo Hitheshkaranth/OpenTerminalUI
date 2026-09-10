@@ -79,7 +79,7 @@ export type StockSnapshot = {
   indices?: string[];
   fifty_two_week_low?: number;
   fifty_two_week_high?: number;
-  raw?: any;
+  raw?: Record<string, unknown>;
 };
 
 export type FinancialSection = Array<Record<string, string | number | null>>;
@@ -414,7 +414,7 @@ export type Watchlist = {
   id: string;
   name: string;
   symbols: string[];
-  column_config: Record<string, any>;
+  column_config: Record<string, Record<string, unknown>>;
   created_at: string;
 };
 
@@ -595,7 +595,7 @@ export type MacroIndicatorsResponse = Record<string, MacroRegion>;
 
 export type AIQueryResult = {
   type: 'screener_results' | 'data_table' | 'chart_command' | 'text_answer';
-  data: any;
+  data: Record<string, unknown>;
   explanation: string;
 };
 

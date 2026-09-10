@@ -1,6 +1,8 @@
 import { useCallback } from "react";
 import { create } from "zustand";
 
+import { getCsrfToken } from "../lib/csrf";
+
 export type USQuotesConnectionState = "connecting" | "connected" | "disconnected";
 
 export type USRawTrade = {
@@ -56,16 +58,19 @@ function normalizeSymbol(symbol: string): string {
 
 function buildUsQuotesWsUrl(): string {
   const apiBase = String(import.meta.env.VITE_API_BASE_URL || "/api").trim();
+  const token = getCsrfToken();
+  const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
   if (apiBase.startsWith("http://") || apiBase.startsWith("https://")) {
     const url = new URL(apiBase);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     url.pathname = `${url.pathname.replace(/\/+$/, "")}/ws/us-quotes`;
+    url.search = tokenParam.replace("?", "");
     return url.toString();
   }
-  if (typeof window === "undefined") return "/api/ws/us-quotes";
+  if (typeof window === "undefined") return `/api/ws/us-quotes${tokenParam}`;
   const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const normalizedBase = apiBase.startsWith("/") ? apiBase : `/${apiBase}`;
-  return `${wsProtocol}//${window.location.host}${normalizedBase.replace(/\/+$/, "")}/ws/us-quotes`;
+  return `${wsProtocol}//${window.location.host}${normalizedBase.replace(/\/+$/, "")}/ws/us-quotes${tokenParam}`;
 }
 
 function sortDedupBars(input: USMinuteBar[], cap = 5000): USMinuteBar[] {
@@ -236,24 +241,27 @@ class USQuotesWsManager {
         }
         if (payload.type === "backfill") {
           const symbol = normalizeSymbol(String(payload.symbol || ""));
-          const bars = Array.isArray((payload as any).bars) ? (payload as any).bars : [];
+          const rawBars = (payload as Record<string, unknown>).bars;
+          const barsTyped = Array.isArray(rawBars) ? rawBars : [];
           useUSQuotesStore.getState().setBackfill(
             symbol,
-            bars.map((b: any) => ({
-              symbol,
-              interval: "1m",
-              t: Number(b.t),
-              o: Number(b.o),
-              h: Number(b.h),
-              l: Number(b.l),
-              c: Number(b.c),
-              v: Number(b.v ?? 0),
-              vwap: Number.isFinite(Number(b.vwap)) ? Number(b.vwap) : undefined,
-              s: typeof b.s === "string" ? b.s : undefined,
-              ext: Boolean(b.ext),
-              status: "closed",
-            })),
-          );
+            barsTyped.map((b: unknown) => {
+              const raw = b as Record<string, unknown>;
+              return {
+                symbol,
+                interval: "1m",
+                t: Number(raw.t),
+                o: Number(raw.o),
+                h: Number(raw.h),
+                l: Number(raw.l),
+                c: Number(raw.c),
+                v: Number(raw.v ?? 0),
+                vwap: Number.isFinite(Number(raw.vwap)) ? Number(raw.vwap) : undefined,
+                s: typeof raw.s === "string" ? raw.s : undefined,
+                ext: Boolean(raw.ext),
+                status: "closed",
+              };
+            }));
           return;
         }
         if (payload.type === "bar") {

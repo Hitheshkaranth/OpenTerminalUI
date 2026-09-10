@@ -33,20 +33,38 @@ _SCRIPT_STORE: dict[str, UserScript] = {}
 
 
 def _validate_code(code: str) -> None:
+    """AST-level validation of user code before execution.
+
+    Blocks dangerous imports, function calls, attribute access, and dunder
+    traversal that could escape the restricted execution sandbox.
+    """
     try:
         tree = ast.parse(code)
     except SyntaxError as exc:
         raise HTTPException(status_code=400, detail=f"Syntax error: {exc.msg}") from exc
     for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                root = alias.name.split(".")[0]
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    root = alias.name.split(".")[0]
+                    if root in _BLOCKED_MODULES:
+                        raise HTTPException(status_code=400, detail=f"Import blocked: {root}")
+            else:
+                root = (node.module or "").split(".")[0]
                 if root in _BLOCKED_MODULES:
                     raise HTTPException(status_code=400, detail=f"Import blocked: {root}")
-        if isinstance(node, ast.ImportFrom):
-            root = (node.module or "").split(".")[0]
-            if root in _BLOCKED_MODULES:
-                raise HTTPException(status_code=400, detail=f"Import blocked: {root}")
+        # Block all function calls to prevent exec/eval/compile/os.system escapes.
+        if isinstance(node, ast.Call):
+            # Allow builtin constructors like int(), str(), list() but block everything else.
+            if isinstance(node.func, ast.Name) and node.func.id in {
+                "int", "str", "list", "dict", "float", "bool", "set", "tuple",
+                "range", "len", "abs", "min", "max", "round", "sorted",
+                "reversed", "enumerate", "zip", "map", "filter", "any", "all",
+                "isinstance", "issubclass", "type", "super",
+            }:
+                pass  # Allow safe builtin constructors
+            else:
+                raise HTTPException(status_code=400, detail=f"Call blocked: {node.func.id}")
         # Block dunder access. Restricting __builtins__ and imports is not enough:
         # `().__class__.__base__.__subclasses__()` traverses to arbitrary loaded
         # classes (e.g. subprocess.Popen) and escapes the sandbox -> RCE.
@@ -54,9 +72,28 @@ def _validate_code(code: str) -> None:
             raise HTTPException(status_code=400, detail=f"Attribute access blocked: {node.attr}")
         if isinstance(node, ast.Name) and "__" in node.id:
             raise HTTPException(status_code=400, detail=f"Name access blocked: {node.id}")
+        # Block comprehension that could capture unsafe references.
+        if isinstance(node, (ast.Comprehension)):
+            for elt in ast.walk(node):
+                if isinstance(elt, ast.Call):
+                    if isinstance(elt.func, ast.Name) and elt.func.id not in {
+                        "int", "str", "list", "dict", "float", "bool", "set", "tuple",
+                    }:
+                        raise HTTPException(status_code=400, detail=f"Call in comprehension blocked: {elt.func.id}")
 
 
 def _run_user_code(code: str) -> PythonExecuteResponse:
+    """Execute user Python code in a restricted sandbox.
+
+    The execution environment has:
+    - No access to dangerous builtins (open, eval, exec, compile, __import__, etc.)
+    - No imports (validated by _validate_code above)
+    - Only whitelisted simple builtin functions
+    - No access to dunder attributes (validated by _validate_code above)
+    - Execution timeout via the existing threading mechanism
+    - stdout/stderr capture
+    """
+    # Strictly allow-listed builtins - no dangerous functions at all.
     safe_builtins = {
         "abs": abs,
         "all": all,
@@ -77,12 +114,13 @@ def _run_user_code(code: str) -> PythonExecuteResponse:
         "sum": sum,
         "tuple": tuple,
     }
-    globals_env = {"__builtins__": safe_builtins}
+    # Completely empty globals - no module-level references at all.
+    globals_env: dict[str, object] = {"__builtins__": safe_builtins}
     locals_env: dict[str, object] = {}
     stdout_buf = io.StringIO()
     try:
         with redirect_stdout(stdout_buf):
-            exec(code, globals_env, locals_env)  # noqa: S102
+            exec(code, globals_env, locals_env)  # security: sandboxed by validate_code + restricted builtins
         return PythonExecuteResponse(stdout=stdout_buf.getvalue(), stderr="", result=locals_env.get("result"), timed_out=False)
     except Exception:
         return PythonExecuteResponse(stdout=stdout_buf.getvalue(), stderr=traceback.format_exc(limit=1), result=None, timed_out=False)

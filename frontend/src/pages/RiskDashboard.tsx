@@ -37,6 +37,16 @@ import { TerminalButton } from "../components/terminal/TerminalButton";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { useStockStore } from "../store/stockStore";
 import type { PortfolioItem } from "../types";
+import type {
+  RiskSummaryData,
+  RiskExposureData,
+  RiskCorrelationData,
+  SectorConcentrationData,
+  FactorExposureData,
+  FactorAttributionData,
+  FactorHistoryData,
+  FactorReturnsData,
+} from "../types/risk";
 
 const COLORS = ["#26A65B", "#E84142", "#F39C12", "#5B8FF9", "#9B59B6", "#E67E22", "#1ABC9C"];
 const FACTOR_ORDER = ["market", "size", "value", "momentum", "quality", "low_vol"] as const;
@@ -73,14 +83,14 @@ export function RiskDashboardPage() {
   const [tab, setTab] = useState<"overview" | "factors" | "stress">("overview");
   const [mode, setMode] = useState<"portfolio" | "ticker">("portfolio");
   const [factorPeriod, setFactorPeriod] = useState<(typeof PERIODS)[number]>("1Y");
-  const [summary, setSummary] = useState<any>(null);
-  const [exposures, setExposures] = useState<any>(null);
-  const [correlation, setCorrelation] = useState<any>(null);
-  const [concentration, setConcentration] = useState<any>(null);
-  const [factorExposures, setFactorExposures] = useState<any>(null);
-  const [factorAttribution, setFactorAttribution] = useState<any>(null);
-  const [factorHistory, setFactorHistory] = useState<any>(null);
-  const [factorReturns, setFactorReturns] = useState<any>(null);
+  const [summary, setSummary] = useState<RiskSummaryData | null>(null);
+  const [exposures, setExposures] = useState<RiskExposureData | null>(null);
+  const [correlation, setCorrelation] = useState<RiskCorrelationData | null>(null);
+  const [concentration, setConcentration] = useState<SectorConcentrationData | null>(null);
+  const [factorExposures, setFactorExposures] = useState<FactorExposureData | null>(null);
+  const [factorAttribution, setFactorAttribution] = useState<FactorAttributionData | null>(null);
+  const [factorHistory, setFactorHistory] = useState<FactorHistoryData | null>(null);
+  const [factorReturns, setFactorReturns] = useState<FactorReturnsData | null>(null);
   const [hiddenFactors, setHiddenFactors] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [factorLoading, setFactorLoading] = useState(false);
@@ -143,7 +153,7 @@ export function RiskDashboardPage() {
   }, [tab, factorPeriod]);
 
   const pcaData =
-    exposures?.pca_factors?.map((f: any) => ({
+    exposures?.pca_factors?.map((f: { factor: string; variance_explained: number }) => ({
       name: f.factor,
       variance: Number((f.variance_explained * 100).toFixed(1)),
     })) || [];
@@ -172,7 +182,7 @@ export function RiskDashboardPage() {
   const factorExposureData = useMemo(
     () =>
       FACTOR_ORDER.map((factor) => {
-        const row = factorExposures?.exposures?.[factor] || {};
+        const row: { exposure?: number; confidence?: number; t_stat?: number } = factorExposures?.exposures?.[factor] || {};
         const exposure = Number(row.exposure || 0);
         const confidence = Number(row.confidence || 0);
         const ci = Math.max(0.05, Math.abs(exposure) * (1 - Math.min(confidence, 0.95)));
@@ -400,7 +410,7 @@ export function RiskDashboardPage() {
                     <YAxis axisLine={{ stroke: "#333" }} stroke="#666" tick={{ fill: "#888" }} fontSize={10} unit="%" />
                     <Tooltip contentStyle={{ backgroundColor: "#0a0a0a", border: "1px solid #333", fontSize: "10px", borderRadius: "2px" }} itemStyle={{ color: "#26A65B" }} cursor={{ fill: "#ffffff11" }} />
                     <Bar dataKey="variance" fill="#26A65B" name="Variance Explained" barSize={30}>
-                      {pcaData.map((_entry: any, index: number) => (
+                      {pcaData.map((_entry, index: number) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} opacity={0.8} />
                       ))}
                     </Bar>
@@ -421,7 +431,10 @@ export function RiskDashboardPage() {
                       outerRadius={80}
                       paddingAngle={5}
                       dataKey="value"
-                      label={({ name, percent }: any) => `${name} ${(Number(percent || 0) * 100).toFixed(0)}%`}
+                      label={(props: unknown) => {
+                          const { name, percent } = props as { name: string; percent: number };
+                          return `${name} ${(Number(percent || 0) * 100).toFixed(0)}%`;
+                        }}
                       labelLine={false}
                       stroke="#000"
                       strokeWidth={2}
@@ -458,21 +471,24 @@ export function RiskDashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {correlation?.matrix?.map((row: number[], idx: number) => (
-                    <tr key={idx} className="transition-colors hover:bg-terminal-border/10">
-                      <td className="border border-terminal-border bg-terminal-panel p-2 text-left font-bold uppercase">{correlation.assets[idx]}</td>
-                      {row.map((val, cIdx) => {
-                        const absVal = Math.abs(val);
-                        const color = val > 0.7 ? "#26A65B" : val < -0.7 ? "#E84142" : "inherit";
-                        const opacity = absVal < 0.2 ? 0.3 : absVal < 0.5 ? 0.6 : 1;
-                        return (
-                          <td key={cIdx} className="border border-terminal-border p-2 tabular-nums" style={{ color, opacity }}>
-                            {val.toFixed(2)}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
+{correlation?.matrix?.map((row: number[], idx: number) => {
+                      const assets = correlation.assets || [];
+                      return (
+                        <tr key={idx} className="transition-colors hover:bg-terminal-border/10">
+                          <td className="border border-terminal-border bg-terminal-panel p-2 text-left font-bold uppercase">{assets[idx]}</td>
+                          {row.map((val, cIdx) => {
+                            const absVal = Math.abs(val);
+                            const color = val > 0.7 ? "#26A65B" : val < -0.7 ? "#E84142" : "inherit";
+                            const opacity = absVal < 0.2 ? 0.3 : absVal < 0.5 ? 0.6 : 1;
+                            return (
+                              <td key={cIdx} className="border border-terminal-border p-2 tabular-nums" style={{ color, opacity }}>
+                                {val.toFixed(2)}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
@@ -492,14 +508,14 @@ export function RiskDashboardPage() {
                     <YAxis type="category" dataKey="label" width={80} stroke="#666" tick={{ fill: "#d8dde7" }} fontSize={11} />
                     <Tooltip
                       contentStyle={{ backgroundColor: "#0a0a0a", border: "1px solid #333", fontSize: "10px", borderRadius: "2px" }}
-                      formatter={(value, key, item: any) => {
+                      formatter={(value, key, item) => {
                         if (key === "exposure") return [fmtSigned(Number(value), 2), "Exposure"];
                         return [String(value), item?.payload?.label || key || "Value"];
                       }}
                     />
                     <ReferenceLine x={0} stroke="#5c6677" />
                     <Bar dataKey="exposure" radius={[0, 4, 4, 0]}>
-                      <LabelList dataKey="exposure" position="right" formatter={(value: any) => fmtSigned(Number(value), 2)} fill="#d8dde7" fontSize={10} />
+                      <LabelList dataKey="exposure" position="right" formatter={(value) => fmtSigned(Number(value), 2)} fill="#d8dde7" fontSize={10} />
                       <ErrorBar dataKey="confidenceInterval" width={4} strokeWidth={1.5} stroke="#d8dde7" />
                       {factorExposureData.map((row) => (
                         <Cell key={row.factor} fill={row.exposure >= 0 ? "#5B8FF9" : "#F39C12"} />
@@ -549,7 +565,7 @@ export function RiskDashboardPage() {
                     <YAxis stroke="#666" tick={{ fill: "#888" }} fontSize={10} tickFormatter={(value) => `${(Number(value) * 100).toFixed(1)}%`} />
                     <Tooltip
                       contentStyle={{ backgroundColor: "#0a0a0a", border: "1px solid #333", fontSize: "10px", borderRadius: "2px" }}
-                      formatter={(_value, key, item: any) => {
+                      formatter={(_value, key, item) => {
                         if (key === "signedContribution") return [fmtPct(item?.payload?.signedContribution || 0), item?.payload?.label || "Contribution"];
                         if (key === "runningTotal") return [fmtPct(item?.payload?.runningTotal || 0), "Running Total"];
                         return [String(_value), key || "Value"];
@@ -610,7 +626,7 @@ export function RiskDashboardPage() {
                         FACTOR_LABELS[(name || "") as keyof typeof FACTOR_LABELS] || name || "Factor",
                       ]}
                     />
-                  <Legend onClick={(entry: any) => toggleFactor(String(entry.dataKey || ""))} />
+                  <Legend onClick={(entry) => toggleFactor(String(entry.dataKey || ""))} />
                   <ReferenceLine y={0} stroke="#d8dde7" strokeWidth={1.5} />
                   {FACTOR_ORDER.map((factor) =>
                     hiddenFactors.includes(factor) ? null : (

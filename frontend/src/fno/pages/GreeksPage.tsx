@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
+import { ErrorBoundary } from "../../components/common/ErrorBoundary";
 import { fetchGreeks } from "../api/fnoApi";
 import { GreeksHeatmap } from "../components/GreeksHeatmap";
 import { useFnoContext } from "../FnoLayout";
@@ -37,7 +38,8 @@ export function GreeksPage() {
   }, [query.data?.strikes, query.data?.spot_price, side]);
 
   return (
-    <div className="space-y-3">
+    <ErrorBoundary>
+      <div className="space-y-3">
       <div className="flex items-center gap-2 rounded border border-terminal-border bg-terminal-panel px-3 py-2 text-xs">
         <span className="uppercase text-terminal-muted">Leg</span>
         {(["CE", "PE"] as const).map((item) => (
@@ -89,6 +91,7 @@ export function GreeksPage() {
           </div>
         </>
       )}
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }

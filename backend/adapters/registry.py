@@ -8,6 +8,7 @@ import yaml
 
 from backend.adapters.base import DataAdapter
 from backend.adapters.alpaca import AlpacaAdapter
+from backend.adapters.alpha_vantage import AlphaVantageAdapter
 from backend.adapters.crypto import CryptoDataAdapter
 from backend.adapters.kite import KiteAdapter
 from backend.adapters.mock import MockDataAdapter
@@ -32,6 +33,7 @@ class AdapterRegistry:
         self.cooldown_seconds = cooldown_seconds
         self._factory = {
             "alpaca": lambda: AlpacaAdapter(),
+            "alpha_vantage": lambda: AlphaVantageAdapter(),
             "kite": lambda: KiteAdapter(),
             "yahoo": lambda: YahooFinanceAdapter(),
             "us_options": lambda: USOptionsAdapter(),

@@ -106,7 +106,7 @@ export function AlertToasts() {
   if (!toasts.length) return null;
 
   return (
-    <TerminalToastViewport className="top-auto bottom-8">
+    <TerminalToastViewport className="top-auto bottom-8" aria-live="polite" aria-label="Alert notifications">
       {toasts.map((toast) => (
         <TerminalToast
           key={toast.id}
@@ -117,6 +117,7 @@ export function AlertToasts() {
             <button
               type="button"
               onClick={() => setToasts((prev) => prev.filter((item) => item.id !== toast.id))}
+              aria-label={`Dismiss ${toast.title || toast.message} alert`}
               className="rounded-sm border border-terminal-border px-2 py-0.5 text-[11px] text-terminal-muted hover:text-terminal-text"
             >
               Dismiss

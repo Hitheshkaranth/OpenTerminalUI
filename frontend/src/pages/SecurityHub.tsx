@@ -494,7 +494,7 @@ export function SecurityHubPage() {
         {tab === "news" ? (
           <TerminalPanel title="News" subtitle={`Ticker-specific news (${activeTicker})`}>
             <div className="mb-2">
-              <SentimentChart data={tickerSentimentQuery.data?.daily_sentiment ?? []} height={140} />
+              <SentimentChart data={(tickerSentimentQuery.data?.daily_sentiment ?? []) as Array<{ date: string; avg_score: number; count?: number }>} height={140} />
             </div>
             <div
               className="max-h-[360px] overflow-auto"

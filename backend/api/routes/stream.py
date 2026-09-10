@@ -1,17 +1,61 @@
 from __future__ import annotations
 
 import logging
+import os
+import secrets
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from jose import jwt, JWTError
 
 from backend.services.marketdata_hub import get_marketdata_hub
 from backend.services.orderbook_service import service as orderbook_service
 from backend.services.us_tick_stream import get_us_tick_stream_service
+from backend.config.security import get_jwt_secret
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 service = orderbook_service
+
+# Allowed CORS origins for WebSocket connections (mirror of CORS allowlist)
+_WS_ORIGIN_ALLOWLIST = frozenset(
+    [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+    ]
+)
+
+
+def _validate_ws_origin(header: str | None) -> bool:
+    """Check that the WebSocket Origin header is in the allowlist."""
+    if not header:
+        return False
+    origin = header.strip()
+    if origin in _WS_ORIGIN_ALLOWLIST:
+        return True
+    # Also allow localhost variants that might differ in port
+    try:
+        from urllib.parse import urlparse
+
+        parsed = urlparse(origin)
+        if parsed.hostname in {"localhost", "127.0.0.1"}:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _validate_ws_jwt(token: str) -> dict | None:
+    """Validate a JWT from a query param or header, return payload or None."""
+    try:
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=["HS256"])
+        if str(payload.get("type", "")) == "access":
+            return payload
+    except (JWTError, Exception):
+        pass
+    return None
 
 
 def _symbols_from_payload(payload: dict[str, Any]) -> list[str]:
@@ -46,6 +90,42 @@ def _market_from_payload(payload: dict[str, Any]) -> str:
     return "US"
 
 
+async def _authenticate_ws(websocket: WebSocket) -> bool:
+    """Validate Origin header and JWT token on WebSocket connection.
+
+    Returns True if authentication passes, False if we should close the connection.
+    """
+    origin = websocket.headers.get("origin") or websocket.headers.get("Origin")
+    if not _validate_ws_origin(origin):
+        try:
+            await websocket.close(code=403, reason="Origin not allowed")
+        except Exception:
+            pass
+        return False
+
+    # Extract JWT from query parameter (e.g. ?token=eyJ...) or Authorization header
+    token = None
+    # Check query parameters first (common for WebSocket connections)
+    query_params = websocket.query_params
+    candidate = query_params.get("token") or query_params.get("access_token")
+    if candidate:
+        token = candidate
+    else:
+        # Check Authorization header
+        auth_header = websocket.headers.get("authorization") or websocket.headers.get("Authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
+            token = auth_header.split(" ", 1)[1].strip()
+
+    if token and not _validate_ws_jwt(token):
+        try:
+            await websocket.close(code=401, reason="Invalid or expired token")
+        except Exception:
+            pass
+        return False
+
+    return True
+
+
 async def _send_depth_snapshots(websocket: WebSocket, symbols: list[str], market: str, levels: int = 10) -> None:
     for symbol in symbols:
         snapshot = service.stream_message(symbol, market_hint=market, levels=levels)
@@ -55,6 +135,8 @@ async def _send_depth_snapshots(websocket: WebSocket, symbols: list[str], market
 @router.websocket("/ws/quotes")
 async def ws_quotes(websocket: WebSocket) -> None:
     hub = get_marketdata_hub()
+    if not await _authenticate_ws(websocket):
+        return
     await websocket.accept()
     await hub.register(websocket)
 
@@ -103,6 +185,8 @@ async def ws_quotes(websocket: WebSocket) -> None:
 @router.websocket("/ws/alerts")
 async def ws_alerts(websocket: WebSocket) -> None:
     hub = get_marketdata_hub()
+    if not await _authenticate_ws(websocket):
+        return
     await websocket.accept()
     await hub.register_alert_socket(websocket)
     try:
@@ -124,6 +208,8 @@ async def ws_alerts(websocket: WebSocket) -> None:
 @router.websocket("/ws/us-quotes")
 async def ws_us_quotes(websocket: WebSocket) -> None:
     us_service = get_us_tick_stream_service()
+    if not await _authenticate_ws(websocket):
+        return
     await websocket.accept()
     await us_service.register(websocket)
     try:
@@ -162,6 +248,8 @@ async def ws_us_quotes(websocket: WebSocket) -> None:
 
 @router.websocket("/ws/depth")
 async def ws_depth(websocket: WebSocket) -> None:
+    if not await _authenticate_ws(websocket):
+        return
     await websocket.accept()
     await websocket.send_json({"type": "ready", "channels": ["depth"]})
     try:

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import type { Bar } from "oakscriptjs";
 
+import type { Trade } from "../types/backtesting";
 import {
   explainBacktest,
   fetchActiveDataVersion,
@@ -288,7 +289,7 @@ function aggregateBars(input: Bar[], tf: BacktestTimeframe): Bar[] {
       high: Math.max(...sorted.map((x) => Number(x.high))),
       low: Math.min(...sorted.map((x) => Number(x.low))),
       close: Number(last.close),
-      volume: sorted.reduce((acc: number, x: any) => acc + Number(x.volume ?? 0), 0),
+      volume: sorted.reduce((acc: number, x: Bar) => acc + Number(x.volume ?? 0), 0),
     });
   }
   return out.sort((a, b) => Number(a.time) - Number(b.time));
@@ -298,7 +299,7 @@ function toBarsFromEquityCurve(
   equityCurve: Array<{ date: string; equity?: number; open?: number; high?: number; low?: number; close?: number; position?: number }>,
 ): Bar[] {
   return equityCurve
-    .map((p: any) => {
+    .map((p: { date: string; equity?: number; close?: number; open?: number; high?: number; low?: number; position?: number }) => {
       const ts = toUnixSeconds(p.date);
       const close = Number((p as { close?: number; equity?: number }).close ?? (p as { equity?: number }).equity);
       const open = Number((p as { open?: number }).open ?? close);
@@ -333,7 +334,7 @@ function mapTradeMarkersToTimeframe(
     const key = bucketKey(Number(b.time), timeframe);
     if (key !== "invalid") keyToTime.set(key, Number(b.time));
   }
-  return trades.map((m: any) => {
+  return trades.map((m: { date: string; price: number; action: string }) => {
     const ts = toUnixSeconds(m.date);
     const key = bucketKey(ts, timeframe);
     const mapped = key !== "invalid" ? keyToTime.get(key) : undefined;
@@ -716,11 +717,11 @@ export function BacktestingPage() {
 
   const equityData = result?.result?.equity_curve || [];
   const trades = result?.result?.trades || [];
-  const tradeMarkers = useMemo(() => trades.map((t: any) => ({ date: t.date, price: t.price, action: t.action.toUpperCase() })), [trades]);
-  const totalTradeQty = useMemo(() => trades.reduce((acc: number, trade: any) => acc + Math.abs(trade.quantity), 0), [trades]);
+  const tradeMarkers = useMemo(() => (trades as Trade[]).map((t) => ({ date: t.date, price: t.price, action: t.action.toUpperCase() })), [trades]);
+  const totalTradeQty = useMemo(() => (trades as Trade[]).reduce((acc: number, trade) => acc + Math.abs(trade.quantity), 0), [trades]);
   const transactionCostBps = 10;
   const turnoverNotional = useMemo(
-    () => trades.reduce((acc: number, t: any) => acc + Math.abs(Number(t.quantity) * Number(t.price)), 0),
+    () => (trades as Trade[]).reduce((acc: number, t) => acc + Math.abs(Number(t.quantity) * Number(t.price)), 0),
     [trades],
   );
   const estimatedTxnCost = (turnoverNotional * transactionCostBps) / 10000;
@@ -886,8 +887,8 @@ export function BacktestingPage() {
     }
     const winning = scatter.filter((s) => s.pnl > 0);
     const losing = scatter.filter((s) => s.pnl <= 0);
-    const totalWinPnl = winning.reduce((a: number, b: any) => a + b.pnl, 0);
-    const totalLossPnl = Math.abs(losing.reduce((a: number, b: any) => a + b.pnl, 0));
+    const totalWinPnl = winning.reduce((a: number, b) => a + b.pnl, 0);
+    const totalLossPnl = Math.abs(losing.reduce((a: number, b) => a + b.pnl, 0));
     const totalTrades = scatter.length;
     const summary: Record<string, number> = {
       total_trades: totalTrades,
@@ -895,12 +896,12 @@ export function BacktestingPage() {
       losing_trades: losing.length,
       win_rate: totalTrades ? (winning.length / totalTrades) * 100 : 0,
       avg_win: winning.length ? totalWinPnl / winning.length : 0,
-      avg_loss: losing.length ? losing.reduce((a: number, b: any) => a + b.pnl, 0) / losing.length : 0,
+      avg_loss: losing.length ? losing.reduce((a: number, b) => a + b.pnl, 0) / losing.length : 0,
       profit_factor: totalLossPnl ? totalWinPnl / totalLossPnl : 0,
-      expectancy: totalTrades ? scatter.reduce((a: number, b: any) => a + b.pnl, 0) / totalTrades : 0,
+      expectancy: totalTrades ? scatter.reduce((a: number, b) => a + b.pnl, 0) / totalTrades : 0,
       largest_win: winning.length ? Math.max(...winning.map((w) => w.pnl)) : 0,
       largest_loss: losing.length ? Math.min(...losing.map((l) => l.pnl)) : 0,
-      avg_holding_days: totalTrades ? scatter.reduce((a: number, b: any) => a + b.holding_days, 0) / totalTrades : 0,
+      avg_holding_days: totalTrades ? scatter.reduce((a: number, b) => a + b.holding_days, 0) / totalTrades : 0,
     };
 
     return {
@@ -1088,14 +1089,14 @@ export function BacktestingPage() {
       const tradeEnd = Math.max(tradeStart + 1, Math.floor(((x + 1) / bucketX) * tradesSeries.length));
       const tradeSlice = tradesSeries.slice(tradeStart, tradeEnd);
       const avgPrice = tradeSlice.length
-        ? tradeSlice.reduce((acc: number, t: any) => acc + Number(t.price || 0), 0) / tradeSlice.length
+        ? tradeSlice.reduce((acc: number, t) => acc + Number(t.price || 0), 0) / tradeSlice.length
         : 0;
       for (let y = 0; y < bucketY; y += 1) {
         const curveStart = Math.floor((y / bucketY) * curve.length);
         const curveEnd = Math.max(curveStart + 1, Math.floor(((y + 1) / bucketY) * curve.length));
         const curveSlice = curve.slice(curveStart, curveEnd);
         const avgEquity = curveSlice.length
-          ? curveSlice.reduce((acc: number, p: any) => acc + Number(p.equity || 0), 0) / curveSlice.length
+          ? curveSlice.reduce((acc: number, p) => acc + Number(p.equity || 0), 0) / curveSlice.length
           : 0;
         const depthProxy = Math.max(0, (tradeSlice.length * 8) + (avgEquity > 0 ? (avgEquity / 100000) : 0));
         const spreadProxy = avgPrice > 0 ? (1 / avgPrice) * 10000 : 0;
@@ -1113,13 +1114,13 @@ export function BacktestingPage() {
 
   const orderbookAvgDepth = useMemo(() => {
     if (!orderbookLiquidityPoints.length) return 0;
-    return orderbookLiquidityPoints.reduce((acc: number, p: any) => acc + p.z, 0) / orderbookLiquidityPoints.length;
+    return orderbookLiquidityPoints.reduce((acc: number, p) => acc + p.z, 0) / orderbookLiquidityPoints.length;
   }, [orderbookLiquidityPoints]);
 
   const orderbookSpreadBps = useMemo(() => {
     const tradesSeries = result?.result?.trades || [];
     if (!tradesSeries.length) return 0;
-    const avgPrice = tradesSeries.reduce((acc: number, t: any) => acc + Number(t.price || 0), 0) / tradesSeries.length;
+    const avgPrice = (tradesSeries as Trade[]).reduce((acc: number, t) => acc + Number(t.price || 0), 0) / tradesSeries.length;
     return avgPrice > 0 ? (1 / avgPrice) * 10000 : 0;
   }, [result]);
 
@@ -1151,7 +1152,7 @@ export function BacktestingPage() {
   const impliedAtmIvPct = useMemo(() => {
     if (!impliedVolatilitySurfacePoints.length) return 0;
     const atm = impliedVolatilitySurfacePoints.filter((p) => p.y === 3 || p.y === 4);
-    const avg = atm.length ? atm.reduce((acc: number, p: any) => acc + p.z, 0) / atm.length : 0;
+    const avg = atm.length ? atm.reduce((acc: number, p) => acc + p.z, 0) / atm.length : 0;
     return avg * 10;
   }, [impliedVolatilitySurfacePoints]);
 
@@ -1159,8 +1160,8 @@ export function BacktestingPage() {
     if (!impliedVolatilitySurfacePoints.length) return 0;
     const left = impliedVolatilitySurfacePoints.filter((p) => p.y <= 2);
     const right = impliedVolatilitySurfacePoints.filter((p) => p.y >= 5);
-    const leftAvg = left.length ? left.reduce((acc: number, p: any) => acc + p.z, 0) / left.length : 0;
-    const rightAvg = right.length ? right.reduce((acc: number, p: any) => acc + p.z, 0) / right.length : 0;
+    const leftAvg = left.length ? left.reduce((acc: number, p) => acc + p.z, 0) / left.length : 0;
+    const rightAvg = right.length ? right.reduce((acc: number, p) => acc + p.z, 0) / right.length : 0;
     return leftAvg - rightAvg;
   }, [impliedVolatilitySurfacePoints]);
 
@@ -1191,7 +1192,7 @@ export function BacktestingPage() {
 
   const realizedVolPct = useMemo(() => {
     if (!volatilitySurfacePoints.length) return 0;
-    const avg = volatilitySurfacePoints.reduce((acc: number, p: any) => acc + p.z, 0) / volatilitySurfacePoints.length;
+    const avg = volatilitySurfacePoints.reduce((acc: number, p) => acc + p.z, 0) / volatilitySurfacePoints.length;
     return avg * 1.5;
   }, [volatilitySurfacePoints]);
 
@@ -1199,8 +1200,8 @@ export function BacktestingPage() {
     if (!volatilitySurfacePoints.length) return 0;
     const near = volatilitySurfacePoints.filter((p) => p.x <= 1);
     const far = volatilitySurfacePoints.filter((p) => p.x >= 6);
-    const nearAvg = near.length ? near.reduce((acc: number, p: any) => acc + p.z, 0) / near.length : 0;
-    const farAvg = far.length ? far.reduce((acc: number, p: any) => acc + p.z, 0) / far.length : 0;
+    const nearAvg = near.length ? near.reduce((acc: number, p) => acc + p.z, 0) / near.length : 0;
+    const farAvg = far.length ? far.reduce((acc: number, p) => acc + p.z, 0) / far.length : 0;
     return farAvg - nearAvg;
   }, [volatilitySurfacePoints]);
 
@@ -1588,7 +1589,7 @@ export function BacktestingPage() {
           <div className="grid grid-cols-1 gap-2 text-xs md:grid-cols-8">
             <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Asset (Ticker)</span><div className="relative"><input className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs uppercase" value={asset} onChange={(e) => { const raw = e.target.value.toUpperCase().trim(); const prefixed = raw.match(/^(NSE|BSE|NYSE|NASDAQ|AMEX):([A-Z0-9._-]+)$/); if (prefixed) { const ex = prefixed[1] as BacktestMarket; setMarket(ex); setAsset(prefixed[2]); } else { if (raw.endsWith(".NS")) setMarket("NSE"); if (raw.endsWith(".BO")) setMarket("BSE"); setAsset(raw); } setShowAssetSuggestions(true); }} onFocus={() => setShowAssetSuggestions(true)} onBlur={() => window.setTimeout(() => setShowAssetSuggestions(false), 150)} />{showAssetSuggestions && assetSuggestions.length > 0 && <div className="absolute left-0 right-0 top-[calc(100%+2px)] z-20 max-h-48 overflow-auto rounded border border-terminal-border bg-terminal-panel shadow-lg">{assetSuggestions.map((item) => (<button key={`${item.ticker}:${item.name}`} type="button" className="flex w-full items-center justify-between border-b border-terminal-border/40 px-2 py-1 text-left text-xs hover:bg-terminal-bg" onMouseDown={(e) => e.preventDefault()} onClick={() => { setAsset((item.ticker || "").toUpperCase()); const ex = (item.exchange || "").toUpperCase(); if (KNOWN_MARKETS.includes(ex as BacktestMarket)) setMarket(ex as BacktestMarket); setShowAssetSuggestions(false); }}><span>{item.ticker}</span><span className="ml-2 truncate text-[10px] text-terminal-muted">{item.name}</span></button>))}</div>}</div></label>
             <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Market</span><select className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs uppercase" value={market} onChange={(e) => setMarket(e.target.value as BacktestMarket)}><option value="NSE">NSE</option><option value="BSE">BSE</option><option value="NYSE">NYSE</option><option value="NASDAQ">NASDAQ</option><option value="AMEX">AMEX</option></select></label>
-            <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Data TF</span><select className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={dataTimeframe} onChange={(e) => setDataTimeframe(e.target.value as any)}><option value="1d">Daily</option><option value="1h">1 Hour</option><option value="15m">15 Min</option><option value="5m">5 Min</option><option value="1m">1 Min</option></select></label>
+            <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Data TF</span><select className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={dataTimeframe} onChange={(e) => setDataTimeframe(e.target.value as "1m" | "5m" | "15m" | "1h" | "1d")}><option value="1d">Daily</option><option value="1h">1 Hour</option><option value="15m">15 Min</option><option value="5m">5 Min</option><option value="1m">1 Min</option></select></label>
             <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Start</span><input type="date" className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={start} onChange={(e) => setStart(e.target.value)} min={dataTimeframe !== "1d" ? new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined} /></label>
             <label className="md:col-span-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">End</span><input type="date" className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
             <label className="md:col-span-2"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Model</span><select className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs" value={strategyMode} onChange={(e) => setStrategyMode(e.target.value)}>{STRATEGY_CATALOG.map((opt) => <option key={opt.key} value={opt.key}>[{opt.category.toUpperCase()}] {opt.label}</option>)}<option value={CUSTOM_STRATEGY_VALUE}>Custom Python Script</option></select></label>

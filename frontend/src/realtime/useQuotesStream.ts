@@ -1,6 +1,8 @@
 import { useCallback, useEffect } from "react";
 import { create } from "zustand";
 
+import { getCsrfToken } from "../lib/csrf";
+
 export type QuotesConnectionState = "connecting" | "connected" | "disconnected";
 
 export type QuoteTick = {
@@ -31,11 +33,11 @@ type QuotesStore = {
   connectionState: QuotesConnectionState;
   ticksByToken: Record<string, QuoteTick>;
   candlesByKey: Record<string, QuoteCandle>;
-  marketStatus: any | null;
+  marketStatus: Record<string, unknown> | null;
   setConnectionState: (state: QuotesConnectionState) => void;
   upsertTick: (tick: QuoteTick) => void;
   upsertCandle: (candle: QuoteCandle) => void;
-  setMarketStatus: (status: any) => void;
+  setMarketStatus: (status: Record<string, unknown>) => void;
 };
 
 export const useQuotesStore = create<QuotesStore>((set) => ({
@@ -77,17 +79,20 @@ function parseToken(token: string): { market: string; symbol: string } | null {
 
 function buildQuotesWsUrl(): string {
   const apiBase = String(import.meta.env.VITE_API_BASE_URL || "/api").trim();
+  const token = getCsrfToken();
+  const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
   if (apiBase.startsWith("http://") || apiBase.startsWith("https://")) {
     const url = new URL(apiBase);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     url.pathname = `${url.pathname.replace(/\/+$/, "")}/ws/quotes`;
+    url.search = tokenParam.replace("?", "");
     return url.toString();
   }
 
-  if (typeof window === "undefined") return "/api/ws/quotes";
+  if (typeof window === "undefined") return `/api/ws/quotes${tokenParam}`;
   const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const normalizedBase = apiBase.startsWith("/") ? apiBase : `/${apiBase}`;
-  return `${wsProtocol}//${window.location.host}${normalizedBase.replace(/\/+$/, "")}/ws/quotes`;
+  return `${wsProtocol}//${window.location.host}${normalizedBase.replace(/\/+$/, "")}/ws/quotes${tokenParam}`;
 }
 
 class QuotesWsManager {

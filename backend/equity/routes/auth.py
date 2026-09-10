@@ -4,7 +4,9 @@ import re
 import secrets
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -15,6 +17,9 @@ from backend.models.user import RefreshToken, User, UserRole
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Rate limiter: 5 requests per minute on login, 3 per hour on forgot-access.
+limiter = Limiter(key_func=get_remote_address)
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -116,7 +121,8 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> UserRes
 
 
 @router.post("/login", response_model=TokenPairResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenPairResponse:
+@limiter.limit("5/minute")
+def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)) -> TokenPairResponse:
     email = _normalize_email(payload.email)
     user = db.query(User).filter(User.email == email).first()
     if not user or not pwd_context.verify(payload.password, user.hashed_password):
@@ -162,7 +168,8 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenPair
 
 
 @router.post("/forgot-access", status_code=204)
-def forgot_access(payload: ForgotAccessRequest, db: Session = Depends(get_db)) -> None:
+@limiter.limit("3/hour")
+def forgot_access(request: Request, payload: ForgotAccessRequest, db: Session = Depends(get_db)) -> None:
     email = _normalize_email(payload.email)
     _validate_email(email)
     _validate_password(payload.new_password)

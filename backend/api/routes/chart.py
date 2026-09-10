@@ -14,9 +14,12 @@ from sqlalchemy.orm import Session
 from backend.api.deps import cache_instance, get_chart_provider, get_unified_fetcher
 from backend.api.deps import get_db
 from backend.auth.deps import get_current_user
+from backend.config.constants import DEFAULT_CHART_LIMIT, MAX_CHART_LIMIT
 from backend.core.models import ChartResponse, IndicatorPoint, IndicatorResponse, OhlcvPoint
-from backend.core.technicals import compute_indicator
+from backend.core.technicals import compute_indicator as compute_indicator_pandas
+from backend.services.indicators import compute as compute_indicator_np, list_indicators as list_indicator_catalog
 from backend.models import ChartDrawing, ChartTemplate, User
+from backend.models.api_response import ApiResponse
 from backend.services.footprint_aggregator import FootprintAggregator, serialize_footprint_candle
 from backend.services.volume_profile_service import compute_volume_profile, parse_period_to_days
 
@@ -468,7 +471,7 @@ async def get_chart(
     start: Optional[str] = Query(default=None),
     end: Optional[str] = Query(default=None),
     normalized: bool = Query(default=False),
-    limit: int | None = Query(default=None, ge=1, le=5000),
+    limit: int | None = Query(default=None, ge=1, le=MAX_CHART_LIMIT),
     cursor: int | None = Query(default=None),
 ) -> Any:
     # Direct function calls in unit tests bypass FastAPI dependency parsing and can leave
@@ -632,6 +635,12 @@ async def get_chart(
     )
 
 
+@router.get("/indicators/list")
+async def list_indicators_endpoint() -> Dict[str, Any]:
+    """Return list of all available indicators."""
+    return {"indicators": list_indicator_catalog()}
+
+
 @router.get("/chart/{ticker}/indicators", response_model=IndicatorResponse)
 async def get_indicator(
     ticker: str,
@@ -671,11 +680,22 @@ async def get_indicator(
             params[key] = val
 
     try:
-        # compute_indicator is synchronous (pandas operations).
-        # Ideally run in threadpool if heavy, but for simple indicators it's fast enough.
-        indicator = compute_indicator(hist, type, params)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        # Try numpy-style indicators first (stochastic, adx, cci, etc.)
+        high = hist["High"].fillna(method="ffill").fillna(method="bfill").values if "High" in hist.columns else None
+        low = hist["Low"].fillna(method="ffill").fillna(method="bfill").values if "Low" in hist.columns else None
+        close = hist["Close"].fillna(method="ffill").fillna(method="bfill").values if "Close" in hist.columns else None
+        volume = hist["Volume"].values if "Volume" in hist.columns else None
+
+        indicator_result = compute_indicator_np(type, high=high, low=low, close=close, volume=volume, **params)
+        indicator = pd.DataFrame(index=hist.index)
+        for col_name, col_data in indicator_result.items():
+            indicator[col_name] = col_data[:len(hist)]
+    except Exception:
+        # Fall back to pandas-style indicators
+        try:
+            indicator = compute_indicator_pandas(hist, type, params)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     points: list[IndicatorPoint] = []
     for idx, row in indicator.iterrows():

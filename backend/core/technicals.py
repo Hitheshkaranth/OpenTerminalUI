@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 
@@ -76,6 +77,63 @@ def compute_indicator(df: pd.DataFrame, indicator_type: str, params: dict[str, i
     elif itype == "atr":
         period = int(params.get("period", 14))
         out["atr"] = atr(df, period)
+    elif itype == "stochastic":
+        k_period = int(params.get("period", 14))
+        d_smooth = int(params.get("signal", 3))
+        high_s = df["High"].fillna(method="ffill").fillna(method="bfill").values
+        low_s = df["Low"].fillna(method="ffill").fillna(method="bfill").values
+        close_s = df["Close"].fillna(method="ffill").fillna(method="bfill").values
+        low_min = pd.Series(low_s).rolling(k_period).min().values
+        high_max = pd.Series(high_s).rolling(k_period).max().values
+        denom = high_max - low_min
+        denom = np.where(denom == 0, 1.0, denom)
+        k = 100.0 * (close_s - low_min) / denom
+        d = pd.Series(k).rolling(d_smooth).mean().values
+        out["stoch_k"] = pd.Series(k).ffill().bfill()
+        out["stoch_d"] = pd.Series(d).ffill().bfill()
+    elif itype == "adx":
+        period = int(params.get("period", 14))
+        high_s = df["High"].values
+        low_s = df["Low"].values
+        close_s = df["Close"].values
+        up = np.diff(high_s, prepend=high_s[0])
+        dn = -np.diff(low_s, prepend=low_s[0])
+        plus_dm = np.where((up > dn) & (up > 0), up, 0.0)
+        minus_dm = np.where((dn > up) & (dn > 0), dn, 0.0)
+        tr = np.maximum(
+            high_s - low_s,
+            np.maximum(np.abs(high_s - np.roll(close_s, 1)), np.abs(low_s - np.roll(close_s, 1))),
+        )
+        atr = pd.Series(tr).rolling(period).mean()
+        plus_di = 100.0 * pd.Series(plus_dm).rolling(period).mean() / atr
+        minus_di = 100.0 * pd.Series(minus_dm).rolling(period).mean() / atr
+        dx = 100.0 * np.abs(plus_di - minus_di) / np.where(np.abs(plus_di + minus_di) == 0, 1.0, plus_di + minus_di)
+        out["adx"] = pd.Series(dx).rolling(period).mean().ffill().bfill()
+        out["plus_di"] = plus_di.ffill().bfill()
+        out["minus_di"] = minus_di.ffill().bfill()
+    elif itype == "cci":
+        period = int(params.get("period", 20))
+        high_s = df["High"].fillna(method="ffill").fillna(method="bfill").values
+        low_s = df["Low"].fillna(method="ffill").fillna(method="bfill").values
+        close_s = df["Close"].fillna(method="ffill").fillna(method="bfill").values
+        tp = (high_s + low_s + close_s) / 3.0
+        tp_s = pd.Series(tp)
+        sma_tp = tp_s.rolling(period).mean()
+        mad = tp_s.rolling(period).apply(lambda x: np.abs(x - sma_tp[x.name]).mean(), raw=True) if hasattr(tp_s.rolling(period), "apply") else tp_s.rolling(period).std() * np.sqrt(period / (period + 1))
+        mad = mad.ffill().bfill()
+        denom = 0.015 * mad
+        denom = np.where(denom == 0, 1.0, denom.values)
+        out["cci"] = ((tp - sma_tp.values) / denom).astype(float)
+    elif itype == "williams_r":
+        period = int(params.get("period", 14))
+        high_s = df["High"].fillna(method="ffill").fillna(method="bfill").values
+        low_s = df["Low"].fillna(method="ffill").fillna(method="bfill").values
+        close_s = df["Close"].fillna(method="ffill").fillna(method="bfill").values
+        hh = pd.Series(high_s).rolling(period).max()
+        ll = pd.Series(low_s).rolling(period).min()
+        denom = hh - ll
+        denom = np.where(denom == 0, 1.0, denom.values)
+        out["williams_r"] = (-100.0 * (hh.values - close_s) / denom)
     else:
         raise ValueError(f"Unsupported indicator type: {indicator_type}")
     return out

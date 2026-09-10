@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   BellIcon,
@@ -73,10 +73,43 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
   const markAsRead = useNotificationStore((s) => s.markAsRead);
   const markAllRead = useNotificationStore((s) => s.markAllRead);
   const dismiss = useNotificationStore((s) => s.dismiss);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void fetchNotifications(activeFilter === "all" ? undefined : activeFilter);
   }, [activeFilter, fetchNotifications]);
+
+  useEffect(() => {
+    if (!panelRef.current) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const focusableElements = panelRef.current?.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusableElements?.length) return;
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   const groupedNotifications = useMemo(() => groupNotifications(notifications), [notifications]);
 
@@ -92,7 +125,11 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
 
   return (
     <div
+      ref={panelRef}
       className="absolute right-0 top-11 z-40 w-[24rem] overflow-hidden rounded border border-terminal-border bg-terminal-panel shadow-2xl"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Notifications panel"
       data-testid="notification-panel"
     >
       <div className="flex items-center justify-between border-b border-terminal-border px-3 py-2">

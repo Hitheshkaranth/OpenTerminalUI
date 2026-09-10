@@ -12,11 +12,31 @@ from backend.shared.db import SessionLocal
 from backend.models.user import User
 
 
+# Development environments where auth can be relaxed.
+_DEV_ENVS = {"dev", "development", "local", "test", "testing"}
+
+
+def _runtime_env() -> str:
+    return (
+        os.getenv("OPENTERMINALUI_ENV")
+        or os.getenv("APP_ENV")
+        or os.getenv("ENV")
+        or "development"
+    ).strip().lower()
+
+
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
         auth_enabled = os.getenv("AUTH_MIDDLEWARE_ENABLED", "1") == "1"
-        if not auth_enabled or not path.startswith("/api") or auth_exempt_path(path):
+
+        # SECURITY: The AUTH_MIDDLEWARE_ENABLED toggle only applies in
+        # development environments.  In production, auth is always enforced.
+        _is_dev = _runtime_env() in _DEV_ENVS
+        if not _is_dev and not auth_enabled:
+            # In production, ignore the dev toggle and enforce auth.
+            pass
+        elif not auth_enabled or not path.startswith("/api") or auth_exempt_path(path):
             return await call_next(request)
 
         auth_header = request.headers.get("Authorization", "")

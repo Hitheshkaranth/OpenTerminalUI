@@ -620,7 +620,7 @@ export function NewsPage() {
               bearishPct={Number(summary.bearish_pct)}
               totalArticles={Number(summary.total_articles)}
               periodDays={periodDays}
-              dailySentiment={summary.daily_sentiment ?? []}
+              dailySentiment={(summary.daily_sentiment ?? []) as Array<{ date: string; avg_score: number; count: number }>}
               sectors={(marketSentimentQuery.data?.sectors ?? []).map((r) => ({ sector: String(r.sector), avg_sentiment: Number(r.avg_sentiment) }))}
               topSources={(sentimentSummaryQuery.data?.top_sources ?? []).map((r) => ({ source: String(r.source), count: Number(r.count) }))}
               keywordInput={keywordInput}

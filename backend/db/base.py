@@ -50,10 +50,34 @@ def _raw_database_url() -> str:
     return raw
 
 
+def _runtime_env() -> str:
+    """Determine the current runtime environment."""
+    return (
+        os.getenv("OPENTERMINALUI_ENV")
+        or os.getenv("APP_ENV")
+        or os.getenv("ENV")
+        or "development"
+    ).strip().lower()
+
+
+_DEV_ENVS = {"dev", "development", "local", "test", "testing"}
+
+
 def get_database_url() -> str:
     # Use DATABASE_URL if provided (e.g. for PostgreSQL in prod)
     # Otherwise use settings.sqlite_url (which already handles OPENTERMINALUI_SQLITE_URL)
     raw = _raw_database_url()
+
+    # SECURITY: SQLite is only allowed in development environments.
+    # Production must use PostgreSQL to ensure data integrity, concurrency,
+    # and proper security controls (row-level security, TLS, etc.).
+    if raw.startswith("sqlite") and _runtime_env() not in _DEV_ENVS:
+        raise RuntimeError(
+            f"SQLite is not permitted in {_runtime_env()!r} environment. "
+            "Set DATABASE_URL to a PostgreSQL connection string (e.g. "
+            "postgresql+asyncpg://user:pass@host:5432/dbname)."
+        )
+
     if raw.startswith("postgresql://"):
         return raw.replace("postgresql://", "postgresql+asyncpg://", 1)
 

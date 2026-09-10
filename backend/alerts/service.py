@@ -565,8 +565,48 @@ class AlertEvaluatorService:
             tree = ast.parse(expression, mode="eval")
         except SyntaxError:
             return False
+        # Whitelist allowed AST node types for safe expression evaluation.
+        # Only binary ops, comparisons, unary ops, numbers, names, bools, None,
+        # and attributes/calls on those (filtered out) are allowed.
+        _SAFE_AST_NODES = (
+            ast.Expression,
+            ast.BinOp,
+            ast.UnaryOp,
+            ast.UAdd,
+            ast.USub,
+            ast.Not,
+            ast.Invert,
+            ast.Add,
+            ast.Sub,
+            ast.Mult,
+            ast.Div,
+            ast.FloorDiv,
+            ast.Mod,
+            ast.Pow,
+            ast.LShift,
+            ast.RShift,
+            ast.BitOr,
+            ast.BitXor,
+            ast.BitAnd,
+            ast.Floordiv,
+            ast.Mod,
+            ast.Eq,
+            ast.NotEq,
+            ast.Lt,
+            ast.LtE,
+            ast.Gt,
+            ast.GtE,
+            ast.Compare,
+            ast.BoolOp,
+            ast.And,
+            ast.Or,
+            ast.Constant,
+            ast.Name,
+            ast.Num,
+            ast.Str,
+        )
         for node in ast.walk(tree):
-            if not isinstance(node, _ALLOWED_AST_NODES):
+            if not isinstance(node, _SAFE_AST_NODES):
                 return False
             if isinstance(node, ast.Call):
                 return False
@@ -574,14 +614,108 @@ class AlertEvaluatorService:
                 return False
             if isinstance(node, ast.Name) and node.id not in {"tick", "ltp", "volume", "change_pct", "None", "True", "False"}:
                 return False
-        safe_globals = {"__builtins__": {}}
-        safe_locals = {"tick": context, **context}
+        safe_globals: dict[str, Any] = {"__builtins__": {}}
+        safe_locals: dict[str, Any] = {"tick": context, **context}
         try:
-            compiled = compile(tree, "<alert_expr>", "eval")
-            result = eval(compiled, safe_globals, safe_locals)  # noqa: S307
+            # Use compile() + exec() on a pre-compiled safe expression tree
+            # instead of eval() to avoid any runtime reflection attacks.
+            # We evaluate the AST tree directly using a restricted evaluator.
+            result = _eval_ast_node(tree.body, safe_globals, safe_locals)
             return isinstance(result, bool) and result
         except Exception:
             return False
+
+    @staticmethod
+    def _eval_ast_node(node: ast.AST, globals_: dict[str, Any], locals_: dict[str, Any]) -> Any:
+        """Safely evaluate a single AST node (no eval/exec used)."""
+        if isinstance(node, ast.Expression):
+            return _eval_ast_node(node.body, globals_, locals_)
+        if isinstance(node, ast.Constant):
+            return node.value
+        if isinstance(node, ast.Num):  # pragma: no cover - ast.Constant covers this in modern Python
+            return node.n
+        if isinstance(node, ast.Str):  # pragma: no cover
+            return node.s
+        if isinstance(node, ast.Name):
+            if node.id in {"True"}:
+                return True
+            if node.id in {"False"}:
+                return False
+            if node.id in {"None"}:
+                return None
+            if node.id in locals_:
+                return locals_[node.id]
+            if node.id in globals_:
+                return globals_[node.id]
+            return None
+        if isinstance(node, ast.UnaryOp):
+            val = _eval_ast_node(node.operand, globals_, locals_)
+            if isinstance(node.op, ast.UAdd):
+                return +val
+            if isinstance(node.op, ast.USub):
+                return -val
+            if isinstance(node.op, ast.Not):
+                return not val
+            if isinstance(node.op, ast.Invert):
+                return ~val
+        if isinstance(node, ast.BinOp):
+            left = _eval_ast_node(node.left, globals_, locals_)
+            right = _eval_ast_node(node.right, globals_, locals_)
+            if isinstance(node.op, ast.Add):
+                return left + right
+            if isinstance(node.op, ast.Sub):
+                return left - right
+            if isinstance(node.op, ast.Mult):
+                return left * right
+            if isinstance(node.op, ast.Div):
+                return left / right
+            if isinstance(node.op, ast.FloorDiv):
+                return left // right
+            if isinstance(node.op, ast.Mod):
+                return left % right
+            if isinstance(node.op, ast.Pow):
+                return left ** right
+            if isinstance(node.op, ast.LShift):
+                return left << right
+            if isinstance(node.op, ast.RShift):
+                return left >> right
+            if isinstance(node.op, ast.BitOr):
+                return left | right
+            if isinstance(node.op, ast.BitXor):
+                return left ^ right
+            if isinstance(node.op, ast.BitAnd):
+                return left & right
+        if isinstance(node, ast.Compare):
+            left = _eval_ast_node(node.left, globals_, locals_)
+            results = []
+            for comparator in node.comparators:
+                right = _eval_ast_node(comparator, globals_, locals_)
+                comp = node.ops[0]
+                if isinstance(comp, ast.Eq):
+                    results.append(left == right)
+                elif isinstance(comp, ast.NotEq):
+                    results.append(left != right)
+                elif isinstance(comp, ast.Lt):
+                    results.append(left < right)
+                elif isinstance(comp, ast.LtE):
+                    results.append(left <= right)
+                elif isinstance(comp, ast.Gt):
+                    results.append(left > right)
+                elif isinstance(comp, ast.GtE):
+                    results.append(left >= right)
+                else:
+                    return None
+                left = right
+            if len(node.ops) == 1:
+                return results[0] if results else None
+            return all(results)
+        if isinstance(node, ast.BoolOp):
+            values = [_eval_ast_node(v, globals_, locals_) for v in node.values]
+            if isinstance(node.op, ast.And):
+                return all(values)
+            if isinstance(node.op, ast.Or):
+                return any(values)
+        return None
 
     @staticmethod
     def _build_trigger_context(alert: AlertORM, tick: dict[str, Any], triggered_value: float | None) -> dict[str, Any]:

@@ -112,3 +112,48 @@ label {
     --ot-density-row-default: 26px;
   }
 }
+
+@media (max-width: 768px) {
+  :root {
+    --ot-type-size-2xs: 9px;
+    --ot-type-size-xs: 10px;
+    --ot-type-size-sm: 11px;
+    --ot-type-size-md: 12px;
+    --ot-line-height-data: 1.35;
+    --ot-line-height-ui: 1.4;
+    --ot-type-heading-xl-size: 16px;
+    --ot-type-heading-lg-size: 14px;
+    --ot-type-table-cell-size: 10px;
+    --ot-type-table-header-size: 9px;
+    --ot-type-status-size: 9px;
+    --ot-type-badge-size: 9px;
+    --ot-density-row-default: 24px;
+  }
+
+  body {
+    font-size: 12px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--ot-color-border-default, #2a2f3a);
+  }
+}
+
+@media (max-width: 640px) {
+  #root {
+    min-height: 100dvh;
+  }
+
+  .ot-type-panel-title {
+    font-size: 11px !important;
+  }
+
+  .ot-type-panel-subtitle {
+    font-size: 10px !important;
+  }
+}

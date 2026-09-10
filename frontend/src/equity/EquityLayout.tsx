@@ -1,4 +1,4 @@
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
@@ -70,7 +70,10 @@ function EquityRightRail() {
     refetchInterval: 60_000,
     refetchOnWindowFocus: false,
   });
-  const activePaperPortfolioId = (paperPortfoliosQuery.data?.[0]?.id ?? "") as string;
+  const activePaperPortfolioId = useMemo(
+    () => (paperPortfoliosQuery.data?.[0]?.id ?? "") as string,
+    [paperPortfoliosQuery.data],
+  );
   const paperPositionsQuery = useQuery({
     queryKey: ["right-rail", "paper", "positions", activePaperPortfolioId],
     queryFn: () => fetchPaperPositions(activePaperPortfolioId),
@@ -161,7 +164,7 @@ function EquityRightRail() {
   const omsOrders = (omsOrdersQuery.data ?? []) as OmsOrder[];
   const omsAudit = (omsAuditQuery.data ?? []) as AuditEvent[];
 
-  const routeLabel = (() => {
+  const routeLabel = useMemo(() => {
     if (location.pathname.includes("/equity/stocks")) return "Market / Stock Detail";
     if (location.pathname.includes("/equity/screener")) return "Equity Screener";
     if (location.pathname.includes("/equity/portfolio")) return "Portfolio";
@@ -172,7 +175,7 @@ function EquityRightRail() {
     if (location.pathname.includes("/equity/news")) return "News";
     if (location.pathname.includes("/equity/watchlist")) return "Watchlist";
     return "Equity Workspace";
-  })();
+  }, [location.pathname]);
 
   const presetConfig = getWorkspacePresetConfig(preset);
   const quickLinks = presetConfig.quickLinks;

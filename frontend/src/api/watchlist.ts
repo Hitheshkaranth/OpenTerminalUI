@@ -16,7 +16,7 @@ export async function createWatchlist(name: string): Promise<Watchlist> {
   return data;
 }
 
-export async function updateWatchlist(id: string, payload: { name?: string; symbols?: string[]; column_config?: any }): Promise<Watchlist> {
+export async function updateWatchlist(id: string, payload: { name?: string; symbols?: string[]; column_config?: Record<string, unknown> }): Promise<Watchlist> {
   const { data } = await api.put<Watchlist>(`/watchlists/${id}`, payload);
   return data;
 }

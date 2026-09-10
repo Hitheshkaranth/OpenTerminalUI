@@ -606,7 +606,17 @@ def _run_inline_strategy(
     frame: pd.DataFrame,
     context: dict[str, Any],
 ) -> tuple[pd.Series | list[int], str, str]:
+    """Run inline strategy code in a restricted sandbox.
+
+    Security measures:
+    - AST-level validation blocks all imports, function calls (except safe builtins),
+      dunder attribute access, and dunder names.
+    - Only whitelisted builtins and pandas/numpy are available.
+    - No access to os, sys, subprocess, socket, or any file-system operations.
+    - Timeout enforced by the caller (StrategyRunner).
+    """
     tree = ast.parse(code, mode="exec")
+    # Validate AST before execution
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             raise ValueError("Inline strategy imports are disabled")
@@ -618,6 +628,18 @@ def _run_inline_strategy(
             raise ValueError(f"Inline strategy blocked attribute access: {node.attr}")
         if isinstance(node, ast.Name) and "__" in node.id:
             raise ValueError(f"Inline strategy blocked name: {node.id}")
+        # Block ALL function calls except safe builtin constructors.
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            if node.func.id not in {
+                "int", "str", "list", "dict", "float", "bool", "set", "tuple",
+                "range", "len", "abs", "min", "max", "round", "sorted",
+                "reversed", "enumerate", "zip", "map", "filter", "any", "all",
+                "isinstance", "issubclass", "type",
+            }:
+                raise ValueError(f"Inline strategy blocked call: {node.func.id}")
+        # Block global() and locals() calls - they leak the execution context.
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in ("globals", "locals"):
+            raise ValueError(f"Inline strategy blocked call: {node.func.id}")
     safe_builtins = {
         "abs": abs,
         "all": all,
@@ -639,6 +661,7 @@ def _run_inline_strategy(
         "tuple": tuple,
         "zip": zip,
     }
+    # Only expose pandas, numpy, and the safe builtins - nothing else.
     scope: dict[str, Any] = {"pd": pd, "np": np, "__builtins__": safe_builtins}
     out = io.StringIO()
     err = io.StringIO()

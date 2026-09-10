@@ -27,6 +27,7 @@ class MultiTierCache:
         self._redis: Optional[aioredis.Redis] = None
         self._db_conn: Optional[sqlite3.Connection] = None
         self._db_lock = threading.Lock()
+        self._redis_fallback_mode: bool = False
         key = get_cache_signing_key()
         self._signing_key = key.encode("utf-8")
 
@@ -54,6 +55,27 @@ class MultiTierCache:
         except Exception as e:
             logger.error("L3 Cache (SQLite) init failed: %s", e)
 
+    def enable_in_memory_fallback(self) -> None:
+        """Mark the cache as using in-memory fallback due to Redis unavailability."""
+        if self._redis_fallback_mode:
+            return
+        self._redis_fallback_mode = True
+        if self._redis:
+            try:
+                asyncio.create_task(self._redis.close())
+            except Exception:
+                pass
+            self._redis = None
+        logger.warning(
+            "Cache entered in-memory fallback mode (Redis unavailable); "
+            "using L1 (memory) + L3 (SQLite) only."
+        )
+
+    @property
+    def is_redis_available(self) -> bool:
+        """Return True when Redis is configured, connected, and not in fallback mode."""
+        return self._redis is not None and not self._redis_fallback_mode
+
     async def close(self):
         if self._redis:
             await self._redis.close()
@@ -65,7 +87,9 @@ class MultiTierCache:
     async def health(self) -> dict[str, Any]:
         """Report availability of each cache tier (used by /healthz)."""
         l2 = "disabled"
-        if self._redis is not None:
+        if self._redis_fallback_mode:
+            l2 = "fallback_mode"
+        elif self._redis is not None:
             try:
                 await self._redis.ping()
                 l2 = "ok"
@@ -89,6 +113,8 @@ class MultiTierCache:
         self._l1_cache[key] = (time.time() + ttl, value)
 
     async def _get_l2(self, key: str) -> Optional[Any]:
+        if self._redis_fallback_mode:
+            return None
         if not self._redis:
             return None
         try:
@@ -99,15 +125,21 @@ class MultiTierCache:
             return decoded
         except Exception as e:
             logger.warning("L2 get error: %s", e)
+            if not self._redis_fallback_mode:
+                self.enable_in_memory_fallback()
             return None
 
     async def _set_l2(self, key: str, value: Any, ttl: int):
+        if self._redis_fallback_mode:
+            return
         if not self._redis:
             return
         try:
             await self._redis.setex(key, ttl, self._encode_blob(value))
         except Exception as e:
             logger.warning("L2 set error: %s", e)
+            if not self._redis_fallback_mode:
+                self.enable_in_memory_fallback()
 
     def _ensure_db(self):
         if self._db_conn is not None:
@@ -196,17 +228,28 @@ class MultiTierCache:
         return b"v1:" + signature + payload
 
     def _decode_blob(self, blob: bytes) -> Any:
+        """Decode and verify a cached blob.
+
+        SECURITY: HMAC signature is verified BEFORE any unpickling to prevent
+        deserialization of tampered data.  pickle is inherently unsafe for
+        untrusted data; consider migrating to msgpack or JSON for future
+        cache tiers.
+        """
+        import warnings
+
         if not isinstance(blob, (bytes, bytearray)):
             return None
         if not blob.startswith(b"v1:") or len(blob) < 3 + 32:
             return None
         signature = blob[3:35]
         payload = blob[35:]
+        # SECURITY: Verify HMAC *before* unpickling so that any tampered
+        # payload is rejected prior to pickle.loads() being called.
         expected = hmac.new(self._signing_key, payload, hashlib.sha256).digest()
         if not hmac.compare_digest(signature, expected):
             return None
         try:
-            return pickle.loads(payload)
+            return pickle.loads(payload)  # security: HMAC-verified; consider msgpack migration
         except Exception:
             return None
 

@@ -41,6 +41,8 @@ export function TopBar({ hideTickerLoader = false, hideMarketMarquee = false }: 
   const selectedCountry = useSettingsStore((s) => s.selectedCountry);
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
   const displayCurrency = useSettingsStore((s) => s.displayCurrency);
+  const themeVariant = useSettingsStore((s) => s.themeVariant);
+  const setThemeVariant = useSettingsStore((s) => s.setThemeVariant);
   const setSelectedCountry = useSettingsStore((s) => s.selectedCountry === "IN" ? s.setSelectedCountry : s.setSelectedCountry); // keep store reactive
   const setSelectedMarket = useSettingsStore((s) => s.setSelectedMarket);
   const setDisplayCurrency = useSettingsStore((s) => s.setDisplayCurrency);
@@ -282,31 +284,32 @@ export function TopBar({ hideTickerLoader = false, hideMarketMarquee = false }: 
 
   return (
     <div className="relative z-20 border-b border-terminal-border bg-terminal-panel">
-      <div className="relative flex items-center gap-2 overflow-x-auto px-3 py-1.5">
-        <Link
-          to="/"
-          className="inline-flex h-7 items-center rounded border border-terminal-border bg-terminal-bg px-1.5"
-          aria-label="OpenTerminalUI Home"
-        >
-          <img src={BRAND_ICON_SRC} alt="OpenTerminalUI" className="h-5 w-5 object-contain" />
-        </Link>
-        <div className="flex shrink-0 items-center gap-2">
-          <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/">
-            HOME
+<div className="relative flex items-center gap-2 overflow-x-auto px-3 py-1.5" role="banner">
+          <Link
+            to="/"
+            className="inline-flex h-7 items-center rounded border border-terminal-border bg-terminal-panel px-1.5"
+            aria-label="OpenTerminalUI Home"
+            title="Home"
+          >
+            <img src={BRAND_ICON_SRC} alt="OpenTerminalUI" className="h-5 w-5 object-contain" />
           </Link>
-          <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/equity/screener">
-            SCREENER
-          </Link>
-          <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/equity/compare">
-            COMPARE
-          </Link>
-          <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno/heatmap?symbol=${encodeURIComponent(safeTicker)}`}>
-            HEATMAP
-          </Link>
-          <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno?symbol=${encodeURIComponent(safeTicker)}`}>
-            F&O -&gt;
-          </Link>
-        </div>
+          <nav className="flex shrink-0 items-center gap-2" aria-label="Main navigation">
+            <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/" title="Home">
+              HOME
+            </Link>
+            <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/equity/screener" title="Equity Screener">
+              SCREENER
+            </Link>
+            <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to="/equity/compare" title="Compare Stocks">
+              COMPARE
+            </Link>
+            <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno/heatmap?symbol=${encodeURIComponent(safeTicker)}`} title="Greeks Heatmap">
+              HEATMAP
+            </Link>
+            <Link className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text" to={`/fno?symbol=${encodeURIComponent(safeTicker)}`} title="F&O Options Chain">
+              F&O <span aria-hidden="true">→</span>
+            </Link>
+          </nav>
         {!hideTickerLoader ? (
           <div className="ml-2 flex min-w-0 flex-[1.4] items-center gap-1 md:min-w-[360px] xl:min-w-[460px]">
             <input
@@ -341,12 +344,18 @@ export function TopBar({ hideTickerLoader = false, hideMarketMarquee = false }: 
                   setIsSuggestionsOpen(false);
                 }
               }}
+              aria-label={`Search ${selectedMarket} symbol`}
+              aria-autocomplete="list"
+              aria-controls="symbol-search-results"
+              aria-expanded={isSuggestionsOpen}
+              aria-haspopup="listbox"
             />
             <button
               className="rounded bg-terminal-accent px-2 py-1 text-xs font-medium text-black"
               onClick={() => {
                 selectTicker(query);
               }}
+              aria-label={`Load ${query || "selected"} symbol`}
             >
               Load
             </button>
@@ -357,6 +366,8 @@ export function TopBar({ hideTickerLoader = false, hideMarketMarquee = false }: 
             className="w-[88px] rounded border border-terminal-border bg-terminal-bg px-1 py-1 text-[11px] uppercase text-terminal-text outline-none"
             value={selectedCountry}
             onChange={(e) => setSelectedCountry(e.target.value as CountryCode)}
+            aria-label="Select country"
+            title="Select country"
           >
             <option value="IN">{COUNTRY_FLAGS.IN} IN</option>
             <option value="US">{COUNTRY_FLAGS.US} US</option>
@@ -365,6 +376,8 @@ export function TopBar({ hideTickerLoader = false, hideMarketMarquee = false }: 
             className="w-[86px] rounded border border-terminal-border bg-terminal-bg px-1 py-1 text-[11px] uppercase text-terminal-text outline-none"
             value={selectedMarket}
             onChange={(e) => setSelectedMarket(e.target.value as MarketCode)}
+            aria-label="Select market"
+            title="Select market"
           >
             {marketsForCountry.map((market) => (
               <option key={market} value={market}>
@@ -399,11 +412,12 @@ export function TopBar({ hideTickerLoader = false, hideMarketMarquee = false }: 
           <img src={BRAND_ICON_SRC} alt="OpenTerminalUI" className="h-5 w-5 object-contain" />
         </Link>
         {!hideTickerLoader && isSuggestionsOpen && results.length > 0 && (
-          <div className="absolute left-3 right-3 top-10 z-10 max-h-72 overflow-auto rounded border border-terminal-border bg-terminal-panel">
+          <div id="symbol-search-results" className="absolute left-3 right-3 top-10 z-10 max-h-72 overflow-auto rounded border border-terminal-border bg-terminal-panel" role="listbox" aria-label="Symbol search results">
             {results.map((item) => (
               <button
                 key={`${item.ticker}:${item.name}`}
                 className="block w-full border-b border-terminal-border px-3 py-2 text-left text-sm hover:bg-terminal-bg"
+                role="option"
                 onMouseDown={(event) => {
                   event.preventDefault();
                   selectTicker(item);
@@ -422,6 +436,24 @@ export function TopBar({ hideTickerLoader = false, hideMarketMarquee = false }: 
             ))}
           </div>
         )}
+        <div className="relative flex shrink-0 items-center border-l border-terminal-border pl-2">
+          <button
+            className="rounded border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text"
+            aria-label={`Change theme. Current: ${themeVariant}`}
+            title="Toggle theme"
+            onClick={() => {
+              if (themeVariant === "terminal-noir") {
+                setThemeVariant("classic-bloomberg");
+              } else if (themeVariant === "classic-bloomberg") {
+                setThemeVariant("light-desk");
+              } else {
+                setThemeVariant("terminal-noir");
+              }
+            }}
+          >
+            {themeVariant === "terminal-noir" ? "🌙" : themeVariant === "classic-bloomberg" ? "📊" : "☀️"}
+          </button>
+        </div>
       </div>
       <div className="border-t border-terminal-border/60 px-3 py-1">
         <div className="flex flex-wrap items-center gap-1 text-[10px] uppercase tracking-[0.12em]">

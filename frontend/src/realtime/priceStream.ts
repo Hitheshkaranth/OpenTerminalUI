@@ -1,4 +1,5 @@
 import { fetchQuotesBatch } from "../api/client";
+import { getCsrfToken } from "../lib/csrf";
 
 export type ConnectionState = "LIVE (polling)" | "DISCONNECTED";
 
@@ -54,6 +55,11 @@ function getBucket(market: string): MarketBucket {
   };
   markets.set(key, created);
   return created;
+}
+
+function getAuthQuery(): string {
+  const token = getCsrfToken();
+  return token ? `?token=${encodeURIComponent(token)}` : "";
 }
 
 function getMarketSymbols(market: string): string[] {

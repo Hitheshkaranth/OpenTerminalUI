@@ -500,7 +500,7 @@ export type NewsSentimentSummary = {
   bullish_pct?: number;
   bearish_pct?: number;
   neutral_pct?: number;
-  daily_sentiment?: any[];
+  daily_sentiment?: Record<string, unknown>[];
 };
 
 export type MarketSentimentSummary = {

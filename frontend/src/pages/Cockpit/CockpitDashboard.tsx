@@ -1018,7 +1018,7 @@ export function CockpitDashboard() {
               subtitle={sentimentQuery.data ? `${sentimentQuery.data.total_articles} articles over ${sentimentQuery.data.period_days} days` : "News sentiment trend"}
               bodyClassName="space-y-3"
             >
-              <SentimentChart data={sentimentQuery.data?.daily_sentiment ?? []} height={190} />
+              <SentimentChart data={(sentimentQuery.data?.daily_sentiment ?? []) as Array<{ date: string; avg_score: number; count?: number }>} height={190} />
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard
                   label="Overall"

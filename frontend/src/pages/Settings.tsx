@@ -11,6 +11,7 @@ import { ErrorBoundary } from "../components/common/ErrorBoundary";
 import { useSettingsStore } from "../store/settingsStore";
 import { COUNTRY_MARKETS } from "../types";
 import type { AlertRule, CountryCode, MarketCode } from "../types";
+import type { ThemeVariant } from "../store/settingsStore";
 import type { ScheduledReport } from "../types";
 
 export function SettingsPage() {
@@ -20,12 +21,14 @@ export function SettingsPage() {
   const realtimeMode = useSettingsStore((s) => s.realtimeMode);
   const newsAutoRefresh = useSettingsStore((s) => s.newsAutoRefresh);
   const newsRefreshSec = useSettingsStore((s) => s.newsRefreshSec);
+  const themeVariant = useSettingsStore((s) => s.themeVariant);
   const setSelectedCountry = useSettingsStore((s) => s.setSelectedCountry);
   const setSelectedMarket = useSettingsStore((s) => s.setSelectedMarket);
   const setDisplayCurrency = useSettingsStore((s) => s.setDisplayCurrency);
   const setRealtimeMode = useSettingsStore((s) => s.setRealtimeMode);
   const setNewsAutoRefresh = useSettingsStore((s) => s.setNewsAutoRefresh);
   const setNewsRefreshSec = useSettingsStore((s) => s.setNewsRefreshSec);
+  const setThemeVariant = useSettingsStore((s) => s.setThemeVariant);
 
   const [alerts, setAlerts] = useState<AlertRule[]>([]);
   const [ticker, setTicker] = useState("RELIANCE");
@@ -91,6 +94,42 @@ export function SettingsPage() {
             onChange={(e) => setNewsRefreshSec(Math.max(5, Number(e.target.value) || 60))}
             placeholder="news refresh sec"
           />
+        </div>
+      </TerminalPanel>
+
+      <TerminalPanel title="Theme">
+        <div className="grid grid-cols-1 gap-2 lg:grid-cols-3">
+          <TerminalInput as="select" value={themeVariant} onChange={(e) => setThemeVariant(e.target.value as ThemeVariant)}>
+            <option value="terminal-noir">terminal-noir</option>
+            <option value="classic-bloomberg">classic-bloomberg</option>
+            <option value="light-desk">light-desk</option>
+            <option value="custom">custom</option>
+          </TerminalInput>
+          <TerminalInput
+            value={themeVariant === "custom" ? useSettingsStore.getState().customAccentColor : ""}
+            onChange={(e) => useSettingsStore.getState().setCustomAccentColor(e.target.value)}
+            disabled={themeVariant !== "custom"}
+            placeholder="accent color (hex)"
+          />
+          <div className="flex items-center gap-2 rounded border border-terminal-border bg-terminal-bg px-2 py-1.5">
+            <span className="text-xs text-terminal-muted">{themeVariant}</span>
+            <TerminalButton
+              variant="ghost"
+              onClick={() => {
+                const next: ThemeVariant =
+                  themeVariant === "terminal-noir"
+                    ? "classic-bloomberg"
+                    : themeVariant === "classic-bloomberg"
+                      ? "light-desk"
+                      : themeVariant === "light-desk"
+                        ? "custom"
+                        : "terminal-noir";
+                setThemeVariant(next);
+              }}
+            >
+              cycle
+            </TerminalButton>
+          </div>
         </div>
       </TerminalPanel>
 

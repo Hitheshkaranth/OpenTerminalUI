@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query
 from backend.adapters.registry import get_adapter_registry
 from backend.api.deps import fetch_stock_snapshot_coalesced, get_unified_fetcher
 from backend.core.models import CapexPoint, CapexTrackerResponse, DeliveryPoint, DeliverySeriesResponse, EquityPerformanceSnapshot, PriceRange, PromoterHoldingPoint, PromoterHoldingsResponse, StockSnapshot, TopBarTicker, TopBarTickersResponse
+from backend.models.api_response import ApiResponse
 from backend.shared.market_classifier import market_classifier
 
 router = APIRouter()

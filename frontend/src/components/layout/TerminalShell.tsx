@@ -266,8 +266,10 @@ export function TerminalShell({
 
   return (
     <TerminalShellContext.Provider value={shellCtx}>
-      <div className="flex h-screen overflow-hidden bg-terminal-bg text-terminal-text">
-        <IconRail />
+      <div className="flex h-screen w-full overflow-hidden bg-terminal-bg text-terminal-text">
+        <div className="hidden sm:block">
+          <IconRail />
+        </div>
 
         <div className="relative z-10 flex min-w-0 flex-1 flex-col">
           <CommandBar
