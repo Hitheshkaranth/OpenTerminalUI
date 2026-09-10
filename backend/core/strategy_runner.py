@@ -601,6 +601,37 @@ EXAMPLE_STRATEGY_MAP: dict[str, Any] = {
 }
 
 
+# Builtins available to inline strategies. This is both the execution environment
+# and the set of names inline code is allowed to call, so the two cannot drift.
+_SAFE_STRATEGY_BUILTINS: dict[str, Any] = {
+    "abs": abs,
+    "all": all,
+    "any": any,
+    "bool": bool,
+    "dict": dict,
+    "enumerate": enumerate,
+    "filter": filter,
+    "float": float,
+    "int": int,
+    "isinstance": isinstance,
+    "len": len,
+    "list": list,
+    "map": map,
+    "max": max,
+    "min": min,
+    "print": print,
+    "range": range,
+    "reversed": reversed,
+    "round": round,
+    "set": set,
+    "sorted": sorted,
+    "str": str,
+    "sum": sum,
+    "tuple": tuple,
+    "zip": zip,
+}
+
+
 def _run_inline_strategy(
     code: str,
     frame: pd.DataFrame,
@@ -628,41 +659,13 @@ def _run_inline_strategy(
             raise ValueError(f"Inline strategy blocked attribute access: {node.attr}")
         if isinstance(node, ast.Name) and "__" in node.id:
             raise ValueError(f"Inline strategy blocked name: {node.id}")
-        # Block ALL function calls except safe builtin constructors.
+        # Block ALL function calls except the builtins actually exposed below,
+        # which excludes globals()/locals() and every context-leaking name.
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-            if node.func.id not in {
-                "int", "str", "list", "dict", "float", "bool", "set", "tuple",
-                "range", "len", "abs", "min", "max", "round", "sorted",
-                "reversed", "enumerate", "zip", "map", "filter", "any", "all",
-                "isinstance", "issubclass", "type",
-            }:
+            if node.func.id not in _SAFE_STRATEGY_BUILTINS:
                 raise ValueError(f"Inline strategy blocked call: {node.func.id}")
-        # Block global() and locals() calls - they leak the execution context.
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in ("globals", "locals"):
-            raise ValueError(f"Inline strategy blocked call: {node.func.id}")
-    safe_builtins = {
-        "abs": abs,
-        "all": all,
-        "any": any,
-        "dict": dict,
-        "enumerate": enumerate,
-        "float": float,
-        "int": int,
-        "len": len,
-        "list": list,
-        "max": max,
-        "min": min,
-        "print": print,
-        "range": range,
-        "round": round,
-        "set": set,
-        "str": str,
-        "sum": sum,
-        "tuple": tuple,
-        "zip": zip,
-    }
     # Only expose pandas, numpy, and the safe builtins - nothing else.
-    scope: dict[str, Any] = {"pd": pd, "np": np, "__builtins__": safe_builtins}
+    scope: dict[str, Any] = {"pd": pd, "np": np, "__builtins__": dict(_SAFE_STRATEGY_BUILTINS)}
     out = io.StringIO()
     err = io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):

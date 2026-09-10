@@ -28,8 +28,46 @@ from backend.services.openscript_compiler import CompileResult, OpenScriptCompil
 router = APIRouter()
 
 _BLOCKED_MODULES = {"os", "sys", "subprocess", "socket", "pathlib", "shutil", "ctypes", "importlib"}
+# Strictly allow-listed builtins - no dangerous functions at all. This is both the
+# execution environment and the set of names user code is allowed to call.
+_SAFE_BUILTINS: dict[str, Any] = {
+    "abs": abs,
+    "all": all,
+    "any": any,
+    "bool": bool,
+    "dict": dict,
+    "enumerate": enumerate,
+    "filter": filter,
+    "float": float,
+    "int": int,
+    "isinstance": isinstance,
+    "len": len,
+    "list": list,
+    "map": map,
+    "max": max,
+    "min": min,
+    "print": print,
+    "range": range,
+    "reversed": reversed,
+    "round": round,
+    "set": set,
+    "sorted": sorted,
+    "str": str,
+    "sum": sum,
+    "tuple": tuple,
+    "zip": zip,
+}
 _COMPILER = OpenScriptCompiler()
 _SCRIPT_STORE: dict[str, UserScript] = {}
+
+
+def _callable_name(func: ast.expr) -> str:
+    """Best-effort name of a call target, for error messages."""
+    if isinstance(func, ast.Name):
+        return func.id
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    return type(func).__name__
 
 
 def _validate_code(code: str) -> None:
@@ -53,18 +91,11 @@ def _validate_code(code: str) -> None:
                 root = (node.module or "").split(".")[0]
                 if root in _BLOCKED_MODULES:
                     raise HTTPException(status_code=400, detail=f"Import blocked: {root}")
-        # Block all function calls to prevent exec/eval/compile/os.system escapes.
+        # Block every call except the allow-listed builtins, so exec/eval/compile/
+        # os.system and arbitrary method calls can never be reached.
         if isinstance(node, ast.Call):
-            # Allow builtin constructors like int(), str(), list() but block everything else.
-            if isinstance(node.func, ast.Name) and node.func.id in {
-                "int", "str", "list", "dict", "float", "bool", "set", "tuple",
-                "range", "len", "abs", "min", "max", "round", "sorted",
-                "reversed", "enumerate", "zip", "map", "filter", "any", "all",
-                "isinstance", "issubclass", "type", "super",
-            }:
-                pass  # Allow safe builtin constructors
-            else:
-                raise HTTPException(status_code=400, detail=f"Call blocked: {node.func.id}")
+            if not isinstance(node.func, ast.Name) or node.func.id not in _SAFE_BUILTINS:
+                raise HTTPException(status_code=400, detail=f"Call blocked: {_callable_name(node.func)}")
         # Block dunder access. Restricting __builtins__ and imports is not enough:
         # `().__class__.__base__.__subclasses__()` traverses to arbitrary loaded
         # classes (e.g. subprocess.Popen) and escapes the sandbox -> RCE.
@@ -72,14 +103,6 @@ def _validate_code(code: str) -> None:
             raise HTTPException(status_code=400, detail=f"Attribute access blocked: {node.attr}")
         if isinstance(node, ast.Name) and "__" in node.id:
             raise HTTPException(status_code=400, detail=f"Name access blocked: {node.id}")
-        # Block comprehension that could capture unsafe references.
-        if isinstance(node, (ast.Comprehension)):
-            for elt in ast.walk(node):
-                if isinstance(elt, ast.Call):
-                    if isinstance(elt.func, ast.Name) and elt.func.id not in {
-                        "int", "str", "list", "dict", "float", "bool", "set", "tuple",
-                    }:
-                        raise HTTPException(status_code=400, detail=f"Call in comprehension blocked: {elt.func.id}")
 
 
 def _run_user_code(code: str) -> PythonExecuteResponse:
@@ -93,29 +116,8 @@ def _run_user_code(code: str) -> PythonExecuteResponse:
     - Execution timeout via the existing threading mechanism
     - stdout/stderr capture
     """
-    # Strictly allow-listed builtins - no dangerous functions at all.
-    safe_builtins = {
-        "abs": abs,
-        "all": all,
-        "any": any,
-        "dict": dict,
-        "enumerate": enumerate,
-        "float": float,
-        "int": int,
-        "len": len,
-        "list": list,
-        "max": max,
-        "min": min,
-        "print": print,
-        "range": range,
-        "round": round,
-        "set": set,
-        "str": str,
-        "sum": sum,
-        "tuple": tuple,
-    }
     # Completely empty globals - no module-level references at all.
-    globals_env: dict[str, object] = {"__builtins__": safe_builtins}
+    globals_env: dict[str, object] = {"__builtins__": dict(_SAFE_BUILTINS)}
     locals_env: dict[str, object] = {}
     stdout_buf = io.StringIO()
     try:

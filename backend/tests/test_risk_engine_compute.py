@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pandas as pd
 from fastapi.testclient import TestClient
@@ -53,10 +55,10 @@ def test_risk_pca_deterministic():
     assert res1["loadings"]["A"] == res2["loadings"]["A"]
 
 def test_risk_endpoints():
-    with patch("os.environ.get") as m_env:
-        # Avoid auth
-        m_env.return_value = "0"
-
+    # The /api/risk auth fallback needs the middleware toggle off *and* a dev
+    # environment. Patching os.environ.get wholesale also blanked the env name,
+    # which made get_current_user treat the run as production and reject it.
+    with patch.dict(os.environ, {"AUTH_MIDDLEWARE_ENABLED": "0", "OPENTERMINALUI_ENV": "test"}):
         r1 = client.get("/api/risk/summary")
         assert r1.status_code == 200
         assert "ewma_vol" in r1.json()

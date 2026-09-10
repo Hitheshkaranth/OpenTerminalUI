@@ -6,7 +6,7 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from backend.auth.deps import auth_exempt_path
+from backend.auth.deps import api_key_auth_path, auth_exempt_path
 from backend.auth.jwt import decode_token
 from backend.shared.db import SessionLocal
 from backend.models.user import User
@@ -37,6 +37,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
             # In production, ignore the dev toggle and enforce auth.
             pass
         elif not auth_enabled or not path.startswith("/api") or auth_exempt_path(path):
+            return await call_next(request)
+
+        # The public API authenticates with X-API-Key, so a bearer token is not
+        # expected there. Hand the request to the route's own get_api_key_user
+        # dependency, which validates the key. Requests with no key header fall
+        # through to the bearer check below, so nothing becomes unauthenticated.
+        if api_key_auth_path(path) and request.headers.get("X-API-Key"):
             return await call_next(request)
 
         auth_header = request.headers.get("Authorization", "")

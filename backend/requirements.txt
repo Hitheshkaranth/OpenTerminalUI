@@ -43,4 +43,4 @@ scikit-learn
 pypdf
 beautifulsoup4
 lxml
-mcp
+mcp>=1.9,<2
