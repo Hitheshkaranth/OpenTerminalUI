@@ -318,7 +318,7 @@ export function ResultsTable({ framed = true }: ResultsTableProps) {
     if (!saveAlertName.trim() || !saveAlertRow) return;
     setSavingAlert(true);
     try {
-      const screenerConfig = (result?.screener_config ?? { symbols: [getTicker(saveAlertRow)] }) as Record<string, unknown>;
+      const screenerConfig = { symbols: [getTicker(saveAlertRow)] } as Record<string, unknown>;
       await createScreenerAlert(saveAlertName.trim(), screenerConfig, undefined, getTicker(saveAlertRow));
       setActionMessage(`Alert "${saveAlertName}" created`);
       setSaveAlertOpen(false);

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchPlugins, setPluginEnabled, reloadPlugin, type PluginManifestItem } from "../api/plugins";
+import { fetchPlugins, setPluginEnabled, reloadPlugin } from "../api/plugins";
+import type { PluginManifestItem } from "../types";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { TerminalBadge } from "../components/terminal/TerminalBadge";
 import { TerminalButton } from "../components/terminal/TerminalButton";

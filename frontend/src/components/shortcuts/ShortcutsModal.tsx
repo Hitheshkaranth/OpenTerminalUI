@@ -1,12 +1,12 @@
 import { useState } from "react";
 
-import { TerminalPanel } from "../components/terminal/TerminalPanel";
-import { TerminalButton } from "../components/terminal/TerminalButton";
-import { TerminalInput } from "../components/terminal/TerminalInput";
-import { TerminalModal } from "../components/terminal/TerminalModal";
+import { TerminalPanel } from "../../components/terminal/TerminalPanel";
+import { TerminalButton } from "../../components/terminal/TerminalButton";
+import { TerminalInput } from "../../components/terminal/TerminalInput";
+import { TerminalModal } from "../../components/terminal/TerminalModal";
 
-import type { ShortcutDefinition, ShortcutCategory } from "../lib/shortcuts";
-import { SHORTCUT_DEFINITIONS, getShortcutsByCategory } from "../lib/shortcuts";
+import type { ShortcutDefinition, ShortcutCategory } from "../../lib/shortcuts";
+import { SHORTCUT_DEFINITIONS, getShortcutsByCategory } from "../../lib/shortcuts";
 
 const CATEGORY_COLORS: Record<string, string> = {
   global: "text-terminal-accent",

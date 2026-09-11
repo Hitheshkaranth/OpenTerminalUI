@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { fetchAuditEvents } from "../api/audit";
+import { fetchAuditEventsApi } from "../api/auditEvents";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { TerminalTable } from "../components/terminal/TerminalTable";
 import { TerminalBadge } from "../components/terminal/TerminalBadge";
 import { TerminalButton } from "../components/terminal/TerminalButton";
 import { TerminalModal } from "../components/terminal/TerminalModal";
 import { TerminalSelect } from "../components/terminal/TerminalSelect";
+import type { AuditEvent } from "../types";
 
 const EVENT_TYPES = [
   "all",
@@ -60,7 +61,7 @@ export function AuditLogPage() {
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["audit-log", eventTypeFilter, page],
     queryFn: () =>
-      fetchAuditEvents({
+      fetchAuditEventsApi({
         event_type: eventTypeFilter === "all" ? undefined : eventTypeFilter,
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
@@ -68,7 +69,7 @@ export function AuditLogPage() {
     staleTime: 10_000,
   });
 
-  const events = data?.items || [];
+  const events = (data?.items ?? []) as AuditEvent[];
   const total = data?.total || 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const selectedEventDetail = events.find((e) => e.id === selectedEvent);

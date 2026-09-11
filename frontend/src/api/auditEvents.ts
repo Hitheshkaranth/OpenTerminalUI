@@ -1,16 +1,5 @@
 import { api } from "./base";
-
-export interface AuditEvent {
-  id: string;
-  user_id: string | null;
-  username?: string;
-  event_type: string;
-  entity_type: string;
-  entity_id: string | null;
-  payload: Record<string, unknown>;
-  created_at: string;
-  ip_address?: string;
-}
+import type { AuditEvent } from "../types";
 
 export interface AuditListResponse {
   items: AuditEvent[];
@@ -19,7 +8,7 @@ export interface AuditListResponse {
   offset: number;
 }
 
-export async function fetchAuditEvents(params?: {
+export async function fetchAuditEventsApi(params?: {
   event_type?: string;
   entity_type?: string;
   limit?: number;
