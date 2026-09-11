@@ -179,7 +179,6 @@ export function FnoLayout() {
   return (
     <TerminalShell
       contentClassName="pb-16 md:pb-0"
-      showInstallPrompt
       showMobileBottomNav
       workspacePresetStorageKey="ot:shell:fno:preset"
       rightRailStorageKey="ot:shell:fno:right-rail"

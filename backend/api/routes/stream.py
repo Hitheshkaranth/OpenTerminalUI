@@ -201,11 +201,8 @@ async def ws_alerts(websocket: WebSocket) -> None:
     try:
         while True:
             payload = await websocket.receive_json()
-            op = str(payload.get("op") or "").strip().lower() if isinstance(payload, dict) else ""
-            if op == "ping":
+            if isinstance(payload, dict) and str(payload.get("op") or "").strip().lower() == "ping":
                 await websocket.send_json({"type": "pong"})
-            else:
-                await websocket.send_json({"type": "info", "message": "alerts channel is push-only"})
     except WebSocketDisconnect:
         logger.debug("WS alerts client disconnected")
     except Exception as exc:

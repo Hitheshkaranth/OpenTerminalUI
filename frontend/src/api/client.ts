@@ -38,3 +38,9 @@ export * from "./savedViews";
 export * from "./pairs";
 export * from "./robustness";
 export * from "./shadowAccount";
+export * from "./screenerAlerts";
+export * from "./chartWorkstation";
+export * from "./dataQuality";
+// audit events intentionally not barrelled out to avoid
+// conflicting with AuditEvent type exported from types.ts → types/index.ts
+// Import directly from auditEvents.ts when needed.

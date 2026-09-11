@@ -502,7 +502,6 @@ export function EquityLayout() {
   return (
     <TerminalShell
       contentClassName="pb-16 md:pb-0"
-      showInstallPrompt
       showMobileBottomNav
       workspacePresetStorageKey="ot:shell:equity:preset"
       rightRailStorageKey="ot:shell:equity:right-rail"

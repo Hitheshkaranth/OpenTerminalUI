@@ -51,8 +51,12 @@ def _get_or_create_dev_user(db: Session) -> User:
             role=UserRole.ADMIN,
         )
         db.add(user)
-        db.commit()
-        db.refresh(user)
+        try:
+            db.commit()
+            db.refresh(user)
+        except Exception:
+            db.rollback()
+            user = db.query(User).filter(User.id == "dev-user").first()
     return user
 
 

@@ -677,11 +677,13 @@ export type OmsOrder = {
 export type AuditEvent = {
   id: string;
   user_id?: string | null;
+  username?: string;
   event_type: string;
   entity_type: string;
   entity_id?: string | null;
   payload: Record<string, unknown>;
   created_at: string;
+  ip_address?: string;
 };
 
 export type KillSwitch = {

@@ -194,9 +194,9 @@ export function AlertsPage() {
             <div className="text-xs text-terminal-muted">No alerts configured.</div>
           ) : (
             activeAlerts.map((alert) => (
-              <div key={alert.id} className="grid gap-2 rounded border border-terminal-border bg-terminal-bg p-3 md:grid-cols-[1.5fr_2fr_1.2fr_auto]">
+              <div key={alert.id} className="flex flex-col gap-3 rounded border border-terminal-border bg-terminal-bg p-3 sm:grid sm:grid-cols-[1.5fr_2fr_1.2fr_auto] sm:gap-2">
                 <div className="space-y-1 text-xs">
-                  <div className="font-semibold text-terminal-text">{alert.symbol || alert.ticker}</div>
+                  <div className="font-semibold text-terminal-text text-base">{alert.symbol || alert.ticker}</div>
                   <div className="text-terminal-muted">Status: {alert.status || "active"}</div>
                   <div className="text-terminal-muted">
                     Cooldown: {alert.cooldown_minutes || 0}m | Triggers: {alert.trigger_count || 0}
@@ -218,9 +218,9 @@ export function AlertsPage() {
                     ))}
                   </div>
                 </div>
-                <div className="flex flex-wrap items-start justify-end gap-2 text-xs">
+                <div className="flex flex-wrap items-start justify-end gap-2 text-xs sm:hidden">
                   <button
-                    className="rounded border border-terminal-border px-2 py-1 text-terminal-muted"
+                    className="min-h-[40px] rounded border border-terminal-border px-3 py-2 text-terminal-muted"
                     onClick={() => {
                       setEditingAlert(alert);
                       setBuilderOpen(true);
@@ -229,19 +229,48 @@ export function AlertsPage() {
                     Edit
                   </button>
                   <button
-                    className="rounded border border-terminal-border px-2 py-1 text-terminal-muted"
+                    className="min-h-[40px] rounded border border-terminal-border px-3 py-2 text-terminal-muted"
                     onClick={() => void updateAlert(alert.id, { status: alert.status === "paused" ? "active" : "paused" }).then(loadAlerts)}
                   >
                     {alert.status === "paused" ? "Resume" : "Pause"}
                   </button>
                   <button
-                    className="rounded border border-terminal-border px-2 py-1 text-terminal-muted"
+                    className="min-h-[40px] rounded border border-terminal-border px-3 py-2 text-terminal-muted"
                     onClick={() => void handleTest(alert.id)}
                   >
                     Test
                   </button>
                   <button
-                    className="rounded border border-terminal-neg px-2 py-1 text-terminal-neg"
+                    className="min-h-[40px] rounded border border-terminal-neg px-3 py-2 text-terminal-neg"
+                    onClick={() => void deleteAlert(alert.id).then(loadAlerts)}
+                  >
+                    Delete
+                  </button>
+                </div>
+                <div className="hidden sm:flex flex-wrap items-start justify-end gap-2 text-xs">
+                  <button
+                    className="rounded border border-terminal-border px-3 py-2 text-terminal-muted"
+                    onClick={() => {
+                      setEditingAlert(alert);
+                      setBuilderOpen(true);
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="rounded border border-terminal-border px-3 py-2 text-terminal-muted"
+                    onClick={() => void updateAlert(alert.id, { status: alert.status === "paused" ? "active" : "paused" }).then(loadAlerts)}
+                  >
+                    {alert.status === "paused" ? "Resume" : "Pause"}
+                  </button>
+                  <button
+                    className="rounded border border-terminal-border px-3 py-2 text-terminal-muted"
+                    onClick={() => void handleTest(alert.id)}
+                  >
+                    Test
+                  </button>
+                  <button
+                    className="rounded border border-terminal-neg px-3 py-2 text-terminal-neg"
                     onClick={() => void deleteAlert(alert.id).then(loadAlerts)}
                   >
                     Delete

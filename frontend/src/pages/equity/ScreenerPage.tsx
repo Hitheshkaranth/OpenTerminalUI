@@ -7,6 +7,7 @@ import {
   Filter,
   LayoutDashboard,
   LineChart,
+  Menu,
   Play,
   Search,
   Share2,
@@ -16,6 +17,7 @@ import {
   Trees,
 } from "lucide-react";
 
+import { MobileSidebar } from "../../components/layout/MobileSidebar";
 import { TerminalBadge } from "../../components/terminal/TerminalBadge";
 import { TerminalButton } from "../../components/terminal/TerminalButton";
 import { TerminalInput } from "../../components/terminal/TerminalInput";
@@ -75,6 +77,7 @@ function splitFilters(query: string) {
 
 function ScreenerWorkspace() {
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [queryOpen, setQueryOpen] = useState(true);
   const [scanOpen, setScanOpen] = useState(false);
@@ -145,7 +148,17 @@ function ScreenerWorkspace() {
   };
 
   return (
-    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(255,107,0,0.08),transparent_34rem)] p-3 md:p-5">
+    <>
+      <MobileSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <button
+        type="button"
+        className="fixed left-3 top-20 z-30 rounded-sm border border-terminal-border bg-terminal-panel p-2 text-terminal-muted shadow-lg transition-colors hover:text-terminal-text md:hidden"
+        onClick={() => setSidebarOpen(true)}
+        aria-label="Open navigation menu"
+      >
+        <Menu className="h-4 w-4" aria-hidden="true" />
+      </button>
+      <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(255,107,0,0.08),transparent_34rem)] p-3 md:p-5">
       <main className="mx-auto flex w-full max-w-[1680px] flex-col gap-4">
         <section className="rounded-md border border-terminal-border/70 bg-terminal-panel/95 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.18)] md:p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -341,7 +354,11 @@ function ScreenerWorkspace() {
                 </div>
               }
             >
-              {view === "table" || view === "split" ? <ResultsTable framed={false} /> : null}
+              {view === "table" || view === "split" ? (
+                <div className="overflow-x-auto">
+                  <ResultsTable framed={false} />
+                </div>
+              ) : null}
               {view !== "table" ? (
                 <div className={view === "split" ? "mt-3" : ""}>
                   <ScreenVizLoader screenId={selectedPresetId} view={view} vizData={(result?.viz_data || {}) as Record<string, unknown>} rows={(result?.results || []) as Array<Record<string, unknown>>} />
@@ -383,6 +400,7 @@ function ScreenerWorkspace() {
       ) : null}
       </main>
     </div>
+    </>
   );
 }
 

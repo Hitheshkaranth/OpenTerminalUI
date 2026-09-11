@@ -68,7 +68,7 @@ test("alerts builder creates and tests a multi-condition alert", async ({ page }
   await page.getByRole("button", { name: "Create New Alert" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
 
-  await page.getByLabel("Symbol").fill("RELIANCE");
+  await page.getByRole("textbox", { name: "Symbol", exact: true }).fill("RELIANCE");
   await page.getByLabel("Condition value 1").fill("2500");
   await page.getByRole("button", { name: "Add Condition" }).click();
   await page.getByLabel("Condition field 2").selectOption("rsi_14");
