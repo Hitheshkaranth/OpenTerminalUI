@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CHART_WORKSTATION_ACTION_EVENT } from "../components/layout/commanding";
@@ -99,11 +100,17 @@ function makeSlot(id: string, ticker: string): ChartSlot {
   };
 }
 
+function createQueryClient() {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } });
+}
+
 function renderPage(initialEntries = ["/equity/chart-workstation"]) {
   return render(
-    <MemoryRouter initialEntries={initialEntries}>
-      <ChartWorkstationPage />
-    </MemoryRouter>,
+    <QueryClientProvider client={createQueryClient()}>
+      <MemoryRouter initialEntries={initialEntries}>
+        <ChartWorkstationPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
