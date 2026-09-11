@@ -4,10 +4,12 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AgentConsole } from "./agent/components/AgentConsole";
 import { AgentLauncher } from "./agent/components/AgentLauncher";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
+import { InstallPrompt } from "./components/pwa/InstallPrompt";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { RootRedirect } from "./components/RootRedirect";
 import { TerminalBackground } from "./components/TerminalBackground";
 import { ThemeRuntime } from "./components/layout/ThemeRuntime";
+import { usePWA } from "./hooks/usePWA";
 import { LoginPage } from "./pages/LoginPage";
 import { ForgotAccessPage } from "./pages/Auth/ForgotAccessPage";
 import { RegisterPage } from "./pages/Auth/RegisterPage";
@@ -68,6 +70,8 @@ const DividendDashboardPage = lazyWithRetry(() => import("./pages/DividendDashbo
 const TimeAndSalesPage = lazyWithRetry(() => import("./pages/TimeAndSalesPage").then((m) => ({ default: m.TimeAndSalesPage })));
 const DOMPage = lazyWithRetry(() => import("./pages/DOMPage").then((m) => ({ default: m.DOMPage })));
 const SavedViewsPage = lazyWithRetry(() => import("./pages/SavedViewsPage").then((m) => ({ default: m.SavedViewsPage })));
+const EarningsCalendarPage = lazyWithRetry(() => import("./pages/equity/EarningsCalendarPage").then((m) => ({ default: m.EarningsCalendarPage })));
+const ReportsSchedulePage = lazyWithRetry(() => import("./pages/ReportsSchedulePage").then((m) => ({ default: m.ReportsSchedulePage })));
 
 const OptionChainPage = lazyWithRetry(() => import("./fno/pages/OptionChainPage").then((m) => ({ default: m.OptionChainPage })));
 const GreeksPage = lazyWithRetry(() => import("./fno/pages/GreeksPage").then((m) => ({ default: m.GreeksPage })));
@@ -110,6 +114,8 @@ const RouteLoadingFallback = (
 );
 
 function App() {
+  const { showInstallPrompt, installPrompt, dismissInstallPrompt } = usePWA();
+
   return (
     <div className="ot-app-shell">
       <ThemeRuntime />
@@ -118,6 +124,7 @@ function App() {
       <AgentLauncher />
       <div className="ot-vignette-overlay" />
       <div className="ot-scanline-overlay" />
+      <InstallPrompt show={showInstallPrompt} onInstall={() => installPrompt?.prompt()} onDismiss={dismissInstallPrompt} />
       <div className="ot-route-layer">
         <ErrorBoundary>
           <Suspense fallback={RouteLoadingFallback}>
@@ -187,8 +194,9 @@ function App() {
             <Route path="crypto" element={<CryptoWorkspacePage />} />
             <Route path="etf-analytics" element={<ETFAnalyticsPage />} />
             <Route path="cockpit" element={<CockpitDashboard />} />
-            <Route path="saved-views" element={<SavedViewsPage />} />
-          </Route>
+<Route path="saved-views" element={<SavedViewsPage />} />
+            <Route path="earnings" element={<EarningsCalendarPage />} />
+           </Route>
 
           <Route path="/fno" element={<ProtectedRoute><FnoLayout /></ProtectedRoute>}>
             <Route index element={<OptionChainPage />} />
@@ -217,6 +225,8 @@ function App() {
           <Route path="/account" element={<ProtectedRoute><AccountLayout /></ProtectedRoute>}>
             <Route index element={<AccountPage />} />
           </Route>
+
+          <Route path="/reports" element={<ProtectedRoute><ReportsSchedulePage /></ProtectedRoute>} />
 
           <Route path="/cockpit" element={<Navigate to="/equity/cockpit" replace />} />
           <Route path="/model-lab" element={<ProtectedRoute><ModelLabPage /></ProtectedRoute>} />

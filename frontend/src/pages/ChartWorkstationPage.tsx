@@ -56,6 +56,7 @@ import {
   type WorkstationSnapshotPayload,
   type WorkstationSnapshotRecord,
 } from "../shared/chart/workstationPersistence";
+import { WorkspaceSaveDialog } from "../components/chart/WorkspaceSaveDialog";
 import "../components/chart-workstation/ChartWorkstation.css";
 
 const MAX_WORKSTATION_SLOTS = 9;
@@ -874,6 +875,7 @@ export function ChartWorkstationPage() {
   const [scriptCompileResult, setScriptCompileResult] = useState<OpenScriptCompileResult | null>(null);
   const [scriptRunResult, setScriptRunResult] = useState<OpenScriptRunResult | null>(null);
   const [scriptOverlayOutputs, setScriptOverlayOutputs] = useState<OpenScriptOutput[]>([]);
+  const [showWorkspaceSaveDialog, setShowWorkspaceSaveDialog] = useState(false);
   const scriptPanelRef = useRef<HTMLDivElement | null>(null);
   const activeChartRowsRef = useRef<ChartPoint[]>([]);
 
@@ -2322,6 +2324,13 @@ export function ChartWorkstationPage() {
             <button
               type="button"
               className="rounded border border-terminal-border px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"
+              onClick={() => setShowWorkspaceSaveDialog(true)}
+            >
+              Save Workspace
+            </button>
+            <button
+              type="button"
+              className="rounded border border-terminal-border px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"
               onClick={toggleScriptPanel}
             >
               {scriptPanelOpen ? "Hide OpenScript" : "Open OpenScript"}
@@ -2496,6 +2505,14 @@ export function ChartWorkstationPage() {
             </PanelFrame>
           </div>
         ) : null}
+
+        <WorkspaceSaveDialog
+          isOpen={showWorkspaceSaveDialog}
+          onClose={() => setShowWorkspaceSaveDialog(false)}
+          gridTemplate={gridTemplate}
+          slots={slots}
+          syncCrosshair={linkSettings.crosshair}
+        />
 
         <TerminalToastViewport className="top-14">
           {layoutNotice ? (

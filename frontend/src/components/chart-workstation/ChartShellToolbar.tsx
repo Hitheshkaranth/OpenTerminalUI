@@ -5,6 +5,7 @@ import { TerminalBadge } from "../terminal/TerminalBadge";
 import { TerminalButton } from "../terminal/TerminalButton";
 import { TerminalDropdown } from "../terminal/TerminalDropdown";
 import { TerminalInput } from "../terminal/TerminalInput";
+import { WorkspaceSaveDialog } from "../chart/WorkspaceSaveDialog";
 import type { ChartSlot, ChartSlotTimeframe, ChartSlotType, GridTemplate, SlotMarket } from "../../store/chartWorkstationStore";
 
 const TIMEFRAMES: ChartSlotTimeframe[] = ["1m", "5m", "15m", "1h", "1D", "1W", "1M"];

@@ -351,6 +351,11 @@ class ChartTemplateCreate(BaseModel):
     layout_config: dict[str, Any] = Field(default_factory=dict)
 
 
+class ChartTemplateUpdate(BaseModel):
+    name: str | None = None
+    layout_config: dict[str, Any] | None = None
+
+
 def _parse_iso_datetime_or_400(value: str | None, field_name: str) -> datetime | None:
     if not value:
         return None
@@ -828,6 +833,54 @@ def create_chart_template(
     db.commit()
     db.refresh(row)
     return {"id": row.id, "name": row.name}
+
+
+@router.get("/chart-templates/{template_id}")
+def get_chart_template(
+    template_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    row = (
+        db.query(ChartTemplate)
+        .filter(ChartTemplate.id == template_id, ChartTemplate.user_id == current_user.id)
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {
+        "id": row.id,
+        "name": row.name,
+        "layout_config": row.layout_config if isinstance(row.layout_config, dict) else {},
+        "created_at": row.created_at.isoformat(),
+    }
+
+
+@router.patch("/chart-templates/{template_id}")
+def update_chart_template(
+    template_id: str,
+    update: ChartTemplateUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    row = (
+        db.query(ChartTemplate)
+        .filter(ChartTemplate.id == template_id, ChartTemplate.user_id == current_user.id)
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Template not found")
+    if update.name is not None:
+        row.name = update.name.strip()
+    if update.layout_config is not None:
+        row.layout_config = dict(update.layout_config)
+    db.commit()
+    db.refresh(row)
+    return {
+        "id": row.id,
+        "name": row.name,
+        "layout_config": row.layout_config if isinstance(row.layout_config, dict) else {},
+    }
 
 
 @router.get("/chart-templates")

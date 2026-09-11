@@ -800,6 +800,28 @@ class AlertEvaluatorService:
         payload = self._build_event_payload(alert, triggered_value, now, context)
         await self._hub.broadcast_alert(payload)
         await self._hub.broadcast(alert.symbol, payload)
+        try:
+            from backend.models.notification import Notification
+            from backend.shared.db import SessionLocal
+
+            db = SessionLocal()
+            try:
+                notification = Notification(
+                    user_id=str(alert.user_id or "1"),
+                    type="alert",
+                    priority="high",
+                    title=f"Alert: {alert.symbol}",
+                    body=self._build_delivery_message(alert, triggered_value, now),
+                    ticker=alert.symbol,
+                    read=0,
+                )
+                db.add(notification)
+                db.commit()
+                db.refresh(notification)
+            finally:
+                db.close()
+        except Exception:
+            logger.exception("Failed to create notification for alert %s", alert.id)
 
 _alert_service = AlertEvaluatorService()
 

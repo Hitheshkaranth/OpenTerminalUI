@@ -46,6 +46,7 @@ from backend.risk_engine.routes import router as risk_router
 from backend.routers.chart_workstation import router as chart_workstation_router
 from backend.routers.charts import router as charts_router
 from backend.saved_views.routes import router as saved_views_router
+from backend.api.routes.screener_alerts import router as screener_alerts_router
 from backend.tca.routes import router as tca_router
 
 api_router = APIRouter()
@@ -117,5 +118,8 @@ api_router.include_router(portfolio_optimizer_router)
 
 # Statlab API
 api_router.include_router(statlab_router)
+
+# Screener Alerts API
+api_router.include_router(screener_alerts_router, prefix="/api", tags=["screener-alerts"])
 
 __all__ = ["api_router"]

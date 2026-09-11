@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Filter, GitCompareArrows, LineChart, ListChecks, Newspaper, Plus, Search, TestTube2, TrendingDown, TrendingUp } from "lucide-react";
+import { Bell, Bookmark, Filter, GitCompareArrows, LineChart, ListChecks, Newspaper, Plus, Search, TestTube2, TrendingDown, TrendingUp } from "lucide-react";
 
-import { addWatchlistItem } from "../../../api/client";
+import { addWatchlistItem, createScreenerAlert } from "../../../api/client";
 import { useAgentStore } from "../../../agent/agentStore";
 import { ExportButton } from "../../../components/common/ExportButton";
 import { DataGrid } from "../../../components/common/DataGrid";
@@ -216,6 +216,10 @@ export function ResultsTable({ framed = true }: ResultsTableProps) {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [searchText, setSearchText] = useState("");
   const [resultFilter, setResultFilter] = useState<ResultFilter>("all");
+  const [saveAlertName, setSaveAlertName] = useState("");
+  const [saveAlertOpen, setSaveAlertOpen] = useState(false);
+  const [savingAlert, setSavingAlert] = useState(false);
+  const [saveAlertRow, setSaveAlertRow] = useState<Record<string, unknown> | null>(null);
   const rows = result?.results || [];
   const visibleRows = useMemo(() => {
     const q = searchText.trim().toLowerCase();
@@ -301,6 +305,29 @@ export function ResultsTable({ framed = true }: ResultsTableProps) {
       setActionMessage(`${ticker} added to watchlist`);
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Failed to add to watchlist");
+    }
+  };
+
+  const openSaveAlert = (row: Record<string, unknown>) => {
+    setSaveAlertRow(row);
+    setSaveAlertName(`${getTicker(row)} Screen`);
+    setSaveAlertOpen(true);
+  };
+
+  const saveAlert = async () => {
+    if (!saveAlertName.trim() || !saveAlertRow) return;
+    setSavingAlert(true);
+    try {
+      const screenerConfig = (result?.screener_config ?? { symbols: [getTicker(saveAlertRow)] }) as Record<string, unknown>;
+      await createScreenerAlert(saveAlertName.trim(), screenerConfig, undefined, getTicker(saveAlertRow));
+      setActionMessage(`Alert "${saveAlertName}" created`);
+      setSaveAlertOpen(false);
+      setSaveAlertName("");
+      setSaveAlertRow(null);
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "Failed to create alert");
+    } finally {
+      setSavingAlert(false);
     }
   };
 
@@ -397,6 +424,56 @@ export function ResultsTable({ framed = true }: ResultsTableProps) {
         ) : null}
 
         {actionMessage ? <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs text-terminal-muted">{actionMessage}</div> : null}
+
+        {saveAlertOpen ? (
+          <div className="rounded-md border border-terminal-border bg-terminal-panel p-3">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold text-terminal-text">Save as Screener Alert</div>
+              <button
+                type="button"
+                className="h-6 w-6 rounded-sm border border-terminal-border text-terminal-muted transition-colors hover:border-terminal-accent hover:text-terminal-accent"
+                onClick={() => {
+                  setSaveAlertOpen(false);
+                  setSaveAlertName("");
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <input
+              className="mt-2 h-9 w-full rounded-sm border border-terminal-border bg-terminal-bg px-2 font-sans text-sm text-terminal-text outline-none transition-colors placeholder:text-terminal-muted focus:border-terminal-accent"
+              value={saveAlertName}
+              onChange={(event) => setSaveAlertName(event.target.value)}
+              placeholder="Alert name (e.g. AAPL Value Screen)"
+              autoFocus
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  void saveAlert();
+                }
+              }}
+            />
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                className="rounded-sm border border-terminal-accent bg-terminal-accent/15 px-3 py-1.5 text-xs text-terminal-accent transition-colors hover:bg-terminal-accent/20"
+                onClick={() => {
+                  void saveAlert();
+                }}
+                disabled={savingAlert || !saveAlertName.trim()}
+              >
+                {savingAlert ? "Saving..." : "Save Alert"}
+              </button>
+              <button
+                className="rounded-sm border border-terminal-border px-3 py-1.5 text-xs text-terminal-muted transition-colors hover:border-terminal-border-hover hover:text-terminal-text"
+                onClick={() => {
+                  setSaveAlertOpen(false);
+                  setSaveAlertName("");
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <DataGrid
@@ -471,6 +548,14 @@ export function ResultsTable({ framed = true }: ResultsTableProps) {
               onClick={(event) => {
                 event.stopPropagation();
                 openAlert(row);
+              }}
+            />
+            <ActionButton
+              label="Save as Alert"
+              icon={Bookmark}
+              onClick={(event) => {
+                event.stopPropagation();
+                openSaveAlert(row);
               }}
             />
           </div>

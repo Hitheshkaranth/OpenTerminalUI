@@ -9,7 +9,6 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { ErrorBoundary } from "../common/ErrorBoundary";
-import { InstallPromptBanner } from "./InstallPromptBanner";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { IconRail } from "./IconRail";
 import { StatusBar } from "./StatusBar";
@@ -60,7 +59,6 @@ type Props = {
   contentClassName?: string;
   hideTickerLoader?: boolean;
   statusBarTickerOverride?: string;
-  showInstallPrompt?: boolean;
   showMobileBottomNav?: boolean;
   workspacePresetStorageKey?: string;
   defaultPreset?: WorkspacePreset;
@@ -218,7 +216,6 @@ export function TerminalShell({
   contentClassName = "",
   hideTickerLoader = false,
   statusBarTickerOverride,
-  showInstallPrompt = false,
   showMobileBottomNav = false,
   workspacePresetStorageKey,
   defaultPreset = "trader",
@@ -304,7 +301,6 @@ export function TerminalShell({
           <StatusBar tickerOverride={statusBarTickerOverride} />
         </div>
 
-        {showInstallPrompt ? <InstallPromptBanner /> : null}
         {showMobileBottomNav ? <MobileBottomNav /> : null}
         <HotKeyPanelFloat />
         <CommandPalette />
