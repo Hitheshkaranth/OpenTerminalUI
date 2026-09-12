@@ -1,6 +1,6 @@
 app:
   name: "OpenTerminalUI API"
-  version: "0.6.0"
+  version: "0.7.0"
   environment: "local"
   default_exchange_suffix: ".NS"
   # LM Studio hosted Gemma model used for news sentiment & emotion analysis.
