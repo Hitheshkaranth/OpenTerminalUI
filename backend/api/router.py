@@ -122,4 +122,7 @@ api_router.include_router(statlab_router)
 # Screener Alerts API
 api_router.include_router(screener_alerts_router, prefix="/api", tags=["screener-alerts"])
 
+# Economics API
+api_router.include_router(economics_router)
+
 __all__ = ["api_router"]

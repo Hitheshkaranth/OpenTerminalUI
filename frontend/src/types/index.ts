@@ -574,7 +574,11 @@ export type EconomicEvent = {
   time: string;
   country: string;
   event_name: string;
-  impact: 'high' | 'medium' | 'low';
+  impact: 'high' | 'medium' | 'low' | 'unknown';
+  announcement_datetime_utc?: string;
+  timezone?: string;
+  source_url?: string;
+  release_time_assumed?: boolean;
   actual?: number | string | null;
   forecast?: number | string | null;
   previous?: number | string | null;
@@ -584,8 +588,11 @@ export type EconomicEvent = {
 
 export type MacroIndicator = {
   value: number;
-  last_value: number;
+  last_value: number | null;
   date: string;
+  label?: string;
+  unit?: string;
+  source_url?: string;
   history: Array<{ date: string; value: number }>;
 };
 
