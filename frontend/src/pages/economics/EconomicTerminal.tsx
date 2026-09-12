@@ -235,7 +235,7 @@ export function EconomicTerminal() {
                           <div>
                             <div className="text-[10px] font-bold text-terminal-muted uppercase tracking-tighter">{data.label || name.replace('_', ' ')}</div>
                             <div className="flex items-baseline gap-2">
-                              <span className="text-lg font-mono font-bold text-terminal-text">{data.value} {data.unit || ""}</span>
+                              <span className="text-lg font-mono font-bold text-terminal-text">{data.value} {data.unit ?? "%"}</span>
                               {!isFlat && (
                                 <span className={isImproving ? "text-terminal-pos" : "text-terminal-neg"}>
                                   {isImproving ? <TrendingUp size={14} /> : <TrendingDown size={14} />}

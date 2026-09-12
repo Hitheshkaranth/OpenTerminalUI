@@ -42,7 +42,7 @@ class FixtureClient:
 
 
 @pytest.mark.parametrize(
-    "operation", list_operations(), ids=lambda operation: operation.name
+    "operation", list_operations(include_mcp=False), ids=lambda operation: operation.name
 )
 def test_all_operations_produce_typed_native_records(operation):
     service = FXMacroDataEconomics(FixtureClient())
@@ -141,8 +141,15 @@ def test_native_routes_expose_calendar_and_explorer():
             ]["date"]
             == "2026-01-02"
         )
-        assert len(client.get("/api/economics/operations").json()) == len(
-            list_operations()
+        operations = client.get("/api/economics/operations").json()
+        assert len(operations) == len(list_operations(include_mcp=False))
+        assert not any(op["name"].startswith("mcp_") for op in operations)
+        assert (
+            client.post(
+                "/api/economics/query",
+                json={"operation": "mcp_subscribe_for_mcp_access", "arguments": {}},
+            ).json()["status"]
+            == "unavailable"
         )
         result = client.post(
             "/api/economics/query",

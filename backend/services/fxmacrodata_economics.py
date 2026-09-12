@@ -42,18 +42,27 @@ def release_instant(row: dict[str, Any]) -> datetime | None:
     return None
 
 
+def _rest_operations():
+    """Public REST catalogue only; hosted MCP tools (paid tier, subscribe CTA) are not exposed."""
+    return list_operations(include_mcp=False)
+
+
 class FXMacroDataEconomics:
     """Read-only provider using a private host secret and bounded requests."""
 
     def __init__(self, client: FXMacroDataClient | None = None):
-        if client is None:
-            from backend.config.settings import get_settings
-
-            secret = get_settings().fxmacrodata_api_key
-            client = FXMacroDataClient(
-                api_key=secret.get_secret_value() if secret else ""
-            )
+        # An injected client is shared (tests). Otherwise a client is built per
+        # call: FXMacroDataClient.execute holds an instance lock for the whole
+        # request, so a single shared instance would serialize every request.
         self.client = client
+
+    def _client(self) -> FXMacroDataClient:
+        if self.client is not None:
+            return self.client
+        from backend.config.settings import get_settings
+
+        secret = get_settings().fxmacrodata_api_key
+        return FXMacroDataClient(api_key=secret.get_secret_value() if secret else "")
 
     def operations(self) -> list[dict[str, Any]]:
         return [
@@ -63,16 +72,16 @@ class FXMacroDataEconomics:
                 "input_schema": op.input_schema,
                 "method": op.method,
             }
-            for op in list_operations()
+            for op in _rest_operations()
         ]
 
     async def query(self, operation: str, arguments: dict[str, Any]) -> OperationResult:
-        if operation not in {op.name for op in list_operations()}:
+        if operation not in {op.name for op in _rest_operations()}:
             return OperationResult(
                 operation=operation, status="unavailable", error="Unknown operation."
             )
         try:
-            result = await asyncio.to_thread(self.client.execute, operation, arguments)
+            result = await asyncio.to_thread(self._client().execute, operation, arguments)
             return OperationResult(**result.as_dict())
         except Exception:
             return OperationResult(

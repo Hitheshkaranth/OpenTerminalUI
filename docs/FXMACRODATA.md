@@ -1,6 +1,15 @@
 # FXMacroData for OpenTerminalUI
 
-The Economic Terminal calendar and macro dashboard consume real FXMacroData USD releases and observations. The Data Explorer displays every supported operation, its parameter schema, a tabular record view and the original response. All displayed calendar times are UTC. Missing data is explicitly unavailable.
+FXMacroData is the **free, no-key tier** of the Economic Terminal's provider chain. A fresh install shows real USD releases and observations without any configuration; keyed providers add richer data on top when configured:
+
+| View | Provider order |
+| --- | --- |
+| Calendar | Finnhub (key) → FMP (key) → **FXMacroData (free, USD)** → built-in sample data |
+| Macro dashboard | FRED (key; US/IN/EU/CN) merged with **FXMacroData (free, US)** → built-in sample data |
+
+Results are cached (calendar 1h, indicators 4h) in `backend/services/economic_data.py`. FXMacroData US indicators are mapped onto the FRED labels (`policy_rate→rate`, `inflation→cpi`) so each concept appears once; FRED wins on overlap. The Data Explorer tab exposes the public **REST** operation catalogue (parameter schema, tabular records, original response). Hosted MCP tools are not exposed. All displayed calendar times are UTC. Missing data is explicitly unavailable.
+
+Note: the public tier's release calendar does not carry actual/forecast/previous values, and indicator history is limited to the recent public window (a few observations). Configure Finnhub/FMP/FRED keys for those.
 
 The core integration uses [FXMacroData](https://fxmacrodata.com/?utm_source=github&utm_medium=referral&utm_campaign=open_source_integrations&utm_content=openterminalui_readme) always-free public USD endpoints and requires no API key, account or credit card. Public indicator history currently covers the most recent 90 days; catalogue and release-calendar access also work without a key. Optional authenticated coverage follows the API contract.
 
@@ -16,9 +25,9 @@ Public USD data requires no API key. Optional authorization is configured below.
 
 ## Use
 
-Optional OPENTERMINALUI_FXMACRODATA_API_KEY (or FXMACRODATA_API_KEY) is loaded by server settings as SecretStr and excluded from settings serialization. It is never sent to the browser. Default dashboard and calendar views cover USD. Other supported currencies and datasets are available in Data Explorer with the required authorization. Unknown importance remains unknown; observation-period dates never substitute for release timestamps; consensus is not replaced by model forecasts. Macro dashboard units come from the public catalogue when indicator history does not carry unit metadata; both original payloads remain available. If metadata is unavailable, the adapter leaves the unit unspecified. This replaces the old economic-service synthetic fallback.
+Optional OPENTERMINALUI_FXMACRODATA_API_KEY (or FXMACRODATA_API_KEY) is loaded by server settings as SecretStr and excluded from settings serialization. It is never sent to the browser. Default dashboard and calendar views cover USD. Other supported currencies and datasets are available in Data Explorer with the required authorization. Unknown importance remains unknown; observation-period dates never substitute for release timestamps; consensus is not replaced by model forecasts. Macro dashboard units come from the public catalogue when indicator history does not carry unit metadata; both original payloads remain available. If metadata is unavailable, the adapter leaves the unit unspecified.
 
-Start with `data_catalogue` and parameters `{"currency":"USD"}`, then `indicator_history` with `{"currency":"USD","indicator":"policy_rate","limit":5}` or `release_calendar` with `{"currency":"USD"}`. Agent tool names have an `fxmacrodata_` prefix. The operation catalogue includes exact required parameters and supported options.
+Start with `data_catalogue` and parameters `{"currency":"USD"}`, then `indicator_history` with `{"currency":"USD","indicator":"policy_rate","limit":5}` or `release_calendar` with `{"currency":"USD"}`. The operation catalogue includes exact required parameters and supported options.
 
 The `data` field preserves the original public response; `records` is an additive table view. Keep source fields, assumed-time flags and timezone offsets when using the data. The API contract distinguishes official forecasts, market consensus and FXMacroData-generated outputs. Historical observation filters do not by themselves establish point-in-time vintage safety. Streaming is bounded by the client; it is not a persistent subscription.
 
@@ -26,7 +35,7 @@ The `data` field preserves the original public response; `records` is an additiv
 
 ## Coverage
 
-Every documented REST operation and listed hosted MCP tool is available through the native consumer above. Access requirements depend on the operation and currency. MCP tools, non-USD data and other protected datasets may require authorization; they are not required for the public USD baseline.
+Every documented public REST operation is available through the Data Explorer (`/api/economics/operations`, `/api/economics/query`). Access requirements depend on the operation and currency; non-USD and other protected datasets may require authorization. Hosted MCP tools are intentionally not exposed.
 
 | Operation | Transport | Native consumer | Status |
 | --- | --- | --- | --- |
@@ -53,55 +62,6 @@ Every documented REST operation and listed hosted MCP tool is available through 
 | `commodities` | GET | `backend/services/fxmacrodata_economics.py` | Implemented |
 | `announcement_changes` | GET | `backend/services/fxmacrodata_economics.py` | Implemented |
 | `stream_events` | GET | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_ping` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_mcp_capabilities` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_mcp_auth_guide` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_subscribe_for_mcp_access` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_data_catalogue` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_risk_sentiment` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_macro_news` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_release_calendar` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_release_calendar_visual_artifact` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_event_predictions` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_latest_announcements` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_announcement_changes` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_press_releases` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_macro_factor` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_fx_reference_sources` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_fx_reference_universe` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_fx_intraday_reference_rates` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_rate_curve` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_rate_differentials` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_latest_commodities` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_forex` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_seasonality` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_indicator_query` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_plot_visual_artifact` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_indicator_visual_artifact` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_forex_visual_artifact` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_commodities_visual_artifact` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_cot_visual_artifact` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_policy_rate_differential_visual_artifact` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_macro_briefing_task` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_indicator_intel_task` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_pair_intel_task` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_macro_heatmap_task` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_policy_scenario_modeler_task` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_macro_war_room_task` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_event_impact_replay_task` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_quant_scenario_lab_task` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_known_at_time_task` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_macro_regime_classifier_task` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_release_risk_score_task` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_portfolio_risk_engine_task` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_fx_trade_setup_task` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_fx_backtest_task` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_macro_research_pack_task` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_market_sessions` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_cot_data` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_commodities` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_financial_prices` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
-| `mcp_official_dataset_family` | MCP | `backend/services/fxmacrodata_economics.py` | Implemented |
 
 ## Validation
 
