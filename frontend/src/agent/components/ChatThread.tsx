@@ -1,4 +1,5 @@
 import { Markdown } from "./Markdown";
+import { ProposalCard } from "./ProposalCard";
 import type { AgentMessage, AgentPhase, AgentRoleNote } from "../types";
 
 // Role → display label, short avatar glyph and accent tone. Mirrors the debate
@@ -167,17 +168,26 @@ function AssistantBody({ content }: { content: string }) {
   return <Markdown content={content} />;
 }
 
-export function ChatThread({ messages }: { messages: AgentMessage[] }) {
+interface ProposalEntry { step: { id: string; name: string; isError: boolean; result?: unknown }; proposal: { proposal_id: string; type: string; summary: string; payload: unknown; status: string; expires_at: string } }
+
+function ChatThreadInner({ messages, proposalReplacements }: { messages: AgentMessage[]; proposalReplacements?: (m: AgentMessage) => ProposalEntry[] }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--ot-space-3)", padding: "var(--ot-space-3)" }}>
-      {messages.map((m) => (
+      {messages.map((m) => {
+        const proposals = proposalReplacements ? proposalReplacements(m) : [];
+        return (
         <div key={m.id} style={{ display: "flex", flexDirection: "column", gap: "var(--ot-space-1)" }}>
           <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--ot-color-text-muted)" }}>
             {m.role}
           </span>
           {m.steps.length > 0 && (
             <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-              {m.steps.map((s) => (
+              {m.steps.map((s) => {
+                const proposalEntry = proposals.find((p) => p.step.id === s.id);
+                if (proposalEntry) {
+                  return null;
+                }
+                return (
                 <li
                   key={s.id}
                   style={{
@@ -187,7 +197,8 @@ export function ChatThread({ messages }: { messages: AgentMessage[] }) {
                 >
                   {s.isError ? "✗ failed " : "→ ran "}{s.name}
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
           {(m.phases ?? []).length > 0 && <PhaseStepper phases={m.phases} />}
@@ -212,8 +223,23 @@ export function ChatThread({ messages }: { messages: AgentMessage[] }) {
               {m.content}
             </div>
           )}
+          {proposals.map((p) => (
+            <ProposalCard key={`proposal-${p.step.id}`} proposal={{
+              proposal_id: p.proposal.proposal_id,
+              type: p.proposal.type as "paper_order" | "alert" | "watchlist_add",
+              summary: p.proposal.summary,
+              payload: p.proposal.payload as Record<string, unknown>,
+              status: p.proposal.status as "pending" | "confirmed" | "rejected" | "expired" | "failed",
+              expires_at: p.proposal.expires_at,
+            }} />
+          ))}
         </div>
-      ))}
+      );
+      })}
     </div>
   );
+}
+
+export function ChatThread({ messages, proposalReplacements }: { messages: AgentMessage[]; proposalReplacements?: (m: AgentMessage) => ProposalEntry[] }) {
+  return <ChatThreadInner messages={messages} proposalReplacements={proposalReplacements} />;
 }

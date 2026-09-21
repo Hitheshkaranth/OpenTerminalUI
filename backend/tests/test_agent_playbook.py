@@ -7,7 +7,9 @@ def test_compose_joins_non_empty_parts() -> None:
 
 
 def test_generalist_prompt_includes_read_only_notice_and_checklist() -> None:
-    assert "read-only" in playbook.GENERALIST_SYSTEM_PROMPT.lower()
+    # The agent is no longer "read-only": it may propose actions but never execute them.
+    assert "propose" in playbook.GENERALIST_SYSTEM_PROMPT.lower()
+    assert "cannot execute" in playbook.GENERALIST_SYSTEM_PROMPT.lower()
     assert "checklist" in playbook.GENERALIST_SYSTEM_PROMPT.lower()
 
 

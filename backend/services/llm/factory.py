@@ -44,6 +44,8 @@ def get_llm_provider(
             api_key=None,
             model=model or settings.lm_studio_model,
             timeout=timeout,
+            # The router's ":free" OpenRouter ids would 404 on a local server.
+            honor_model_chain=False,
         )
     if provider == "gemini":
         return OpenAICompatibleProvider(

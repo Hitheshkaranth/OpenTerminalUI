@@ -86,6 +86,7 @@ class Orchestrator:
 
     async def run(
         self, user_prompt: str, *, screen_context: dict[str, Any] | None = None,
+        history: list[LLMMessage] | None = None, memory_directive: str | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         settings = get_settings()
         intent = classify_intent(user_prompt)
@@ -106,6 +107,14 @@ class Orchestrator:
                 role="system",
                 content=self._screening_directive(user_prompt, screen_context),
             ))
+        if memory_directive:
+            messages.append(LLMMessage(role="system", content=memory_directive))
+        # Strict chat templates (vLLM/Qwen, some LM Studio models) accept a single system
+        # message at index 0 — fold every directive into one block.
+        system_parts = [m.content for m in messages if isinstance(m, LLMMessage) and m.role == "system" and m.content]
+        messages = [LLMMessage(role="system", content="\n\n".join(system_parts))]
+        if history:
+            messages.extend(history)
         messages.append(LLMMessage(role="user", content=user_prompt))
 
         tool_defs = self.registry.tool_defs()

@@ -67,6 +67,9 @@ from backend.instruments.models import InstrumentMaster
 from backend.saved_views.models import SavedViewORM
 from backend.models.user import RefreshToken, User, UserRole
 from backend.models.journal import JournalEntry
+from backend.models.agent_memory import AgentMessage, AgentNote, AgentRun, AgentThread  # noqa: F401
+from backend.models.agent_proposals import AgentProposal  # noqa: F401
+from backend.models.agent_signals import AgentSignal  # noqa: F401
 from backend.models.notification import Notification
 
 __all__ = [

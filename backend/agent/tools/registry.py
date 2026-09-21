@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
@@ -42,4 +43,8 @@ class ToolRegistry:
         spec = self.get(name)
         if spec.handler is None:
             raise KeyError(f"Tool has no handler: {name}")
-        return await spec.handler(args)
+        # Handlers may be plain functions (DB-only tools) or coroutines.
+        result = spec.handler(args)
+        if inspect.isawaitable(result):
+            result = await result
+        return result

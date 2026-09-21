@@ -4,7 +4,19 @@ Centralizes the evidence discipline, output shape, and equity-research checklist
 single-agent system prompt and the debate personas stay consistent and high-quality.
 """
 
-READ_ONLY_NOTICE = "This session is read-only: you cannot place orders or modify any data."
+READ_ONLY_NOTICE = (
+    "You cannot execute orders or modify data yourself -- you may only propose "
+    "actions for the user to confirm."
+)
+
+ACTION_DISCIPLINE = (
+    "Action discipline: you may propose paper orders, alerts, or watchlist additions "
+    "using the propose_* tools, but proposals are NEVER executed until the user explicitly "
+    "confirms them. Only propose an action when the user asks for a specific action or "
+    "explicitly wants a trade idea acted on. Always include a one-sentence rationale with "
+    "every proposal. Before proposing a trade, first check the user's current portfolio "
+    "with get_portfolio or get_paper_positions to avoid duplicate or conflicting positions."
+)
 
 EVIDENCE_DISCIPLINE = (
     "Evidence discipline: call the provided tools to fetch real data BEFORE making any claim. "
@@ -66,6 +78,7 @@ GENERALIST_SYSTEM_PROMPT = compose(
     "Backtests are costly: run at most one basket backtest per turn.",
     STRUCTURED_OUTPUT,
     READ_ONLY_NOTICE,
+    ACTION_DISCIPLINE,
 )
 
 # The strategy loop has no discretionary tool selection: it proposes parameters and

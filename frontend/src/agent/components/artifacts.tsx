@@ -1,6 +1,7 @@
 import type * as React from "react";
 import { formatMoney } from "../../lib/format";
-import type { AgentArtifact } from "../types";
+import type { AgentArtifact, SignalTableData } from "../types";
+import { SignalTable } from "./SignalTable";
 
 const cell: React.CSSProperties = {
   padding: "var(--ot-space-1) var(--ot-space-2)",
@@ -502,6 +503,9 @@ export function ArtifactView({ artifact }: { artifact: AgentArtifact }) {
       break;
     case "robustness_card":
       body = <RobustnessReportCard data={(artifact.data as RobustnessCard) || {}} />;
+      break;
+    case "signal_table":
+      body = <SignalTable data={artifact.data as SignalTableData} />;
       break;
     default:
       body = (

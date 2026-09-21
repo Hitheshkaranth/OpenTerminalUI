@@ -21,7 +21,8 @@ export interface RunRequest {
   context?: RunContext;
   provider?: string;
   model?: string;
-  mode?: "standard" | "deep" | "debate" | "strategy" | "screener";
+  mode?: "standard" | "deep" | "debate" | "strategy" | "screener" | "ensemble";
+  thread_id?: string;
   ticker?: string;
 }
 
@@ -39,7 +40,7 @@ export interface AgentMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
-  steps: { id: string; name: string; isError: boolean }[];
+  steps: { id: string; name: string; isError: boolean; result?: unknown }[];
   phases: AgentPhase[];
   roles: AgentRoleNote[];
   pending: boolean;
@@ -54,4 +55,12 @@ export interface AgentArtifact {
   kind: string;
   name: string;
   data: unknown;
+}
+
+export interface SignalTableData {
+  as_of: string;
+  basket: string[];
+  personas: { id: string; label: string; weight: number }[];
+  signals: { symbol: string; persona: string; signal: string; confidence: number; reason: string }[];
+  consensus: { symbol: string; score: number; verdict: "BUY" | "SELL" | "HOLD"; bullish: number; bearish: number; neutral: number }[];
 }

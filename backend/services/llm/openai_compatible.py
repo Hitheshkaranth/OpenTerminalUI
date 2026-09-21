@@ -27,12 +27,18 @@ def _short_model(model: str) -> str:
     return name.removesuffix(":free")
 
 
+# Qwen/Hermes-style models sometimes emit a tool call as literal text instead of a
+# structured call; never show that scaffolding to the user.
+_LEAKED_TOOL_CALL_RE = re.compile(r"<tool_call>.*?</tool_call>|<tool_call>.*$|<function=[^>]*>.*?</function>", re.DOTALL)
+
+
 def _clean_content(content: str | None) -> str | None:
     if not content:
         return content
     cleaned = _HARMONY_TOKEN_RE.sub("", content)
     cleaned = _CHANNEL_LEAD_RE.sub("", cleaned)
-    return cleaned.strip() or content
+    cleaned = _LEAKED_TOOL_CALL_RE.sub("", cleaned)
+    return cleaned.strip() or None
 
 from backend.services.llm.base import (
     AssistantMessage, LLMError, LLMMessage, ToolCall, ToolDef,
@@ -52,8 +58,11 @@ class OpenAICompatibleProvider:
         extra_headers: dict[str, str] | None = None,
         transport: httpx.BaseTransport | None = None,
         fallback_models: list[str] | None = None,
+        honor_model_chain: bool = True,
     ) -> None:
         self.base_url = base_url.rstrip("/")
+        # A single-model local server (LM Studio / vLLM) ignores routed model chains.
+        self.honor_model_chain = honor_model_chain
         self.api_key = api_key
         self.model = model
         self.timeout = timeout
@@ -67,6 +76,10 @@ class OpenAICompatibleProvider:
             headers["Authorization"] = f"Bearer {self.api_key}"
         return headers
 
+    def _is_local_server(self) -> bool:
+        host = self.base_url.lower()
+        return not any(h in host for h in ("openrouter.ai", "api.openai.com", "generativelanguage.googleapis.com"))
+
     async def complete(
         self,
         messages: list[LLMMessage | AssistantMessage],
@@ -76,6 +89,7 @@ class OpenAICompatibleProvider:
         max_tokens: int = 1024,
         models: list[str] | None = None,
         on_status: StatusCallback | None = None,
+        disable_thinking: bool = False,
     ) -> AssistantMessage:
         payload: dict[str, Any] = {
             "messages": [m.to_wire() for m in messages],
@@ -83,6 +97,11 @@ class OpenAICompatibleProvider:
             "max_tokens": max_tokens,
             "stream": False,
         }
+        if disable_thinking and self._is_local_server():
+            # Structured (JSON-only) calls: a reasoning model that spends the budget
+            # thinking returns no answer. vLLM / LM Studio honour this template flag;
+            # hosted APIs would reject the unknown field, so it is never sent there.
+            payload["chat_template_kwargs"] = {"enable_thinking": False}
         if tools:
             payload["tools"] = [t.to_wire() for t in tools]
             payload["tool_choice"] = "auto"
@@ -91,6 +110,11 @@ class OpenAICompatibleProvider:
         # Try the primary model, then any fallbacks (free models are flaky:
         # 429 = rate-limited, 404 = unavailable). Each model gets a short
         # retry/backoff for transient 429/5xx before moving to the next.
+        # Routed model chains (`:free` OpenRouter ids from model_router) only make sense on
+        # OpenRouter. A local LM Studio / vLLM / OpenAI endpoint serves its own configured
+        # model, so ignore the chain there instead of 404-ing on a foreign model id.
+        if models is not None and not self.honor_model_chain:
+            models = None
         candidates = models if models is not None else [self.model] + [m for m in self.fallback_models if m != self.model]
 
         async def notify(text: str) -> None:
@@ -118,7 +142,14 @@ class OpenAICompatibleProvider:
                         return self._parse(resp.json(), model=model)
                 except httpx.HTTPStatusError as exc:
                     status = exc.response.status_code if exc.response is not None else 0
-                    last_exc = LLMError(f"LLM HTTP {status}")
+                    # Keep a slice of the body: 4xx from a local server usually says exactly
+                    # what was wrong (bad role order, unknown param, context length…).
+                    detail = ""
+                    try:
+                        detail = (exc.response.text or "")[:240].replace("\n", " ") if exc.response is not None else ""
+                    except Exception:
+                        detail = ""
+                    last_exc = LLMError(f"LLM HTTP {status}" + (f": {detail}" if detail else ""))
                     if status == 401:
                         raise last_exc from exc  # bad key — no point trying other models
                     if status in (429, 500, 502, 503, 504) and attempt < 2:

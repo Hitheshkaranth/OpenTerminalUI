@@ -3,6 +3,8 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from backend.api.routes.agent import router as agent_router
+from backend.api.routes.agent_proposals import router as agent_proposals_router
+from backend.api.routes.agent_signals import router as agent_signals_router
 from backend.api.routes.provider_keys import router as provider_keys_router
 from backend.api.routes.providers import router as providers_router
 from backend.api.routes.ai import router as ai_router
@@ -67,6 +69,8 @@ api_router.include_router(alpha_zoo_router, prefix="/api")
 api_router.include_router(strategy_export_router, prefix="/api")
 api_router.include_router(ai_router, prefix="/api")
 api_router.include_router(agent_router, prefix="/api")
+api_router.include_router(agent_proposals_router, prefix="/api")
+api_router.include_router(agent_signals_router, prefix="/api")
 # These routers already carry their full "/api/..." prefix internally,
 # so they must be included WITHOUT an extra prefix (avoids "/api/api/...").
 api_router.include_router(analytics_router)

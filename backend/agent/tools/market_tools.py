@@ -677,8 +677,13 @@ def build_strategy_registry() -> ToolRegistry:
     return reg
 
 
-def build_default_registry() -> ToolRegistry:
+def build_default_registry(user_id: str | None = None) -> ToolRegistry:
     reg = ToolRegistry()
+    if user_id:
+        from backend.agent.tools.portfolio_tools import portfolio_tool_specs
+        from backend.agent.proposals import proposal_tool_specs
+        for spec in [*portfolio_tool_specs(user_id), *proposal_tool_specs(user_id)]:
+            reg.register(spec)
     reg.register(ToolSpec(
         name="screen_stocks",
         description="Required first tool for user requests that ask to find, screen, scan, filter, "

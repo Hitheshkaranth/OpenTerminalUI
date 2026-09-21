@@ -7,6 +7,14 @@ import { useStockStore } from "../store/stockStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { SymbolContextRail } from "../components/layout/SymbolContextRail";
 
+
+// Event dates relative to the local calendar so the test doesn't expire at midnight.
+function localIso(offsetDays: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 vi.mock("../store/settingsStore", () => {
   const useSettingsStore = vi.fn((selector: (state: { selectedMarket: string }) => string) => {
     const state = { selectedMarket: "NSE" };
@@ -51,7 +59,7 @@ vi.mock("../api/eventsHub", async (importOriginal) => {
             type: "earnings" as const,
             symbol: "RELIANCE",
             title: "Q2 FY26 earnings",
-            date: "2026-09-24",
+            date: localIso(3),
             time: "amc",
             impact: "high" as const,
             source: "earnings_service",
@@ -62,7 +70,7 @@ vi.mock("../api/eventsHub", async (importOriginal) => {
             type: "expiry" as const,
             symbol: "RELIANCE",
             title: "Monthly expiry",
-            date: "2026-09-21",
+            date: localIso(0),
             time: null,
             impact: "medium" as const,
             source: "fno",
