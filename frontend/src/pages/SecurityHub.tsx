@@ -26,6 +26,7 @@ import { TerminalTabs, type TerminalTabItem } from "../components/terminal/Termi
 import { TerminalInput } from "../components/terminal/TerminalInput";
 import { X, Search, FileText } from "lucide-react";
 import { useAnalystConsensus, useFinancials, usePeerComparison, useStock, useStockHistory } from "../hooks/useStocks";
+import { isExchange, countryForExchange } from "../lib/instrument";
 import { quickAddToFirstPortfolio } from "../shared/portfolioQuickAdd";
 import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
@@ -151,6 +152,7 @@ export function SecurityHubPage() {
   const { ticker: tickerParam } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
+  const selectedCountry = useSettingsStore((s) => s.selectedCountry);
   const storeTicker = useStockStore((s) => s.ticker);
   const setTicker = useStockStore((s) => s.setTicker);
   const loadTicker = useStockStore((s) => s.load);
@@ -207,6 +209,23 @@ export function SecurityHubPage() {
   }, [compareQuery.data, activeTicker, compareSymbols]);
 
   const stockQuery = useStock(activeTicker);
+
+  // Market follows the symbol: a snapshot that resolves to a different exchange
+  // re-points the global market/country so every other panel agrees with the header.
+  const setSelectedMarket = useSettingsStore((s) => s.setSelectedMarket);
+  const setSelectedCountry = useSettingsStore((s) => s.setSelectedCountry);
+  const setInstrument = useStockStore((s) => s.setInstrument);
+  useEffect(() => {
+    const ex = stockQuery.data?.exchange;
+    if (!isExchange(ex)) return;
+    setInstrument({ symbol: activeTicker, exchange: ex });
+    if (ex !== selectedMarket) {
+      const country = countryForExchange(ex);
+      if (country !== selectedCountry) setSelectedCountry(country);
+      setSelectedMarket(ex);
+    }
+  }, [stockQuery.data?.exchange, activeTicker, selectedMarket, selectedCountry, setSelectedMarket, setSelectedCountry, setInstrument]);
+
   const historyQuery = useStockHistory(activeTicker, "6mo", "1d");
   const annualFinancialsQuery = useFinancials(activeTicker, "annual");
   const quarterlyFinancialsQuery = useFinancials(activeTicker, "quarterly");

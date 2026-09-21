@@ -1,13 +1,21 @@
-import { useMemo } from "react";
+import { useState, useMemo, useContext } from "react";
 
 import { useProvidersStatus } from "../../api/providers";
+import { testProvider, useProviderKeys } from "../../api/providerKeys";
+import { AuthContextRef } from "../../contexts/AuthContext";
 import { TerminalBadge } from "../terminal/TerminalBadge";
 import { TerminalButton } from "../terminal/TerminalButton";
 import { TerminalTable } from "../terminal/TerminalTable";
 import { formatDistanceToNow } from "date-fns";
+import { ProviderKeyForm } from "./ProviderKeyForm";
 
 export function DataProvidersPanel() {
   const { data, isLoading, error, refetch } = useProvidersStatus();
+  const authCtx = useContext(AuthContextRef);
+  const isAdmin = String(authCtx?.user?.role ?? "").toLowerCase() === "admin";
+  const keysQuery = useProviderKeys(isAdmin);
+  const [testResults, setTestResults] = useState<Record<string, { status: string; last_error: string | null; loading: boolean }>>({});
+  const [openProvider, setOpenProvider] = useState<string | null>(null);
 
   if (isLoading) {
     return <div className="text-xs text-terminal-muted">Checking providers…</div>;
@@ -112,6 +120,88 @@ export function DataProvidersPanel() {
         return <span className="text-terminal-muted">—</span>;
       },
     },
+    {
+      key: "keys",
+      label: "Keys",
+      align: "right",
+      render: (row) => {
+        if (!isAdmin) {
+          return <span className="text-[10px] text-terminal-muted">Sign in as admin to manage keys</span>;
+        }
+        if (row.env_keys.length === 0) {
+          return <span className="text-terminal-muted">—</span>;
+        }
+        return (
+          <TerminalButton
+            size="sm"
+            variant="default"
+            onClick={() => setOpenProvider(openProvider === row.id ? null : row.id)}
+          >
+            Set keys
+          </TerminalButton>
+        );
+      },
+    },
+    {
+      key: "test",
+      label: "Test",
+      align: "right",
+      render: (row) => {
+        if (!isAdmin) {
+          return <span className="text-[10px] text-terminal-muted">—</span>;
+        }
+        const result = testResults[row.id];
+        const isLoadingTest = result?.loading ?? false;
+
+        const handleTest = async () => {
+          setTestResults((prev) => ({
+            ...prev,
+            [row.id]: { ...prev[row.id], loading: true },
+          }));
+          try {
+            const res = await testProvider(row.id);
+            setTestResults((prev) => ({
+              ...prev,
+              [row.id]: { status: res.status, last_error: res.last_error, loading: false },
+            }));
+          } catch {
+            setTestResults((prev) => ({
+              ...prev,
+              [row.id]: { status: "down", last_error: "Test failed", loading: false },
+            }));
+          }
+        };
+
+        const statusBadge = result ? (
+          result.status === "ok" ? (
+            <TerminalBadge variant="live" dot>OK</TerminalBadge>
+          ) : result.status === "degraded" ? (
+            <TerminalBadge variant="warn" dot>DEGRADED</TerminalBadge>
+          ) : result.status === "unconfigured" ? (
+            <TerminalBadge variant="neutral" dot>NOT CONFIGURED</TerminalBadge>
+          ) : (
+            <TerminalBadge variant="danger" dot>DOWN</TerminalBadge>
+          )
+        ) : null;
+
+        return (
+          <div className="flex items-center justify-end gap-1">
+            {statusBadge}
+            {result?.last_error && (
+              <span className="text-[10px] text-terminal-neg">{result.last_error}</span>
+            )}
+            <TerminalButton
+              size="sm"
+              variant="default"
+              loading={isLoadingTest}
+              onClick={handleTest}
+            >
+              Test
+            </TerminalButton>
+          </div>
+        );
+      },
+    },
   ];
 
   return (
@@ -135,6 +225,41 @@ export function DataProvidersPanel() {
         emptyText="No providers configured"
         density="compact"
       />
+      {isAdmin && openProvider && (
+        <div className="mt-2">
+          {(() => {
+            const providerData = data.providers.find((p) => p.id === openProvider);
+            if (!providerData) return null;
+            // All key rows for this provider (Kite has three); the form matches by name.
+            const rows = (keysQuery.data?.keys ?? []).filter((k) => k.provider === providerData.id);
+            return (
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-terminal-muted">{providerData.name}</span>
+                  <TerminalButton size="sm" variant="ghost" onClick={() => setOpenProvider(null)}>
+                    Close
+                  </TerminalButton>
+                </div>
+                <ProviderKeyForm
+                  providerId={providerData.id}
+                  envKeys={providerData.env_keys}
+                  rows={rows}
+                  onSaved={() => {
+                    // Keep the form open so the "applied live / restart required" line is readable.
+                    void keysQuery.refetch();
+                    void refetch();
+                  }}
+                />
+              </div>
+            );
+          })()}
+        </div>
+      )}
+      {!isAdmin && (
+        <div className="mt-2 text-[11px] text-terminal-muted">
+          Sign in as admin to manage keys
+        </div>
+      )}
     </div>
   );
 }

@@ -29,6 +29,7 @@ import { EventsTimeline } from "../components/EventsTimeline";
 import { QuarterlyFinancialsChart } from "../components/QuarterlyFinancialsChart";
 import { useDeliverySeries, useEquityPerformance, useFinancials, useStock, useStockHistory, useStockReturns } from "../hooks/useStocks";
 import { useNextEarnings } from "../hooks/useStocks";
+import { isExchange, countryForExchange } from "../lib/instrument";
 import { useDisplayCurrency } from "../hooks/useDisplayCurrency";
 import { useQuotesStore, useQuotesStream } from "../realtime/useQuotesStream";
 import { ChartEngine } from "../shared/chart/ChartEngine";
@@ -80,6 +81,7 @@ export function StockDetailPage() {
   const { ticker, interval, range, setInterval, setRange } = useStockStore();
   const { formatDisplayMoney } = useDisplayCurrency();
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
+  const selectedCountry = useSettingsStore((s) => s.selectedCountry);
   const realtimeMarket = normalizeRealtimeMarketCode(selectedMarket);
   const { subscribe, unsubscribe, isConnected, connectionState } = useQuotesStream(realtimeMarket);
   const ticksByToken = useQuotesStore((s) => s.ticksByToken);
@@ -110,6 +112,22 @@ export function StockDetailPage() {
   const chartFullscreenRef = useRef<HTMLDivElement | null>(null);
 
   const { data: stock } = useStock(ticker);
+
+  // Market follows the symbol: a snapshot that resolves to a different exchange
+  // re-points the global market/country so every other panel agrees with the header.
+  const setSelectedMarket = useSettingsStore((s) => s.setSelectedMarket);
+  const setSelectedCountry = useSettingsStore((s) => s.setSelectedCountry);
+  const setInstrument = useStockStore((s) => s.setInstrument);
+  useEffect(() => {
+    const ex = stock?.exchange;
+    if (!isExchange(ex)) return;
+    setInstrument({ symbol: ticker, exchange: ex });
+    if (ex !== selectedMarket) {
+      const country = countryForExchange(ex);
+      if (country !== selectedCountry) setSelectedCountry(country);
+      setSelectedMarket(ex);
+    }
+  }, [stock?.exchange, ticker, selectedMarket, selectedCountry, setSelectedMarket, setSelectedCountry, setInstrument]);
   const { data: returnsData } = useStockReturns(ticker);
   const { data: performanceData } = useEquityPerformance(ticker);
   const { data: chart, isLoading: isChartLoading, error: chartError } = useStockHistory(ticker, range, interval, extended);

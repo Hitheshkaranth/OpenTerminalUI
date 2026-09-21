@@ -5,9 +5,11 @@ import { fetchChart, fetchStock } from "../api/client";
 import { useSettingsStore } from "./settingsStore";
 import type { ChartResponse, StockSnapshot } from "../types";
 import { normalizeTicker } from "../utils/ticker";
+import { parseInstrument, isExchange, type Exchange, type Instrument } from "../lib/instrument";
 
 type StockState = {
   ticker: string;
+  exchange: Exchange | null;
   interval: string;
   range: string;
   stock: StockSnapshot | null;
@@ -15,6 +17,7 @@ type StockState = {
   loading: boolean;
   error: string | null;
   setTicker: (ticker: string) => void;
+  setInstrument: (i: Instrument) => void;
   setInterval: (interval: string) => void;
   setRange: (range: string) => void;
   load: () => Promise<void>;
@@ -24,13 +27,30 @@ export const useStockStore = create<StockState>()(
   persist(
     (set, get) => ({
       ticker: "RELIANCE",
+      exchange: null,
       interval: "1d",
       range: "1y",
       stock: null,
       chart: null,
       loading: false,
       error: null,
-      setTicker: (ticker) => set({ ticker: normalizeTicker(ticker) }),
+      setInstrument: (i) => {
+        const parsed = parseInstrument(i.symbol);
+        const nextExchange = parsed.exchange ?? i.exchange;
+        set({
+          ticker: normalizeTicker(parsed.symbol),
+          exchange: nextExchange,
+        });
+      },
+      setTicker: (ticker) => {
+        const parsed = parseInstrument(ticker);
+        const bareTicker = normalizeTicker(parsed.symbol);
+        if (parsed.exchange) {
+          set({ ticker: bareTicker, exchange: parsed.exchange });
+        } else {
+          set({ ticker: bareTicker });
+        }
+      },
       setInterval: (interval) => set({ interval }),
       setRange: (range) => set({ range }),
       load: async () => {
@@ -67,9 +87,22 @@ export const useStockStore = create<StockState>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         ticker: state.ticker,
+        exchange: state.exchange,
         interval: state.interval,
         range: state.range,
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState as Partial<Pick<StockState, "ticker" | "exchange" | "interval" | "range">>) ?? {};
+        const current = currentState as StockState;
+        const exchange: Exchange | null = isExchange(persisted.exchange) ? persisted.exchange : current.exchange;
+        return {
+          ...current,
+          ticker: typeof persisted.ticker === "string" ? persisted.ticker : current.ticker,
+          exchange,
+          interval: typeof persisted.interval === "string" ? persisted.interval : current.interval,
+          range: typeof persisted.range === "string" ? persisted.range : current.range,
+        };
+      },
     },
   ),
 );

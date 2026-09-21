@@ -88,10 +88,53 @@ _PROBE_MAP: dict[str, Any] = {
 _FREE_IDS = {"yahoo", "nse"}
 
 
+# ---------------------------------------------------------------------------
+# Public helpers
+# ---------------------------------------------------------------------------
+
+def _build_provider_env_keys() -> dict[str, str]:
+    """Build env_name -> provider_id mapping from _PROVIDER_DEFS."""
+    result: dict[str, str] = {}
+    for pdef in _PROVIDER_DEFS:
+        pid = pdef["id"]
+        for key in pdef.get("env_keys", []):
+            result[key] = pid
+    return result
+
+
+PROVIDER_ENV_KEYS: dict[str, str] = _build_provider_env_keys()
+
+
+async def probe_provider(provider_id: str) -> dict[str, Any]:
+    """Single-provider view of the SAME logic as /providers/status (real Kite/FMP/Finnhub
+    probes, placeholder detection, health snapshot). Used by the Settings "Test" button.
+    Unknown provider -> status "unconfigured" with last_error "unknown provider"."""
+    checked_at = datetime.now(timezone.utc).isoformat()
+    known = {p["id"] for p in _PROVIDER_DEFS}
+    if provider_id not in known:
+        return {"provider": provider_id, "status": "unconfigured", "last_error": "unknown provider",
+                "checked_at": checked_at, "env_keys": [], "configured": False}
+    full = await providers_status()
+    row = next((r for r in full["providers"] if r["id"] == provider_id), None)
+    if row is None:  # pragma: no cover - defensive
+        return {"provider": provider_id, "status": "degraded", "last_error": full.get("error"),
+                "checked_at": checked_at, "env_keys": [], "configured": False}
+    return {"provider": provider_id, "status": row["status"], "last_error": row["last_error"],
+            "checked_at": full["checked_at"], "env_keys": row["env_keys"], "configured": row["configured"]}
+
+
+# Values the installer / .env.example leave behind; a key holding one of these is not configured.
+_PLACEHOLDER_VALUES = {"your-api-key-here", "your-api-key", "your_api_key", "change_me", "todo", "placeholder", "test-key", "xxx"}
+
+
+def is_placeholder(value: str | None) -> bool:
+    v = (value or "").strip().lower()
+    return not v or v in _PLACEHOLDER_VALUES or v.startswith("your-") or v.startswith("your_")
+
+
 def _is_configured(provider: dict[str, Any]) -> bool:
     for key in provider["env_keys"]:
-        val = os.getenv(key)
-        if not val:
+        if is_placeholder(os.getenv(key)):
             return False
     return True
 
@@ -215,7 +258,7 @@ async def _providers_status_impl() -> dict[str, Any]:
 
     # fmp probe (if configured)
     fmp_key = os.getenv("FMP_API_KEY") or os.getenv("OPENTERMINALUI_FMP_API_KEY")
-    if fmp_key:
+    if not is_placeholder(fmp_key):
         fmp_probing = asyncio.ensure_future(
             _light_probe("fmp", fetcher.fmp.get_quote("AAPL"))
         )
@@ -223,7 +266,7 @@ async def _providers_status_impl() -> dict[str, Any]:
 
     # finnhub probe (if configured)
     finnhub_key = os.getenv("FINNHUB_API_KEY") or os.getenv("OPENTERMINALUI_FINNHUB_API_KEY")
-    if finnhub_key:
+    if not is_placeholder(finnhub_key):
         finnhub_probing = asyncio.ensure_future(
             _light_probe("finnhub", fetcher.finnhub.get_company_profile("AAPL"))
         )
@@ -232,7 +275,7 @@ async def _providers_status_impl() -> dict[str, Any]:
     # kite probe (if configured): /user/profile is the cheapest authenticated call.
     # KiteClient._get returns {} on 401/403, which is exactly the "token expired" case.
     kite_token = os.getenv("KITE_ACCESS_TOKEN")
-    if os.getenv("KITE_API_KEY") and kite_token:
+    if not is_placeholder(os.getenv("KITE_API_KEY")) and not is_placeholder(kite_token):
         async def _kite_profile_ok() -> None:
             from backend.core.kite_client import KiteClient
 

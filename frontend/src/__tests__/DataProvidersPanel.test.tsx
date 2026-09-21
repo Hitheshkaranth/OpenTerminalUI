@@ -7,14 +7,27 @@ vi.mock("../api/providers", () => ({
   useProvidersStatus: vi.fn(),
 }));
 
+vi.mock("../api/providerKeys", () => ({
+  useProviderKeys: vi.fn(),
+  testProvider: vi.fn(),
+}));
+
 // Import after mock is set up
 import * as ProvidersApi from "../api/providers";
+import * as ProviderKeysApi from "../api/providerKeys";
 vi.mock("../../store/settingsStore", () => ({
   useSettingsStore: () => ({ selectedMarket: "NSE" }),
 }));
 
 afterEach(() => {
   vi.clearAllMocks();
+});
+
+vi.mocked(ProviderKeysApi.useProviderKeys).mockReturnValue({
+  data: undefined,
+  isLoading: false,
+  error: null,
+  refetch: vi.fn(),
 });
 
 describe("DataProvidersPanel", () => {

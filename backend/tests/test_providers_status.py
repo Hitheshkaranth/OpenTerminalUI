@@ -244,3 +244,32 @@ def test_kite_reports_down_when_token_rejected(monkeypatch):
     kite = next(p for p in out["providers"] if p["id"] == "kite")
     assert kite["status"] == "down"
     assert "access token" in (kite["last_error"] or "")
+
+
+def test_placeholder_keys_are_not_configured(monkeypatch):
+    from backend.api.routes import providers as mod
+
+    monkeypatch.setenv("FINNHUB_API_KEY", "your-api-key")
+    monkeypatch.setenv("FMP_API_KEY", "REALKEY123")
+    rows = mod._build_provider_list({}, {}, False)
+    by_id = {r["id"]: r for r in rows}
+    assert by_id["finnhub"]["configured"] is False and by_id["finnhub"]["status"] == "unconfigured"
+    assert by_id["fmp"]["configured"] is True
+    assert mod.is_placeholder("CHANGE_ME") and mod.is_placeholder("") and not mod.is_placeholder("sk-or-abc")
+
+
+def test_probe_provider_uses_real_status_logic(monkeypatch):
+    """The Settings 'Test' button must not report Kite OK just because keys exist."""
+    import asyncio
+
+    from backend.api.routes import providers as mod
+
+    async def fake_status():
+        return {"checked_at": "2026-01-01T00:00:00+00:00", "overall": "degraded", "providers": [
+            {"id": "kite", "status": "down", "last_error": "Kite rejected the access token (it expires daily)",
+             "configured": True, "env_keys": ["KITE_API_KEY"]}]}
+
+    monkeypatch.setattr(mod, "providers_status", fake_status)
+    out = asyncio.run(mod.probe_provider("kite"))
+    assert out["status"] == "down" and "access token" in out["last_error"]
+    assert asyncio.run(mod.probe_provider("nope"))["last_error"] == "unknown provider"

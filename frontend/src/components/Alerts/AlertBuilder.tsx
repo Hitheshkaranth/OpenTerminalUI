@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 
 import type { AlertCondition, AlertRule } from "../../types";
+import { readActions, validateActions } from "../../api/alertActions";
+import type { AlertAction } from "../../api/alertActions";
 import { TerminalModal } from "../terminal/TerminalModal";
+import { AlertActionsEditor } from "./AlertActionsEditor";
 
 type Props = {
   open: boolean;
@@ -14,7 +17,7 @@ type Props = {
     conditions: AlertCondition[];
     logic: string;
     delivery_channels: string[];
-    delivery_config: Record<string, string>;
+    delivery_config: Record<string, string> & { actions?: AlertAction[] };
     cooldown_minutes: number;
     expiry_date: string | null;
     max_triggers: number;
@@ -96,6 +99,7 @@ export function AlertBuilder({
   const [maxTriggers, setMaxTriggers] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [actions, setActions] = useState<AlertAction[]>(() => readActions(initialAlert?.delivery_config));
 
   useEffect(() => {
     if (!open) return;
@@ -108,6 +112,7 @@ export function AlertBuilder({
     setCooldownMinutes(next.cooldown_minutes);
     setExpiryDate(next.expiry_date);
     setMaxTriggers(next.max_triggers);
+    setActions(readActions(initialAlert?.delivery_config));
     setError(null);
   }, [defaultDeliveryConfig, initialAlert, open]);
 
@@ -117,19 +122,28 @@ export function AlertBuilder({
   }, [conditions, logic, symbol]);
 
   async function handleSave() {
+    const actionError = validateActions(actions);
+    if (actionError) {
+      setError(actionError);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
+      const mergedConfig: Record<string, string | AlertAction[]> = { ...deliveryConfig };
+      if (actions.length) {
+        mergedConfig.actions = actions;
+      }
       await onSave({
         symbol: symbol.trim().toUpperCase(),
         conditions,
         logic,
         delivery_channels: deliveryChannels,
-        delivery_config: deliveryConfig,
+        delivery_config: mergedConfig,
         cooldown_minutes: Math.max(0, cooldownMinutes),
         expiry_date: expiryDate ? new Date(expiryDate).toISOString() : null,
         max_triggers: Math.max(0, maxTriggers),
-      });
+      } as unknown as Parameters<typeof onSave>[0]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save alert");
       return;
@@ -388,6 +402,8 @@ export function AlertBuilder({
             />
           ) : null}
         </section>
+
+        <AlertActionsEditor value={actions} onChange={setActions} alertId={initialAlert?.id ?? null} />
 
         <section className="grid gap-2 md:grid-cols-3">
           <div className="space-y-1">
