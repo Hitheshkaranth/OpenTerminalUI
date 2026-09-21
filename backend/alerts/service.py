@@ -2,16 +2,20 @@ from __future__ import annotations
 
 import asyncio
 import ast
+import logging
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from statistics import mean
 from typing import Any
 
+from backend.alerts.actions import run_actions
 from backend.alerts.delivery import deliver_alert
 from backend.alerts.scanner_rules import process_scanner_tick
 from backend.shared.db import SessionLocal
 from backend.models import AlertConditionType, AlertORM, AlertStatus, AlertTriggerORM
 from backend.services.marketdata_hub import MarketDataHub, get_marketdata_hub
+
+logger = logging.getLogger(__name__)
 
 
 def _utcnow() -> datetime:
@@ -372,20 +376,26 @@ class AlertEvaluatorService:
                 alert.trigger_count = int(alert.trigger_count or 0) + 1
                 if self._max_triggers_reached(alert):
                     alert.status = AlertStatus.EXPIRED.value
-                db.add(
-                    AlertTriggerORM(
-                        alert_id=alert.id,
-                        user_id=alert.user_id,
-                        symbol=alert.symbol,
-                        condition_type=alert.condition_type,
-                        triggered_value=triggered_value,
-                        context=trigger_context,
-                        triggered_at=now,
-                    )
+                trigger_row = AlertTriggerORM(
+                    alert_id=alert.id,
+                    user_id=alert.user_id,
+                    symbol=alert.symbol,
+                    condition_type=alert.condition_type,
+                    triggered_value=triggered_value,
+                    context=trigger_context,
+                    triggered_at=now,
                 )
+                db.add(trigger_row)
                 db.commit()
                 message = self._build_delivery_message(alert, triggered_value, now)
                 await deliver_alert(alert, message, db=db)
+                if (alert.delivery_config or {}).get("actions"):
+                    try:
+                        results = await run_actions(db, alert, {**trigger_context, "message": message})
+                        trigger_row.context = {**(trigger_row.context or {}), "actions": results}
+                        db.commit()
+                    except Exception:
+                        logger.exception("Action execution failed for alert %s", alert.id)
                 await self._emit_alert_event(alert, triggered_value, now, trigger_context)
             if self._hub is not None:
                 await process_scanner_tick(db, self._hub, tick)

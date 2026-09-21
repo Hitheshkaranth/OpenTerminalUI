@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from backend.alerts.actions import ActionValidationError, run_actions, validate_actions
 from backend.alerts.delivery import deliver_alert
 from backend.api.deps import get_db
 from backend.auth.deps import get_current_user
@@ -291,6 +292,16 @@ def create_alert(
     channels = _normalize_channels(payload.channels, payload.delivery_channels, parameters)
     config = _normalize_delivery_config(payload, parameters)
     _ensure_configured_channels(channels, config)
+    raw_actions = config.get("actions")
+    if raw_actions is not None:
+        try:
+            normalised = validate_actions(raw_actions)
+            if normalised:
+                config["actions"] = normalised
+            else:
+                config.pop("actions", None)
+        except ActionValidationError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
     status = str(payload.status or AlertStatus.ACTIVE.value).strip().lower()
     if status not in {x.value for x in AlertStatus}:
         raise HTTPException(status_code=400, detail="Invalid status")
@@ -426,6 +437,19 @@ def update_alert(
         row.delivery_channels = channels
         row.delivery_config = config
 
+    # Validate and normalize actions if delivery_config was provided or already has actions
+    raw_actions = config.get("actions") if payload.delivery_config is not None else (row.delivery_config or {}).get("actions")
+    if payload.delivery_config is not None:
+        try:
+            normalised = validate_actions(raw_actions)
+            if normalised:
+                config["actions"] = normalised
+            else:
+                config.pop("actions", None)
+            row.delivery_config = config
+        except ActionValidationError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+
     db.commit()
     db.refresh(row)
     alert = _serialize_alert(row)
@@ -479,3 +503,16 @@ def get_alert_channel_status() -> dict[str, Any]:
             for key, value in get_delivery_options()["channels"].items()
         }
     }
+
+
+@router.post("/alerts/{alert_id}/actions/dry-run")
+async def dry_run_alert_actions(
+    alert_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    alert = db.query(AlertORM).filter(AlertORM.id == alert_id, AlertORM.user_id == current_user.id).first()
+    if alert is None:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    results = await run_actions(db, alert, {"message": "dry-run", "dry_run": True}, dry_run=True)
+    return {"alert_id": alert_id, "actions": results}

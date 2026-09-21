@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Minus, Move, X } from "lucide-react";
 
 import { HotKeyPanel } from "./HotKeyPanel";
+import { useStockStore } from "../../store/stockStore";
 
 const VISIBILITY_KEY = "ot:hotkey-panel:visible:v1";
 const POSITION_KEY = "ot:hotkey-panel:position:v1";
@@ -60,6 +61,20 @@ export function HotKeyPanelFloat() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const onHotKeyPanelOpen = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (!detail?.symbol) return;
+      useStockStore.getState().setTicker(detail.symbol);
+      setVisible(true);
+      setMinimized(false);
+    };
+    window.addEventListener("ot:hotkey-panel:open", onHotKeyPanelOpen);
+    return () => {
+      window.removeEventListener("ot:hotkey-panel:open", onHotKeyPanelOpen);
+    };
   }, []);
 
   useEffect(() => {

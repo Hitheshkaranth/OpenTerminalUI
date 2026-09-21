@@ -47,6 +47,7 @@ from backend.risk_engine.routes import router as risk_router
 from backend.routers.chart_workstation import router as chart_workstation_router
 from backend.routers.charts import router as charts_router
 from backend.saved_views.routes import router as saved_views_router
+from backend.api.routes.events_hub import router as events_hub_router
 from backend.api.routes.screener_alerts import router as screener_alerts_router
 from backend.tca.routes import router as tca_router
 
@@ -82,6 +83,7 @@ api_router.include_router(research_autopilot_router)
 api_router.include_router(shadow_account_router)
 api_router.include_router(notifications_router)
 api_router.include_router(stress_test_router, prefix="/api")
+api_router.include_router(events_hub_router, prefix="/api")
 api_router.include_router(insider_router)
 api_router.include_router(etf_router, prefix="/api")
 api_router.include_router(tape_router, prefix="/api/tape")

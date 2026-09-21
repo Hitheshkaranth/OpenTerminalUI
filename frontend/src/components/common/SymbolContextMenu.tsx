@@ -9,6 +9,7 @@ import {
   Check,
   Columns3,
   Copy,
+  Minus,
   Plus,
   X,
 } from "lucide-react";
@@ -95,6 +96,26 @@ function mergeActions(
         if (!activeTicker) return;
         useStockStore.getState().setTicker(activeTicker);
         navigate(`/equity/alerts?ticker=${encodeURIComponent(activeTicker)}`);
+      },
+    },
+    {
+      id: "paper-buy",
+      label: "Paper Buy",
+      icon: <Plus className="h-3.5 w-3.5" />,
+      onAction: async (nextSymbol) => {
+        const activeTicker = nextSymbol.trim().toUpperCase();
+        if (!activeTicker) return;
+        window.dispatchEvent(new CustomEvent("ot:hotkey-panel:open", { detail: { symbol: activeTicker, side: "buy" } }));
+      },
+    },
+    {
+      id: "paper-sell",
+      label: "Paper Sell",
+      icon: <Minus className="h-3.5 w-3.5" />,
+      onAction: async (nextSymbol) => {
+        const activeTicker = nextSymbol.trim().toUpperCase();
+        if (!activeTicker) return;
+        window.dispatchEvent(new CustomEvent("ot:hotkey-panel:open", { detail: { symbol: activeTicker, side: "sell" } }));
       },
     },
     {

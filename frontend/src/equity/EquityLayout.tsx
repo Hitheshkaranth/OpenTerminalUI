@@ -24,6 +24,7 @@ import { useAlertsStore } from "../store/alertsStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
 import { getWorkspacePresetConfig } from "../workspace/presets";
+import { SymbolContextRail } from "../components/layout/SymbolContextRail";
 import type { AlertRule, AuditEvent, KillSwitch, OmsOrder, PaperOrder, PaperPerformance, PaperPortfolio, PaperPosition, WatchlistItem } from "../types";
 
 function EquityRightRail() {
@@ -188,6 +189,7 @@ function EquityRightRail() {
         <div className="ot-type-panel-subtitle text-terminal-muted">{routeLabel}</div>
       </div>
       <div className="flex-1 space-y-2 overflow-auto p-2">
+        <SymbolContextRail />
         <TerminalPanel
           title="Workspace"
           subtitle="Preset + Session"
