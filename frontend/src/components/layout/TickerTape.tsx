@@ -49,6 +49,13 @@ function formatPct(value: number | null) {
 }
 
 export function TickerTape() {
+  // Guard in a wrapper so the inner component's hooks always run in the same order.
+  const tickerTapeVisible = useSettingsStore((s) => s.tickerTapeVisible);
+  if (!tickerTapeVisible) return null;
+  return <TickerTapeInner />;
+}
+
+function TickerTapeInner() {
   const navigate = useNavigate();
   const { data: polledStatus } = useMarketStatus();
   const realtimeStatus = useQuotesStore((s) => s.marketStatus);

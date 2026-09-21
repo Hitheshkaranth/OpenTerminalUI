@@ -44,6 +44,14 @@ export type IndicatorResponse = {
   };
 };
 
+export type Provenance = {
+  source: string;
+  quality: "live" | "delayed" | "cached" | "synthetic" | "unavailable";
+  as_of: string | null;
+  latency_ms: number | null;
+  note: string | null;
+};
+
 export type StockSnapshot = {
   ticker: string;
   symbol: string;
@@ -80,6 +88,7 @@ export type StockSnapshot = {
   fifty_two_week_low?: number;
   fifty_two_week_high?: number;
   raw?: Record<string, unknown>;
+  provenance?: Provenance;
 };
 
 export type FinancialSection = Array<Record<string, string | number | null>>;

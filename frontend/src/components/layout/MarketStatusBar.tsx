@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bell, CircleDot } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import { useMarketStatus } from "../../hooks/useStocks";
 import { useAlertsStore } from "../../store/alertsStore";
 import { useQuotesStore } from "../../realtime/useQuotesStream";
+import { useProvidersStatus } from "../../api/providers";
 
 function formatZone(now: Date, timeZone: string) {
   return now.toLocaleTimeString([], {
@@ -36,6 +38,8 @@ export function MarketStatusBar(_props: { tickerOverride?: string | null } = {})
   const { data: marketStatus } = useMarketStatus();
   const unreadAlerts = useAlertsStore((s) => s.unreadCount);
   const connectionState = useQuotesStore((s) => s.connectionState);
+  const { data: providersData, isLoading: providersLoading, error: providersError } = useProvidersStatus();
+  const navigate = useNavigate();
   const [now, setNow] = useState(() => new Date());
   const [lagMs, setLagMs] = useState(0);
   const lagRef = useRef(performance.now());
@@ -77,7 +81,11 @@ export function MarketStatusBar(_props: { tickerOverride?: string | null } = {})
   const connectionTone =
     connectionState === "connected" ? "green" : connectionState === "connecting" ? "yellow" : "red";
   const connText =
-    connectionState === "connected" ? "CONNECTED" : connectionState === "connecting" ? "DEGRADED" : "DISCONNECTED";
+    connectionState === "connected" ? "WS: CONNECTED" : connectionState === "connecting" ? "WS: DEGRADED" : "WS: OFF";
+
+  const visibleProviders = providersData?.providers
+    .filter((p) => p.configured || ["yahoo", "nse"].includes(p.id))
+    .slice(0, 6) || [];
 
   return (
     <div className="border-t border-terminal-border bg-[#0D1117] px-3 py-0.5 text-[11px]">
@@ -101,6 +109,32 @@ export function MarketStatusBar(_props: { tickerOverride?: string | null } = {})
         </div>
 
         <div className="inline-flex items-center gap-3 ot-type-data whitespace-nowrap">
+          <button
+            type="button"
+            onClick={() => navigate("/equity/settings?section=providers")}
+            title="Data providers — open Settings"
+            aria-label="Data providers — open Settings"
+            className="inline-flex items-center gap-1"
+          >
+            {providersLoading || providersError || !providersData ? (
+              <>
+                <Dot tone="gray" />
+                <span>PROVIDERS</span>
+              </>
+            ) : (
+              <>
+                {visibleProviders.map((p) => {
+                  const tone = p.status === "ok" ? "green" : p.status === "degraded" ? "yellow" : p.status === "down" ? "red" : "gray";
+                  return (
+                    <span key={p.id} className="inline-flex items-center gap-0.5">
+                      <Dot tone={tone} />
+                      <span>{p.id.toUpperCase()}</span>
+                    </span>
+                  );
+                })}
+              </>
+            )}
+          </button>
           <span className="inline-flex items-center gap-1">
             <Dot tone={connectionTone} />
             <span>{connText}</span>

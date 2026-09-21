@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query
@@ -9,6 +10,19 @@ from backend.core.kite_client import KiteClient
 
 router = APIRouter()
 kite = KiteClient()
+
+
+_KITE_FAIL_HINT = (
+    "Failed to fetch Kite {what}. The Kite access token expires daily — refresh "
+    "KITE_ACCESS_TOKEN (or log in again via /api/kite/auth/login-url) and retry."
+)
+
+
+def _num(v: Any) -> float | None:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
 
 
 class KiteSessionRequest(BaseModel):
@@ -160,3 +174,75 @@ async def kite_latest_many(
         if isinstance(quote, dict):
             items.append(_movement_payload(instrument, quote))
     return {"status": "ok", "source": "kite", "count": len(items), "items": items}
+
+
+@router.get("/kite/holdings")
+async def kite_holdings(
+    authorization: str | None = Header(default=None),
+) -> dict[str, object]:
+    if not kite.api_key:
+        raise HTTPException(status_code=400, detail="KITE_API_KEY is not configured")
+    access_token = _token_from_header_or_env(authorization)
+    raw = await kite.get_holdings(access_token)
+    if raw is None:
+        raise HTTPException(status_code=502, detail=_KITE_FAIL_HINT.format(what="holdings"))
+    holdings = []
+    for h in raw:
+        qty = _num(h.get("quantity")) or 0.0
+        t1 = _num(h.get("t1_quantity")) or 0.0
+        holdings.append({
+            "symbol": h.get("tradingsymbol"),
+            "exchange": h.get("exchange"),
+            "isin": h.get("isin"),
+            "quantity": qty + t1,
+            "average_price": _num(h.get("average_price")),
+            "last_price": _num(h.get("last_price")),
+            "pnl": _num(h.get("pnl")),
+            "product": h.get("product"),
+        })
+    return {
+        "source": "kite",
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "holdings": holdings,
+    }
+
+
+@router.get("/kite/positions")
+async def kite_positions(
+    authorization: str | None = Header(default=None),
+) -> dict[str, object]:
+    if not kite.api_key:
+        raise HTTPException(status_code=400, detail="KITE_API_KEY is not configured")
+    access_token = _token_from_header_or_env(authorization)
+    data = await kite.get_positions(access_token)
+    if data is None:
+        raise HTTPException(status_code=502, detail=_KITE_FAIL_HINT.format(what="positions"))
+    net = data.get("net")
+    if not isinstance(net, list):
+        net = []
+    positions = []
+    for p in net:
+        qty = _num(p.get("quantity")) or 0.0
+        if qty > 0:
+            side = "long"
+        elif qty < 0:
+            side = "short"
+        else:
+            side = "flat"
+        positions.append({
+            "symbol": p.get("tradingsymbol"),
+            "exchange": p.get("exchange"),
+            "isin": None,
+            "quantity": qty,
+            "average_price": _num(p.get("average_price")),
+            "last_price": _num(p.get("last_price")),
+            "pnl": _num(p.get("pnl")),
+            "product": p.get("product"),
+            "day_pnl": _num(p.get("day_m2m")),
+            "side": side,
+        })
+    return {
+        "source": "kite",
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "positions": positions,
+    }

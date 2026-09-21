@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 
 type Variant = "neutral" | "live" | "mock" | "warn" | "success" | "danger" | "info" | "accent";
 type Size = "sm" | "md";
@@ -9,7 +9,7 @@ type Props = {
   size?: Size;
   className?: string;
   dot?: boolean;
-};
+} & Omit<HTMLAttributes<HTMLSpanElement>, "children" | "className">;
 
 const variants: Record<Variant, string> = {
   neutral: "border-terminal-border text-terminal-muted",
@@ -27,9 +27,10 @@ const sizes: Record<Size, string> = {
   md: "px-2 py-0.5 text-[11px]",
 };
 
-export function TerminalBadge({ children, variant = "neutral", size = "sm", className = "", dot = false }: Props) {
+export function TerminalBadge({ children, variant = "neutral", size = "sm", className = "", dot = false, ...rest }: Props) {
   return (
     <span
+      {...rest}
       className={[
         "inline-flex items-center rounded-sm border ot-type-badge",
         dot ? "gap-1" : "",

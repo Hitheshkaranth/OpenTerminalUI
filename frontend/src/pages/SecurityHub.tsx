@@ -30,6 +30,7 @@ import { quickAddToFirstPortfolio } from "../shared/portfolioQuickAdd";
 import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
 import type { ChartPoint } from "../types";
+import { ProvenanceChip } from "../components/common/ProvenanceChip";
 
 type HubTab = "overview" | "financials" | "chart" | "news" | "ownership" | "estimates" | "peers" | "esg" | "tape" | "insider";
 
@@ -80,11 +81,15 @@ function TinyPriceChart({ points }: { points: ChartPoint[] }) {
   );
 }
 
-function MetricCell({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+function MetricCell({ label, value, accent = false, hint }: { label: string; value: string; accent?: boolean; hint?: string }) {
+  // "-" from fmtNum/fmtPct, or a composite like "- - -" for a range with no data.
+  const isBlank = /^[-\s\u2014]*$/.test(value);
   return (
     <div className="rounded-sm border border-terminal-border bg-terminal-panel px-2 py-1">
       <div className="ot-type-label text-terminal-muted">{label}</div>
-      <div className={`mt-1 ${accent ? "text-terminal-accent" : "text-terminal-text"} ot-type-data text-xs`}>{value}</div>
+      <div className={`mt-1 ${isBlank ? "text-terminal-muted" : accent ? "text-terminal-accent" : "text-terminal-text"} ot-type-data text-xs`} title={hint ?? (isBlank ? "Not provided by current data source" : undefined)}>
+        {isBlank ? "\u2014" : value}
+      </div>
     </div>
   );
 }
@@ -314,7 +319,7 @@ export function SecurityHubPage() {
             <div className="grid min-w-[280px] grid-cols-3 gap-2">
               <MetricCell label="Last" value={fmtNum(currentPrice)} accent />
               <MetricCell label="Change %" value={fmtPct(stock.change_pct)} />
-              <MetricCell label="Volume" value={fmtNum(stock.volume)} />
+              <MetricCell label="Volume" value={fmtNum(stock.volume)} hint="Requires a real-time provider (Kite / Finnhub)" />
             </div>
           </div>
           <div className="mt-2 flex items-center justify-between">
@@ -353,11 +358,11 @@ export function SecurityHubPage() {
 
         {tab === "overview" ? (
           <div className="grid grid-cols-1 gap-2 xl:grid-cols-[1.2fr_1fr]">
-            <TerminalPanel title="Overview" subtitle="DES-style snapshot" bodyClassName="grid gap-2">
+            <TerminalPanel title="Overview" subtitle="DES-style snapshot" actions={<ProvenanceChip provenance={stockQuery.data?.provenance ?? undefined} />} bodyClassName="grid gap-2">
               <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-                <MetricCell label="Market Cap" value={fmtNum(marketCap)} />
-                <MetricCell label="P/E" value={fmtNum(peRatio)} />
-                <MetricCell label="Div Yield" value={fmtPct(dividendYield)} />
+                <MetricCell label="Market Cap" value={fmtNum(marketCap)} hint="Requires FMP or Yahoo summary data" />
+                <MetricCell label="P/E" value={fmtNum(peRatio)} hint="Requires FMP or Yahoo summary data" />
+                <MetricCell label="Div Yield" value={fmtPct(dividendYield)} hint="Requires FMP or Yahoo summary data" />
                 <MetricCell label="52W Range" value={`${fmtNum(week52Low)} - ${fmtNum(week52High)}`} />
               </div>
               <div className="grid grid-cols-1 gap-2 lg:grid-cols-[1fr_auto_auto_auto]">
@@ -365,9 +370,9 @@ export function SecurityHubPage() {
                   <div className="mb-1 ot-type-label text-terminal-muted">52-Week Position</div>
                   <MiniRangeBar low={Number.isFinite(week52Low) ? week52Low : null} high={Number.isFinite(week52High) ? week52High : null} current={Number.isFinite(currentPrice) ? currentPrice : null} />
                 </div>
-                <MetricCell label="Open" value={fmtNum(stock.open)} />
-                <MetricCell label="High" value={fmtNum(stock.day_high ?? stock.high)} />
-                <MetricCell label="Low" value={fmtNum(stock.day_low ?? stock.low)} />
+                <MetricCell label="Open" value={fmtNum(stock.open)} hint="Requires a real-time provider (Kite / Finnhub)" />
+                <MetricCell label="High" value={fmtNum(stock.day_high ?? stock.high)} hint="Requires a real-time provider (Kite / Finnhub)" />
+                <MetricCell label="Low" value={fmtNum(stock.day_low ?? stock.low)} hint="Requires a real-time provider (Kite / Finnhub)" />
               </div>
               <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
                 <div className="rounded-sm border border-terminal-border bg-terminal-bg p-2">
@@ -396,8 +401,8 @@ export function SecurityHubPage() {
             <TerminalPanel title="6M Price Chart" subtitle="Compact overview chart" bodyClassName="space-y-2">
               <TinyPriceChart points={histData} />
               <div className="grid grid-cols-3 gap-2 text-xs">
-                <MetricCell label="Prev Close" value={fmtNum(stock.previous_close)} />
-                <MetricCell label="Avg Volume" value={fmtNum(stock.avg_volume)} />
+                <MetricCell label="Prev Close" value={fmtNum(stock.previous_close)} hint="Requires a real-time provider (Kite / Finnhub)" />
+                <MetricCell label="Avg Volume" value={fmtNum(stock.avg_volume)} hint="Requires a real-time provider (Kite / Finnhub)" />
                 <MetricCell label="Beta" value={fmtNum(stock.beta)} />
               </div>
             </TerminalPanel>

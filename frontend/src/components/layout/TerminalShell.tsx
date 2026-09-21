@@ -21,8 +21,6 @@ import { useSettingsStore } from "../../store/settingsStore";
 import { HudOverlay } from "./HudOverlay";
 import { AlertToasts } from "./AlertToasts";
 import { useNotificationStore } from "../../store/notificationStore";
-import type { ThemeVariant } from "../../store/settingsStore";
-import { TerminalSelect } from "../terminal/TerminalSelect";
 import { HotKeyPanelFloat } from "../trading/HotKeyPanelFloat";
 import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 import { ShortcutOverlay } from "../common/ShortcutOverlay";
@@ -124,13 +122,6 @@ function WorkspaceControlBar({
 }: Pick<TerminalShellContextValue, "preset" | "setPreset" | "rightRailOpen" | "toggleRightRail"> & {
   rightRailEnabled: boolean;
 }) {
-  const themeVariant = useSettingsStore((s) => s.themeVariant);
-  const setThemeVariant = useSettingsStore((s) => s.setThemeVariant);
-  const customAccentColor = useSettingsStore((s) => s.customAccentColor);
-  const setCustomAccentColor = useSettingsStore((s) => s.setCustomAccentColor);
-  const hudOverlayEnabled = useSettingsStore((s) => s.hudOverlayEnabled);
-  const setHudOverlayEnabled = useSettingsStore((s) => s.setHudOverlayEnabled);
-
   const applyPreset = (nextPreset: WorkspacePreset) => {
     setPreset(nextPreset);
     window.dispatchEvent(new CustomEvent("ot:preset-change", { detail: nextPreset }));
@@ -158,41 +149,6 @@ function WorkspaceControlBar({
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <label className="inline-flex items-center gap-1 text-[11px] text-terminal-muted">
-          Theme
-          <TerminalSelect
-            size="sm"
-            tone="ui"
-            className="min-w-36"
-            value={themeVariant}
-            onChange={(e) => setThemeVariant(e.target.value as ThemeVariant)}
-          >
-            <option value="terminal-noir">Terminal Noir</option>
-            <option value="classic-bloomberg">Classic Bloomberg</option>
-            <option value="light-desk">Light Desk</option>
-            <option value="custom">Custom</option>
-          </TerminalSelect>
-        </label>
-        {themeVariant === "custom" ? (
-          <input
-            type="color"
-            className="h-6 w-8 cursor-pointer rounded-sm border border-terminal-border bg-transparent p-0"
-            aria-label="Custom accent color"
-            value={customAccentColor}
-            onChange={(e) => setCustomAccentColor(e.target.value)}
-          />
-        ) : null}
-        <button
-          type="button"
-          onClick={() => setHudOverlayEnabled(!hudOverlayEnabled)}
-          className={`rounded-sm border px-2 py-1 ot-type-label ${
-            hudOverlayEnabled
-              ? "border-terminal-accent text-terminal-accent"
-              : "border-terminal-border text-terminal-muted hover:text-terminal-text"
-          }`}
-        >
-          {hudOverlayEnabled ? "HUD On" : "HUD Off"}
-        </button>
         {rightRailEnabled ? (
           <button
             type="button"
@@ -240,6 +196,7 @@ export function TerminalShell({
 
   useKeyboardShortcuts();
 
+  const tickerTapeVisible = useSettingsStore((s) => s.tickerTapeVisible);
   const hasRightRail = Boolean(rightRailContent) || Boolean(rightRailSections?.length);
 
   const shellCtx = useMemo<TerminalShellContextValue>(
@@ -275,7 +232,7 @@ export function TerminalShell({
               return executeParsedCommand(parsed, navigate);
             }}
           />
-          <TickerTape />
+          {tickerTapeVisible ? <TickerTape /> : null}
           <TopBar hideTickerLoader={hideTickerLoader} />
           {showWorkspaceControls ? (
             <WorkspaceControlBar

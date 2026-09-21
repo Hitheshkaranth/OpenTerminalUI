@@ -140,6 +140,25 @@ class KiteClient:
         params = [("i", ins.strip()) for ins in instruments if ins.strip()]
         return await self._get("/quote", access_token, params=params)
 
+    async def get_holdings(self, access_token: str) -> list[dict[str, Any]] | None:
+        """GET /portfolio/holdings — returns the Kite `data` list ([] for an empty account).
+        Returns None when the request failed (auth/network), so callers can tell
+        "no holdings" apart from "could not fetch"."""
+        result = await self._get("/portfolio/holdings", access_token)
+        data = result.get("data") if isinstance(result, dict) else None
+        if isinstance(data, list):
+            return data
+        return None
+
+    async def get_positions(self, access_token: str) -> dict[str, Any] | None:
+        """GET /portfolio/positions — returns Kite `data` dict with keys 'net' and 'day'.
+        Returns None when the request failed."""
+        result = await self._get("/portfolio/positions", access_token)
+        data = result.get("data") if isinstance(result, dict) else None
+        if isinstance(data, dict):
+            return data
+        return None
+
     async def get_historical_data(
         self,
         access_token: str,

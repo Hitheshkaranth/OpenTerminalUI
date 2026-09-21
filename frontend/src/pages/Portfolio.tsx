@@ -57,6 +57,8 @@ import type {
 import { MOMENTUM_ROTATION_BASKET } from "../utils/constants";
 import { formatInr } from "../utils/formatters";
 import { consumePendingSavedView } from "../workspace/savedViewRestore";
+import { PortfolioImportDrawer } from "../components/portfolio/PortfolioImportDrawer";
+import type { ImportResponse } from "../api/portfolioImport";
 
 const AttributionPanel = lazy(() => import("../components/portfolio/AttributionPanel"));
 
@@ -242,6 +244,8 @@ export function PortfolioPage() {
   const [tickerSuggestions, setTickerSuggestions] = useState<SearchSymbolItem[]>([]);
   const [isTickerSuggestionsOpen, setIsTickerSuggestionsOpen] = useState(false);
   const [holdingContextMenu, setHoldingContextMenu] = useState<{ row: PortfolioHoldingRow; x: number; y: number } | null>(null);
+  const [showAddHolding, setShowAddHolding] = useState(false);
+  const [showImportDrawer, setShowImportDrawer] = useState(false);
 
   useEffect(() => {
     const payload = consumePendingSavedView(window.location.pathname);
@@ -476,6 +480,11 @@ export function PortfolioPage() {
   const returnSpread = Math.max(1, returnMax - returnMin);
   const returnDomain: [number, number] = [returnMin - returnSpread * 0.18, returnMax + returnSpread * 0.18];
   const closeHoldingContextMenu = () => setHoldingContextMenu(null);
+  const handleImported = (_result: ImportResponse) => {
+    // Refresh holdings behind the drawer; the drawer stays open so the user can
+    // read the imported/skipped summary and close it with Done.
+    void load();
+  };
 
   useEffect(() => {
     void load();
@@ -524,7 +533,7 @@ export function PortfolioPage() {
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <TerminalBadge variant="accent">Portfolio</TerminalBadge>
             <TerminalBadge variant="neutral">{portfolioMode === "mutual_funds" ? "Mutual Funds" : "Equity"}</TerminalBadge>
-            <TerminalBadge variant="info">{portfolioView === "manager" ? "Portfolio Manager" : "Legacy"}</TerminalBadge>
+            {(searchParams.get("view") === "legacy" || portfolioView === "manager") && <TerminalBadge variant="info">{portfolioView === "manager" ? "Portfolio Manager" : "Legacy"}</TerminalBadge>}
           </div>
           <h1 className="max-w-4xl font-sans text-2xl font-semibold tracking-normal text-terminal-text md:text-3xl">
             Your holdings, positioned and monitored.
@@ -561,9 +570,11 @@ export function PortfolioPage() {
           <TerminalButton size="sm" variant={portfolioView === "manager" ? "accent" : "default"} onClick={() => switchPortfolioView("manager")}>
             Portfolio Manager
           </TerminalButton>
-          <TerminalButton size="sm" variant={portfolioView === "legacy" ? "accent" : "default"} onClick={() => switchPortfolioView("legacy")}>
-            Legacy View
-          </TerminalButton>
+          {(searchParams.get("view") === "legacy" || portfolioView === "manager") && (
+            <TerminalButton size="sm" variant={portfolioView === "legacy" ? "accent" : "default"} onClick={() => switchPortfolioView("legacy")}>
+              Legacy View
+            </TerminalButton>
+          )}
           <Link className="inline-flex min-h-8 items-center justify-center rounded-sm border border-terminal-border px-2 py-1 text-[10px] uppercase tracking-wide text-terminal-muted transition-colors hover:text-terminal-text" to="/equity/portfolio/lab">
             Open Portfolio Lab
           </Link>
@@ -754,7 +765,126 @@ export function PortfolioPage() {
         </Suspense>
       ) : (
         <>
-      <TerminalPanel title="Add Holding" subtitle={`Market: ${selectedMarket}`}>
+      <TerminalPanel title="Holdings" subtitle={`${holdingsCount} positions`} actions={<div className="flex items-center gap-1.5"><ExportButton source="portfolio" data={data.items} /><TerminalButton size="sm" onClick={() => setShowAddHolding(true)}>Add holding</TerminalButton><TerminalButton size="sm" onClick={() => setShowImportDrawer(true)}>Import</TerminalButton></div>}>
+        {holdingsCount === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-8">
+            <div className="text-sm text-terminal-muted">No holdings yet.</div>
+            <div className="flex items-center gap-2">
+              <TerminalButton size="sm" onClick={() => setShowImportDrawer(true)}>Import CSV / Kite</TerminalButton>
+              <TerminalButton size="sm" onClick={() => setShowAddHolding(true)}>Add manually</TerminalButton>
+            </div>
+          </div>
+        ) : (
+          <>
+                <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px]">
+                  <span className="rounded border border-terminal-accent/40 bg-terminal-bg px-2 py-1 text-terminal-text">
+                    Total Holdings: <span className="text-terminal-text">{holdingsCount}</span>
+                  </span>
+                  <span className="rounded border border-terminal-border/80 bg-terminal-bg px-2 py-1 text-terminal-text">
+                    Net Invested: <span className="text-terminal-text">{formatInr(totalCost)}</span>
+                  </span>
+                  <span className="rounded border border-terminal-border/80 bg-terminal-bg px-2 py-1 text-terminal-text">
+                    Net Current: <span className="text-terminal-text">{formatInr(totalValue)}</span>
+                  </span>
+                  <span className={`rounded border px-2 py-1 ${overallPnl >= 0 ? "border-terminal-pos/60 bg-terminal-pos/10 text-terminal-pos" : "border-terminal-neg/60 bg-terminal-neg/10 text-terminal-neg"}`}>
+                    Net P&L: {formatInr(overallPnl)} ({lifetimePct.toFixed(2)}%)
+                  </span>
+                </div>
+                <div className="overflow-auto">
+                  <table className="min-w-full text-xs">
+                <thead>
+                  <tr className="border-b border-terminal-border text-terminal-muted">
+                    <th className="px-2 py-1 text-left">Flag</th>
+                    <th className="px-2 py-1 text-left">Ticker</th>
+                    <th className="px-2 py-1 text-left">Next Earnings</th>
+                    <th className="px-2 py-1 text-left">F&O</th>
+                    <th className="px-2 py-1 text-right">Qty</th>
+                    <th className="px-2 py-1 text-right">Avg Buy</th>
+                    <th className="px-2 py-1 text-left">Sector</th>
+                    <th className="px-2 py-1 text-right">Days Held</th>
+                    <th className="px-2 py-1 text-right">Current</th>
+                    <th className="px-2 py-1 text-right">Value</th>
+                    <th className="px-2 py-1 text-right">Weight</th>
+                    <th className="px-2 py-1 text-right">% Change</th>
+                    <th className="px-2 py-1 text-right">P&L Contrib</th>
+                    <th className="px-2 py-1 text-right">P&L</th>
+                    <th className="px-2 py-1 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.items.map((row) => {
+                    const invested = Number(row.quantity) * Number(row.avg_buy_price);
+                    const current = row.current_value == null ? null : Number(row.current_value);
+                    const pctChange = current != null && invested > 0 ? ((current - invested) / invested) * 100 : null;
+                    const weightPct = totalValue > 0 && current != null ? (current / totalValue) * 100 : null;
+                    const pnlContribPct = overallPnl !== 0 && row.pnl != null ? (Number(row.pnl) / overallPnl) * 100 : null;
+                    const heldDays = daysSince(row.buy_date);
+                    const pnlClass =
+                      row.pnl == null ? "text-terminal-muted" : row.pnl >= 0 ? "text-terminal-pos" : "text-terminal-neg";
+                    const pctClass =
+                      pctChange == null ? "text-terminal-muted" : pctChange >= 0 ? "text-terminal-pos" : "text-terminal-neg";
+                    const contribClass =
+                      pnlContribPct == null ? "text-terminal-muted" : pnlContribPct >= 0 ? "text-terminal-pos" : "text-terminal-neg";
+                    return (
+                      <tr
+                        key={row.id}
+                        className="border-b border-terminal-border/50"
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          setHoldingContextMenu({ row, x: event.clientX, y: event.clientY });
+                        }}
+                      >
+                        <td className="px-2 py-1">
+                          <CountryFlag countryCode={row.country_code} flagEmoji={row.flag_emoji} />
+                        </td>
+                        <td className="px-2 py-1">{row.ticker}</td>
+                        <td className="px-2 py-1">
+                          <EarningsDateBadge event={nextEarningsMap[row.ticker.toUpperCase()]} />
+                        </td>
+                        <td className="px-2 py-1">
+                          <InstrumentBadges exchange={row.exchange} hasFutures={row.has_futures} hasOptions={row.has_options} />
+                        </td>
+                        <td className="px-2 py-1 text-right">{row.quantity}</td>
+                        <td className="px-2 py-1 text-right">{formatInr(row.avg_buy_price)}</td>
+                        <td className="px-2 py-1">{row.sector || "-"}</td>
+                        <td className="px-2 py-1 text-right">{heldDays == null ? "-" : heldDays}</td>
+                        <td className="px-2 py-1 text-right">{formatInr(row.current_price ?? undefined)}</td>
+                        <td className="px-2 py-1 text-right">{formatInr(row.current_value ?? undefined)}</td>
+                        <td className="px-2 py-1 text-right text-terminal-text">{formatPctValue(weightPct, 2)}</td>
+                        <td className={`px-2 py-1 text-right ${pctClass}`}>{formatPctValue(pctChange, 2)}</td>
+                        <td className={`px-2 py-1 text-right ${contribClass}`}>{formatPctValue(pnlContribPct, 2)}</td>
+                        <td className={`px-2 py-1 text-right ${pnlClass}`}>{formatInr(row.pnl ?? undefined)}</td>
+                        <td className="px-2 py-1 text-right">
+                          <button
+                            className="rounded border border-terminal-border px-2 py-1"
+                            onClick={async () => {
+                              try {
+                                await deleteHolding(row.id);
+                                await load();
+                              } catch (e) {
+                                setError(e instanceof Error ? e.message : "Failed to delete holding");
+                              }
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                  </table>
+                </div>
+          </>
+        )}
+      </TerminalPanel>
+
+      {showAddHolding && (
+        <TerminalPanel
+          title="Add Holding"
+          subtitle={`Market: ${selectedMarket}`}
+          actions={<TerminalButton size="sm" onClick={() => setShowAddHolding(false)}>Hide</TerminalButton>}
+        >
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div>
             <label className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Ticker</label>
@@ -905,6 +1035,7 @@ export function PortfolioPage() {
           ))}
         </div>
       </TerminalPanel>
+            )}
 
       {loading && <div className="text-xs text-terminal-muted">Loading portfolio...</div>}
       {error && <div className="rounded border border-terminal-neg bg-terminal-neg/10 p-3 text-xs text-terminal-neg">{error}</div>}
@@ -1187,112 +1318,7 @@ export function PortfolioPage() {
               </div>
             </TerminalPanel>
 
-            <div className="space-y-3 xl:col-span-8">
-              <TerminalPanel title="Holdings" subtitle={`${holdingsCount} positions`} actions={<ExportButton source="portfolio" data={data.items} />}>
-              <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px]">
-                  <span className="rounded border border-terminal-accent/40 bg-terminal-bg px-2 py-1 text-terminal-text">
-                    Total Holdings: <span className="text-terminal-text">{holdingsCount}</span>
-                  </span>
-                  <span className="rounded border border-terminal-border/80 bg-terminal-bg px-2 py-1 text-terminal-text">
-                    Net Invested: <span className="text-terminal-text">{formatInr(totalCost)}</span>
-                  </span>
-                  <span className="rounded border border-terminal-border/80 bg-terminal-bg px-2 py-1 text-terminal-text">
-                    Net Current: <span className="text-terminal-text">{formatInr(totalValue)}</span>
-                  </span>
-                  <span className={`rounded border px-2 py-1 ${overallPnl >= 0 ? "border-terminal-pos/60 bg-terminal-pos/10 text-terminal-pos" : "border-terminal-neg/60 bg-terminal-neg/10 text-terminal-neg"}`}>
-                    Net P&L: {formatInr(overallPnl)} ({lifetimePct.toFixed(2)}%)
-                  </span>
-                </div>
-                <div className="overflow-auto">
-                  <table className="min-w-full text-xs">
-                <thead>
-                  <tr className="border-b border-terminal-border text-terminal-muted">
-                    <th className="px-2 py-1 text-left">Flag</th>
-                    <th className="px-2 py-1 text-left">Ticker</th>
-                    <th className="px-2 py-1 text-left">Next Earnings</th>
-                    <th className="px-2 py-1 text-left">F&O</th>
-                    <th className="px-2 py-1 text-right">Qty</th>
-                    <th className="px-2 py-1 text-right">Avg Buy</th>
-                    <th className="px-2 py-1 text-left">Sector</th>
-                    <th className="px-2 py-1 text-right">Days Held</th>
-                    <th className="px-2 py-1 text-right">Current</th>
-                    <th className="px-2 py-1 text-right">Value</th>
-                    <th className="px-2 py-1 text-right">Weight</th>
-                    <th className="px-2 py-1 text-right">% Change</th>
-                    <th className="px-2 py-1 text-right">P&L Contrib</th>
-                    <th className="px-2 py-1 text-right">P&L</th>
-                    <th className="px-2 py-1 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.items.map((row) => {
-                    const invested = Number(row.quantity) * Number(row.avg_buy_price);
-                    const current = row.current_value == null ? null : Number(row.current_value);
-                    const pctChange = current != null && invested > 0 ? ((current - invested) / invested) * 100 : null;
-                    const weightPct = totalValue > 0 && current != null ? (current / totalValue) * 100 : null;
-                    const pnlContribPct = overallPnl !== 0 && row.pnl != null ? (Number(row.pnl) / overallPnl) * 100 : null;
-                    const heldDays = daysSince(row.buy_date);
-                    const pnlClass =
-                      row.pnl == null ? "text-terminal-muted" : row.pnl >= 0 ? "text-terminal-pos" : "text-terminal-neg";
-                    const pctClass =
-                      pctChange == null ? "text-terminal-muted" : pctChange >= 0 ? "text-terminal-pos" : "text-terminal-neg";
-                    const contribClass =
-                      pnlContribPct == null ? "text-terminal-muted" : pnlContribPct >= 0 ? "text-terminal-pos" : "text-terminal-neg";
-                    return (
-                      <tr
-                        key={row.id}
-                        className="border-b border-terminal-border/50"
-                        onContextMenu={(event) => {
-                          event.preventDefault();
-                          setHoldingContextMenu({ row, x: event.clientX, y: event.clientY });
-                        }}
-                      >
-                        <td className="px-2 py-1">
-                          <CountryFlag countryCode={row.country_code} flagEmoji={row.flag_emoji} />
-                        </td>
-                        <td className="px-2 py-1">{row.ticker}</td>
-                        <td className="px-2 py-1">
-                          <EarningsDateBadge event={nextEarningsMap[row.ticker.toUpperCase()]} />
-                        </td>
-                        <td className="px-2 py-1">
-                          <InstrumentBadges exchange={row.exchange} hasFutures={row.has_futures} hasOptions={row.has_options} />
-                        </td>
-                        <td className="px-2 py-1 text-right">{row.quantity}</td>
-                        <td className="px-2 py-1 text-right">{formatInr(row.avg_buy_price)}</td>
-                        <td className="px-2 py-1">{row.sector || "-"}</td>
-                        <td className="px-2 py-1 text-right">{heldDays == null ? "-" : heldDays}</td>
-                        <td className="px-2 py-1 text-right">{formatInr(row.current_price ?? undefined)}</td>
-                        <td className="px-2 py-1 text-right">{formatInr(row.current_value ?? undefined)}</td>
-                        <td className="px-2 py-1 text-right text-terminal-text">{formatPctValue(weightPct, 2)}</td>
-                        <td className={`px-2 py-1 text-right ${pctClass}`}>{formatPctValue(pctChange, 2)}</td>
-                        <td className={`px-2 py-1 text-right ${contribClass}`}>{formatPctValue(pnlContribPct, 2)}</td>
-                        <td className={`px-2 py-1 text-right ${pnlClass}`}>{formatInr(row.pnl ?? undefined)}</td>
-                        <td className="px-2 py-1 text-right">
-                          <button
-                            className="rounded border border-terminal-border px-2 py-1"
-                            onClick={async () => {
-                              try {
-                                await deleteHolding(row.id);
-                                await load();
-                              } catch (e) {
-                                setError(e instanceof Error ? e.message : "Failed to delete holding");
-                              }
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                  </table>
-                </div>
-              </TerminalPanel>
-
-            </div>
-
-            <div className="space-y-3 xl:col-span-4">
+            <div className="grid gap-3 xl:col-span-12 xl:grid-cols-2">
               <TerminalPanel title="Portfolio Signals" subtitle="Momentum and concentration markers">
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded border border-terminal-border bg-terminal-bg p-2">
@@ -1356,6 +1382,7 @@ export function PortfolioPage() {
       ) : null}
 
       <BacktestResults initialTickers={(data?.items ?? []).map((row) => row.ticker)} />
+      <PortfolioImportDrawer open={showImportDrawer} onClose={() => setShowImportDrawer(false)} onImported={handleImported} />
         </>
       )}
       </main>

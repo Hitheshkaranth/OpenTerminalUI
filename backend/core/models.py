@@ -107,6 +107,7 @@ class StockSnapshot(BaseModel):
     classification: dict[str, Any] | None = None
     indices: list[str] = Field(default_factory=list)
     raw: dict[str, Any] = Field(default_factory=dict)
+    provenance: dict[str, Any] | None = None
 
 
 class PriceRange(BaseModel):

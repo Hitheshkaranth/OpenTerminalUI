@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -10,10 +11,21 @@ from fastapi import APIRouter, HTTPException, Query
 from backend.adapters.registry import get_adapter_registry
 from backend.api.deps import fetch_stock_snapshot_coalesced, get_unified_fetcher
 from backend.core.models import CapexPoint, CapexTrackerResponse, DeliveryPoint, DeliverySeriesResponse, EquityPerformanceSnapshot, PriceRange, PromoterHoldingPoint, PromoterHoldingsResponse, StockSnapshot, TopBarTicker, TopBarTickersResponse
+from backend.core.provenance import provenance_from_snapshot
 from backend.models.api_response import ApiResponse
 from backend.shared.market_classifier import market_classifier
 
 router = APIRouter()
+
+# Adapter class -> registry key (backend/adapters/registry.py factory names).
+_ADAPTER_KEYS = {
+    "KiteAdapter": "kite",
+    "AlpacaAdapter": "alpaca",
+    "YahooFinanceAdapter": "yahoo",
+    "CryptoDataAdapter": "crypto",
+    "AlphaVantageAdapter": "alpha_vantage",
+    "MockDataAdapter": "mock",
+}
 
 # --- Helpers to process 10y financials into frontend format ---
 def _process_timeseries(data: Dict[str, Any], metric_map: Dict[str, str]) -> List[Dict[str, Any]]:
@@ -132,6 +144,8 @@ def _pct_change_from_cutoff(close: pd.Series, days: int) -> float | None:
 async def get_stock(ticker: str) -> StockSnapshot:
     classification = await market_classifier.classify(ticker)
     yf_symbol = await market_classifier.yfinance_symbol(ticker)
+    started = time.perf_counter()
+    q = None
     try:
         snap = await fetch_stock_snapshot_coalesced(ticker)
         try:
@@ -148,6 +162,38 @@ async def get_stock(ticker: str) -> StockSnapshot:
     except Exception:
         snap = {}
         # In case of total failure
+
+    # Compute provenance
+    prov = provenance_from_snapshot(snap if isinstance(snap, dict) else {}, latency_ms=(time.perf_counter() - started) * 1000)
+    if q is not None:
+        # The registry chain is primary -> fallbacks; if every real adapter is currently
+        # suspended and a MockDataAdapter is in the chain, the quote we just used is synthetic.
+        try:
+            chain = get_adapter_registry().get_chain(classification.exchange or "NSE")
+            names = [type(a).__name__ for a in chain]
+            if names and names[0] == "MockDataAdapter":
+                prov["quality"] = "synthetic"
+                prov["source"] = "mock"
+                prov["note"] = "Synthetic fallback data — configure a provider"
+            elif prov.get("quality") == "unavailable":
+                # Price came from the adapter registry (e.g. crypto) rather than the
+                # unified snapshot, so `details` is empty. Attribute it to the first
+                # chain slot that is available and has succeeded — failover walks the
+                # chain in order and marks the serving slot on success.
+                health = get_adapter_registry().health_snapshot()
+                for a in chain:
+                    key = _ADAPTER_KEYS.get(type(a).__name__)
+                    if not key:
+                        continue
+                    slot = health.get(key) or {}
+                    if slot.get("available") and slot.get("last_success_at"):
+                        prov["source"] = key
+                        prov["quality"] = "live" if key in {"kite", "alpaca", "crypto", "finnhub"} else "delayed"
+                        prov["as_of"] = slot.get("last_success_at")
+                        prov["note"] = None
+                        break
+        except Exception:
+            pass
 
     # Map UnifiedFetcher snapshot dict to StockSnapshot model
     return StockSnapshot(
@@ -185,6 +231,7 @@ async def get_stock(ticker: str) -> StockSnapshot:
         },
         indices=snap.get("indices") or [],
         raw=snap,
+        provenance=prov,
     )
 
 def _yahoo_ts_to_table(yahoo_data: Dict, prefix: str, field_map: Dict[str, str]) -> List[Dict[str, Any]]:

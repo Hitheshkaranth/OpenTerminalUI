@@ -78,6 +78,7 @@ type SettingsState = {
   themeVariant: ThemeVariant;
   customAccentColor: string;
   hudOverlayEnabled: boolean;
+  tickerTapeVisible: boolean;
   recentSecurities: RecentSecurity[];
   setSelectedCountry: (country: CountryCode) => void;
   setSelectedMarket: (market: MarketCode) => void;
@@ -88,6 +89,7 @@ type SettingsState = {
   setThemeVariant: (theme: ThemeVariant) => void;
   setCustomAccentColor: (value: string) => void;
   setHudOverlayEnabled: (enabled: boolean) => void;
+  setTickerTapeVisible: (value: boolean) => void;
   addRecentSecurity: (security: RecentSecurity) => void;
   clearRecentSecurities: () => void;
 };
@@ -120,6 +122,7 @@ export const useSettingsStore = create<SettingsState>()(
       themeVariant: "terminal-noir",
       customAccentColor: "#FF6B00",
       hudOverlayEnabled: false,
+      tickerTapeVisible: true,
       recentSecurities: [],
       setSelectedCountry: (country) => {
         const defaults = countryDefaults[country];
@@ -140,6 +143,7 @@ export const useSettingsStore = create<SettingsState>()(
           customAccentColor: /^#[0-9A-Fa-f]{6}$/.test(value) ? value.toUpperCase() : "#FF6B00",
         }),
       setHudOverlayEnabled: (enabled) => set({ hudOverlayEnabled: enabled }),
+      setTickerTapeVisible: (value) => set({ tickerTapeVisible: value }),
       addRecentSecurity: (security) =>
         set((state) => {
           const next = sanitizeRecentSecurity(security);
@@ -184,6 +188,10 @@ export const useSettingsStore = create<SettingsState>()(
             typeof persisted.hudOverlayEnabled === "boolean"
               ? persisted.hudOverlayEnabled
               : current.hudOverlayEnabled,
+          tickerTapeVisible:
+            typeof persisted.tickerTapeVisible === "boolean"
+              ? persisted.tickerTapeVisible
+              : current.tickerTapeVisible,
           recentSecurities: sanitizeRecentSecurities((persisted as Partial<SettingsState>).recentSecurities),
         };
       },

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import re
+from datetime import date, datetime, timezone
 
 from pydantic import BaseModel, Field
+from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -40,6 +43,20 @@ class TaxLotRealizeRequest(BaseModel):
     sell_date: str
     method: str = Field(default="FIFO", pattern="^(FIFO|LIFO|SPECIFIC|fifo|lifo|specific)$")
     specific_lot_ids: list[int] | None = None
+
+
+class PortfolioImportRow(BaseModel):
+    ticker: str
+    quantity: float
+    avg_buy_price: float
+    buy_date: str | None = None
+    exchange: str | None = None
+
+
+class PortfolioImportRequest(BaseModel):
+    source: Literal["csv", "kite", "manual"] = "csv"
+    mode: Literal["append", "replace"] = "append"
+    rows: list[PortfolioImportRow]
 
 
 @router.get("/portfolio")
@@ -188,6 +205,79 @@ def add_holding(payload: HoldingCreate, db: Session = Depends(get_db)) -> dict[s
     db.commit()
     db.refresh(row)
     return {"status": "created", "holding": {"id": row.id, "ticker": row.ticker}}
+
+
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+@router.post("/portfolio/import")
+def import_holdings(
+    payload: PortfolioImportRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    if len(payload.rows) > 2000:
+        raise HTTPException(status_code=413, detail="Too many rows: maximum 2000")
+
+    today = datetime.now(timezone.utc).date().isoformat()
+    errors: list[dict[str, object]] = []
+    valid_rows: list[Holding] = []
+    skipped = 0
+
+    for idx, row in enumerate(payload.rows):
+        ticker = row.ticker.strip().upper()
+        if not ticker:
+            errors.append({"row": idx, "ticker": None, "reason": "empty ticker"})
+            skipped += 1
+            continue
+
+        qty = row.quantity
+        if not isinstance(qty, (int, float)) or qty <= 0:
+            errors.append({"row": idx, "ticker": ticker, "reason": "quantity must be > 0"})
+            skipped += 1
+            continue
+
+        avg = row.avg_buy_price
+        if not isinstance(avg, (int, float)) or avg <= 0:
+            errors.append({"row": idx, "ticker": ticker, "reason": "avg_buy_price must be > 0"})
+            skipped += 1
+            continue
+
+        buy_date = row.buy_date
+        if buy_date is not None:
+            if not _DATE_RE.match(buy_date):
+                errors.append({"row": idx, "ticker": ticker, "reason": "buy_date must be YYYY-MM-DD"})
+                skipped += 1
+                continue
+            # Validate it's a real date
+            try:
+                date.fromisoformat(buy_date)
+            except (ValueError, TypeError):
+                errors.append({"row": idx, "ticker": ticker, "reason": "buy_date must be YYYY-MM-DD"})
+                skipped += 1
+                continue
+        else:
+            buy_date = today
+
+        valid_rows.append(Holding(ticker=ticker, quantity=float(qty), avg_buy_price=float(avg), buy_date=buy_date))
+
+    if payload.mode == "replace":
+        db.query(Holding).delete()
+
+    for h in valid_rows:
+        db.add(h)
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Import failed")
+
+    return {
+        "imported": len(valid_rows),
+        "skipped": skipped,
+        "mode": payload.mode,
+        "errors": errors,
+    }
 
 
 @router.delete("/portfolio/holdings/{holding_id}")

@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from backend.api.routes.agent import router as agent_router
+from backend.api.routes.providers import router as providers_router
 from backend.api.routes.ai import router as ai_router
 from backend.api.routes.alpha_zoo import router as alpha_zoo_router
 from backend.api.routes.analytics import router as analytics_router
@@ -123,6 +124,7 @@ api_router.include_router(statlab_router)
 api_router.include_router(screener_alerts_router, prefix="/api", tags=["screener-alerts"])
 
 # Economics API
+api_router.include_router(providers_router, prefix="/api")
 api_router.include_router(economics_router)
 
 __all__ = ["api_router"]

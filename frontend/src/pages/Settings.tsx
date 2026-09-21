@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { createAlert, createScheduledReport, deleteAlert, deleteScheduledReport, downloadExport, fetchAlerts, fetchScheduledReports } from "../api/client";
 import { TerminalButton } from "../components/terminal/TerminalButton";
@@ -7,6 +8,7 @@ import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { TerminalTable } from "../components/terminal/TerminalTable";
 import { DataManager } from "../components/settings/DataManager";
 import { APIKeyManager } from "../components/settings/APIKeyManager";
+import { DataProvidersPanel } from "../components/settings/DataProvidersPanel";
 import { ErrorBoundary } from "../components/common/ErrorBoundary";
 import { useSettingsStore } from "../store/settingsStore";
 import { COUNTRY_MARKETS } from "../types";
@@ -22,6 +24,12 @@ export function SettingsPage() {
   const newsAutoRefresh = useSettingsStore((s) => s.newsAutoRefresh);
   const newsRefreshSec = useSettingsStore((s) => s.newsRefreshSec);
   const themeVariant = useSettingsStore((s) => s.themeVariant);
+  const customAccentColor = useSettingsStore((s) => s.customAccentColor);
+  const setCustomAccentColor = useSettingsStore((s) => s.setCustomAccentColor);
+  const hudOverlayEnabled = useSettingsStore((s) => s.hudOverlayEnabled);
+  const setHudOverlayEnabled = useSettingsStore((s) => s.setHudOverlayEnabled);
+  const tickerTapeVisible = useSettingsStore((s) => s.tickerTapeVisible);
+  const setTickerTapeVisible = useSettingsStore((s) => s.setTickerTapeVisible);
   const setSelectedCountry = useSettingsStore((s) => s.setSelectedCountry);
   const setSelectedMarket = useSettingsStore((s) => s.setSelectedMarket);
   const setDisplayCurrency = useSettingsStore((s) => s.setDisplayCurrency);
@@ -29,6 +37,15 @@ export function SettingsPage() {
   const setNewsAutoRefresh = useSettingsStore((s) => s.setNewsAutoRefresh);
   const setNewsRefreshSec = useSettingsStore((s) => s.setNewsRefreshSec);
   const setThemeVariant = useSettingsStore((s) => s.setThemeVariant);
+
+  const [searchParams] = useSearchParams();
+  const providersRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get("section") === "providers" && providersRef.current) {
+      providersRef.current.scrollIntoView({ block: "start" });
+    }
+  }, [searchParams]);
 
   const [alerts, setAlerts] = useState<AlertRule[]>([]);
   const [ticker, setTicker] = useState("RELIANCE");
@@ -62,6 +79,12 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-3 p-3">
+      <div ref={providersRef}>
+        <TerminalPanel title="Data Providers" subtitle="What is live, what is missing, and what a key unlocks">
+          <DataProvidersPanel />
+        </TerminalPanel>
+      </div>
+
       <TerminalPanel title="UI Settings" subtitle="Dense terminal defaults">
         <div className="grid grid-cols-1 gap-2 lg:grid-cols-6">
           <TerminalInput as="select" value={selectedCountry} onChange={(e) => setSelectedCountry(e.target.value as CountryCode)}>
@@ -98,37 +121,41 @@ export function SettingsPage() {
       </TerminalPanel>
 
       <TerminalPanel title="Theme">
-        <div className="grid grid-cols-1 gap-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
           <TerminalInput as="select" value={themeVariant} onChange={(e) => setThemeVariant(e.target.value as ThemeVariant)}>
-            <option value="terminal-noir">terminal-noir</option>
-            <option value="classic-bloomberg">classic-bloomberg</option>
-            <option value="light-desk">light-desk</option>
-            <option value="custom">custom</option>
+            <option value="terminal-noir">Terminal Noir</option>
+            <option value="classic-bloomberg">Classic Bloomberg</option>
+            <option value="light-desk">Light Desk</option>
+            <option value="custom">Custom</option>
           </TerminalInput>
-          <TerminalInput
-            value={themeVariant === "custom" ? useSettingsStore.getState().customAccentColor : ""}
-            onChange={(e) => useSettingsStore.getState().setCustomAccentColor(e.target.value)}
-            disabled={themeVariant !== "custom"}
-            placeholder="accent color (hex)"
-          />
+          {themeVariant === "custom" ? (
+            <input
+              type="color"
+              className="h-8 w-12 cursor-pointer rounded border border-terminal-border bg-transparent p-0"
+              aria-label="Custom accent color"
+              value={customAccentColor}
+              onChange={(e) => setCustomAccentColor(e.target.value)}
+            />
+          ) : null}
           <div className="flex items-center gap-2 rounded border border-terminal-border bg-terminal-bg px-2 py-1.5">
-            <span className="text-xs text-terminal-muted">{themeVariant}</span>
-            <TerminalButton
-              variant="ghost"
-              onClick={() => {
-                const next: ThemeVariant =
-                  themeVariant === "terminal-noir"
-                    ? "classic-bloomberg"
-                    : themeVariant === "classic-bloomberg"
-                      ? "light-desk"
-                      : themeVariant === "light-desk"
-                        ? "custom"
-                        : "terminal-noir";
-                setThemeVariant(next);
-              }}
-            >
-              cycle
-            </TerminalButton>
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={hudOverlayEnabled}
+                onChange={(e) => setHudOverlayEnabled(e.target.checked)}
+              />
+              <span className="text-terminal-muted">HUD overlay</span>
+            </label>
+          </div>
+          <div className="flex items-center gap-2 rounded border border-terminal-border bg-terminal-bg px-2 py-1.5">
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={tickerTapeVisible}
+                onChange={(e) => setTickerTapeVisible(e.target.checked)}
+              />
+              <span className="text-terminal-muted">Show ticker tape</span>
+            </label>
           </div>
         </div>
       </TerminalPanel>
