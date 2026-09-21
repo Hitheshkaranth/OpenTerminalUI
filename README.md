@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.7.0-0f172a" alt="Version 0.7.0" />
+  <img src="https://img.shields.io/badge/version-0.8.0-0f172a" alt="Version 0.8.0" />
   <img src="https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white" alt="Python 3.11" />
   <img src="https://img.shields.io/badge/node-22-339933?logo=node.js&logoColor=white" alt="Node 22" />
   <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI" />
@@ -35,9 +35,21 @@ OpenTerminalUI is a self-hosted, full-stack financial terminal that combines rea
 
 **Multi-market coverage** across NSE, BSE, NYSE, NASDAQ, crypto, commodities, forex, bonds, ETFs, and mutual funds. **70+ technical indicators**, **multi-panel chart workstations**, **F&O option chains with live Greeks**, **backtesting with Model Lab**, **statistical arbitrage with Pair Trading Lab**, **Portfolio Lab and optimizer workflows**, **paper trading and trade journal**, **OMS / ops / data-quality consoles**, **saved views and launchpad workspaces**, a **tool-using AI research agent with multi-agent debate and Strategy Lab**, and an **extensible plugin system** &mdash; all running on your own hardware.
 
+## What's new in 0.8.0
+
+**Trust the numbers.** Every security snapshot now carries a provenance envelope (`live / delayed / cached / synthetic / unavailable`, source, as-of, latency) rendered as a chip on the Security Hub and the symbol rail; blank metrics say *why* they are blank; the status bar shows a per-provider health row; and synthetic data (the order book, when no depth feed is connected) is labelled as such and never used as a price basis.
+
+**Manage providers in-app.** Settings → Data Providers shows what each provider unlocks, its live status (Kite is probed for real, so an expired daily token reads *down*), and — for admins — lets you set, mask, test and clear API keys without leaving the browser. Placeholder values are no longer counted as configured.
+
+**Analysis → action.** Zerodha Kite holdings/positions import and CSV import (Zerodha / Groww / generic) into a holdings-first Portfolio page; Paper Buy/Sell from the symbol rail and right-click menu; alert **actions** that run on trigger (paper order, add to watchlist, webhook) with a dry-run.
+
+**One product, not 77 pages.** A grouped, collapsible navigation rail with pinned and recent pages; a symbol-aware Context Rail (quote, paper position, alerts, next events, quick actions); a unified events hub (earnings, dividends, corporate actions, F&O expiry, macro); and the global market now follows the symbol you open, so a RELIANCE header can no longer read NASDAQ.
+
+**Verified screen by screen.** Every route was captured and checked for failed API calls and page errors (`docs/screenshots/SCREENSHOTS.md`); the sweep fixed ten integration bugs, including the Backtesting *Run* button, US charts on an NSE desk, and 54 screens hitting a non-existent watchlist endpoint.
+
 ## Screenshots
 
-Captured from the rebuilt Docker image running at `http://localhost:8000`. Account-backed screens are seeded before capture so portfolio, watchlist, paper trading, and journal views show populated data.
+Captured from the built app with `scripts/capture_screens.mjs` (headless Chromium, 1680×1050 @2×). Account-backed screens are seeded before capture so portfolio, watchlist, paper trading, alerts, and journal views show populated data; each screen is checked for failed API calls and page errors — see `docs/screenshots/SCREENSHOTS.md` for the per-screen manifest.
 
 ### Complete Feature Gallery
 
@@ -89,6 +101,10 @@ Captured from the rebuilt Docker image running at `http://localhost:8000`. Accou
 |---|---|
 | <img src="assets/screenshots/dividends.png" alt="Dividend dashboard" width="420" /> | <img src="assets/screenshots/insider-activity.png" alt="Insider activity monitor" width="420" /> |
 
+| Earnings Calendar |
+|---|
+| <img src="assets/screenshots/earnings-calendar.png" alt="Earnings calendar" width="420" /> |
+
 #### Portfolio, Risk & Trading
 
 | Portfolio | Portfolio Lab |
@@ -109,7 +125,11 @@ Captured from the rebuilt Docker image running at `http://localhost:8000`. Accou
 
 | Trade Journal | Alerts |
 |---|---|
-| <img src="assets/screenshots/trade-journal.png" alt="Trade journal with seeded AAPL entry" width="420" /> | <img src="assets/screenshots/alerts.png" alt="Alerts console and alert builder" width="420" /> |
+| <img src="assets/screenshots/trade-journal.png" alt="Trade journal with seeded entries" width="420" /> | <img src="assets/screenshots/alerts.png" alt="Alerts console with actions on trigger" width="420" /> |
+
+| Shadow Account |
+|---|
+| <img src="assets/screenshots/shadow-account.png" alt="Shadow account behavioural analytics" width="420" /> |
 
 #### Quant Research & Backtesting
 
@@ -124,6 +144,14 @@ Captured from the rebuilt Docker image running at `http://localhost:8000`. Accou
 | Statistical Lab | Pair Trading |
 |---|---|
 | <img src="assets/screenshots/stat-lab.png" alt="Statistical Lab" width="420" /> | <img src="assets/screenshots/pair-trading.png" alt="Pair Trading Lab with cointegration result" width="420" /> |
+
+| Alpha Zoo | Research Autopilot |
+|---|---|
+| <img src="assets/screenshots/alpha-zoo.png" alt="Alpha Zoo factor ranking" width="420" /> | <img src="assets/screenshots/research-autopilot.png" alt="Research Autopilot" width="420" /> |
+
+| Strategy Export |
+|---|
+| <img src="assets/screenshots/strategy-export.png" alt="Strategy export to Pine / MQL5" width="420" /> |
 
 #### Futures & Options
 
@@ -187,13 +215,13 @@ Captured from the rebuilt Docker image running at `http://localhost:8000`. Accou
 |---|---|
 | <img src="assets/screenshots/oms-compliance.png" alt="OMS compliance dashboard" width="420" /> | <img src="assets/screenshots/ops-dashboard.png" alt="Operations dashboard" width="420" /> |
 
-| Plugins | Settings |
+| Plugins | Settings & Data Providers |
 |---|---|
-| <img src="assets/screenshots/plugins.png" alt="Plugin manager" width="420" /> | <img src="assets/screenshots/settings.png" alt="Settings workspace" width="420" /> |
+| <img src="assets/screenshots/plugins.png" alt="Plugin manager" width="420" /> | <img src="assets/screenshots/settings.png" alt="Settings with the Data Providers panel" width="420" /> |
 
-| Saved Views |
-|---|
-| <img src="assets/screenshots/saved-views.png" alt="Saved views manager" width="420" /> |
+| Saved Views | Scheduled Reports |
+|---|---|
+| <img src="assets/screenshots/saved-views.png" alt="Saved views manager" width="420" /> | <img src="assets/screenshots/reports.png" alt="Scheduled reports" width="420" /> |
 
 ### Workspace & Markets
 
@@ -215,7 +243,7 @@ Captured from the rebuilt Docker image running at `http://localhost:8000`. Accou
 <p align="center">
   <img src="assets/screenshots/stock-detail.png" alt="Security Hub (US)" width="900" />
 </p>
-<p align="center"><em>Security Hub for a US name (AAPL) — quotes, fundamentals, price chart, analysis tabs, and the AI Catalyst &amp; Conviction panel.</em></p>
+<p align="center"><em>Security Hub for a US name (AAPL) — quotes with a provenance chip, fundamentals, price chart, analysis tabs, the AI Catalyst &amp; Conviction panel, and the symbol Context Rail.</em></p>
 
 <p align="center">
   <img src="assets/screenshots/security-hub-india.png" alt="Security Hub (India)" width="900" />
@@ -230,7 +258,7 @@ Captured from the rebuilt Docker image running at `http://localhost:8000`. Accou
 <p align="center">
   <img src="assets/screenshots/fno-option-chain.png" alt="F&O Option Chain" width="900" />
 </p>
-<p align="center"><em>Futures &amp; Options (AAPL, US) — live option chain with Greeks, OI build-up, and PCR signals; the same workflow covers NSE F&amp;O.</em></p>
+<p align="center"><em>Futures &amp; Options (AAPL, US) — option chain with Greeks, OI build-up, and PCR signals; the same workflow covers NSE F&amp;O when NSE data is reachable.</em></p>
 
 <p align="center">
   <img src="assets/screenshots/commodities.png" alt="Commodities" width="900" />
@@ -320,9 +348,19 @@ Captured from the rebuilt Docker image running at `http://localhost:8000`. Accou
 - **GO Bar** (`Ctrl+G`) &mdash; Bloomberg-style command bar with symbol lookup and route navigation
 - **Command Palette** (`Ctrl+K`) &mdash; fuzzy search across 25+ functions, tickers, and natural language queries
 - **Function Keys** (`F1`-`F9`) &mdash; rapid workspace switching with Bloomberg-style hotkeys
-- **Ticker Tape** &mdash; rolling market pulse with live quotes across exchanges
-- **Theme Engine** &mdash; Terminal Noir (default), classic, and light themes with custom accent support
+- **Grouped Navigation Rail** &mdash; Markets · Research · Charts · Derivatives · Portfolio · Quant · Risk & Ops · System, collapsible to a 64px pinned rail, with recent pages and keyboard navigation
+- **Symbol Context Rail** &mdash; on any symbol page: quote with provenance chip, paper position, symbol alerts, next events, and one-click Chart / Options / Backtest / Watchlist / Paper Buy / Paper Sell
+- **Market Follows Symbol** &mdash; opening `RELIANCE` re-points the global market to NSE (and `AAPL` to NASDAQ) so every panel agrees with the header; `NSE:RELIANCE`, `RELIANCE.NS` and `NASDAQ:AAPL` are all understood
+- **Ticker Tape** &mdash; rolling market pulse with live quotes across exchanges (toggle in Settings)
+- **Theme Engine** &mdash; Terminal Noir (default), classic, and light themes with custom accent support, managed from Settings
 - **Desktop & Mobile Layouts** &mdash; responsive design with persistent workspace framing
+
+### Data Trust & Providers
+
+- **Provenance Everywhere** &mdash; every security snapshot carries `{source, quality, as_of, latency_ms, note}`; the UI renders `LIVE · KITE`, `DELAYED · YAHOO`, `CACHED`, `SYNTHETIC` or `NO DATA`, and blank metrics explain which provider would fill them
+- **Provider Status Row** &mdash; per-provider health dots in the status bar (Kite, Alpaca, FMP, Finnhub, Yahoo, NSE, …) backed by `GET /api/providers/status` with real probes &mdash; an expired Kite token reads *down*, not *ok*
+- **Data Providers Panel** &mdash; Settings shows what each provider unlocks, its status and last error; admins can set, mask, test and clear keys in-app (written to the same `.env` the installer uses, with an honest "restart required" list). Placeholder values such as `your-api-key` are not treated as configured
+- **Synthetic Is Labelled** &mdash; generated data (the order book when no depth feed is connected) is marked `SYNTHETIC`, centred on the real last price, and never used as a price basis for orders
 
 ### Charting & Technical Analysis
 
@@ -393,7 +431,8 @@ Captured from the rebuilt Docker image running at `http://localhost:8000`. Accou
 
 ### Portfolio & Risk Management
 
-- **Multi-Portfolio CRUD** &mdash; holdings management with cost basis and transaction tracking
+- **Multi-Portfolio CRUD** &mdash; holdings-first workspace with cost basis and transaction tracking; "Add holding" and "Import" live in the holdings panel
+- **Broker & CSV Import** &mdash; sync Zerodha Kite holdings/positions, or import Zerodha / Groww / generic CSV exports with format detection, per-row validation, preview and append/replace modes
 - **Allocation & Attribution** &mdash; sector allocation charts, contributor/detractor analysis
 - **Benchmark Overlay** &mdash; compare against indices with relative performance metrics
 - **Risk Engine** &mdash; VaR (95%), CVaR, EWMA volatility, rolling correlation, PCA factor exposures
@@ -402,7 +441,7 @@ Captured from the rebuilt Docker image running at `http://localhost:8000`. Accou
 - **Correlation Deep Dive** &mdash; correlation matrix, rolling correlation with regime detection, hierarchical clustering with dendrogram, and cross-asset dependency visualization
 - **Tax Lot Manager** &mdash; cost basis tracking across tax lots
 - **Dividend Tracker** &mdash; income tracking with ex-date calendar
-- **Paper Trading** &mdash; virtual trading engine with realistic order fills, slippage modeling, and TCA analytics
+- **Paper Trading** &mdash; virtual trading engine with realistic order fills, slippage modeling, and TCA analytics; Paper Buy/Sell from the symbol rail or the right-click menu opens the HotKey panel on that symbol
 
 ### Backtesting & Model Lab
 
@@ -434,6 +473,7 @@ Captured from the rebuilt Docker image running at `http://localhost:8000`. Accou
 
 - **Cockpit Priority Stack** &mdash; a ranked daily brief across portfolio risk, alerts, catalysts, news shocks, top movers, and model signals
 - **Unified Intelligence Timeline** &mdash; news, alerts, events, insider activity, earnings, corporate actions, model signals, and backtest runs in one chronological feed
+- **Events Hub** &mdash; `GET /api/events-hub/upcoming` merges earnings, dividends/corporate actions, F&O expiries and macro releases into one dated, impact-ranked feed; failing sources are reported, not fatal
 - **Exposure Heatmaps** &mdash; sector, factor, currency, and correlation exposure maps across Home, Cockpit, and Risk
 - **Workspace Presets** &mdash; Trader / Quant / PM / Risk / Ops presets that reconfigure dashboards, panels, and quick links
 - **Saved Views** &mdash; capture and restore page, filters, ticker, tabs, columns, and chart layout across major workflows
@@ -455,6 +495,7 @@ Captured from the rebuilt Docker image running at `http://localhost:8000`. Accou
 
 - **Multi-Condition Alert Builder** &mdash; compound rules with AND/OR logic, multi-field conditions (price, volume, RSI, MACD, moving averages), and natural-language summary
 - **Multi-Channel Delivery** &mdash; in-app, email, webhook, Slack, and Telegram with per-channel configuration and delivery testing
+- **Actions on Trigger** &mdash; up to five actions per rule: place a paper market order, add the symbol to a watchlist, or POST a webhook; validated on save, executed in isolation after delivery, results stored on the trigger, with a dry-run button in the builder
 - **Alert Lifecycle** &mdash; cooldown periods, expiry dates, max trigger limits, trigger history with deduplication
 - **WebSocket Push** &mdash; real-time desktop notifications on alert trigger
 - **Breakout Scanner** &mdash; automated pattern detection with confidence scoring
@@ -485,7 +526,7 @@ Captured from the rebuilt Docker image running at `http://localhost:8000`. Accou
 ### Real-Time Data
 
 - **Multi-Provider WebSocket** &mdash; Zerodha Kite (India) and Finnhub (US) real-time ticks
-- **Provider Waterfall** &mdash; automatic failover chain: primary → fallback → error
+- **Provider Waterfall** &mdash; automatic failover chain: primary → fallback → error, with the serving provider reported in the response provenance
 - **Multi-Level Caching** &mdash; L1 SQLite + L2 Redis with TTL-based invalidation
 - **Candle Aggregation** &mdash; tick-by-tick to any interval with distributed bar construction
 - **Redis Pub/Sub** &mdash; horizontal scaling for multi-client quote fan-out
@@ -620,6 +661,8 @@ make keys          # or: ./scripts/setup-keys.sh
 ```
 
 All keys are optional — the platform runs on built-in fallback data without them.
+
+Once the app is running, an admin can also do this from **Settings → Data Providers**: each provider shows its live status, last error and what it unlocks; "Set keys" writes the same `.env`, applies the value live where the client reads it per call (Kite access token, OpenRouter, FRED, LM Studio) and tells you which ones need a backend restart; "Test" runs the real probe.
 
 ### Manual alternatives
 
@@ -792,29 +835,31 @@ make gate
 backend/                 FastAPI app, adapters, services, routes, tests
   adapters/              Market data provider adapters
   agent/                 AI research agent: orchestrator, tools, debate roles
-  api/routes/            53 route modules (equity, fno, backtest, risk, oms, ...)
+  api/routes/            80+ route modules (equity, fno, backtest, risk, oms, providers, ...)
   core/                  Unified fetcher, failover, service status
   services/              48 business logic modules
   db/                    SQLAlchemy ORM, migrations, caching
   auth/                  JWT authentication and middleware
   config/                Settings, environment, security
-  tests/                 409+ backend tests
+  tests/                 870+ backend tests
 frontend/                React + Vite + TypeScript SPA
   src/agent/             AI agent console, SSE client, artifact + markdown UI
-  src/pages/             51 page components
+  src/pages/             77 page components
   src/components/        UI components, terminal design system
   src/fno/               F&O workspace modules
   src/store/             Zustand state management
-  src/__tests__/         234+ unit tests
+  src/__tests__/         500+ unit tests
   tests/e2e/             Playwright E2E specs
 plugins/                 Extensible plugin system with examples
 docs/                    Wiki, architecture specs, and contributor docs
+  screenshots/           Per-screen capture manifest (SCREENSHOTS.md)
   site/                  GitHub Pages website
   wiki/                  Getting started, contributing guides
 data/                    Local SQLite databases and test fixtures
 docker-compose.yml       Container orchestration (backend + Redis + Postgres)
 Dockerfile               Multi-stage build (Node builder + Python runtime)
 Makefile                 Development commands (setup, test, gate)
+scripts/capture_screens.mjs  Headless capture + functional check of every screen
 ```
 
 ## Keyboard Shortcuts
