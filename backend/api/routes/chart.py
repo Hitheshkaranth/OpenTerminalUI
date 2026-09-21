@@ -517,11 +517,25 @@ async def get_chart(
             end=end_dt,
             market_hint=market,
         )
+        resolved_market = market
+        if not bars and market:
+            # The global market selector is only a hint. A US symbol requested while the
+            # desk is on NSE (or vice versa) used to come back as an empty chart; retry
+            # letting the classifier decide the exchange.
+            try:
+                fallback = await provider.get_ohlcv(
+                    ticker, interval=interval, period=period or range or "6mo", start=start_dt, end=end_dt, market_hint=None
+                )
+            except Exception:
+                fallback = []
+            if fallback:
+                bars = fallback
+                resolved_market = ""
         return {
             "symbol": ticker.upper(),
             "interval": interval,
             "count": len(bars),
-            "market_hint": (market or "").upper(),
+            "market_hint": (resolved_market or "").upper(),
             "data": [
                 {
                     "t": int((b.timestamp if b.timestamp.tzinfo else b.timestamp.replace(tzinfo=timezone.utc)).timestamp() * 1000),

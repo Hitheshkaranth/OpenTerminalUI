@@ -38,6 +38,15 @@ class DepthSnapshot:
             "symbol": self.symbol,
             "market": self.market,
             "provider_key": self.provider_key,
+            # Every snapshot from this service is generated (seeded from the symbol); say so.
+            "synthetic": True,
+            "provenance": {
+                "source": "mock",
+                "quality": "synthetic",
+                "as_of": self.as_of.isoformat(),
+                "latency_ms": None,
+                "note": "Synthetic order book — no live depth provider is connected",
+            },
             "as_of": self.as_of.isoformat(),
             "mid_price": self.mid_price,
             "spread": self.spread,
@@ -122,7 +131,7 @@ class OrderBookService:
             return 1
         return 2
 
-    def _build_snapshot(self, symbol: str, market: str, levels: int) -> DepthSnapshot:
+    def _build_snapshot(self, symbol: str, market: str, levels: int, ref_price: float | None = None) -> DepthSnapshot:
         provider_key = self._provider_key_for_market(market)
         seed = self._seed(symbol, market, provider_key, levels)
 
@@ -139,6 +148,10 @@ class OrderBookService:
             tick_size = 0.01 if base_price < 25 else 0.05
             spread = tick_size * (6 + seed % 4)
 
+        if ref_price:
+            base_price = ref_price
+            tick_size = 0.01 if base_price < 25 else (0.05 if base_price < 1_000 else 0.10)
+            spread = tick_size * (4 + seed % 3)
         precision = self._decimal_places(tick_size)
         mid_price = round(base_price, precision)
         bid_anchor = mid_price - spread / 2.0
@@ -206,17 +219,22 @@ class OrderBookService:
             imbalance=imbalance,
         )
 
-    def get_snapshot(self, symbol: str, market_hint: str | None = None, levels: int = 10) -> DepthSnapshot:
+    def get_snapshot(
+        self, symbol: str, market_hint: str | None = None, levels: int = 10, ref_price: float | None = None
+    ) -> DepthSnapshot:
+        """`ref_price`: when the caller knows the real last price, the synthetic book is
+        centred on it instead of the seeded base price, so the ladder agrees with the tape."""
         normalized_symbol = self._normalize_symbol(symbol)
         normalized_market = self._normalize_market(market_hint, normalized_symbol)
         safe_levels = max(1, min(int(levels), 40))
-        cache_key = f"{normalized_symbol}:{normalized_market}:{safe_levels}"
+        ref = float(ref_price) if ref_price is not None and float(ref_price) > 0 else None
+        cache_key = f"{normalized_symbol}:{normalized_market}:{safe_levels}:{round(ref, 4) if ref else '-'}"
         now = datetime.now(timezone.utc).timestamp()
         cached = self._cache.get(cache_key)
         if cached and cached[0] > now:
             return cached[1]
 
-        snapshot = self._build_snapshot(normalized_symbol, normalized_market, safe_levels)
+        snapshot = self._build_snapshot(normalized_symbol, normalized_market, safe_levels, ref_price=ref)
         self._cache[cache_key] = (now + self._cache_ttl_seconds, snapshot)
         return snapshot
 

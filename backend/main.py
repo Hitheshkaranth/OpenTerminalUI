@@ -207,6 +207,7 @@ _frontend_app_entry_paths = {
     "fno",
     "backtesting",
     "account",
+    "reports",  # /reports served the marketing page instead of the SPA
 }
 
 

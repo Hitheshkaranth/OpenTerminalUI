@@ -33,7 +33,7 @@ export async function fetchHistoricalYieldCurve(date: string): Promise<YieldCurv
 }
 
 export async function fetch2s10sHistory(): Promise<SpreadHistoryResponse> {
-  const { data } = await api.get<SpreadHistoryResponse>("/fixed-income/spreads/2s10s");
+  const { data } = await api.get<SpreadHistoryResponse>("/fixed-income/2s10s-spread-history");
   return data;
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 import { terminalColors } from "../../../theme/terminal";
@@ -22,6 +22,9 @@ function hexColor(input: string): number {
 export function ThreeDSurface({ points, emptyText }: ThreeDSurfaceProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const frameRef = useRef<number | null>(null);
+  // WebGL can be unavailable (remote desktops, headless, GPU-less VMs). Degrade to a
+  // message instead of letting THREE throw into the page error boundary.
+  const [webglUnavailable, setWebglUnavailable] = useState(false);
 
   const normalized = useMemo(() => {
     if (!points.length) return [];
@@ -52,7 +55,13 @@ export function ThreeDSurface({ points, emptyText }: ThreeDSurfaceProps) {
     camera.position.set(12, 11, 13);
     camera.lookAt(0, 0, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    } catch {
+      setWebglUnavailable(true);
+      return;
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(host.clientWidth, host.clientHeight);
     host.appendChild(renderer.domElement);
@@ -121,6 +130,14 @@ export function ThreeDSurface({ points, emptyText }: ThreeDSurfaceProps) {
     return (
       <div className="flex h-[44vh] min-h-[280px] items-center justify-center rounded border border-terminal-border/40 bg-terminal-bg/50 text-center">
         <div className="text-xs text-terminal-muted">{emptyText}</div>
+      </div>
+    );
+  }
+
+  if (webglUnavailable) {
+    return (
+      <div className="flex h-[44vh] min-h-[280px] items-center justify-center rounded border border-terminal-border/40 bg-terminal-bg/50 text-center">
+        <div className="text-xs text-terminal-muted">3D view needs WebGL, which this browser or session does not provide.</div>
       </div>
     );
   }

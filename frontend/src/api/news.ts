@@ -6,22 +6,27 @@ import type {
 } from "./types";
 
 export async function fetchSymbolNews(market: string, symbol: string, limit = 30): Promise<NewsApiItem[]> {
-  const { data } = await api.get<{ results: NewsApiItem[] }>(`/news/${market}/${symbol}`, { params: { limit } });
-  return Array.isArray(data?.results) ? data.results : [];
+  // Backend route is /news/symbol?market=&symbol= and returns {items}; older builds returned {results}.
+  const { data } = await api.get<{ items?: NewsApiItem[]; results?: NewsApiItem[] }>("/news/symbol", {
+    params: { market, symbol, limit },
+  });
+  const rows = data?.items ?? data?.results;
+  return Array.isArray(rows) ? rows : [];
 }
 
 export async function fetchMarketNews(market: string, limit = 30): Promise<NewsApiItem[]> {
-  const { data } = await api.get<{ results: NewsApiItem[] }>(`/news/${market}`, { params: { limit } });
-  return Array.isArray(data?.results) ? data.results : [];
+  const { data } = await api.get<{ items?: NewsApiItem[]; results?: NewsApiItem[] }>("/news/market", { params: { market, limit } });
+  const rows = data?.items ?? data?.results;
+  return Array.isArray(rows) ? rows : [];
 }
 
 export async function fetchLatestNews(limit = 100): Promise<NewsLatestApiItem[]> {
-  const { data } = await api.get<{ items: NewsLatestApiItem[] }>("/v1/news/latest", { params: { limit } });
+  const { data } = await api.get<{ items: NewsLatestApiItem[] }>("/news/latest", { params: { limit } });
   return Array.isArray(data?.items) ? data.items : [];
 }
 
 export async function searchLatestNews(q: string, limit = 100): Promise<NewsLatestApiItem[]> {
-  const { data } = await api.get<{ items: NewsLatestApiItem[] }>("/v1/news/search", { params: { q, limit } });
+  const { data } = await api.get<{ items: NewsLatestApiItem[] }>("/news/search", { params: { q, limit } });
   return Array.isArray(data?.items) ? data.items : [];
 }
 

@@ -29,18 +29,20 @@ export async function runBacktest(payload: BacktestPayload): Promise<BacktestRes
   return data;
 }
 
+// Async backtest jobs live at /api/backtests (submit) and /api/backtests/{run_id}/status|result.
+// The old /v1/backtest/jobs paths never existed on the backend (405 on every Run click).
 export async function submitBacktestJob(payload: BacktestJobSubmitPayload): Promise<BacktestJobStatus> {
-  const { data } = await api.post<BacktestJobStatus>("/v1/backtest/jobs", payload);
+  const { data } = await api.post<BacktestJobStatus>("/backtests", payload);
   return data;
 }
 
 export async function fetchBacktestJobStatus(runId: string): Promise<BacktestJobStatus> {
-  const { data } = await api.get<BacktestJobStatus>(`/v1/backtest/jobs/${encodeURIComponent(runId)}`);
+  const { data } = await api.get<BacktestJobStatus>(`/backtests/${encodeURIComponent(runId)}/status`);
   return data;
 }
 
 export async function fetchBacktestJobResult(runId: string): Promise<BacktestJobResult> {
-  const { data } = await api.get<BacktestJobResult>(`/v1/backtest/jobs/${encodeURIComponent(runId)}/result`);
+  const { data } = await api.get<BacktestJobResult>(`/backtests/${encodeURIComponent(runId)}/result`);
   return data;
 }
 

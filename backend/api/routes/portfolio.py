@@ -326,6 +326,7 @@ def realize_tax_lot(payload: TaxLotRealizeRequest, db: Session = Depends(get_db)
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+@router.get("/watchlist")  # singular alias: the multi-watchlist router owns /api/watchlists
 @router.get("/watchlists")
 async def get_watchlists(db: Session = Depends(get_db)) -> dict[str, list[dict[str, object]]]:
     items = db.query(WatchlistItem).all()

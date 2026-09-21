@@ -28,6 +28,7 @@ type DepthSnapshot = {
   symbol: string;
   market: string;
   providerKey: string;
+  synthetic: boolean;
   asOf: string;
   midPrice: number;
   spread: number;
@@ -127,6 +128,7 @@ function normalizeDepthSnapshot(raw: unknown): DepthSnapshot | null {
     symbol,
     market: normalizeMarket(String(payload.market ?? "US")),
     providerKey: String(payload.provider_key ?? payload.providerKey ?? "synthetic").trim() || "synthetic",
+    synthetic: payload.synthetic === true || (payload.provenance as { quality?: string } | undefined)?.quality === "synthetic",
     asOf: typeof payload.as_of === "string" ? payload.as_of : typeof payload.asOf === "string" ? payload.asOf : new Date().toISOString(),
     midPrice: Number.isFinite(Number(payload.mid_price ?? payload.midPrice)) ? Number(payload.mid_price ?? payload.midPrice) : 0,
     spread: Number.isFinite(Number(payload.spread)) ? Number(payload.spread) : 0,
@@ -569,8 +571,8 @@ export function OrderBookPanel({
           <div className={`mt-1 ${depthConnectionState === "connected" ? "text-terminal-pos" : depthConnectionState === "connecting" ? "text-terminal-warn" : "text-terminal-neg"}`}>
             {depthConnectionState}
           </div>
-          <div className="mt-1 text-[9px] text-terminal-muted">
-            {depthSnapshot?.providerKey ?? (isUS ? usConnectionState : quotesConnectionState)}
+          <div className="mt-1 text-[9px] text-terminal-muted" title={depthSnapshot?.synthetic ? "Synthetic order book — no live depth provider is connected" : undefined}>
+            {depthSnapshot?.synthetic ? "SYNTHETIC" : depthSnapshot?.providerKey ?? (isUS ? usConnectionState : quotesConnectionState)}
           </div>
         </div>
       </div>

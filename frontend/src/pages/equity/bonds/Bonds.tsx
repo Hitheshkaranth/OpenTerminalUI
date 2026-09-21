@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import { api } from "../../../api/base";
 import { TerminalPanel } from "../../../components/terminal/TerminalPanel";
 
-const BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
 interface Bond {
   isin: string;
@@ -42,19 +41,19 @@ export function BondsPage() {
     const params = new URLSearchParams();
     if (ratingFilter) params.set("rating", ratingFilter);
     if (typeFilter) params.set("issuer_type", typeFilter);
-    axios
-      .get<Bond[]>(`${BASE}/bonds/screener?${params.toString()}`)
+    api
+      .get<Bond[]>(`/bonds/screener?${params.toString()}`)
       .then((r) => setBonds(r.data))
       .catch(() => {});
   }, [ratingFilter, typeFilter]);
 
   useEffect(() => {
-    axios
-      .get<{ history: CreditSpreadPoint[] }>(`${BASE}/bonds/credit-spreads`)
+    api
+      .get<{ history: CreditSpreadPoint[] }>("/bonds/credit-spreads")
       .then((r) => setCreditSpreads(r.data.history ?? []))
       .catch(() => {});
-    axios
-      .get<RatingMigration[]>(`${BASE}/bonds/ratings-migration`)
+    api
+      .get<RatingMigration[]>("/bonds/ratings-migration")
       .then((r) => setMigrations(r.data))
       .catch(() => {});
   }, []);

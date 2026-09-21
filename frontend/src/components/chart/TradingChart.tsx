@@ -1505,7 +1505,7 @@ export function TradingChart({
       sessionShadingRef.current = null;
       overlaySeriesRef.current = [];
       for (const series of comparisonSeriesRef.current) {
-        chart.removeSeries(series);
+        try { chart.removeSeries(series); } catch { /* already detached */ }
       }
       comparisonSeriesRef.current = [];
       highLineRef.current = null;
@@ -1673,7 +1673,7 @@ export function TradingChart({
       return;
     }
     for (const series of overlaySeriesRef.current) {
-      chart.removeSeries(series);
+      try { chart.removeSeries(series); } catch { /* already detached */ }
     }
     overlaySeriesRef.current = [];
 
@@ -1710,7 +1710,7 @@ export function TradingChart({
     const chart = apiRef.current;
     if (!chart) return;
     for (const s of comparisonSeriesRef.current) {
-      chart.removeSeries(s);
+      try { chart.removeSeries(s); } catch { /* already detached */ }
     }
     comparisonSeriesRef.current = [];
     if (!comparisonSeries.length) return;
@@ -1747,7 +1747,7 @@ export function TradingChart({
     }
 
     for (const s of drawingLineSeriesRef.current) {
-      chart.removeSeries(s);
+      try { chart.removeSeries(s); } catch { /* already detached */ }
     }
     drawingLineSeriesRef.current = [];
     for (const pl of drawingPriceLinesRef.current) {

@@ -146,9 +146,9 @@ export async function searchStocks(q: string, market = "NSE"): Promise<SearchSym
   return searchSymbols(q, market);
 }
 
-export async function fetchDepth(symbol: string, market = "NSE", levels = 20): Promise<DepthSnapshotResponse> {
+export async function fetchDepth(symbol: string, market = "NSE", levels = 20, refPrice?: number): Promise<DepthSnapshotResponse> {
   const { data } = await api.get<DepthSnapshotResponse>(`/depth/${encodeURIComponent(symbol)}`, {
-    params: { market, levels },
+    params: { market, levels, ...(refPrice && refPrice > 0 ? { ref_price: refPrice } : {}) },
   });
   return data;
 }

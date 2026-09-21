@@ -21,7 +21,7 @@ class WatchlistBase(BaseModel):
 
 
 class WatchlistCreate(WatchlistBase):
-    pass
+    symbols: List[str] = Field(default_factory=list)
 
 
 class WatchlistUpdate(BaseModel):
@@ -77,7 +77,8 @@ def create_watchlist(payload: WatchlistCreate, db: Session = Depends(get_db), cu
         id=str(uuid4()),
         user_id=user_id,
         name=payload.name,
-        symbols_json=[],
+        # Honour the symbols sent on create (previously always stored []).
+        symbols_json=list(dict.fromkeys(s.strip().upper() for s in (payload.symbols or []) if s and s.strip())),
         column_config_json=payload.column_config,
         created_at=datetime.now(timezone.utc)
     )

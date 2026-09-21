@@ -9,21 +9,21 @@ import type {
 } from "./types";
 
 export async function fetchNewsSentiment(ticker: string, days = 7, market?: string): Promise<NewsSentimentSummary> {
-  const { data } = await api.get<NewsSentimentSummary>(`/v1/sentiment/ticker/${encodeURIComponent(ticker)}`, {
+  const { data } = await api.get<NewsSentimentSummary>(`/news/sentiment/${encodeURIComponent(ticker)}`, {
     params: { days, market },
   });
   return data;
 }
 
 export async function fetchMarketSentiment(days = 7, market?: string): Promise<MarketSentimentSummary> {
-  const { data } = await api.get<MarketSentimentSummary>("/v1/sentiment/market", {
+  const { data } = await api.get<MarketSentimentSummary>("/news/sentiment/market", {
     params: { days, market },
   });
   return data;
 }
 
 export async function fetchNewsSentimentSummary(days = 7, limit = 200, market?: string): Promise<NewsSentimentMarketSummary> {
-  const { data } = await api.get<NewsSentimentMarketSummary>("/v1/sentiment/summary", {
+  const { data } = await api.get<NewsSentimentMarketSummary>("/news/sentiment/summary", {
     params: { days, limit, market },
   });
   return data;
@@ -34,7 +34,7 @@ export async function fetchStockEmotion(
   days = 7,
   market?: string,
 ): Promise<StockEmotion> {
-  const { data } = await api.get<StockEmotion>(`/v1/sentiment/emotion/${encodeURIComponent(ticker)}`, {
+  const { data } = await api.get<StockEmotion>(`/sentiment/emotion/${encodeURIComponent(ticker)}`, {
     params: { days, market },
   });
   return data;

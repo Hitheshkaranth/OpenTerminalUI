@@ -8,6 +8,8 @@ type Props = {
   symbol: string;
   market: string;
   className?: string;
+  /** Real last price; a synthetic book is centred on it so the ladder agrees with the tape. */
+  refPrice?: number;
   onSnapshot?: (snapshot: DepthSnapshotResponse | null) => void;
 };
 
@@ -107,7 +109,7 @@ function buildRows(snapshot: DepthSnapshotResponse, levels: number, previous: De
   return rows;
 }
 
-export function DOMLadder({ symbol, market, className = "", onSnapshot }: Props) {
+export function DOMLadder({ symbol, market, className = "", refPrice, onSnapshot }: Props) {
   const normalizedSymbol = String(symbol || "").trim().toUpperCase() || "RELIANCE";
   const normalizedMarket = normalizeMarket(market);
   const [autoCenter, setAutoCenter] = useState(true);
@@ -120,9 +122,9 @@ export function DOMLadder({ symbol, market, className = "", onSnapshot }: Props)
   const lastSnapshotRef = useRef<DepthSnapshotResponse | null>(null);
 
   const depthQuery = useQuery({
-    queryKey: ["dom-depth", normalizedMarket, normalizedSymbol, levels],
+    queryKey: ["dom-depth", normalizedMarket, normalizedSymbol, levels, refPrice && refPrice > 0 ? Math.round(refPrice * 100) : 0],
     queryFn: async () => {
-      const next = await fetchDepth(normalizedSymbol, normalizedMarket, levels);
+      const next = await fetchDepth(normalizedSymbol, normalizedMarket, levels, refPrice);
       setPreviousSnapshot(lastSnapshotRef.current);
       lastSnapshotRef.current = next;
       return next;

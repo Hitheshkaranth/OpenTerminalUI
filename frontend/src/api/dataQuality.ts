@@ -45,7 +45,9 @@ export interface DataQualityListResponse {
 }
 
 export async function fetchDataQualityHealth(): Promise<DataQualityHealth> {
-  const { data } = await api.get<DataQualityHealth>("/healthz");
+  // /healthz is mounted at the app root, not under the /api prefix.
+  const root = String(api.defaults.baseURL || "/api").replace(/\/api\/?$/, "") || "/";
+  const { data } = await api.get<DataQualityHealth>("/healthz", { baseURL: root });
   return data;
 }
 

@@ -133,7 +133,7 @@ export async function fetchIntelligenceTimeline(params: {
 
   const calls: Array<Promise<{ bucket: string; rows: RawRow[] }>> = [
     api
-      .get(primarySymbol ? `/v1/news/ticker/${encodeURIComponent(primarySymbol)}` : "/v1/news/latest", {
+      .get(primarySymbol ? `/news/by-ticker/${encodeURIComponent(primarySymbol)}` : "/news/latest", {
         params: { limit: Math.min(limit, 40), market },
       })
       .then((res) => ({ bucket: "news", rows: asArray(res.data, ["items", "results", "news"]) })),

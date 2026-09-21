@@ -7,8 +7,11 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ChartSyncProvider } from "./shared/chart/ChartSyncContext";
 
 import App from "./App";
+import { installAuthFetch } from "./api/installAuthFetch";
 import "./index.css";
 import "./styles/terminal-theme.css";
+
+installAuthFetch();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

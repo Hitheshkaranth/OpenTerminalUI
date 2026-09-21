@@ -353,6 +353,8 @@ export type DepthSnapshotResponse = {
   symbol: string;
   market: string;
   provider_key: string;
+  synthetic?: boolean;
+  provenance?: { source: string; quality: string; as_of: string | null; latency_ms: number | null; note: string | null } | null;
   as_of: string;
   mid_price: number;
   spread: number;

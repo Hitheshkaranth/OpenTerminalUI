@@ -12,6 +12,7 @@ import type { PaperOrder, PaperPosition } from "../../types";
 import { useQuotesStore } from "../../realtime/useQuotesStream";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useStockStore } from "../../store/stockStore";
+import { useStock } from "../../hooks/useStocks";
 
 const PAPER_PORTFOLIO_KEY = "ot:paper:selected-portfolio:v1";
 
@@ -103,6 +104,10 @@ export function HotKeyPanel({
   const [flash, setFlash] = useState<FlashState>(null);
 
   const activeTicker = (ticker || "RELIANCE").toUpperCase();
+  // Real snapshot (shared react-query cache with Security Hub). Synthetic depth must
+  // never be the price basis for an order.
+  const snapshotQuery = useStock(activeTicker);
+  const snapshotPrice = Number(snapshotQuery.data?.current_price ?? NaN);
 
   const portfoliosQuery = useQuery({
     queryKey: ["paper", "portfolios"],
@@ -145,10 +150,11 @@ export function HotKeyPanel({
   }, [autoFocus]);
 
   useEffect(() => {
-    const fallback = Number(tick?.ltp ?? stock?.current_price ?? depthQuery.data?.last_price ?? 0);
+    const depthPrice = depthQuery.data?.synthetic ? undefined : depthQuery.data?.last_price;
+    const fallback = Number(tick?.ltp ?? (Number.isFinite(snapshotPrice) ? snapshotPrice : undefined) ?? stock?.current_price ?? depthPrice ?? 0);
     if (!Number.isFinite(fallback) || fallback <= 0) return;
     setLimitPrice((prev) => (prev > 0 ? prev : fallback));
-  }, [depthQuery.data?.last_price, stock?.current_price, tick?.ltp]);
+  }, [depthQuery.data?.last_price, depthQuery.data?.synthetic, snapshotPrice, stock?.current_price, tick?.ltp]);
 
   useEffect(
     () => () => {
@@ -178,12 +184,16 @@ export function HotKeyPanel({
     [activeTicker, ordersQuery.data],
   );
 
-  const lastPrice = Number(tick?.ltp ?? stock?.current_price ?? depthQuery.data?.last_price ?? activePosition?.mark_price ?? 0);
+  const depthLast = depthQuery.data?.synthetic ? undefined : depthQuery.data?.last_price;
+  const lastPrice = Number(
+    tick?.ltp ?? (Number.isFinite(snapshotPrice) ? snapshotPrice : undefined) ?? stock?.current_price ?? depthLast ?? activePosition?.mark_price ?? 0,
+  );
   const changePct = Number(tick?.change_pct ?? stock?.change_pct ?? 0);
   const previousClose = changePct !== -100 && lastPrice > 0 ? lastPrice / (1 + changePct / 100) : 0;
   const change = lastPrice > 0 ? lastPrice - previousClose : 0;
-  const bestBid = Number(depthQuery.data?.bids?.[0]?.price ?? (lastPrice > 0 ? lastPrice - Math.max(0.01, lastPrice * 0.0005) : 0));
-  const bestAsk = Number(depthQuery.data?.asks?.[0]?.price ?? (lastPrice > 0 ? lastPrice + Math.max(0.01, lastPrice * 0.0005) : 0));
+  const realDepth = depthQuery.data && !depthQuery.data.synthetic ? depthQuery.data : undefined;
+  const bestBid = Number(realDepth?.bids?.[0]?.price ?? (lastPrice > 0 ? lastPrice - Math.max(0.01, lastPrice * 0.0005) : 0));
+  const bestAsk = Number(realDepth?.asks?.[0]?.price ?? (lastPrice > 0 ? lastPrice + Math.max(0.01, lastPrice * 0.0005) : 0));
   const maxQty = useMemo(() => {
     const cash = Number(selectedPortfolio?.current_cash ?? 0);
     const basis = orderMode === "limit" && limitPrice > 0 ? limitPrice : lastPrice;

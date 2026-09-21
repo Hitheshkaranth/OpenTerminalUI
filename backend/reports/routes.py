@@ -305,3 +305,39 @@ async def quarterly_reports(
 
     items.sort(key=lambda item: item["publishedAt"], reverse=True)
     return {"items": items[:limit]}
+
+
+# ---------------------------------------------------------------------------
+# Scheduled reports — the scheduler service existed but was never exposed, so the
+# Settings → Scheduled Reports panel 404'd on every load.
+# ---------------------------------------------------------------------------
+from dataclasses import asdict as _asdict  # noqa: E402
+
+from pydantic import BaseModel as _BaseModel, Field as _Field  # noqa: E402
+
+from backend.reports.scheduler import scheduled_reports_service  # noqa: E402
+
+
+class ScheduledReportCreate(_BaseModel):
+    report_type: str = _Field(min_length=1, max_length=64)
+    frequency: str = _Field(pattern="^(daily|weekly|monthly)$")
+    email: str = _Field(min_length=3, max_length=254)
+    data_type: str = _Field(default="positions", max_length=64)
+
+
+@router.get("/reports/scheduled")
+def list_scheduled_reports() -> dict[str, Any]:
+    return {"items": [_asdict(cfg) for cfg in scheduled_reports_service.list()]}
+
+
+@router.post("/reports/scheduled")
+def create_scheduled_report(payload: ScheduledReportCreate) -> dict[str, Any]:
+    cfg = scheduled_reports_service.upsert(payload.report_type, payload.frequency, payload.email, payload.data_type)
+    return _asdict(cfg)
+
+
+@router.delete("/reports/scheduled/{config_id}")
+def delete_scheduled_report(config_id: str) -> dict[str, Any]:
+    if not scheduled_reports_service.delete(config_id):
+        raise HTTPException(status_code=404, detail="Scheduled report not found")
+    return {"status": "deleted", "id": config_id}

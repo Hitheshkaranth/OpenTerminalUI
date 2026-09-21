@@ -38,6 +38,8 @@ class DepthSnapshotResponse(BaseModel):
     last_price: float
     last_qty: float
     imbalance: float
+    synthetic: bool = True
+    provenance: dict[str, Any] | None = None
     bids: list[DepthLevelResponse] = Field(default_factory=list)
     asks: list[DepthLevelResponse] = Field(default_factory=list)
 
@@ -47,9 +49,10 @@ def get_depth_snapshot(
     symbol: str,
     market: str = Query(default="US"),
     levels: int = Query(default=20, ge=1, le=40),
+    ref_price: float | None = Query(default=None, gt=0, description="Real last price to centre a synthetic book on"),
 ) -> Any:
     try:
-        snapshot = service.get_snapshot(symbol, market_hint=market, levels=levels)
+        snapshot = service.get_snapshot(symbol, market_hint=market, levels=levels, ref_price=ref_price)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return snapshot.to_wire()

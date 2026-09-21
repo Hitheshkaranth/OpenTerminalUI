@@ -93,6 +93,15 @@ export function DOMPage() {
                   {formatSpread(depthSnapshot?.spread ?? 0, depthSnapshot?.last_price ?? lastPrice)}
                 </div>
               </div>
+              {depthSnapshot?.synthetic ? (
+                <div
+                  className="rounded-sm border border-amber-500/40 bg-amber-500/10 px-3 py-2"
+                  title={depthSnapshot.provenance?.note ?? "Synthetic order book — no live depth provider is connected"}
+                >
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-terminal-muted">Book</div>
+                  <div className="mt-1 font-mono text-lg text-amber-300">SYNTHETIC</div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -101,6 +110,7 @@ export function DOMPage() {
           <DOMLadder
             symbol={activeTicker}
             market={selectedMarket}
+            refPrice={Number(stock?.current_price) > 0 ? Number(stock?.current_price) : undefined}
             className="min-h-[920px]"
             onSnapshot={setDepthSnapshot}
           />

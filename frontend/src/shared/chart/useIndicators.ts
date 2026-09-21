@@ -60,10 +60,20 @@ function toPlotData(points: Array<{ time: unknown; value: unknown }>): Array<{ t
   return out;
 }
 
+function safeRemoveSeries(chart: IChartApi, series: ISeriesApi<"Line", Time>): void {
+  // Lightweight Charts throws "Value is undefined" when a series was already removed
+  // (chart re-created, data reset, or React effect cleanup racing a re-render).
+  try {
+    chart.removeSeries(series);
+  } catch {
+    /* already detached */
+  }
+}
+
 function clearSeries(chart: IChartApi, map: SeriesMap): SeriesMap {
   for (const plotMap of Object.values(map)) {
     for (const series of Object.values(plotMap)) {
-      chart.removeSeries(series);
+      safeRemoveSeries(chart, series);
     }
   }
   return {};
@@ -80,7 +90,7 @@ function removeIndicatorSeries(
   indicatorId: string,
 ): void {
   for (const series of Object.values(seriesMap[indicatorId] ?? {})) {
-    chart.removeSeries(series);
+    safeRemoveSeries(chart, series);
   }
   delete seriesMap[indicatorId];
   delete placementMap[indicatorId];
