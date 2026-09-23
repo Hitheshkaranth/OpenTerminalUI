@@ -15,6 +15,7 @@ from backend.api.routes.commodities import router as commodities_router
 from backend.api.routes.correlation import router as correlation_router
 from backend.api.routes.pair_trading import router as pair_trading_router
 from backend.api.routes.economics import router as economics_router
+from backend.mcp.http_app import build_mcp_router
 from backend.api.routes.etf import router as etf_router
 from backend.api.routes.factor_analysis import router as factor_analysis_router
 from backend.api.routes.fixed_income import router as fixed_income_router
@@ -134,5 +135,11 @@ api_router.include_router(screener_alerts_router, prefix="/api", tags=["screener
 api_router.include_router(providers_router, prefix="/api")
 api_router.include_router(provider_keys_router, prefix="/api")
 api_router.include_router(economics_router)
+
+# MCP over HTTP: the agent tool registry, authenticated per API key so an
+# external MCP client reaches the calling user's portfolio and proposal tools.
+# The router carries its own "/mcp" prefix and authenticates via X-API-Key, so
+# it is mounted under "/api" alongside the other API-key surfaces.
+api_router.include_router(build_mcp_router(), prefix="/api")
 
 __all__ = ["api_router"]

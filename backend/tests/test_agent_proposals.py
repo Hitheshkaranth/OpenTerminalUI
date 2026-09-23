@@ -38,10 +38,17 @@ def test_db():
 @pytest.fixture()
 def monkeypatch_session_local(monkeypatch, test_db):
     """Monkeypatch SessionLocal to return the test database session."""
+    # Import the targets BEFORE patching backend.shared.db. Both modules bind
+    # SessionLocal at import time, so if monkeypatch's string form imports them
+    # after the shared patch is live, it records the mock as the "original" and
+    # restores the mock on teardown — leaking an in-memory DB into later tests.
+    import backend.agent.proposals  # noqa: F401
+    import backend.agent.tools.portfolio_tools  # noqa: F401
+
     mock = MagicMock(return_value=test_db)
-    monkeypatch.setattr("backend.shared.db.SessionLocal", mock)
     monkeypatch.setattr("backend.agent.tools.portfolio_tools.SessionLocal", mock)
     monkeypatch.setattr("backend.agent.proposals.SessionLocal", mock)
+    monkeypatch.setattr("backend.shared.db.SessionLocal", mock)
     return mock
 
 

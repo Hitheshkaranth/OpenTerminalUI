@@ -187,6 +187,9 @@ _API_KEY_ROUTE_PREFIXES = (
     "/api/v1/fundamentals/",
     "/api/v1/watchlist/",
     "/api/v1/portfolio",
+    # MCP over HTTP (backend/mcp/http_app.py) authenticates with X-API-Key and
+    # resolves the key to a user, so the JWT middleware defers to it.
+    "/api/mcp/",
 )
 
 

@@ -49,11 +49,16 @@ _CSRF_EXEMPT_PATHS = frozenset(
 )
 
 
-def _should_skip_csrf(path: str, method: str) -> bool:
+def _should_skip_csrf(path: str, method: str, has_api_key: bool = False) -> bool:
     """Return True if CSRF validation should be skipped for this request."""
     if method not in _STATE_CHANGE_METHODS:
         return True
     if path in _CSRF_EXEMPT_PATHS:
+        return True
+    # CSRF defends against ambient credentials (cookies) being replayed from a
+    # third-party page. An X-API-Key header is never attached automatically by a
+    # browser, so key-authenticated calls have nothing to forge.
+    if has_api_key:
         return True
     # Skip for WebSocket upgrade requests.
     if "upgrade" in (path or "").split("/"):
@@ -71,7 +76,9 @@ class CsrfProtectMiddleware(BaseHTTPMiddleware):
     _COOKIE_MAX_AGE = 86400  # 24 hours
 
     async def dispatch(self, request: Request, call_next) -> Response:
-        if _should_skip_csrf(request.url.path, request.method):
+        if _should_skip_csrf(
+            request.url.path, request.method, bool(request.headers.get("X-API-Key"))
+        ):
             response = await call_next(request)
             return response
 

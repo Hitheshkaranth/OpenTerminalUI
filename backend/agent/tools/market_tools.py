@@ -679,11 +679,30 @@ def build_strategy_registry() -> ToolRegistry:
 
 def build_default_registry(user_id: str | None = None) -> ToolRegistry:
     reg = ToolRegistry()
+    # Imported lazily: these modules pull in screener, risk and provider engines
+    # that are expensive to import and not needed when the registry is unused.
+    from backend.agent.tools.derivatives_tools import derivatives_tool_specs
+    from backend.agent.tools.macro_tools import macro_tool_specs
+    from backend.agent.tools.analytics_tools import analytics_tool_specs
+
     if user_id:
         from backend.agent.tools.portfolio_tools import portfolio_tool_specs
         from backend.agent.proposals import proposal_tool_specs
-        for spec in [*portfolio_tool_specs(user_id), *proposal_tool_specs(user_id)]:
-            reg.register(spec)
+        from backend.agent.tools.news_tools import news_tool_specs
+        from backend.agent.tools.action_tools import action_tool_specs
+        from backend.agent.tools.risk_tools import risk_tool_specs
+        reg.register_many([
+            *portfolio_tool_specs(user_id),
+            *proposal_tool_specs(user_id),
+            *news_tool_specs(user_id),
+            *action_tool_specs(user_id),
+            *risk_tool_specs(user_id),
+        ])
+    reg.register_many([
+        *derivatives_tool_specs(),
+        *macro_tool_specs(),
+        *analytics_tool_specs(),
+    ])
     reg.register(ToolSpec(
         name="screen_stocks",
         description="Required first tool for user requests that ask to find, screen, scan, filter, "

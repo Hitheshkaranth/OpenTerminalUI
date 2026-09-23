@@ -47,15 +47,21 @@ async def test_call_tool_returns_json_result() -> None:
 
     assert len(content) == 1
     assert isinstance(content[0], types.TextContent)
-    assert json.loads(content[0].text) == {"received": {"message": "hello"}, "status": "ok"}
+    # The MCP boundary normalises every result into an envelope so external
+    # clients see one shape across legacy and newer tools.
+    payload = json.loads(content[0].text)
+    assert payload["ok"] is True
+    assert payload["data"] == {"received": {"message": "hello"}, "status": "ok"}
+    assert payload["provenance"]["quality"] == "delayed"
 
 
 @pytest.mark.asyncio
 async def test_call_unknown_tool_returns_error_payload() -> None:
     content = await call_tool_for(make_registry(), "nope", {})
 
-    assert "error" in json.loads(content[0].text)
-    assert json.loads(content[0].text)["error"] == "unknown tool: nope"
+    payload = json.loads(content[0].text)
+    assert payload["ok"] is False
+    assert payload["error"]["message"] == "unknown tool: nope"
 
 
 @pytest.mark.asyncio
@@ -68,7 +74,9 @@ async def test_call_failing_tool_returns_error_payload() -> None:
 
     content = await call_tool_for(registry, "fail", {})
 
-    assert json.loads(content[0].text) == {"error": "boom"}
+    payload = json.loads(content[0].text)
+    assert payload["ok"] is False
+    assert payload["error"]["message"] == "boom"
 
 
 def test_build_mcp_server_uses_expected_name() -> None:

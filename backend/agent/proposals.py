@@ -115,7 +115,12 @@ async def confirm_proposal(
         elif p.type == "watchlist_add":
             result = _confirm_watchlist_add(db, p)
         else:
-            result = {"error": f"unknown proposal type: {p.type}"}
+            # No executor for this type yet (rebalance, journal_entry,
+            # watchlist_remove and screener_alert are proposal-only for now).
+            # Leaving status as "confirmed" would tell the user the action ran,
+            # so fail loudly instead.
+            result = {"error": f"no executor for proposal type: {p.type}"}
+            p.status = "failed"
     except Exception as exc:  # noqa: BLE001
         result = {"error": str(exc)}
         p.status = "failed"
