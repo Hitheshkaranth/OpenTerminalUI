@@ -79,7 +79,7 @@ export function CryptoOverview() {
                 <th className="text-right">Price</th>
                 <th className="text-right">24h</th>
                 <th className="text-right">Volume</th>
-                <th className="text-left">Sector</th>
+                <th className="pl-4 text-left">Sector</th>
               </tr>
             </thead>
             <tbody>
@@ -97,7 +97,7 @@ export function CryptoOverview() {
                   <td className="text-right">{fmt(row.price, 4)}</td>
                   <td className={`text-right ${pctClass(row.change_24h)}`}>{row.change_24h.toFixed(2)}%</td>
                   <td className="text-right">{fmt(Math.round(row.volume_24h), 0)}</td>
-                  <td>{row.sector}</td>
+                  <td className="pl-4">{row.sector}</td>
                 </tr>
               ))}
             </tbody>
@@ -127,7 +127,7 @@ export function CryptoOverview() {
                 <div>{fmt(Math.round(detailQuery.data.volume_24h), 0)}</div>
               </div>
               <div>
-                <div className="text-terminal-muted">Mkt Cap Proxy</div>
+                <div className="text-terminal-muted">Mkt Cap</div>
                 <div>{fmt(Math.round(detailQuery.data.market_cap), 0)}</div>
               </div>
             </div>

@@ -14,6 +14,10 @@ type HeatCell = {
   extra: string;
 };
 
+// Neutral grey for symbols whose chain fetch failed/returned nothing — never a
+// green/red reading derived from a fake 0.
+const NO_DATA_COLOR = "#8a94a6";
+
 const getPcrColor = (pcr: number) => {
   if (pcr >= 1.5) return "#00e676";
   if (pcr >= 1.0) return "#00c176";
@@ -65,7 +69,7 @@ function HeatGrid({ cells, onCellClick }: { cells: HeatCell[]; onCellClick: (nam
               {cell.name}
             </span>
             <span className="text-[#05070b] opacity-80 leading-tight" style={{ fontSize: Math.max(9, Math.min(12, side / 8)) }}>
-              {Number(cell.value).toFixed(2)}
+              {Number.isFinite(cell.value) ? Number(cell.value).toFixed(2) : "No data"}
             </span>
             {side > 100 && (
               <span className="text-[#05070b] opacity-60 mt-0.5 leading-tight" style={{ fontSize: 9 }}>
@@ -88,27 +92,40 @@ export function HeatmapPage() {
 
   const data = useMemo((): HeatCell[] => {
     if (mode === "iv") {
-      return (ivQuery.data ?? []).map((r) => ({
-        name: r.symbol,
-        size: Math.max(Math.abs(Number(r.atm_iv || 0)), 0.01),
-        value: Number(r.atm_iv || 0),
-        color: getIvColor(Number(r.iv_rank || 0)),
-        extra: `IV Rank: ${Number(r.iv_rank || 0).toFixed(1)}`,
-      }));
+      return (ivQuery.data ?? []).map((r) => {
+        const atmIv = typeof r.atm_iv === "number" && r.atm_iv > 0 ? r.atm_iv : Number.NaN;
+        const rank = typeof r.iv_rank === "number" ? r.iv_rank : null;
+        const hasData = Number.isFinite(atmIv);
+        return {
+          name: r.symbol,
+          size: hasData ? atmIv : 0.01,
+          value: atmIv,
+          color: !hasData ? NO_DATA_COLOR : rank == null ? NO_DATA_COLOR : getIvColor(rank),
+          extra: hasData ? `IV Rank: ${rank == null ? "—" : rank.toFixed(1)}` : "No data",
+        };
+      });
     }
     return (oiQuery.data ?? []).map((r) => {
-      const peOpts = Number(r.pe_oi_total || 0);
-      const ceOpts = Number(r.ce_oi_total || 0);
+      const hasData = r.available !== false && typeof r.ce_oi_total === "number" && typeof r.pe_oi_total === "number";
+      const peOpts = Number(r.pe_oi_total ?? 0);
+      const ceOpts = Number(r.ce_oi_total ?? 0);
       const oi = ceOpts + peOpts;
-      const pcr = Number(r.pcr_oi || 0);
+      const pcr = typeof r.pcr_oi === "number" ? r.pcr_oi : Number.NaN;
       const proxyVolume = oi;
-      const selectedValue = mode === "pcr" ? pcr : mode === "volume" ? proxyVolume : oi;
+      const selectedValue = !hasData ? Number.NaN : mode === "pcr" ? pcr : mode === "volume" ? proxyVolume : oi;
+      const color = !hasData
+        ? NO_DATA_COLOR
+        : mode === "pcr"
+          ? Number.isFinite(pcr) ? getPcrColor(pcr) : NO_DATA_COLOR
+          : getOiColor(peOpts, ceOpts);
       return {
         name: r.symbol,
-        size: Math.max(Math.abs(selectedValue), 0.01),
+        size: Number.isFinite(selectedValue) ? Math.max(Math.abs(selectedValue), 0.01) : 0.01,
         value: selectedValue,
-        color: mode === "pcr" ? getPcrColor(pcr) : getOiColor(peOpts, ceOpts),
-        extra: `PCR: ${pcr.toFixed(2)} | CE: ${ceOpts.toLocaleString()} | PE: ${peOpts.toLocaleString()}`,
+        color,
+        extra: hasData
+          ? `PCR: ${Number.isFinite(pcr) ? pcr.toFixed(2) : "—"} | CE: ${ceOpts.toLocaleString()} | PE: ${peOpts.toLocaleString()}`
+          : "No data",
       };
     });
   }, [mode, ivQuery.data, oiQuery.data]);
@@ -129,7 +146,8 @@ export function HeatmapPage() {
             {m.toUpperCase()}
           </button>
         ))}
-        <span className="ml-auto text-terminal-muted">Click a tile to view option chain</span>
+        {/* The heatmap always covers the tracked NSE F&O list, independent of the selected symbol. */}
+        <span className="ml-auto text-terminal-muted">Universe: NSE F&amp;O · Grey = no data · Click a tile to view option chain</span>
       </div>
 
       <div className="rounded border border-terminal-border bg-terminal-panel p-3">

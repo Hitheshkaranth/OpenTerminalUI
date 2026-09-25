@@ -1,15 +1,24 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { fetchExpiryDashboard } from "../api/fnoApi";
-import { useDisplayCurrency } from "../../hooks/useDisplayCurrency";
+import { fetchExpiryDashboard, type ExpiryDashboardItem } from "../api/fnoApi";
+import { formatMoney } from "../../lib/format";
 import { useFnoContext } from "../FnoLayout";
 import { TerminalPanel } from "../../components/terminal/TerminalPanel";
 import { TerminalBadge } from "../../components/terminal/TerminalBadge";
 
+const NA = "—";
+const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+// Max pain / S&R are strike prices in the underlying's own currency — never FX-converted.
+const fmtStrike = (row: ExpiryDashboardItem, v: number | null | undefined) =>
+  isNum(v) && v > 0 ? formatMoney(v, row.market === "US" ? "USD" : "INR") : NA;
+const fmtIv = (v: number | null | undefined) => (isNum(v) && v > 0 ? `${v.toFixed(2)}%` : NA);
+const fmtPcr = (v: number | null | undefined) => (isNum(v) ? v.toFixed(2) : NA);
+const signalOf = (row: ExpiryDashboardItem) => row.pcr?.signal || "No data";
+const signalVariant = (signal: string) => (signal === "Bullish" ? "success" : signal === "Bearish" ? "danger" : "neutral");
+
 export function ExpiryPage() {
   const { symbol } = useFnoContext();
-  const { formatDisplayMoney } = useDisplayCurrency();
 
   const query = useQuery({
     queryKey: ["fno-expiry-dashboard"],
@@ -39,7 +48,13 @@ export function ExpiryPage() {
         <div className="lg:col-span-2">
           <TerminalPanel
             title={`EXPIRY ANALYSIS: ${symbol}`}
-            subtitle={selectedSymbolData ? `Next Expiry: ${selectedSymbolData.expiry_date}` : "Loading index context..."}
+            subtitle={
+              selectedSymbolData
+                ? `Next Expiry: ${selectedSymbolData.expiry_date || NA}`
+                : query.isLoading
+                  ? "Loading index context..."
+                  : "Not available for this symbol"
+            }
           >
             {selectedSymbolData ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-2">
@@ -47,7 +62,7 @@ export function ExpiryPage() {
                   <div className="space-y-1">
                     <div className="text-[10px] text-terminal-muted uppercase">Days to Expiry</div>
                     <div className="text-2xl font-bold text-terminal-accent">
-                      {selectedSymbolData.days_to_expiry} <span className="text-xs font-normal text-terminal-muted">DAYS REMAINING</span>
+                      {isNum(selectedSymbolData.days_to_expiry) ? selectedSymbolData.days_to_expiry : NA} <span className="text-xs font-normal text-terminal-muted">DAYS REMAINING</span>
                     </div>
                   </div>
 
@@ -55,13 +70,13 @@ export function ExpiryPage() {
                     <div className="space-y-1">
                       <div className="text-[10px] text-terminal-muted uppercase">ATM IV</div>
                       <div className="text-lg font-bold text-terminal-info">
-                        {Number(selectedSymbolData.atm_iv || 0).toFixed(2)}%
+                        {fmtIv(selectedSymbolData.atm_iv)}
                       </div>
                     </div>
                     <div className="space-y-1">
                       <div className="text-[10px] text-terminal-muted uppercase">Max Pain</div>
                       <div className="text-lg font-bold text-terminal-pos">
-                        {formatDisplayMoney(selectedSymbolData.max_pain)}
+                        {fmtStrike(selectedSymbolData, selectedSymbolData.max_pain)}
                       </div>
                     </div>
                   </div>
@@ -70,12 +85,10 @@ export function ExpiryPage() {
                     <div className="text-[10px] text-terminal-muted uppercase">PCR (OI)</div>
                     <div className="flex items-center gap-2">
                       <div className="text-lg font-bold text-terminal-text">
-                        {Number(selectedSymbolData.pcr?.pcr_oi || 0).toFixed(2)}
+                        {fmtPcr(selectedSymbolData.pcr?.pcr_oi)}
                       </div>
-                      <TerminalBadge
-                        variant={selectedSymbolData.pcr?.signal === "Bullish" ? "success" : selectedSymbolData.pcr?.signal === "Bearish" ? "danger" : "neutral"}
-                      >
-                        {selectedSymbolData.pcr?.signal.toUpperCase()}
+                      <TerminalBadge variant={signalVariant(signalOf(selectedSymbolData))}>
+                        {signalOf(selectedSymbolData).toUpperCase()}
                       </TerminalBadge>
                     </div>
                   </div>
@@ -90,7 +103,7 @@ export function ExpiryPage() {
                         <div className="flex flex-wrap gap-2">
                           {(selectedSymbolData.support_resistance?.support ?? []).map(val => (
                             <span key={val} className="rounded bg-terminal-pos/10 border border-terminal-pos/20 px-2 py-0.5 text-xs text-terminal-pos font-bold tabular-nums">
-                              {formatDisplayMoney(val)}
+                              {fmtStrike(selectedSymbolData, val)}
                             </span>
                           ))}
                         </div>
@@ -100,7 +113,7 @@ export function ExpiryPage() {
                         <div className="flex flex-wrap gap-2">
                           {(selectedSymbolData.support_resistance?.resistance ?? []).map(val => (
                             <span key={val} className="rounded bg-terminal-neg/10 border border-terminal-neg/20 px-2 py-0.5 text-xs text-terminal-neg font-bold tabular-nums">
-                              {formatDisplayMoney(val)}
+                              {fmtStrike(selectedSymbolData, val)}
                             </span>
                           ))}
                         </div>
@@ -111,7 +124,9 @@ export function ExpiryPage() {
               </div>
             ) : (
               <div className="flex h-48 items-center justify-center text-xs text-terminal-muted italic">
-                {query.isLoading ? "Crunching expiry analytics..." : "No specific data for this symbol in dashboard."}
+                {query.isLoading
+                  ? "Crunching expiry analytics..."
+                  : `Expiry analytics are not available for ${symbol} — the dashboard tracks the NSE F&O universe listed below.`}
               </div>
             )}
           </TerminalPanel>
@@ -138,7 +153,7 @@ export function ExpiryPage() {
       </div>
 
       {/* Comparisons Table */}
-      <TerminalPanel title="ACTIVE F&O UNIVERSE" subtitle="Comparative expiry metrics across tracked symbols">
+      <TerminalPanel title="ACTIVE F&O UNIVERSE" subtitle="Comparative expiry metrics across tracked NSE symbols">
         <div className="overflow-x-auto">
           <table className="min-w-full text-xs border-collapse">
             <thead>
@@ -156,14 +171,14 @@ export function ExpiryPage() {
               {otherSymbols.map((row) => (
                 <tr key={`expiry-${row.symbol}`} className="border-b border-terminal-border/20 hover:bg-terminal-border/10 transition-colors">
                   <td className="px-3 py-2 font-bold text-terminal-accent">{row.symbol}</td>
-                  <td className="px-3 py-2 text-terminal-dim">{row.expiry_date}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{row.days_to_expiry}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-terminal-info">{Number(row.atm_iv || 0).toFixed(2)}%</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{Number(row.pcr?.pcr_oi || 0).toFixed(2)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-bold">{formatDisplayMoney(row.max_pain)}</td>
+                  <td className="px-3 py-2 text-terminal-dim">{row.expiry_date || NA}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{isNum(row.days_to_expiry) ? row.days_to_expiry : NA}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-terminal-info">{fmtIv(row.atm_iv)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{fmtPcr(row.pcr?.pcr_oi)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums font-bold">{fmtStrike(row, row.max_pain)}</td>
                   <td className="px-3 py-2 text-center">
-                    <TerminalBadge variant={row.pcr?.signal === "Bullish" ? "success" : row.pcr?.signal === "Bearish" ? "danger" : "neutral"} size="sm">
-                      {row.pcr?.signal.toUpperCase()}
+                    <TerminalBadge variant={signalVariant(signalOf(row))} size="sm">
+                      {signalOf(row).toUpperCase()}
                     </TerminalBadge>
                   </td>
                 </tr>

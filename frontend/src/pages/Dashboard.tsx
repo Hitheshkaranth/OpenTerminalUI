@@ -1,6 +1,39 @@
+import { useQuery } from "@tanstack/react-query";
+
+import { api } from "../api/client";
 import { BulkDealsTable } from "../components/market/BulkDealsTable";
 import { EventCalendar } from "../components/market/EventCalendar";
 import { useEarningsCalendar, useMarketStatus } from "../hooks/useStocks";
+
+type MoverRow = { symbol: string; price: number; change_pct: number };
+
+function useMovers(listType: "gainers" | "losers") {
+    return useQuery<MoverRow[]>({
+        queryKey: ["dashboard-movers", listType],
+        queryFn: async () => {
+            const { data } = await api.get<{ items: MoverRow[] }>("/hotlists", { params: { list_type: listType, market: "IN", limit: 5 } });
+            return data.items ?? [];
+        },
+        staleTime: 60_000,
+    });
+}
+
+function MoverList({ rows, loading }: { rows: MoverRow[]; loading: boolean }) {
+    if (loading) return <div className="text-xs text-terminal-muted">Loading…</div>;
+    if (!rows.length) return <div className="text-xs text-terminal-muted">None</div>;
+    return (
+        <div className="space-y-1">
+            {rows.map((row) => (
+                <div key={row.symbol} className="flex justify-between gap-2 text-xs">
+                    <span className="text-terminal-text">{row.symbol}</span>
+                    <span className={row.change_pct >= 0 ? "text-terminal-pos" : "text-terminal-neg"}>
+                        {row.change_pct >= 0 ? "+" : ""}{row.change_pct.toFixed(2)}%
+                    </span>
+                </div>
+            ))}
+        </div>
+    );
+}
 
 export function DashboardPage() {
     const { data: marketStatus } = useMarketStatus();
@@ -10,6 +43,9 @@ export function DashboardPage() {
         from_date: today.toISOString().slice(0, 10),
         to_date: weekAhead.toISOString().slice(0, 10),
     });
+    const gainers = useMovers("gainers");
+    const losers = useMovers("losers");
+    const moversUnavailable = !gainers.isLoading && !losers.isLoading && !(gainers.data?.length || losers.data?.length);
     const hasMarketData = Array.isArray((marketStatus as { marketState?: unknown[] } | undefined)?.marketState);
 
     return (
@@ -71,7 +107,14 @@ export function DashboardPage() {
                                 <span className="font-medium text-terminal-pos">Top Gainers</span>
                                 <span className="font-medium text-terminal-neg">Top Losers</span>
                             </div>
-                            <div className="py-4 text-center text-xs text-terminal-muted">Feature wired, data source pending.</div>
+                            {moversUnavailable ? (
+                                <div className="py-4 text-center text-xs text-terminal-muted">Movers unavailable — price history provider did not respond.</div>
+                            ) : (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <MoverList rows={gainers.data ?? []} loading={gainers.isLoading} />
+                                    <MoverList rows={losers.data ?? []} loading={losers.isLoading} />
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

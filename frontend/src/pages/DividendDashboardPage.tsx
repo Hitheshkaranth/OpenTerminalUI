@@ -72,21 +72,30 @@ export function DividendDashboardPage() {
       </div>
 
       {activeTab === "calendar" && (
-        <TerminalPanel title="Upcoming Dividends" subtitle="Ex-dates in the next 30 days">
+        <TerminalPanel title="Upcoming Dividends" subtitle="Ex-dates in the next 30 days (NSE corporate-action filings)">
+          {!loading && calendar.length === 0 ? (
+            <div className="py-3 text-xs text-terminal-muted">No dividend ex-dates announced in the next 30 days, or the filings source is unavailable.</div>
+          ) : null}
           <TerminalTable
             rows={calendar}
             rowKey={(r) => r.symbol + r.ex_date}
             columns={[
               { key: "symbol", label: "Symbol", render: (r) => r.symbol },
               { key: "ex_date", label: "Ex-Date", render: (r) => r.ex_date },
-              { key: "amount", label: "Amount", align: "right", render: (r) => r.amount.toFixed(2) },
+              { key: "amount", label: "Amount", align: "right", render: (r) => (typeof r.amount === "number" ? r.amount.toFixed(2) : "—") },
               { key: "type", label: "Type", render: (r) => r.type },
             ]}
           />
         </TerminalPanel>
       )}
 
-      {activeTab === "income" && income && (
+      {activeTab === "income" && income && income.annual_income == null && (
+        <TerminalPanel title="Portfolio Income">
+          <div className="py-3 text-xs text-terminal-muted">No portfolio holdings found — add holdings to project dividend income.</div>
+        </TerminalPanel>
+      )}
+
+      {activeTab === "income" && income && income.annual_income != null && (
         <div className="grid gap-3 lg:grid-cols-3">
           <TerminalPanel title="Annual Projection" className="lg:col-span-1">
             <div className="text-3xl font-bold text-terminal-pos mt-4">
@@ -117,6 +126,9 @@ export function DividendDashboardPage() {
             <button onClick={loadData} className="px-2 py-1 bg-terminal-accent text-terminal-bg text-[10px] rounded">Go</button>
           </div>
         }>
+          {!loading && history.length === 0 ? (
+            <div className="py-3 text-xs text-terminal-muted">No dividend history found for {symbol}.</div>
+          ) : null}
           <div className="h-64 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={history}>
@@ -132,14 +144,17 @@ export function DividendDashboardPage() {
       )}
 
       {activeTab === "aristocrats" && (
-        <TerminalPanel title="Dividend Aristocrats" subtitle="Consistent growth over decades">
+        <TerminalPanel title="Dividend Aristocrats" subtitle="Consecutive years of dividend growth (from filing history)">
+          {!loading && aristocrats.length === 0 ? (
+            <div className="py-3 text-xs text-terminal-muted">No stocks with 3+ consecutive years of dividend growth found, or the filings source is unavailable.</div>
+          ) : null}
           <TerminalTable
             rows={aristocrats}
             rowKey={(r) => r.symbol}
             columns={[
               { key: "symbol", label: "Symbol", render: (r) => r.symbol },
               { key: "years_growth", label: "Years of Growth", align: "right", render: (r) => r.years_growth },
-              { key: "yield", label: "Yield %", align: "right", render: (r) => `${r.yield}%` },
+              { key: "yield", label: "Yield %", align: "right", render: (r) => (typeof r.yield === "number" ? `${r.yield}%` : "—") },
             ]}
           />
         </TerminalPanel>

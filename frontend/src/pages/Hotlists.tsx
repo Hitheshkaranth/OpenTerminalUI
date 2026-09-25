@@ -215,6 +215,12 @@ export function HotlistsPage() {
         <div className="rounded border border-terminal-neg/40 bg-terminal-neg/10 px-3 py-2 text-xs text-terminal-neg">{error}</div>
       ) : null}
 
+      {!loading && !error && rows.length === 0 ? (
+        <div className="mb-2 rounded border border-terminal-border bg-terminal-bg px-3 py-2 text-xs text-terminal-muted">
+          No symbols match this list right now (e.g. no gainers when every tracked stock is down), or price history is unavailable.
+        </div>
+      ) : null}
+
       <DenseTable<HotlistRow>
         id="hotlists-main"
         rows={rows}

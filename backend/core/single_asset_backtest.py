@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from backend.core.backtest_analytics import pair_round_trips, summarize_round_trips
 from backend.core.backtesting_models import BacktestConfig, BacktestResult, EquityPoint, TradeRecord
 
 
@@ -17,49 +18,26 @@ def _safe_float(value: float | int | np.floating | None) -> float:
 def _max_consecutive_losses(trades: list[TradeRecord]) -> int:
     streak = 0
     max_streak = 0
-    open_trade: TradeRecord | None = None
-    for trade in trades:
-        action = trade.action.upper()
-        if action == "BUY":
-            open_trade = trade
-            continue
-        if action != "SELL" or open_trade is None:
-            continue
-        pnl = (trade.price - open_trade.price) * abs(open_trade.quantity or trade.quantity or 1.0)
-        if pnl < 0:
+    for trip in pair_round_trips(trades):
+        if trip["pnl"] < 0:
             streak += 1
             max_streak = max(max_streak, streak)
         else:
             streak = 0
-        open_trade = None
     return max_streak
 
 
 def _trade_stats(trades: list[TradeRecord]) -> tuple[float, float, float, float]:
-    pnls: list[float] = []
-    open_trade: TradeRecord | None = None
-    for trade in trades:
-        action = trade.action.upper()
-        if action == "BUY":
-            open_trade = trade
-            continue
-        if action != "SELL" or open_trade is None:
-            continue
-        qty = abs(open_trade.quantity or trade.quantity or 1.0)
-        pnls.append((trade.price - open_trade.price) * qty)
-        open_trade = None
+    pnls = [float(trip["pnl"]) for trip in pair_round_trips(trades)]
     if not pnls:
         return 0.0, 0.0, 0.0, 0.0
-    pnl_series = pd.Series(pnls, dtype=float)
-    wins = pnl_series[pnl_series > 0]
-    losses = pnl_series[pnl_series < 0]
-    win_rate = _safe_float((wins.count() / pnl_series.count()) * 100.0)
-    avg_win = _safe_float(wins.mean()) if not wins.empty else 0.0
-    avg_loss = _safe_float(losses.mean()) if not losses.empty else 0.0
-    gross_profit = _safe_float(wins.sum())
-    gross_loss = abs(_safe_float(losses.sum()))
-    profit_factor = _safe_float(gross_profit / gross_loss) if gross_loss > 0 else 0.0
-    return win_rate, avg_win, avg_loss, profit_factor
+    stats = summarize_round_trips(pnls)
+    return (
+        _safe_float(stats["win_rate"]),
+        _safe_float(stats["avg_win"]),
+        _safe_float(stats["avg_loss"]),
+        _safe_float(stats["profit_factor"]),
+    )
 
 
 def _drawdown_metadata(drawdown: pd.Series) -> tuple[str | None, str | None, str | None]:
@@ -137,39 +115,22 @@ def _intraday_trade_stats(trades: list[TradeRecord], date_index: pd.DatetimeInde
     afternoon_wins = 0
     afternoon_losses = 0
 
-    open_trade: TradeRecord | None = None
-    open_time: pd.Timestamp | None = None
-
-    for trade in trades:
-        action = trade.action.upper()
-        trade_time = pd.to_datetime(trade.date)
-
-        if action == "BUY":
-            open_trade = trade
-            open_time = trade_time
-            continue
-
-        if action == "SELL" and open_trade is not None:
-            qty = abs(open_trade.quantity or trade.quantity or 1.0)
-            pnl = (trade.price - open_trade.price) * qty
-
-            if open_time is not None:
-                hold_mins = (trade_time - open_time).total_seconds() / 60.0
-                hold_times.append(hold_mins)
-
-            is_morning = trade_time.hour < 12
-            if pnl > 0:
-                if is_morning:
-                    morning_wins += 1
-                else:
-                    afternoon_wins += 1
-            elif pnl < 0:
-                if is_morning:
-                    morning_losses += 1
-                else:
-                    afternoon_losses += 1
-
-            open_trade = None
+    for trip in pair_round_trips(trades):
+        entry_time = pd.to_datetime(trip["entry_ts"])
+        trade_time = pd.to_datetime(trip["exit_ts"])
+        hold_times.append((trade_time - entry_time).total_seconds() / 60.0)
+        pnl = trip["pnl"]
+        is_morning = trade_time.hour < 12
+        if pnl > 0:
+            if is_morning:
+                morning_wins += 1
+            else:
+                afternoon_wins += 1
+        elif pnl < 0:
+            if is_morning:
+                morning_losses += 1
+            else:
+                afternoon_losses += 1
 
     avg_hold = float(np.mean(hold_times)) if hold_times else 0.0
     morning_total = morning_wins + morning_losses
@@ -248,6 +209,10 @@ class BacktestEngine:
 
             if target == 0:
                 target_pos = 0.0
+            elif pos_frac is not None and current_pos != 0 and np.sign(current_pos) == np.sign(target):
+                # Capital-fraction sizing is decided at entry; holding the same
+                # direction must not re-size (and churn fills) every bar.
+                target_pos = current_pos
             elif pos_frac is not None:
                 eq_now = max(current_cash + current_pos * close_px, 0.0)
                 target_notional = eq_now * pos_frac

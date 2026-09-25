@@ -22,16 +22,21 @@ async def heatmap_oi() -> dict[str, Any]:
             totals = chain.get("totals") if isinstance(chain.get("totals"), dict) else {}
         except Exception:
             totals = {}
+        ce_oi = float(totals.get("ce_oi_total") or 0)
+        pe_oi = float(totals.get("pe_oi_total") or 0)
+        available = ce_oi + pe_oi > 0
+        # A failed/empty fetch is "no data" (nulls), never a real 0 OI / 0 PCR reading.
         rows.append(
             {
                 "symbol": symbol,
-                "ce_oi_total": totals.get("ce_oi_total", 0),
-                "pe_oi_total": totals.get("pe_oi_total", 0),
-                "pcr_oi": totals.get("pcr_oi", 0.0),
+                "available": available,
+                "ce_oi_total": ce_oi if available else None,
+                "pe_oi_total": pe_oi if available else None,
+                "pcr_oi": totals.get("pcr_oi") if available else None,
             }
         )
-    rows.sort(key=lambda x: float(x.get("ce_oi_total", 0) or 0) + float(x.get("pe_oi_total", 0) or 0), reverse=True)
-    return {"items": rows}
+    rows.sort(key=lambda x: float(x.get("ce_oi_total") or 0) + float(x.get("pe_oi_total") or 0), reverse=True)
+    return {"universe": "NSE", "items": rows}
 
 
 @router.get("/fno/heatmap/iv")
@@ -44,6 +49,15 @@ async def heatmap_iv() -> dict[str, Any]:
             iv = await iv_engine.get_iv_data(symbol)
         except Exception:
             iv = {}
-        rows.append({"symbol": symbol, "atm_iv": iv.get("atm_iv", 0.0), "iv_rank": iv.get("iv_rank", 0.0)})
-    rows.sort(key=lambda x: float(x.get("atm_iv", 0.0) or 0.0), reverse=True)
-    return {"items": rows}
+        atm_iv = float(iv.get("atm_iv") or 0.0)
+        available = atm_iv > 0
+        rows.append(
+            {
+                "symbol": symbol,
+                "available": available,
+                "atm_iv": atm_iv if available else None,
+                "iv_rank": iv.get("iv_rank") if available else None,
+            }
+        )
+    rows.sort(key=lambda x: float(x.get("atm_iv") or 0.0), reverse=True)
+    return {"universe": "NSE", "items": rows}

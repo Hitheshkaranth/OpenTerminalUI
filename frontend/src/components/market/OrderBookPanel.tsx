@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
+import { fetchDepth } from "../../api/client";
 import { useStock } from "../../hooks/useStocks";
 import { useQuotesStore, useQuotesStream } from "../../realtime/useQuotesStream";
 import { isUSMarketCode, useUSQuotesStore, useUSQuotesStream } from "../../realtime/useUsQuotesStream";
@@ -69,10 +70,6 @@ const DEPTH_BAR_WIDTH_CLASSES = [
   "w-[90%]",
   "w-full",
 ] as const;
-
-function apiBase(): string {
-  return String(import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/+$/, "") || "/api";
-}
 
 function buildDepthWsUrl(): string {
   const base = String(import.meta.env.VITE_API_BASE_URL || "/api").trim();
@@ -232,16 +229,9 @@ function barWidthClass(size: number, maxSize: number): string {
   return DEPTH_BAR_WIDTH_CLASSES[bucket];
 }
 
-async function fetchDepthSnapshot(symbol: string, market: string, levels = DEFAULT_DEPTH_LEVELS): Promise<DepthSnapshot | null> {
-  const params = new URLSearchParams({
-    market,
-    levels: String(levels),
-  });
-  const response = await fetch(`${apiBase()}/depth/${encodeURIComponent(symbol)}?${params.toString()}`);
-  if (!response.ok) {
-    throw new Error(`Depth snapshot failed: ${response.status}`);
-  }
-  return normalizeDepthSnapshot(await response.json());
+async function fetchDepthSnapshot(symbol: string, market: string, levels = DEFAULT_DEPTH_LEVELS, refPrice?: number): Promise<DepthSnapshot | null> {
+  // Authenticated client; ref_price centres the synthetic book on the real last price.
+  return normalizeDepthSnapshot(await fetchDepth(symbol, market, levels, refPrice));
 }
 
 export function OrderBookPanel({
@@ -255,7 +245,7 @@ export function OrderBookPanel({
   const normalizedMarket = String(market || "").trim().toUpperCase() || "NASDAQ";
   const depthMarket = normalizeMarket(normalizedMarket);
   const isUS = isUSMarketCode(normalizedMarket);
-  const { data: stock } = useStock(normalizedSymbol);
+  const { data: stock, isFetched: stockFetched } = useStock(normalizedSymbol);
   const quoteToken = `${normalizedMarket}:${normalizedSymbol}`;
   const quoteTick = useQuotesStore((state) => state.ticksByToken[quoteToken]);
   const usTrade = useUSQuotesStore((state) => state.lastTradeBySymbol[normalizedSymbol]);
@@ -285,20 +275,28 @@ export function OrderBookPanel({
     connectionState: usConnectionState,
   } = useUSQuotesStream();
 
+  // Real last price used to anchor the (synthetic) book; wait for the quote before requesting depth.
+  const refPrice = useMemo(() => {
+    const quote = Number(stock?.current_price);
+    return Number.isFinite(quote) && quote > 0 ? quote : undefined;
+  }, [stock?.current_price]);
+  const depthReady = Boolean(normalizedSymbol) && (stockFetched || refPrice !== undefined);
+
   const pullSnapshot = useCallback(async () => {
     if (!normalizedSymbol) {
       setDepthSnapshot(null);
       return;
     }
+    if (!depthReady) return;
     try {
-      const snapshot = await fetchDepthSnapshot(normalizedSymbol, depthMarket, DEFAULT_DEPTH_LEVELS);
+      const snapshot = await fetchDepthSnapshot(normalizedSymbol, depthMarket, DEFAULT_DEPTH_LEVELS, refPrice);
       if (snapshot) {
         setDepthSnapshot(snapshot);
       }
     } catch {
       // The depth websocket can still hydrate state if the REST route is unavailable.
     }
-  }, [depthMarket, normalizedSymbol]);
+  }, [depthMarket, depthReady, normalizedSymbol, refPrice]);
 
   useEffect(() => {
     if (!normalizedSymbol) return;
@@ -315,7 +313,7 @@ export function OrderBookPanel({
   }, [pullSnapshot]);
 
   useEffect(() => {
-    if (!normalizedSymbol) return;
+    if (!normalizedSymbol || !depthReady) return;
     let active = true;
     let socket: WebSocket | null = null;
 
@@ -338,6 +336,7 @@ export function OrderBookPanel({
             symbols: [normalizedSymbol],
             market: depthMarket,
             channels: ["depth"],
+            ...(refPrice ? { ref_price: refPrice } : {}),
           }),
         );
       };
@@ -375,7 +374,7 @@ export function OrderBookPanel({
       }
       socket?.close();
     };
-  }, [depthMarket, normalizedSymbol]);
+  }, [depthMarket, depthReady, normalizedSymbol, refPrice]);
 
   const lastPrice = useMemo(() => {
     const tradePrice = Number(usTrade?.p);

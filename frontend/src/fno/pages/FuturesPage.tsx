@@ -43,6 +43,16 @@ export function FuturesPage() {
   // Must be memoized: inline chartPointsToBars() creates a new array reference every render,
   // which feeds an unstable seedBars into useRealtimeChart → infinite setBars loop.
   const chartBars = useMemo(() => (chart?.data?.length ? chartPointsToBars(chart.data) : []), [chart?.data]);
+  // Realtime ticks only arrive while a feed is live; otherwise fall back to the last
+  // bar the chart is drawing so the LATEST card agrees with the chart.
+  const latest = useMemo(() => {
+    if (tick && Number.isFinite(tick.ltp)) return tick;
+    const last = chartBars[chartBars.length - 1];
+    const prev = chartBars[chartBars.length - 2];
+    if (!last || !Number.isFinite(last.close)) return null;
+    const change_pct = prev && prev.close ? ((last.close - prev.close) / prev.close) * 100 : 0;
+    return { ltp: last.close, change_pct };
+  }, [tick, chartBars]);
   const summaryQuery = useQuery({
     queryKey: ["fno-summary-futures", symbol, expiry],
     queryFn: () => fetchChainSummary(symbol, expiry || undefined),
@@ -54,8 +64,8 @@ export function FuturesPage() {
     <div className="space-y-3">
       <SharedChartToolbar
         symbol={symbol}
-        ltp={tick?.ltp ?? null}
-        changePct={tick?.change_pct ?? null}
+        ltp={latest?.ltp ?? null}
+        changePct={latest?.change_pct ?? null}
         ohlc={ohlc}
         timeframe={timeframe}
         onTimeframeChange={setTimeframe}
@@ -79,7 +89,6 @@ export function FuturesPage() {
               showVolume={showVolume}
               enableRealtime={true}
               market={selectedMarket}
-              symbolIsFnO={true}
               activeIndicators={activeIndicators}
               onCrosshairOHLC={setOhlc}
               onTick={setTick}
@@ -91,10 +100,10 @@ export function FuturesPage() {
           <div className="rounded border border-terminal-border bg-terminal-panel p-3 text-xs">
             <div className="text-[10px] uppercase tracking-wide text-terminal-muted">Latest</div>
             <div className="mt-1 text-lg font-semibold text-terminal-accent">
-              {typeof tick?.ltp === "number" ? formatDisplayMoney(tick.ltp) : "-"}
+              {latest ? formatDisplayMoney(latest.ltp) : "-"}
             </div>
-            <div className={tick && tick.change_pct >= 0 ? "text-terminal-pos" : "text-terminal-neg"}>
-              {tick ? `${tick.change_pct >= 0 ? "+" : ""}${tick.change_pct.toFixed(2)}%` : "-"}
+            <div className={latest && latest.change_pct >= 0 ? "text-terminal-pos" : "text-terminal-neg"}>
+              {latest ? `${latest.change_pct >= 0 ? "+" : ""}${latest.change_pct.toFixed(2)}%` : "-"}
             </div>
             <div className="mt-2 flex items-center gap-2">
               <TerminalBadge variant="live">F&O LIVE</TerminalBadge>
@@ -120,7 +129,7 @@ export function FuturesPage() {
           </div>
           <div>
             <div className="text-[10px] uppercase text-terminal-muted">PCR</div>
-            <div>{summaryQuery.data ? Number(summaryQuery.data.pcr?.pcr_oi || 0).toFixed(2) : "-"}</div>
+            <div>{typeof summaryQuery.data?.pcr?.pcr_oi === "number" ? summaryQuery.data.pcr.pcr_oi.toFixed(2) : "-"}</div>
           </div>
           <div>
             <div className="text-[10px] uppercase text-terminal-muted">Max Pain</div>

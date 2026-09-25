@@ -58,3 +58,33 @@ def test_heatmap_rapid_calls_use_same_cached_payload() -> None:
     assert first.status_code == 200
     assert second.status_code == 200
     assert first.json() == second.json()
+
+
+def test_heatmap_flags_rows_without_live_quotes_as_synthetic(monkeypatch) -> None:
+    class _NoDataRegistry:
+        async def invoke(self, *_args, **_kwargs):
+            raise RuntimeError("provider blocked")
+
+    monkeypatch.setattr(heatmap_routes, "get_adapter_registry", lambda: _NoDataRegistry())
+    monkeypatch.setattr(heatmap_routes, "_CACHE", {})
+    payload = _build_client().get("/api/heatmap/treemap", params={"market": "US"}).json()
+
+    assert payload["data"]
+    assert all(row["synthetic"] is True for row in payload["data"])
+    assert payload["synthetic_count"] == len(payload["data"])
+
+
+def test_heatmap_provider_timeout_degrades_instead_of_hanging(monkeypatch) -> None:
+    import asyncio
+
+    class _HangingRegistry:
+        async def invoke(self, *_args, **_kwargs):
+            await asyncio.sleep(30)
+
+    monkeypatch.setattr(heatmap_routes, "get_adapter_registry", lambda: _HangingRegistry())
+    monkeypatch.setattr(heatmap_routes, "_PROVIDER_TIMEOUT_SECONDS", 0.05)
+    monkeypatch.setattr(heatmap_routes, "_CACHE", {})
+    response = _build_client().get("/api/heatmap/treemap", params={"market": "IN"})
+
+    assert response.status_code == 200
+    assert response.json()["synthetic_count"] == len(response.json()["data"])

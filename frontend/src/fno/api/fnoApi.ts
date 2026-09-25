@@ -66,7 +66,7 @@ export async function fetchOIAnalysis(symbol: string, expiry?: string, range = 2
   return data;
 }
 
-export async function fetchPCR(symbol: string, expiry?: string): Promise<{ pcr_oi: number; pcr_vol: number; signal: string }> {
+export async function fetchPCR(symbol: string, expiry?: string): Promise<{ pcr_oi: number | null; pcr_vol: number | null; signal: string }> {
   const { data } = await api.get<PCRCurrentResponse>(`/fno/pcr/${encodeURIComponent(symbol.trim().toUpperCase())}`, {
     params: { expiry },
   });
@@ -123,36 +123,33 @@ export async function fetchIVSurface(symbol: string): Promise<IvSurfaceResponse>
   return data;
 }
 
-export async function fetchHeatmapOI(): Promise<Array<{ symbol: string; ce_oi_total: number; pe_oi_total: number; pcr_oi: number }>> {
-  const { data } = await api.get<{ items: Array<{ symbol: string; ce_oi_total: number; pe_oi_total: number; pcr_oi: number }> }>("/fno/heatmap/oi");
+type HeatmapOIItem = { symbol: string; available?: boolean; ce_oi_total: number | null; pe_oi_total: number | null; pcr_oi: number | null };
+type HeatmapIVItem = { symbol: string; available?: boolean; atm_iv: number | null; iv_rank: number | null };
+
+export async function fetchHeatmapOI(): Promise<HeatmapOIItem[]> {
+  const { data } = await api.get<{ items: HeatmapOIItem[] }>("/fno/heatmap/oi");
   return Array.isArray(data?.items) ? data.items : [];
 }
 
-export async function fetchHeatmapIV(): Promise<Array<{ symbol: string; atm_iv: number; iv_rank: number }>> {
-  const { data } = await api.get<{ items: Array<{ symbol: string; atm_iv: number; iv_rank: number }> }>("/fno/heatmap/iv");
+export async function fetchHeatmapIV(): Promise<HeatmapIVItem[]> {
+  const { data } = await api.get<{ items: HeatmapIVItem[] }>("/fno/heatmap/iv");
   return Array.isArray(data?.items) ? data.items : [];
 }
 
-export async function fetchExpiryDashboard(): Promise<Array<{
+export type ExpiryDashboardItem = {
   symbol: string;
-  expiry_date: string;
-  days_to_expiry: number;
-  atm_iv: number;
-  pcr: { pcr_oi: number; pcr_volume: number; pcr_oi_change: number; signal: string };
-  max_pain: number;
+  market?: "NSE" | "US";
+  available?: boolean;
+  expiry_date: string | null;
+  days_to_expiry: number | null;
+  atm_iv: number | null;
+  pcr: { pcr_oi: number | null; pcr_volume: number | null; pcr_oi_change: number | null; signal: string };
+  max_pain: number | null;
   support_resistance: { support: number[]; resistance: number[] };
-}>> {
-  const { data } = await api.get<{
-    items: Array<{
-      symbol: string;
-      expiry_date: string;
-      days_to_expiry: number;
-      atm_iv: number;
-      pcr: { pcr_oi: number; pcr_volume: number; pcr_oi_change: number; signal: string };
-      max_pain: number;
-      support_resistance: { support: number[]; resistance: number[] };
-    }>
-  }>("/fno/expiry/dashboard");
+};
+
+export async function fetchExpiryDashboard(): Promise<ExpiryDashboardItem[]> {
+  const { data } = await api.get<{ items: ExpiryDashboardItem[] }>("/fno/expiry/dashboard");
   return Array.isArray(data?.items) ? data.items : [];
 }
 

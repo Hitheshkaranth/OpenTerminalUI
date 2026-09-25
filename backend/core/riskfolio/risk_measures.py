@@ -24,11 +24,9 @@ def risk_report(returns, confidence: float = 0.95, rf: float = 0.0, periods_per_
     vol_daily = np.std(returns, ddof=1)
     volatility = vol_daily * np.sqrt(periods_per_year)
 
-    downside_returns = returns[returns < 0]
-    if len(downside_returns) > 0:
-        downside_deviation = np.sqrt(np.mean(returns[returns < 0]**2)) * np.sqrt(periods_per_year)
-    else:
-        downside_deviation = 0.0
+    # Downside deviation: RMS of returns clipped at 0 over ALL periods (not only
+    # the negative ones), otherwise it collapses to ~volatility and Sortino ~= Sharpe.
+    downside_deviation = float(np.sqrt(np.mean(np.minimum(returns, 0.0) ** 2)) * np.sqrt(periods_per_year))
 
     mad = np.mean(np.abs(returns - mean_daily))
 

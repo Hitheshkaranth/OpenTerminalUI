@@ -10,6 +10,17 @@ export type FactorScores = {
   composite?: number;
 };
 
+/** Raw backend factor scores: sector-neutral z-scores plus composite percentile/rank. */
+export type BackendFactorScores = {
+  value?: number;
+  momentum?: number;
+  quality?: number;
+  low_volatility?: number;
+  composite?: number;
+  percentile?: number;
+  rank?: number;
+};
+
 export type StockIdea = {
   symbol: string;
   name?: string;
@@ -17,6 +28,9 @@ export type StockIdea = {
   sector?: string;
   rank?: number;
   composite_score?: number;
+  percentile?: number;
+  company_name?: string;
+  scores?: BackendFactorScores;
   factors?: FactorScores;
   chips?: string[];
   why_ranked?: string[];
@@ -32,7 +46,8 @@ export type SymbolFactorResponse = {
   symbol: string;
   market?: string;
   sector?: string;
-  scores?: FactorScores;
+  company_name?: string;
+  scores?: BackendFactorScores;
   factors?: FactorScores;
   chips?: string[];
   why_ranked?: string[];

@@ -13,27 +13,25 @@ from backend.models.core import InsiderTrade
 
 router = APIRouter(prefix="/api/insider", tags=["insider"])
 
-_SAMPLE_STOCKS: list[dict[str, Any]] = [
-    {"symbol": "RELIANCE", "name": "Reliance Industries", "base_price": 2860.0},
-    {"symbol": "TCS", "name": "Tata Consultancy Services", "base_price": 4135.0},
-    {"symbol": "INFY", "name": "Infosys", "base_price": 1585.0},
-    {"symbol": "HDFCBANK", "name": "HDFC Bank", "base_price": 1685.0},
-    {"symbol": "ICICIBANK", "name": "ICICI Bank", "base_price": 1140.0},
-    {"symbol": "BHARTIARTL", "name": "Bharti Airtel", "base_price": 1242.0},
-    {"symbol": "LT", "name": "Larsen & Toubro", "base_price": 3680.0},
-    {"symbol": "SUNPHARMA", "name": "Sun Pharmaceutical", "base_price": 1525.0},
-    {"symbol": "TITAN", "name": "Titan Company", "base_price": 3480.0},
-    {"symbol": "MARUTI", "name": "Maruti Suzuki", "base_price": 12120.0},
-]
+# Display names for common NSE symbols; trades themselves only ever come from the
+# insider_trades table (populated by real filings ingestion). No sample rows are seeded.
+_KNOWN_NAMES: dict[str, str] = {
+    "RELIANCE": "Reliance Industries",
+    "TCS": "Tata Consultancy Services",
+    "INFY": "Infosys",
+    "HDFCBANK": "HDFC Bank",
+    "ICICIBANK": "ICICI Bank",
+    "BHARTIARTL": "Bharti Airtel",
+    "LT": "Larsen & Toubro",
+    "SUNPHARMA": "Sun Pharmaceutical",
+    "TITAN": "Titan Company",
+    "MARUTI": "Maruti Suzuki",
+}
 
-_SAMPLE_INSIDERS: list[dict[str, str]] = [
-    {"name": "Mukesh D Ambani", "designation": "Chairman"},
-    {"name": "N V Subramanian", "designation": "Managing Director"},
-    {"name": "Vinit Sambre", "designation": "Whole-Time Director"},
-    {"name": "Sandeep Batra", "designation": "Executive Director"},
-    {"name": "Roshni Nadar", "designation": "Non-Executive Director"},
-    {"name": "Keki M Mistry", "designation": "Independent Director"},
-]
+# Rows written by the old auto-seeder (fabricated insiders/prices) must never be served as real.
+_FABRICATED_SOURCES = ("SEEDED",)
+_INR_SOURCES = {"NSE", "BSE", "SEBI"}
+_USD_SOURCES = {"SEC", "FINNHUB", "FMP", "EDGAR"}
 
 
 def _today_utc() -> datetime:
@@ -41,10 +39,17 @@ def _today_utc() -> datetime:
 
 
 def _symbol_name(symbol: str) -> str:
-    for item in _SAMPLE_STOCKS:
-        if item["symbol"] == symbol:
-            return str(item["name"])
-    return symbol
+    return _KNOWN_NAMES.get(symbol, symbol)
+
+
+def _currency_for(symbol: str, source: str | None) -> str | None:
+    src = str(source or "").strip().upper()
+    sym = str(symbol or "").strip().upper()
+    if src in _INR_SOURCES or sym.endswith((".NS", ".BO")) or sym in _KNOWN_NAMES:
+        return "INR"
+    if src in _USD_SOURCES:
+        return "USD"
+    return None
 
 
 def _trade_payload(trade: InsiderTrade) -> dict[str, Any]:
@@ -60,41 +65,9 @@ def _trade_payload(trade: InsiderTrade) -> dict[str, Any]:
         "price": trade.price,
         "value": trade.value,
         "post_holding_pct": getattr(trade, "post_holding_pct", None),
+        "currency": _currency_for(trade.symbol, trade.source),
+        "source": trade.source,
     }
-
-
-def _seed_sample_data_if_empty(db: Session) -> None:
-    count = db.query(func.count(InsiderTrade.id)).scalar() or 0
-    if count > 0:
-        return
-
-    today = _today_utc()
-    rows: list[InsiderTrade] = []
-    for stock_index, stock in enumerate(_SAMPLE_STOCKS):
-        for offset in range(6):
-            insider = _SAMPLE_INSIDERS[(stock_index + offset) % len(_SAMPLE_INSIDERS)]
-            is_cluster_buy = stock_index < 4 and offset < 3
-            trade_type = "buy" if is_cluster_buy or (offset + stock_index) % 3 != 0 else "sell"
-            trade_date = today - timedelta(days=stock_index * 3 + offset * 6 + (stock_index % 2))
-            quantity = 1400 + stock_index * 320 + offset * 175
-            price = round(float(stock["base_price"]) * (0.92 + (offset * 0.035)), 2)
-            value = round(quantity * price, 2)
-            rows.append(
-                InsiderTrade(
-                    symbol=str(stock["symbol"]),
-                    insider_name=str(insider["name"]),
-                    insider_title=str(insider["designation"]),
-                    transaction_type=trade_type,
-                    shares=quantity,
-                    price=price,
-                    value=value,
-                    date=trade_date,
-                    filing_date=trade_date + timedelta(days=1),
-                    source="SEEDED",
-                )
-            )
-    db.add_all(rows)
-    db.commit()
 
 
 def _load_filtered_trades(
@@ -106,9 +79,11 @@ def _load_filtered_trades(
     symbol: str | None = None,
     limit: int | None = None,
 ) -> list[InsiderTrade]:
-    _seed_sample_data_if_empty(db)
     start_date = _today_utc() - timedelta(days=max(days, 1))
-    query = db.query(InsiderTrade).filter(InsiderTrade.date >= start_date)
+    query = db.query(InsiderTrade).filter(
+        InsiderTrade.date >= start_date,
+        InsiderTrade.source.notin_(_FABRICATED_SOURCES),
+    )
     if min_value > 0:
         query = query.filter(InsiderTrade.value >= min_value)
     if trade_type:
@@ -164,6 +139,7 @@ def _build_top_activity(db: Session, *, days: int, limit: int, trade_type: str) 
             {
                 "symbol": symbol,
                 "name": _symbol_name(symbol),
+                "currency": _currency_for(symbol, trade.source),
                 "total_value": 0.0,
                 "trade_count": 0,
                 "avg_price_numerator": 0.0,
@@ -192,6 +168,7 @@ def _build_top_activity(db: Session, *, days: int, limit: int, trade_type: str) 
             {
                 "symbol": row["symbol"],
                 "name": row["name"],
+                "currency": row["currency"],
                 "total_value": round(float(row["total_value"]), 2),
                 "trade_count": int(row["trade_count"]),
                 "avg_price": round(avg_price, 2),
@@ -256,6 +233,7 @@ def get_cluster_buys(
             {
                 "symbol": symbol,
                 "name": _symbol_name(symbol),
+                "currency": _currency_for(symbol, symbol_trades[0].source if symbol_trades else None),
                 "insider_count": len(insider_rows),
                 "total_value": round(sum(float(item["value"]) for item in insider_rows), 2),
                 "insiders": [

@@ -45,6 +45,11 @@ _FINNHUB_RESOLUTION_MAP: dict[str, str] = {
     "1mo": "M",
 }
 
+# Static, manually maintained snapshot -- there is no live central-bank feed.
+# The payload carries ``snapshot_as_of`` / ``stale`` so the UI never presents
+# these as current, and past "next decision" dates are reported as unknown.
+_CENTRAL_BANK_SNAPSHOT_AS_OF = date(2026, 3, 19)
+_CENTRAL_BANK_STALE_AFTER_DAYS = 45
 _CENTRAL_BANK_SNAPSHOTS: list[dict[str, Any]] = [
     {
         "currency": "USD",
@@ -509,14 +514,26 @@ class ForexService:
         for snapshot in _CENTRAL_BANK_SNAPSHOTS:
             next_decision = snapshot["next_decision_date"]
             last_decision = snapshot["last_decision_date"]
+            # A scheduled date that has already passed is not a "next" decision;
+            # we don't know what happened or when the following one is.
+            if next_decision is not None and next_decision < today:
+                next_decision = None
             banks.append(
                 {
                     **snapshot,
+                    "next_decision_date": next_decision,
                     "days_since_last_decision": (today - last_decision).days,
-                    "days_until_next_decision": (next_decision - today).days,
+                    "days_until_next_decision": (next_decision - today).days if next_decision else None,
                 }
             )
-        return {"as_of": self._now(), "banks": banks}
+        snapshot_age_days = (today - _CENTRAL_BANK_SNAPSHOT_AS_OF).days
+        return {
+            "as_of": self._now(),
+            "snapshot_as_of": _CENTRAL_BANK_SNAPSHOT_AS_OF,
+            "stale": snapshot_age_days > _CENTRAL_BANK_STALE_AFTER_DAYS,
+            "source": "static_snapshot",
+            "banks": banks,
+        }
 
     async def get_cross_rates(self) -> dict[str, Any]:
         params = {"currencies": SUPPORTED_CURRENCIES}

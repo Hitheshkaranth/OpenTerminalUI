@@ -92,10 +92,11 @@ class FMPClient:
                 # institutional ownership, ESG, or non-US symbols). Per-call restriction only.
                 logger.debug("FMP restricted endpoint %s (402); skipping.", endpoint)
             else:
-                logger.warning("FMP request failed for %s: %s", endpoint, e)
+                # httpx error text embeds the URL, which carries apikey= -- log the status only.
+                logger.warning("FMP request failed for %s: HTTP %s", endpoint, status)
             return []
         except Exception as e:
-            logger.error(f"FMP Request Error: {e}")
+            logger.error("FMP request error for %s: %s", endpoint, type(e).__name__)
             return []
 
     async def get_quote(self, symbol: str) -> Dict[str, Any]:

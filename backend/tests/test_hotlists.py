@@ -1,12 +1,29 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from backend.api.routes.hotlists import router
-from backend.services.hotlist_service import HotlistService, get_hotlist_service
+from backend.services.hotlist_service import _UNIVERSE_NAMES, HotlistService, get_hotlist_service
+
+_NOW = datetime(2026, 3, 20, 14, 45, tzinfo=timezone.utc)
+
+
+async def _fake_loader(symbol: str, market: str) -> list[tuple[float, float, float, float, float]]:
+    # Deterministic bars: half the universe up on the day, half down.
+    idx = [s for s, _ in _UNIVERSE_NAMES[market]].index(symbol)  # type: ignore[index]
+    base = 100.0 + idx * 10
+    last = base * (1.0 + (idx - 4.5) / 100.0)
+    bars = [(base, base * 1.01, base * 0.99, base, 1_000_000.0) for _ in range(30)]
+    bars.append((base * (1.0 + (idx - 4.5) / 200.0), max(base, last) * 1.01, min(base, last) * 0.99, last, 1_000_000.0 + idx * 100_000))
+    return bars
+
+
+def _service(now_factory=lambda: _NOW) -> HotlistService:
+    return HotlistService(now_factory=now_factory, history_loader=_fake_loader)
 
 
 def _build_test_app(service: HotlistService) -> TestClient:
@@ -17,7 +34,7 @@ def _build_test_app(service: HotlistService) -> TestClient:
 
 
 def test_hotlist_route_returns_expected_shape() -> None:
-    service = HotlistService(now_factory=lambda: datetime(2026, 3, 20, 14, 45, tzinfo=timezone.utc))
+    service = _service()
     client = _build_test_app(service)
 
     response = client.get("/api/hotlists", params={"list_type": "gainers", "market": "IN", "limit": 5})
@@ -34,11 +51,13 @@ def test_hotlist_route_returns_expected_shape() -> None:
 
 
 def test_hotlist_sorting_rules() -> None:
-    service = HotlistService(now_factory=lambda: datetime(2026, 3, 20, 14, 45, tzinfo=timezone.utc))
+    service = _service()
 
-    gainers = service._rank("gainers", [service._row_to_item(row) for row in service._universes["US"]])  # type: ignore[attr-defined]
-    losers = service._rank("losers", [service._row_to_item(row) for row in service._universes["US"]])  # type: ignore[attr-defined]
-    active = service._rank("most_active", [service._row_to_item(row) for row in service._universes["US"]])  # type: ignore[attr-defined]
+    universe = asyncio.run(service._load_universe("US"))  # type: ignore[attr-defined]
+    rows = [service._row_to_item(row) for row in universe]  # type: ignore[attr-defined]
+    gainers = service._rank("gainers", rows)  # type: ignore[attr-defined]
+    losers = service._rank("losers", rows)  # type: ignore[attr-defined]
+    active = service._rank("most_active", rows)  # type: ignore[attr-defined]
 
     assert gainers[0]["change_pct"] >= gainers[1]["change_pct"]
     assert losers[0]["change_pct"] <= losers[1]["change_pct"]
@@ -46,7 +65,7 @@ def test_hotlist_sorting_rules() -> None:
 
 
 def test_hotlist_limit_and_market_filtering() -> None:
-    service = HotlistService(now_factory=lambda: datetime(2026, 3, 20, 14, 45, tzinfo=timezone.utc))
+    service = _service()
     client = _build_test_app(service)
 
     response_in = client.get("/api/hotlists", params={"list_type": "most_active", "market": "IN", "limit": 3})
@@ -64,7 +83,7 @@ def test_hotlist_limit_and_market_filtering() -> None:
 
 
 def test_hotlist_rejects_invalid_inputs() -> None:
-    service = HotlistService(now_factory=lambda: datetime(2026, 3, 20, 14, 45, tzinfo=timezone.utc))
+    service = _service()
     client = _build_test_app(service)
 
     bad_type = client.get("/api/hotlists", params={"list_type": "invalid", "market": "IN"})
@@ -78,7 +97,7 @@ def test_hotlist_rejects_invalid_inputs() -> None:
 
 def test_hotlist_cache_ttl_respects_market_hours() -> None:
     now = [datetime(2026, 3, 20, 15, 0, tzinfo=timezone.utc)]
-    service = HotlistService(now_factory=lambda: now[0])
+    service = _service(now_factory=lambda: now[0])
 
     first = service._ttl_seconds("US")  # type: ignore[attr-defined]
     now[0] = now[0] + timedelta(hours=10)
@@ -86,3 +105,25 @@ def test_hotlist_cache_ttl_respects_market_hours() -> None:
 
     assert first == 5
     assert second == 300
+
+
+def test_hotlist_gainers_and_losers_are_sign_filtered() -> None:
+    client = _build_test_app(_service())
+
+    gainers = client.get("/api/hotlists", params={"list_type": "gainers", "market": "IN", "limit": 50}).json()["items"]
+    losers = client.get("/api/hotlists", params={"list_type": "losers", "market": "IN", "limit": 50}).json()["items"]
+
+    assert gainers and all(item["change_pct"] > 0 for item in gainers)
+    assert losers and all(item["change_pct"] < 0 for item in losers)
+    # Prices come from the provider bars, not a hardcoded table.
+    reliance = next(i for i in losers if i["symbol"] == "RELIANCE")
+    assert reliance["price"] == 95.5
+
+
+def test_hotlist_returns_empty_when_provider_unavailable() -> None:
+    async def _dead_loader(symbol: str, market: str):
+        raise RuntimeError("provider down")
+
+    client = _build_test_app(HotlistService(now_factory=lambda: _NOW, history_loader=_dead_loader))
+    body = client.get("/api/hotlists", params={"list_type": "gainers", "market": "US"}).json()
+    assert body["items"] == []

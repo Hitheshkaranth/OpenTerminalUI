@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer, Tooltip } from "recharts";
 
-import { fetchStockIdeas, fetchSymbolFactors, type FactorMarket, type FactorScores, type StockIdea } from "../api/client";
+import { fetchStockIdeas, fetchSymbolFactors, type BackendFactorScores, type FactorMarket, type FactorScores, type StockIdea } from "../api/client";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 
 const SECTORS = ["All", "Technology", "Financials", "Consumer", "Industrials", "Healthcare", "Energy", "Materials"];
@@ -13,8 +13,33 @@ function score(value: unknown): number {
   return n > 1 ? n : n * 100;
 }
 
+// Standard normal CDF (Abramowitz-Stegun 7.1.26) — maps a factor z-score to a 0-1 percentile.
+function zToUnit(z: unknown): number | undefined {
+  const n = Number(z);
+  if (z == null || !Number.isFinite(n)) return undefined;
+  const t = 1 / (1 + 0.3275911 * Math.abs(n) / Math.SQRT2);
+  const erf = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-(n * n) / 2);
+  return n >= 0 ? (1 + erf) / 2 : (1 - erf) / 2;
+}
+
+function fromBackendScores(scores?: BackendFactorScores): FactorScores | undefined {
+  if (!scores) return undefined;
+  return {
+    value: zToUnit(scores.value),
+    momentum: zToUnit(scores.momentum),
+    quality: zToUnit(scores.quality),
+    low_vol: zToUnit(scores.low_volatility),
+    composite: scores.percentile ?? zToUnit(scores.composite),
+  };
+}
+
 function normalizeFactors(row?: StockIdea | null, override?: FactorScores): FactorScores {
-  return override || row?.factors || {};
+  return override || row?.factors || fromBackendScores(row?.scores) || {};
+}
+
+function compositeOf(row: StockIdea): number {
+  if (row.percentile != null) return score(row.percentile);
+  return score(normalizeFactors(row).composite);
 }
 
 function factorChips(row?: StockIdea | null, factors?: FactorScores): string[] {
@@ -47,13 +72,13 @@ export function FactorDashboardPage() {
     enabled: Boolean(activeIdea?.symbol),
   });
 
-  const activeFactors = normalizeFactors(activeIdea, factorQuery.data?.scores || factorQuery.data?.factors);
+  const activeFactors = normalizeFactors(activeIdea, factorQuery.data?.factors || fromBackendScores(factorQuery.data?.scores));
   const radarRows = [
     { factor: "Value", score: score(activeFactors.value) },
     { factor: "Momentum", score: score(activeFactors.momentum) },
     { factor: "Quality", score: score(activeFactors.quality) },
     { factor: "Low-Vol", score: score(activeFactors.low_vol) },
-    { factor: "Composite", score: score(activeFactors.composite ?? activeIdea?.composite_score) },
+    { factor: "Composite", score: activeIdea ? compositeOf(activeIdea) : score(activeFactors.composite) },
   ];
   const whyRanked = factorQuery.data?.why_ranked || activeIdea?.why_ranked || [];
 
@@ -89,9 +114,9 @@ export function FactorDashboardPage() {
                   <tr key={`${row.symbol}-${index}`} className={`cursor-pointer border-b border-terminal-border/30 hover:bg-terminal-bg ${activeIdea?.symbol === row.symbol ? "bg-terminal-accent/10" : ""}`} onClick={() => setSelectedSymbol(row.symbol)}>
                     <td className="px-2 py-1">{row.rank ?? index + 1}</td>
                     <td className="px-2 py-1 font-semibold text-terminal-accent">{row.symbol}</td>
-                    <td className="px-2 py-1">{row.name || "-"}</td>
+                    <td className="px-2 py-1">{row.name || row.company_name || "-"}</td>
                     <td className="px-2 py-1 text-terminal-muted">{row.sector || "-"}</td>
-                    <td className="px-2 py-1 text-right">{score(row.composite_score ?? row.factors?.composite).toFixed(1)}</td>
+                    <td className="px-2 py-1 text-right" title="Composite factor percentile within the universe">{compositeOf(row).toFixed(1)}</td>
                     <td className="px-2 py-1">
                       <div className="flex flex-wrap gap-1">
                         {factorChips(row).slice(0, 4).map((chip) => <span key={`${row.symbol}-${chip}`} className="rounded border border-terminal-border px-1 py-0.5 text-[10px] text-terminal-muted">{chip}</span>)}
@@ -105,7 +130,7 @@ export function FactorDashboardPage() {
           </div>
         </TerminalPanel>
 
-        <TerminalPanel title={activeIdea?.symbol || "Factor Radar"} subtitle={activeIdea?.name || "Select an idea"}>
+        <TerminalPanel title={activeIdea?.symbol || "Factor Radar"} subtitle={activeIdea?.name || activeIdea?.company_name || "Select an idea"}>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={radarRows} outerRadius="72%">

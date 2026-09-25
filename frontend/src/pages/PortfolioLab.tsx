@@ -174,6 +174,11 @@ export function PortfolioLabPage() {
             <div className="space-y-2 text-xs">
               {portfolios.isLoading && <div className="text-terminal-muted">Loading portfolios...</div>}
               {portfolios.isError && <div className="text-terminal-neg">Failed to load portfolios.</div>}
+              {portfolios.isSuccess && !(portfolios.data || []).length && (
+                <div className="rounded-md border border-dashed border-terminal-border/60 p-3 text-terminal-muted">
+                  No portfolio definitions yet. Create one with the New Portfolio form to backtest a universe and construction policy.
+                </div>
+              )}
               {(portfolios.data || []).map((portfolio) => (
                 <div className="rounded-md border border-terminal-border/50 bg-terminal-bg/40 p-2" key={portfolio.id}>
                   <div className="flex items-center justify-between gap-3">

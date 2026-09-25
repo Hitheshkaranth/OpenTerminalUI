@@ -111,3 +111,15 @@ def test_max_return_concentrates(synthetic_returns):
     eq_ret = optimize_portfolio(synthetic_returns, objective="min_risk")["metrics"]["expected_return"]
     assert res["metrics"]["expected_return"] >= eq_ret - 1e-9
     assert max(res["weights"].values()) > 1.0 / synthetic_returns.shape[1] + 1e-3
+
+
+def test_risk_report_downside_deviation_uses_all_periods():
+    from backend.core.riskfolio.risk_measures import risk_report
+
+    returns = np.array([0.02, -0.01, 0.03, -0.02, 0.01])
+    report = risk_report(returns, periods_per_year=252)
+    # Hand-computed: sqrt(mean([0, 1e-4, 0, 4e-4, 0])) = sqrt(1e-4), annualised by sqrt(252).
+    expected_dd = np.sqrt(1e-4) * np.sqrt(252)
+    assert report["downside_deviation"] == pytest.approx(expected_dd, rel=1e-5)
+    assert report["sortino"] == pytest.approx(report["expected_return"] / expected_dd, rel=1e-4)
+    assert report["sortino"] > report["sharpe"]

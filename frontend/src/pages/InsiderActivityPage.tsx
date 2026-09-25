@@ -25,16 +25,27 @@ const TABS: TerminalTabItem[] = [
   { id: "clusters", label: "Cluster Buys" },
 ];
 
-function formatCurrency(value: number | null | undefined): string {
+// Currency comes from the row's market (INR for NSE/BSE, USD for SEC); unknown -> plain number.
+function money(value: number | null | undefined, currency: string | null | undefined, fractionDigits: number): string {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "-";
-  return `$${numeric.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  const locale = currency === "INR" ? "en-IN" : "en-US";
+  if (!currency) return numeric.toLocaleString(locale, { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits });
+  return new Intl.NumberFormat(locale, { style: "currency", currency, minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits }).format(numeric);
 }
 
-function formatPrice(value: number | null | undefined): string {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return "-";
-  return `$${numeric.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function formatCurrency(value: number | null | undefined, currency?: string | null): string {
+  return money(value, currency, 0);
+}
+
+function formatPrice(value: number | null | undefined, currency?: string | null): string {
+  return money(value, currency, 2);
+}
+
+/** Single currency shared by all rows, or null when rows mix markets / are unknown. */
+function commonCurrency(rows: Array<{ currency?: string | null }>): string | null {
+  const set = new Set(rows.map((row) => row.currency || ""));
+  return set.size === 1 ? [...set][0] || null : null;
 }
 
 function SummaryCard({
@@ -93,6 +104,7 @@ function RankedActivityPanel({
     symbol: row.symbol,
     total_value: row.total_value,
   }));
+  const chartCurrency = commonCurrency(rows.slice(0, 10));
 
   return (
     <div className="grid gap-2 xl:grid-cols-[1.25fr_0.95fr]">
@@ -114,7 +126,7 @@ function RankedActivityPanel({
               getValue: (row) => row.symbol,
             },
             { key: "name", title: "Name", width: 220, sortable: true, getValue: (row) => row.name },
-            { key: "total_value", title: "Total Value", type: "currency", align: "right", sortable: true, render: (row) => formatCurrency(row.total_value), getValue: (row) => row.total_value },
+            { key: "total_value", title: "Total Value", type: "currency", align: "right", sortable: true, render: (row) => formatCurrency(row.total_value, row.currency), getValue: (row) => row.total_value },
             { key: "trade_count", title: "Trades", type: "number", align: "right", sortable: true, getValue: (row) => row.trade_count },
             { key: "latest_date", title: "Latest", width: 130, sortable: true, getValue: (row) => row.latest_date },
           ]}
@@ -128,11 +140,11 @@ function RankedActivityPanel({
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartRows} layout="vertical" margin={{ top: 8, right: 20, left: 8, bottom: 8 }}>
               <CartesianGrid stroke="#253041" strokeDasharray="3 3" />
-              <XAxis type="number" tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(value) => `$${Math.round(Number(value) / 1_000_000)}M`} />
+              <XAxis type="number" tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(value) => `${Math.round(Number(value) / 1_000_000)}M`} />
               <YAxis type="category" dataKey="symbol" tick={{ fill: "#e2e8f0", fontSize: 11 }} width={90} />
               <Tooltip
                 cursor={{ fill: "rgba(255,107,0,0.08)" }}
-                formatter={(value) => [formatCurrency(Number(value ?? 0)), "Value"]}
+                formatter={(value) => [formatCurrency(Number(value ?? 0), chartCurrency), "Value"]}
                 contentStyle={{ background: "#0f1720", border: "1px solid #334155", color: "#e2e8f0" }}
               />
               <Bar dataKey="total_value" fill="#FF6B00" radius={[0, 3, 3, 0]} />
@@ -186,6 +198,7 @@ export function InsiderActivityPage() {
   const totalBuyValue = summaryTrades.reduce((sum, row) => sum + (row.type === "buy" ? Number(row.value || 0) : 0), 0);
   const totalSellValue = summaryTrades.reduce((sum, row) => sum + (row.type === "sell" ? Number(row.value || 0) : 0), 0);
   const netFlow = totalBuyValue - totalSellValue;
+  const summaryCurrency = commonCurrency(summaryTrades);
 
   const recentRows = useMemo(() => {
     let rows = recentQuery.data?.trades ?? [];
@@ -202,9 +215,9 @@ export function InsiderActivityPage() {
     <div className="h-full min-h-0 overflow-auto p-2">
       <div className="grid gap-2">
         <div className="grid gap-2 lg:grid-cols-4">
-          <SummaryCard label="Total Buy Value (30d)" value={formatCurrency(totalBuyValue)} positive />
-          <SummaryCard label="Total Sell Value (30d)" value={formatCurrency(totalSellValue)} positive={false} />
-          <SummaryCard label="Net Insider Flow (30d)" value={formatCurrency(netFlow)} positive={netFlow >= 0} />
+          <SummaryCard label="Total Buy Value (30d)" value={formatCurrency(totalBuyValue, summaryCurrency)} positive />
+          <SummaryCard label="Total Sell Value (30d)" value={formatCurrency(totalSellValue, summaryCurrency)} positive={false} />
+          <SummaryCard label="Net Insider Flow (30d)" value={formatCurrency(netFlow, summaryCurrency)} positive={netFlow >= 0} />
           <SummaryCard label="Cluster Buy Stocks" value={String(clusterRows.length)} positive={null} onClick={() => setActiveTab("clusters")} />
         </div>
 
@@ -235,6 +248,11 @@ export function InsiderActivityPage() {
                 </div>
               </div>
 
+              {!recentQuery.isLoading && !recentRows.length ? (
+                <div className="rounded-sm border border-terminal-border bg-terminal-bg px-3 py-2 text-xs text-terminal-muted" data-testid="insider-empty">
+                  No insider filings stored for this window. Trades appear here once exchange (NSE/BSE) or SEC filings are ingested — no sample data is shown.
+                </div>
+              ) : null}
               <DenseTable
                 id="insider-recent-trades"
                 rows={recentRows}
@@ -262,8 +280,8 @@ export function InsiderActivityPage() {
                     getValue: (row) => row.type,
                   },
                   { key: "quantity", title: "Qty", type: "volume", align: "right", sortable: true, getValue: (row) => row.quantity },
-                  { key: "price", title: "Price", type: "currency", align: "right", sortable: true, render: (row) => formatPrice(row.price), getValue: (row) => row.price },
-                  { key: "value", title: "Value", type: "currency", align: "right", sortable: true, render: (row) => formatCurrency(row.value), getValue: (row) => row.value },
+                  { key: "price", title: "Price", type: "currency", align: "right", sortable: true, render: (row) => formatPrice(row.price, row.currency), getValue: (row) => row.price },
+                  { key: "value", title: "Value", type: "currency", align: "right", sortable: true, render: (row) => formatCurrency(row.value, row.currency), getValue: (row) => row.value },
                   {
                     key: "post_holding_pct",
                     title: "Post-Holding %",
@@ -290,6 +308,9 @@ export function InsiderActivityPage() {
 
           {activeTab === "clusters" ? (
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {!clusterQuery.isLoading && !clusterRows.length ? (
+                <div className="text-xs text-terminal-muted">No cluster buys in stored insider filings for the last 30 days.</div>
+              ) : null}
               {clusterRows.map((cluster: InsiderClusterRow) => {
                 const expanded = expandedCluster === cluster.symbol;
                 return (
@@ -307,7 +328,7 @@ export function InsiderActivityPage() {
                       </div>
                       <TerminalBadge variant="accent">{cluster.insider_count} insiders</TerminalBadge>
                     </div>
-                    <div className="mt-3 text-sm text-terminal-text">{formatCurrency(cluster.total_value)}</div>
+                    <div className="mt-3 text-sm text-terminal-text">{formatCurrency(cluster.total_value, cluster.currency)}</div>
                     <button
                       type="button"
                       className="mt-3 text-xs text-terminal-accent hover:underline"
@@ -325,7 +346,7 @@ export function InsiderActivityPage() {
                                 <div className="text-[11px] text-terminal-muted">{insider.designation || "Insider"}</div>
                               </div>
                               <div className="text-right">
-                                <div className="text-sm text-terminal-accent">{formatCurrency(insider.value)}</div>
+                                <div className="text-sm text-terminal-accent">{formatCurrency(insider.value, cluster.currency)}</div>
                                 <div className="text-[11px] text-terminal-muted">{insider.date || "-"}</div>
                               </div>
                             </div>

@@ -148,145 +148,154 @@ def compute_return_distribution(equity_curve: list[dict], bins: int = 50) -> dic
     }
 
 
-def compute_trade_analytics(trades: list[dict], equity_curve: list[dict]) -> dict:
-    del equity_curve  # reserved for future extensions
-    if not trades:
-        return {
-            "scatter": [],
-            "streaks": {"max_win_streak": 0, "max_loss_streak": 0, "current_streak": 0, "current_streak_type": "none"},
-            "summary": {
-                "total_trades": 0,
-                "winning_trades": 0,
-                "losing_trades": 0,
-                "win_rate": 0.0,
-                "avg_win": 0.0,
-                "avg_loss": 0.0,
-                "profit_factor": 0.0,
-                "expectancy": 0.0,
-                "largest_win": 0.0,
-                "largest_loss": 0.0,
-                "avg_holding_days": 0.0,
-            },
-        }
+_EMPTY_TRADE_SUMMARY: dict[str, Any] = {
+    "total_trades": 0,
+    "winning_trades": 0,
+    "losing_trades": 0,
+    "breakeven_trades": 0,
+    "fill_count": 0,
+    "win_rate": 0.0,
+    "avg_win": 0.0,
+    "avg_loss": 0.0,
+    "profit_factor": 0.0,
+    "expectancy": 0.0,
+    "largest_win": 0.0,
+    "largest_loss": 0.0,
+    "avg_holding_days": 0.0,
+}
 
-    trade_df = pd.DataFrame(trades).copy()
-    if trade_df.empty:
-        return {
-            "scatter": [],
-            "streaks": {"max_win_streak": 0, "max_loss_streak": 0, "current_streak": 0, "current_streak_type": "none"},
-            "summary": {
-                "total_trades": 0,
-                "winning_trades": 0,
-                "losing_trades": 0,
-                "win_rate": 0.0,
-                "avg_win": 0.0,
-                "avg_loss": 0.0,
-                "profit_factor": 0.0,
-                "expectancy": 0.0,
-                "largest_win": 0.0,
-                "largest_loss": 0.0,
-                "avg_holding_days": 0.0,
-            },
-        }
+_FLAT_EPS = 1e-9
 
-    trade_df["action"] = trade_df.get("action", "").astype(str).str.upper()
-    trade_df["date"] = pd.to_datetime(trade_df.get("date"), errors="coerce")
-    trade_df["quantity"] = pd.to_numeric(trade_df.get("quantity"), errors="coerce").fillna(0.0)
-    trade_df["price"] = pd.to_numeric(trade_df.get("price"), errors="coerce").fillna(0.0)
-    trade_df = trade_df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
-    if trade_df.empty:
-        return {
-            "scatter": [],
-            "streaks": {"max_win_streak": 0, "max_loss_streak": 0, "current_streak": 0, "current_streak_type": "none"},
-            "summary": {
-                "total_trades": 0,
-                "winning_trades": 0,
-                "losing_trades": 0,
-                "win_rate": 0.0,
-                "avg_win": 0.0,
-                "avg_loss": 0.0,
-                "profit_factor": 0.0,
-                "expectancy": 0.0,
-                "largest_win": 0.0,
-                "largest_loss": 0.0,
-                "avg_holding_days": 0.0,
-            },
-        }
 
-    pairs: list[dict[str, Any]] = []
-    open_buy: dict[str, Any] | None = None
-    for _, row in trade_df.iterrows():
-        action = str(row["action"]).upper()
-        if action == "BUY":
-            open_buy = row.to_dict()
+def pair_round_trips(fills: list[Any]) -> list[dict[str, Any]]:
+    """Group fills into round trips (flat -> position -> flat) with average-cost accounting.
+
+    Scale-ins average into the entry price; partial exits realise PnL against the
+    average cost; a fill that crosses through zero closes the round trip and opens
+    a new one in the opposite direction with the remainder. Shorts are symmetric.
+    Fills may be dicts or objects with ``date``/``action``/``quantity``/``price``.
+    An open position at the end is not a completed round trip and is skipped.
+    """
+
+    def _get(fill: Any, key: str) -> Any:
+        return fill.get(key) if isinstance(fill, dict) else getattr(fill, key, None)
+
+    rows: list[tuple[pd.Timestamp, int, float, float]] = []
+    for fill in fills:
+        action = str(_get(fill, "action") or "").upper()
+        if action not in {"BUY", "SELL"}:
             continue
-        if action != "SELL" or open_buy is None:
+        date = pd.to_datetime(_get(fill, "date"), errors="coerce")
+        try:
+            qty = abs(float(_get(fill, "quantity") or 0.0))
+            price = float(_get(fill, "price") or 0.0)
+        except (TypeError, ValueError):
             continue
-        entry_price = float(open_buy["price"])
-        exit_price = float(row["price"])
-        quantity = float(abs(open_buy["quantity"]) if open_buy["quantity"] else abs(row["quantity"]))
-        if quantity <= 0:
-            quantity = 1.0
-        pnl = (exit_price - entry_price) * quantity
-        ret_pct = ((exit_price / entry_price) - 1.0) * 100.0 if entry_price != 0 else 0.0
-        holding_days = int(max(0, (row["date"] - open_buy["date"]).days))
-        pairs.append(
-            {
-                "entry_date": open_buy["date"].date().isoformat(),
-                "exit_date": row["date"].date().isoformat(),
-                "entry_price": round(entry_price, 6),
-                "exit_price": round(exit_price, 6),
-                "pnl": round(float(pnl), 6),
-                "return_pct": round(float(ret_pct), 6),
-                "holding_days": holding_days,
-                "quantity": round(float(quantity), 6),
-            }
-        )
-        open_buy = None
+        if pd.isna(date) or qty <= 0 or not np.isfinite(price):
+            continue
+        rows.append((date, 1 if action == "BUY" else -1, qty, price))
+    rows.sort(key=lambda r: r[0])  # stable: same-timestamp fills keep input order
 
-    if not pairs:
-        return {
-            "scatter": [],
-            "streaks": {"max_win_streak": 0, "max_loss_streak": 0, "current_streak": 0, "current_streak_type": "none"},
-            "summary": {
-                "total_trades": 0,
-                "winning_trades": 0,
-                "losing_trades": 0,
-                "win_rate": 0.0,
-                "avg_win": 0.0,
-                "avg_loss": 0.0,
-                "profit_factor": 0.0,
-                "expectancy": 0.0,
-                "largest_win": 0.0,
-                "largest_loss": 0.0,
-                "avg_holding_days": 0.0,
-            },
-        }
+    trips: list[dict[str, Any]] = []
+    pos = 0.0
+    avg_cost = 0.0
+    trip: dict[str, Any] | None = None
 
-    pair_df = pd.DataFrame(pairs)
-    pnl = pair_df["pnl"].astype(float)
+    def _open(date: pd.Timestamp, side: int) -> dict[str, Any]:
+        return {"entry_date": date, "side": side, "pnl": 0.0, "entry_qty": 0.0, "entry_notional": 0.0, "exit_qty": 0.0, "exit_notional": 0.0}
+
+    for date, side, qty, price in rows:
+        remaining = qty
+        while remaining > _FLAT_EPS:
+            if abs(pos) <= _FLAT_EPS or np.sign(pos) == side:
+                if trip is None:
+                    trip = _open(date, side)
+                    pos, avg_cost = 0.0, 0.0
+                avg_cost = (avg_cost * abs(pos) + price * remaining) / (abs(pos) + remaining)
+                pos += side * remaining
+                trip["entry_qty"] += remaining
+                trip["entry_notional"] += price * remaining
+                remaining = 0.0
+                continue
+            close_qty = min(remaining, abs(pos))
+            assert trip is not None
+            trip["pnl"] += (price - avg_cost) * close_qty * np.sign(pos)
+            trip["exit_qty"] += close_qty
+            trip["exit_notional"] += price * close_qty
+            pos += side * close_qty
+            remaining -= close_qty
+            if abs(pos) <= _FLAT_EPS:
+                entry_price = trip["entry_notional"] / trip["entry_qty"]
+                exit_price = trip["exit_notional"] / trip["exit_qty"]
+                cost_basis = trip["entry_notional"] * (trip["exit_qty"] / trip["entry_qty"])
+                trips.append(
+                    {
+                        "entry_date": trip["entry_date"].date().isoformat(),
+                        "exit_date": date.date().isoformat(),
+                        "entry_ts": trip["entry_date"].isoformat(),
+                        "exit_ts": date.isoformat(),
+                        "side": "long" if trip["side"] > 0 else "short",
+                        "entry_price": round(float(entry_price), 6),
+                        "exit_price": round(float(exit_price), 6),
+                        "pnl": round(float(trip["pnl"]), 6),
+                        "return_pct": round(float(trip["pnl"] / cost_basis * 100.0) if cost_basis else 0.0, 6),
+                        "holding_days": int(max(0, (date - trip["entry_date"]).days)),
+                        "quantity": round(float(trip["entry_qty"]), 6),
+                    }
+                )
+                trip = None
+                pos, avg_cost = 0.0, 0.0
+    return trips
+
+
+def summarize_round_trips(pnls: list[float]) -> dict[str, float]:
+    pnl = pd.Series(pnls, dtype=float)
     wins = pnl[pnl > 0]
     losses = pnl[pnl < 0]
-    total_trades = int(len(pair_df))
-    winning_trades = int((pnl > 0).sum())
-    losing_trades = int((pnl < 0).sum())
-    win_rate = (winning_trades / total_trades) * 100.0 if total_trades else 0.0
-    avg_win = float(wins.mean()) if not wins.empty else 0.0
-    avg_loss = float(losses.mean()) if not losses.empty else 0.0
+    decisive = int(len(wins) + len(losses))
     total_wins = float(wins.sum()) if not wins.empty else 0.0
     total_losses = float(abs(losses.sum())) if not losses.empty else 0.0
-    profit_factor = float(total_wins / total_losses) if total_losses > 0 else 0.0
-    expectancy = float(pnl.mean()) if total_trades else 0.0
-    largest_win = float(pnl.max()) if total_trades else 0.0
-    largest_loss = float(pnl.min()) if total_trades else 0.0
-    avg_holding_days = float(pair_df["holding_days"].mean()) if total_trades else 0.0
+    return {
+        "winning_trades": int(len(wins)),
+        "losing_trades": int(len(losses)),
+        "breakeven_trades": int(len(pnl) - decisive),
+        # Breakeven round trips are neither wins nor losses.
+        "win_rate": (len(wins) / decisive) * 100.0 if decisive else 0.0,
+        "avg_win": float(wins.mean()) if not wins.empty else 0.0,
+        "avg_loss": float(losses.mean()) if not losses.empty else 0.0,
+        "profit_factor": float(total_wins / total_losses) if total_losses > 0 else 0.0,
+    }
 
-    outcomes = [1 if x > 0 else -1 for x in pnl.tolist()]
+
+def compute_trade_analytics(trades: list[dict], equity_curve: list[dict]) -> dict:
+    del equity_curve  # reserved for future extensions
+    empty = {
+        "scatter": [],
+        "streaks": {"max_win_streak": 0, "max_loss_streak": 0, "current_streak": 0, "current_streak_type": "none"},
+        "summary": {**_EMPTY_TRADE_SUMMARY, "fill_count": len(trades or [])},
+    }
+    pairs = pair_round_trips(trades or [])
+    if not pairs:
+        return empty
+
+    pnl_list = [float(p["pnl"]) for p in pairs]
+    stats = summarize_round_trips(pnl_list)
+    total_trades = len(pairs)
+    expectancy = float(np.mean(pnl_list))
+    largest_win = float(max(pnl_list))
+    largest_loss = float(min(pnl_list))
+    avg_holding_days = float(np.mean([p["holding_days"] for p in pairs]))
+
     max_win_streak = 0
     max_loss_streak = 0
     cur_type = 0
     cur_count = 0
-    for out in outcomes:
+    for value in pnl_list:
+        out = 1 if value > 0 else (-1 if value < 0 else 0)
+        if out == 0:
+            # breakeven ends a streak without starting a new one
+            cur_type, cur_count = 0, 0
+            continue
         if out == cur_type:
             cur_count += 1
         else:
@@ -296,7 +305,7 @@ def compute_trade_analytics(trades: list[dict], equity_curve: list[dict]) -> dic
             max_win_streak = max(max_win_streak, cur_count)
         else:
             max_loss_streak = max(max_loss_streak, cur_count)
-    current_streak_type = "win" if cur_type == 1 else "loss"
+    current_streak_type = "win" if cur_type == 1 else ("loss" if cur_type == -1 else "none")
 
     return {
         "scatter": pairs,
@@ -308,12 +317,14 @@ def compute_trade_analytics(trades: list[dict], equity_curve: list[dict]) -> dic
         },
         "summary": {
             "total_trades": total_trades,
-            "winning_trades": winning_trades,
-            "losing_trades": losing_trades,
-            "win_rate": round(win_rate, 6),
-            "avg_win": round(avg_win, 6),
-            "avg_loss": round(avg_loss, 6),
-            "profit_factor": round(profit_factor, 6),
+            "winning_trades": stats["winning_trades"],
+            "losing_trades": stats["losing_trades"],
+            "breakeven_trades": stats["breakeven_trades"],
+            "fill_count": len(trades),
+            "win_rate": round(stats["win_rate"], 6),
+            "avg_win": round(stats["avg_win"], 6),
+            "avg_loss": round(stats["avg_loss"], 6),
+            "profit_factor": round(stats["profit_factor"], 6),
             "expectancy": round(expectancy, 6),
             "largest_win": round(largest_win, 6),
             "largest_loss": round(largest_loss, 6),

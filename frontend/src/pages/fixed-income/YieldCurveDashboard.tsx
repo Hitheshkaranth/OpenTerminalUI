@@ -21,7 +21,7 @@ function safeFormatIso(input: unknown, pattern: string, fallback = "-"): string 
 
 export function YieldCurveDashboard() {
   const [compareDate, setCompareDate] = useState<string>("");
-  const [historicalCurves, setHistoricalCurves] = useState<Array<{ date: string; data: any[] }>>([]);
+  const [historicalCurves, setHistoricalCurves] = useState<Array<{ date: string; data: any[]; mock?: boolean }>>([]);
 
   const { data: currentCurve, isLoading: loadingCurrent } = useQuery({
     queryKey: ["yield-curve"],
@@ -41,7 +41,7 @@ export function YieldCurveDashboard() {
 
     try {
       const hist = await fetchHistoricalYieldCurve(compareDate);
-      setHistoricalCurves(prev => [...prev, { date: compareDate, data: hist.data }]);
+      setHistoricalCurves(prev => [...prev, { date: compareDate, data: hist.data, mock: Boolean(hist.mock) }]);
     } catch (err) {
       console.error("Failed to fetch historical curve", err);
     }
@@ -106,7 +106,11 @@ export function YieldCurveDashboard() {
       <div className="flex items-center justify-between border-b border-terminal-border pb-4">
         <div>
           <h1 className="text-xl font-bold text-terminal-accent">US TREASURY YIELD CURVE</h1>
-          <p className="text-xs text-terminal-muted">As of {currentCurve?.date || "N/A"}</p>
+          <p className="text-xs text-terminal-muted">
+            {currentCurve?.mock
+              ? "Sample data — not a live observation"
+              : `As of ${currentCurve?.date || "N/A"}${currentCurve?.source === "yahoo" ? " · Yahoo Treasury indices (3M/5Y/10Y/30Y)" : ""}`}
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -124,6 +128,12 @@ export function YieldCurveDashboard() {
           </button>
         </div>
       </div>
+
+      {currentCurve?.mock ? (
+        <div className="rounded border border-terminal-warn/40 bg-terminal-warn/10 px-3 py-2 text-xs text-terminal-warn">
+          SAMPLE DATA — live Treasury yields are unavailable. Configure FRED_API_KEY for the full live curve.
+        </div>
+      ) : null}
 
       {/* Main Yield Curve Chart */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
@@ -202,7 +212,7 @@ export function YieldCurveDashboard() {
               {historicalCurves.map((hist, idx) => (
                 <div key={hist.date} className="flex items-center gap-2 text-xs">
                   <div className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[(idx + 1) % COLORS.length] }} />
-                  <span className="flex-grow text-terminal-text">{hist.date}</span>
+                  <span className="flex-grow text-terminal-text">{hist.date}{hist.mock ? " (sample)" : ""}</span>
                   <button
                     onClick={() => removeComparison(hist.date)}
                     className="text-terminal-neg hover:text-red-400"
@@ -284,7 +294,7 @@ export function YieldCurveDashboard() {
       {/* 2s10s Spread Chart */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <TerminalPanel title="10Y - 2Y Spread (Recession Indicator)">
+          <TerminalPanel title={`10Y - 2Y Spread (Recession Indicator)${spread2s10s?.mock ? " — SAMPLE DATA" : ""}`}>
             <div className="h-[250px] w-full p-4">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={spread2s10s?.history}>
@@ -328,7 +338,7 @@ export function YieldCurveDashboard() {
             <h3 className="text-xs font-bold uppercase text-terminal-muted">Current 2s10s Spread</h3>
             <div className="mt-2 flex items-baseline gap-2">
               <span className={`text-3xl font-bold font-mono ${(currentCurve?.spreads?.["2s10s"] ?? 0) >= 0 ? "text-terminal-pos" : "text-terminal-neg"}`}>
-                {(currentCurve?.spreads?.["2s10s"] || 0).toFixed(3)}%
+                {currentCurve?.spreads?.["2s10s"] != null ? `${currentCurve.spreads["2s10s"].toFixed(3)}%` : "--"}
               </span>
               <span className="text-xs text-terminal-muted">basis points</span>
             </div>

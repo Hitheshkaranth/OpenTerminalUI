@@ -149,8 +149,16 @@ export function DOMLadder({ symbol, market, className = "", refPrice, onSnapshot
     const region = scrollRef.current;
     const row = lastPriceRowRef.current;
     if (!region || !row) return;
-    const offset = row.getBoundingClientRect().top - region.getBoundingClientRect().top;
-    const top = region.scrollTop + offset - (region.clientHeight - row.offsetHeight) / 2;
+    const regionRect = region.getBoundingClientRect();
+    const offset = row.getBoundingClientRect().top - regionRect.top;
+    // The region can extend below the fold (the page is taller than the viewport), so centre the
+    // last-price row in the part of the region the user can actually see, not its full height.
+    const viewportH = typeof window !== "undefined" ? window.innerHeight : regionRect.bottom;
+    const visibleTop = Math.max(regionRect.top, 0);
+    const visibleBottom = Math.min(regionRect.bottom, viewportH);
+    const visibleH = visibleBottom - visibleTop > row.offsetHeight * 3 ? visibleBottom - visibleTop : region.clientHeight;
+    const hiddenAbove = visibleBottom - visibleTop > row.offsetHeight * 3 ? visibleTop - regionRect.top : 0;
+    const top = region.scrollTop + offset - hiddenAbove - (visibleH - row.offsetHeight) / 2;
     region.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
   }, [autoCenter, depthQuery.data, levels]);
 

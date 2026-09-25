@@ -41,7 +41,7 @@ async def get_oi_analysis(
             "spot_price": 0.0,
             "max_pain": 0.0,
             "support_resistance": {"support": [], "resistance": []},
-            "pcr": {"pcr_oi": 0.0, "pcr_volume": 0.0, "pcr_oi_change": 0.0, "signal": "Neutral"},
+            "pcr": {"pcr_oi": None, "pcr_volume": None, "pcr_oi_change": None, "signal": "No data"},
             "buildup": [],
         }
 
@@ -66,8 +66,8 @@ async def get_oi_pcr(
         return {
             "symbol": symbol_u,
             "expiry_date": expiry or "",
-            "pcr_oi": 0.0,
-            "pcr_volume": 0.0,
-            "pcr_oi_change": 0.0,
-            "signal": "Neutral",
+            "pcr_oi": None,
+            "pcr_volume": None,
+            "pcr_oi_change": None,
+            "signal": "No data",
         }

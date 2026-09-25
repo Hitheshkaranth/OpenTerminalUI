@@ -196,6 +196,7 @@ function App() {
             <Route path="cockpit" element={<CockpitDashboard />} />
 <Route path="saved-views" element={<SavedViewsPage />} />
             <Route path="earnings" element={<EarningsCalendarPage />} />
+            <Route path="reports" element={<ReportsSchedulePage />} />
            </Route>
 
           <Route path="/fno" element={<ProtectedRoute><FnoLayout /></ProtectedRoute>}>
@@ -226,7 +227,7 @@ function App() {
             <Route index element={<AccountPage />} />
           </Route>
 
-          <Route path="/reports" element={<ProtectedRoute><ReportsSchedulePage /></ProtectedRoute>} />
+          <Route path="/reports" element={<Navigate to="/equity/reports" replace />} />
 
           <Route path="/cockpit" element={<Navigate to="/equity/cockpit" replace />} />
           <Route path="/model-lab" element={<ProtectedRoute><ModelLabPage /></ProtectedRoute>} />

@@ -35,15 +35,16 @@ export function PCRPage() {
     refetchOnWindowFocus: false,
   });
 
-  const pcr = Number(currentQuery.data?.pcr_oi);
-  const pcrVol = Number(currentQuery.data?.pcr_vol);
+  // null PCR = no chain data; Number(null) would be 0 and read as "Bearish".
+  const pcr = currentQuery.data?.pcr_oi == null ? Number.NaN : Number(currentQuery.data.pcr_oi);
+  const pcrVol = currentQuery.data?.pcr_vol == null ? Number.NaN : Number(currentQuery.data.pcr_vol);
   const safePcr = Number.isFinite(pcr) ? pcr : 0;
   const gaugeValue = Number.isFinite(pcr) ? pcr : 1;
   const gaugePct = clamp((gaugeValue / 2) * 100, 0, 100);
   const historyData = (historyQuery.data ?? [])
     .map((row) => ({
       date: String(row.date || ""),
-      pcr_oi: Number(row.pcr_oi),
+      pcr_oi: row.pcr_oi == null ? Number.NaN : Number(row.pcr_oi),
       pcr_vol: Number(row.pcr_vol),
     }))
     .filter((row) => row.date && Number.isFinite(row.pcr_oi));
@@ -107,7 +108,7 @@ export function PCRPage() {
           <div className="text-sm">
             <div>PCR (OI): <span className="font-semibold">{Number.isFinite(pcr) ? pcr.toFixed(2) : "--"}</span></div>
             <div>PCR (Vol): <span className="font-semibold">{Number.isFinite(pcrVol) ? pcrVol.toFixed(2) : "--"}</span></div>
-            <div>Signal: <span className="font-semibold">{currentQuery.data?.signal || "Neutral"}</span></div>
+            <div>Signal: <span className="font-semibold">{currentQuery.data?.signal || "No data"}</span></div>
             <div className="mt-2 h-4 w-full overflow-hidden rounded border border-terminal-border bg-terminal-bg">
               <div className="h-full" style={{ width: `${gaugePct}%`, background: `linear-gradient(90deg,#ff4d4f 0%,#ffb74d 35%,#00c176 70%,#007a4b 100%)` }} />
             </div>

@@ -418,16 +418,16 @@ export function AlgorithmFrameworkLab() {
                   { label: "Total Return", val: result.summary.strategy.total_return, fmt: "%", color: "text-terminal-accent" },
                   { label: "CAGR", val: result.summary.strategy.cagr, fmt: "%" },
                   { label: "Sharpe Ratio", val: result.summary.strategy.sharpe, fmt: "" },
-                  { label: "Alpha Total", val: result.summary.alpha_total_return, fmt: "%", color: "text-terminal-pos" },
+                  { label: "Alpha Total", val: result.summary.alpha_total_return, fmt: "%", color: result.summary.alpha_total_return == null ? undefined : result.summary.alpha_total_return >= 0 ? "text-terminal-pos" : "text-terminal-neg" },
                   { label: "Volatility", val: result.summary.strategy.volatility, fmt: "%" },
                   { label: "Max Drawdown", val: result.summary.strategy.max_drawdown, fmt: "%", color: "text-terminal-neg" },
                   { label: "Benchmark Ret", val: result.summary.benchmark?.total_return, fmt: "%", color: "text-terminal-muted" },
-                  { label: "Holdings Count", val: Object.keys(result.holdings[result.holdings.length - 1]?.weights || {}).length, fmt: "" },
+                  { label: "Holdings Count", val: Object.keys(result.holdings[result.holdings.length - 1]?.weights || {}).length, fmt: "int" },
                 ].map((m, i) => (
                   <div key={i} className="bg-terminal-panel border border-terminal-border p-2 rounded">
                     <div className="text-[10px] text-terminal-muted uppercase">{m.label}</div>
                     <div className={`text-sm font-mono font-bold ${m.color || "text-terminal-text"}`}>
-                      {m.val != null ? (typeof m.val === 'number' ? (m.fmt === "%" ? (m.val * 100).toFixed(2) : m.val.toFixed(2)) : m.val) : "N/A"}{m.fmt}
+                      {m.val != null ? (typeof m.val === 'number' ? (m.fmt === "%" ? (m.val * 100).toFixed(2) : m.fmt === "int" ? String(Math.round(m.val)) : m.val.toFixed(2)) : m.val) : "N/A"}{m.fmt === "%" ? "%" : ""}
                     </div>
                   </div>
                 ))}

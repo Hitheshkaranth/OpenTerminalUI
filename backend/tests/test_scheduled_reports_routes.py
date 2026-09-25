@@ -33,7 +33,8 @@ def test_scheduled_reports_rejects_bad_frequency():
 def test_watchlist_singular_alias_is_mounted():
     from backend.main import app
 
-    paths = {getattr(r, "path", "") for r in app.routes}
+    # Read the OpenAPI paths: newer FastAPI keeps included routers nested in app.routes.
+    paths = set(app.openapi()["paths"])
     assert "/api/watchlist" in paths and "/api/watchlists" in paths
 
 

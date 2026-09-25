@@ -430,7 +430,21 @@ def top_factor_ideas(
         rows = [row for row in rows if str(row.get("sector") or "").strip().lower() == sector_key]
     threshold = 80.0
     ideas = [row for row in rows if float((row.get("scores") or {}).get("percentile") or 0.0) >= threshold]
-    return ideas[: max(1, int(limit))]
+    ideas.sort(key=lambda row: float((row.get("scores") or {}).get("composite") or 0.0), reverse=True)
+    out: list[dict[str, Any]] = []
+    for row in ideas[: max(1, int(limit))]:
+        scores = row.get("scores") or {}
+        out.append(
+            {
+                **row,
+                # Flat fields consumed by the Factor Dashboard idea list.
+                "name": row.get("company_name") or row.get("symbol"),
+                "rank": scores.get("rank"),
+                "composite_score": scores.get("composite"),
+                "percentile": scores.get("percentile"),
+            }
+        )
+    return out
 
 
 def factor_breakdown(

@@ -69,3 +69,29 @@ def test_iv_engine_shape() -> None:
     assert len(iv["iv_skew"]) == 3
     surface = asyncio.run(engine.get_iv_surface("NIFTY"))
     assert len(surface["expiries"]) == 3
+
+
+class _EmptyFetcher(_FakeFetcher):
+    async def get_option_chain(self, symbol: str, expiry: str | None = None, strike_range: int = 20):  # noqa: ARG002
+        return {"symbol": symbol.upper(), "expiry_date": "", "spot_price": 0.0, "atm_strike": 0.0, "strikes": [], "totals": {}}
+
+
+def test_pcr_empty_chain_is_no_data_not_bearish() -> None:
+    from backend.fno.services.oi_analyzer import OIAnalyzer
+
+    pcr = OIAnalyzer().get_pcr({"strikes": []})
+    assert pcr["pcr_oi"] is None
+    assert pcr["signal"] == "No data"
+
+    tracker = PCRTracker()
+    tracker._fetcher = _EmptyFetcher()  # noqa: SLF001
+    current = asyncio.run(tracker.get_current_pcr("NOCHAINSYM"))
+    assert current["pcr_oi"] is None
+    assert current["signal"] == "No data"
+
+
+def test_iv_rank_undefined_without_history() -> None:
+    engine = IVEngine()
+    # Only the current reading (no stored history for this symbol): no range to rank against.
+    assert asyncio.run(engine._iv_rank_percentile("NOIVHISTORYSYM", 18.5)) == (None, None)  # noqa: SLF001
+    assert asyncio.run(engine._iv_rank_percentile("NOIVHISTORYSYM", 0.0)) == (None, None)  # noqa: SLF001

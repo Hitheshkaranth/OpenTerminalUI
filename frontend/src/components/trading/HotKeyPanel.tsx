@@ -188,9 +188,24 @@ export function HotKeyPanel({
   const lastPrice = Number(
     tick?.ltp ?? (Number.isFinite(snapshotPrice) ? snapshotPrice : undefined) ?? stock?.current_price ?? depthLast ?? activePosition?.mark_price ?? 0,
   );
-  const changePct = Number(tick?.change_pct ?? stock?.change_pct ?? 0);
-  const previousClose = changePct !== -100 && lastPrice > 0 ? lastPrice / (1 + changePct / 100) : 0;
-  const change = lastPrice > 0 ? lastPrice - previousClose : 0;
+  // The quote stream coerces a missing change_pct to 0, so a tick reporting
+  // 0 / 0 is treated as "unknown" and we fall through to the snapshot, then to
+  // prev close. Never render a fabricated +0.00%.
+  const finiteOrNull = (value: unknown): number | null => {
+    if (value == null || value === "") return null;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+  };
+  const snapshotRecord = (snapshotQuery.data ?? {}) as Record<string, unknown>;
+  const tickChangePct = tick && (tick.change_pct !== 0 || tick.change !== 0) ? finiteOrNull(tick.change_pct) : null;
+  const prevCloseRef = finiteOrNull(snapshotRecord.previous_close ?? snapshotRecord.prev_close ?? snapshotRecord.previousClose);
+  const changePct: number | null =
+    tickChangePct
+    ?? finiteOrNull(snapshotQuery.data?.change_pct)
+    ?? finiteOrNull(stock?.change_pct)
+    ?? (prevCloseRef != null && prevCloseRef > 0 && lastPrice > 0 ? ((lastPrice - prevCloseRef) / prevCloseRef) * 100 : null);
+  const previousClose = changePct != null && changePct !== -100 && lastPrice > 0 ? lastPrice / (1 + changePct / 100) : null;
+  const change: number | null = previousClose != null ? lastPrice - previousClose : null;
   const realDepth = depthQuery.data && !depthQuery.data.synthetic ? depthQuery.data : undefined;
   const bestBid = Number(realDepth?.bids?.[0]?.price ?? (lastPrice > 0 ? lastPrice - Math.max(0.01, lastPrice * 0.0005) : 0));
   const bestAsk = Number(realDepth?.asks?.[0]?.price ?? (lastPrice > 0 ? lastPrice + Math.max(0.01, lastPrice * 0.0005) : 0));
@@ -370,7 +385,11 @@ export function HotKeyPanel({
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-terminal-muted">
             <span className="font-mono text-terminal-text">{formatPrice(lastPrice)}</span>
-            <span className={change >= 0 ? "text-emerald-300" : "text-red-300"}>{formatSignedPrice(change)} ({formatSignedPct(changePct)})</span>
+            {change == null || changePct == null ? (
+              <span className="text-terminal-muted">— (—)</span>
+            ) : (
+              <span className={change >= 0 ? "text-emerald-300" : "text-red-300"}>{formatSignedPrice(change)} ({formatSignedPct(changePct)})</span>
+            )}
             <span>BID {formatPrice(bestBid)}</span>
             <span>ASK {formatPrice(bestAsk)}</span>
           </div>

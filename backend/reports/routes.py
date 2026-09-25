@@ -8,6 +8,7 @@ from typing import Any, List, Dict
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.api.deps import get_unified_fetcher
+from backend.shared.market_calendar import is_market_open
 
 router = APIRouter()
 US_MARKETS = {"NASDAQ", "NYSE"}
@@ -121,7 +122,41 @@ async def block_deals() -> Dict[str, Any]:
     except Exception as e:
         return {"error": str(e), "data": []}
 
-import random
+# Last successfully fetched value per ticker key. When a provider call fails we
+# serve the last real value flagged as stale instead of fabricating a number.
+_LAST_GOOD_TICKERS: dict[str, tuple[float, float | None]] = {}
+
+_YAHOO_TICKER_SYMBOLS: dict[str, str] = {
+    "sp500": "^GSPC",
+    "nasdaq": "^IXIC",
+    "dowjones": "^DJI",
+    "ftse100": "^FTSE",
+    "dax": "^GDAXI",
+    "nikkei225": "^N225",
+    "hangseng": "^HSI",
+    "usdInr": "USDINR=X",
+    "gold": "GC=F",
+    "silver": "SI=F",
+    "crude": "CL=F",
+}
+
+
+def _exchange_status(exchange: str) -> str:
+    try:
+        return "OPEN" if is_market_open(exchange) else "CLOSED"
+    except Exception:
+        return "UNKNOWN"
+
+
+def _nse_capital_market_open(market_state: list[Any]) -> bool | None:
+    """Status of the NSE Capital Market segment from NSE's marketState list, if present."""
+    for row in market_state:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("market") or "").strip().lower() == "capital market":
+            return str(row.get("marketStatus") or "").strip().upper() == "OPEN"
+    return None
+
 
 @router.get("/reports/market-status")
 async def market_status() -> Dict[str, Any]:
@@ -131,7 +166,7 @@ async def market_status() -> Dict[str, Any]:
     nse_market_task = fetcher.nse.get_market_status()
     nse_indices_task = fetcher.nse.get_index_quote("NIFTY 50")
     yahoo_quotes_task = fetcher.yahoo.get_quotes(
-        ["^NSEI", "^BSESN", "^GSPC", "^IXIC", "^DJI", "^FTSE", "^GDAXI", "^N225", "^HSI", "INRUSD=X", "USDINR=X", "BTC-USD", "ETH-USD"]
+        ["^NSEI", "^BSESN", *_YAHOO_TICKER_SYMBOLS.values(), "INRUSD=X", "BTC-USD", "ETH-USD"]
     )
 
     results = await asyncio.gather(
@@ -144,119 +179,87 @@ async def market_status() -> Dict[str, Any]:
     nse_market_raw = results[0] if not isinstance(results[0], Exception) else {}
     indices_payload = results[1] if not isinstance(results[1], Exception) else {}
     yahoo_quotes = results[2] if not isinstance(results[2], Exception) else []
-
-    nifty, nifty_pct = _extract_index_metrics(indices_payload, {"NIFTY 50", "NIFTY50", "NIFTY"})
-    sensex, sensex_pct = _extract_index_metrics(indices_payload, {"SENSEX", "BSE SENSEX"})
+    if not isinstance(indices_payload, dict):
+        indices_payload = {}
 
     yahoo_map: dict[str, dict[str, Any]] = {}
-    for item in yahoo_quotes:
+    for item in yahoo_quotes if isinstance(yahoo_quotes, list) else []:
         if isinstance(item, dict) and item.get("symbol"):
-            yahoo_map[item["symbol"].upper()] = item
+            yahoo_map[str(item["symbol"]).upper()] = item
 
-    # Fallback Logic
-    if nifty is None:
-        q = yahoo_map.get("^NSEI", {})
-        nifty = _to_float(q.get("regularMarketPrice"))
-        nifty_pct = _to_float(q.get("regularMarketChangePercent"))
+    def _yahoo(symbol: str) -> tuple[float | None, float | None]:
+        q = yahoo_map.get(symbol, {})
+        return _to_float(q.get("regularMarketPrice")), _to_float(q.get("regularMarketChangePercent"))
 
-    if sensex is None:
-        q = yahoo_map.get("^BSESN", {})
-        sensex = _to_float(q.get("regularMarketPrice"))
-        sensex_pct = _to_float(q.get("regularMarketChangePercent"))
+    values: dict[str, tuple[float | None, float | None]] = {}
+    nifty = _extract_index_metrics(indices_payload, {"NIFTY 50", "NIFTY50", "NIFTY"})
+    sensex = _extract_index_metrics(indices_payload, {"SENSEX", "BSE SENSEX"})
+    nse_indices_ok = nifty[0] is not None
+    values["nifty50"] = nifty if nifty[0] is not None else _yahoo("^NSEI")
+    values["sensex"] = sensex if sensex[0] is not None else _yahoo("^BSESN")
+    for key, symbol in _YAHOO_TICKER_SYMBOLS.items():
+        values[key] = _yahoo(symbol)
 
-    sp500 = _to_float(yahoo_map.get("^GSPC", {}).get("regularMarketPrice"))
-    sp500_pct = _to_float(yahoo_map.get("^GSPC", {}).get("regularMarketChangePercent"))
-
-    nasdaq = _to_float(yahoo_map.get("^IXIC", {}).get("regularMarketPrice"))
-    nasdaq_pct = _to_float(yahoo_map.get("^IXIC", {}).get("regularMarketChangePercent"))
-
-    dow = _to_float(yahoo_map.get("^DJI", {}).get("regularMarketPrice"))
-    dow_pct = _to_float(yahoo_map.get("^DJI", {}).get("regularMarketChangePercent"))
-
-    ftse = _to_float(yahoo_map.get("^FTSE", {}).get("regularMarketPrice"))
-    ftse_pct = _to_float(yahoo_map.get("^FTSE", {}).get("regularMarketChangePercent"))
-
-    dax = _to_float(yahoo_map.get("^GDAXI", {}).get("regularMarketPrice"))
-    dax_pct = _to_float(yahoo_map.get("^GDAXI", {}).get("regularMarketChangePercent"))
-
-    nikkei = _to_float(yahoo_map.get("^N225", {}).get("regularMarketPrice"))
-    nikkei_pct = _to_float(yahoo_map.get("^N225", {}).get("regularMarketChangePercent"))
-
-    hangseng = _to_float(yahoo_map.get("^HSI", {}).get("regularMarketPrice"))
-    hangseng_pct = _to_float(yahoo_map.get("^HSI", {}).get("regularMarketChangePercent"))
-
-    usd_inr = _to_float(yahoo_map.get("USDINR=X", {}).get("regularMarketPrice"))
-    usd_inr_pct = _to_float(yahoo_map.get("USDINR=X", {}).get("regularMarketChangePercent"))
-
-    gold = _to_float(yahoo_map.get("GC=F", {}).get("regularMarketPrice"))
-    gold_pct = _to_float(yahoo_map.get("GC=F", {}).get("regularMarketChangePercent"))
-
-    silver = _to_float(yahoo_map.get("SI=F", {}).get("regularMarketPrice"))
-    silver_pct = _to_float(yahoo_map.get("SI=F", {}).get("regularMarketChangePercent"))
-
-    crude = _to_float(yahoo_map.get("CL=F", {}).get("regularMarketPrice"))
-    crude_pct = _to_float(yahoo_map.get("CL=F", {}).get("regularMarketChangePercent"))
-
-    # Final Mock Fallback
-    if nifty is None: nifty, nifty_pct = 22450.0 + random.uniform(-10, 10), random.uniform(-0.5, 0.5)
-    if sensex is None: sensex, sensex_pct = 73800.0 + random.uniform(-30, 30), random.uniform(-0.4, 0.4)
-    if sp500 is None: sp500, sp500_pct = 5100.0 + random.uniform(-2, 2), random.uniform(-0.2, 0.2)
-    if nasdaq is None: nasdaq, nasdaq_pct = 16000.0 + random.uniform(-10, 10), random.uniform(-0.3, 0.3)
-    if dow is None: dow, dow_pct = 39000.0 + random.uniform(-20, 20), random.uniform(-0.2, 0.2)
-    if ftse is None: ftse, ftse_pct = 7600.0 + random.uniform(-5, 5), random.uniform(-0.1, 0.1)
-    if dax is None: dax, dax_pct = 17800.0 + random.uniform(-15, 15), random.uniform(-0.2, 0.2)
-    if nikkei is None: nikkei, nikkei_pct = 39000.0 + random.uniform(-50, 50), random.uniform(-0.8, 0.8)
-    if hangseng is None: hangseng, hangseng_pct = 16500.0 + random.uniform(-20, 20), random.uniform(-0.6, 0.6)
-    if usd_inr is None: usd_inr, usd_inr_pct = 83.15 + random.uniform(-0.01, 0.01), random.uniform(-0.05, 0.05)
-
-    if gold is None: gold, gold_pct = 2100.0 + random.uniform(-2, 2), random.uniform(-0.1, 0.1)
-    if silver is None: silver, silver_pct = 23.5 + random.uniform(-0.1, 0.1), random.uniform(-0.2, 0.2)
-    if crude is None: crude, crude_pct = 78.0 + random.uniform(-0.5, 0.5), random.uniform(-0.3, 0.3)
+    # Never fabricate prices: a missing value is served as the last real value
+    # (flagged stale) or as null (flagged unavailable).
+    stale: list[str] = []
+    unavailable: list[str] = []
+    out: dict[str, Any] = {}
+    for key, (price, pct) in values.items():
+        if price is not None:
+            _LAST_GOOD_TICKERS[key] = (price, pct)
+        elif key in _LAST_GOOD_TICKERS:
+            price, pct = _LAST_GOOD_TICKERS[key]
+            stale.append(key)
+        else:
+            pct = None
+            unavailable.append(key)
+        out[key] = price
+        out[f"{key}Pct"] = pct
 
     market_state = nse_market_raw.get("marketState", []) if isinstance(nse_market_raw, dict) else []
+    if not isinstance(market_state, list):
+        market_state = []
+
+    nse_status = _exchange_status("NSE")
+    if nse_status == "OPEN" and _nse_capital_market_open(market_state) is False:
+        # Inside regular hours but NSE reports the capital market closed (unlisted holiday/halt).
+        nse_status = "CLOSED"
 
     return {
         "marketState": market_state,
-        "nifty50": nifty,
-        "nifty50Pct": nifty_pct,
-        "sensex": sensex,
-        "sensexPct": sensex_pct,
-        "usdInr": usd_inr,
-        "usdInrPct": usd_inr_pct,
-        "sp500": sp500,
-        "sp500Pct": sp500_pct,
-        "nasdaq": nasdaq,
-        "nasdaqPct": nasdaq_pct,
-        "dowjones": dow,
-        "dowjonesPct": dow_pct,
-        "ftse100": ftse,
-        "ftse100Pct": ftse_pct,
-        "dax": dax,
-        "daxPct": dax_pct,
-        "nikkei225": nikkei,
-        "nikkei225Pct": nikkei_pct,
-        "hangseng": hangseng,
-        "hangsengPct": hangseng_pct,
-        "gold": gold,
-        "goldPct": gold_pct,
-        "silver": silver,
-        "silverPct": silver_pct,
-        "crude": crude,
-        "crudePct": crude_pct,
-        "fallbackEnabled": nifty is None or sensex is None,
+        "nseStatus": nse_status,
+        "nyseStatus": _exchange_status("NYSE"),
+        **out,
+        "stale": stale,
+        "unavailable": unavailable,
+        "source": {"nseIndices": nse_indices_ok},
+        "fallbackEnabled": not nse_indices_ok or bool(stale) or bool(unavailable),
         "ts": datetime.now(timezone.utc).isoformat()
     }
 
+_EVENTS_UNIVERSE = (
+    "RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "HINDUNILVR", "ITC", "SBIN",
+    "BHARTIARTL", "KOTAKBANK", "LT", "AXISBANK", "MARUTI", "SUNPHARMA", "TITAN",
+)
+
+
 @router.get("/reports/events")
-async def events() -> List[Dict[str, Any]]:
-    # Mock events for now or fetch from a calendar source if available
-    # NSE doesn't have a simple public "calendar" endpoint without scraping
-    # We will return some mock upcoming results/events for demo
+async def events(days: int = Query(default=30, ge=1, le=120)) -> List[Dict[str, Any]]:
+    """Upcoming earnings / dividend / corporate events for large-cap NSE names from the events hub.
+
+    Returns an empty list when the upstream sources are unavailable — never placeholder events.
+    """
+    from backend.services.events_hub import get_upcoming_events
+
+    try:
+        payload = await get_upcoming_events(list(_EVENTS_UNIVERSE), days=days, types={"earnings", "dividend", "corporate"})
+    except Exception:
+        return []
     return [
-        {"date": "2024-10-15", "ticker": "RELIANCE", "event": "Q2 Earnings"},
-        {"date": "2024-10-16", "ticker": "INFY", "event": "AGM"},
-        {"date": "2024-10-18", "ticker": "TCS", "event": "Dividend Ex-Date"},
-        {"date": "2024-10-20", "ticker": "HDFCBANK", "event": "Q2 Earnings"},
+        {"date": item["date"], "ticker": item.get("symbol") or "", "event": item.get("title") or item.get("type") or ""}
+        for item in (payload.get("items") or [])
+        if item.get("date")
     ]
 
 

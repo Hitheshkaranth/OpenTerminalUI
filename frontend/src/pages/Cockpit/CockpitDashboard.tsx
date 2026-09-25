@@ -483,16 +483,28 @@ export function CockpitDashboard() {
     (selectedMarket === "NSE" || selectedMarket === "BSE" ? "INR" : "USD");
   const currentPrice = asNumber(stock?.current_price ?? stockRecord.current_price);
   const changePct = pctValue(stock?.change_pct ?? stockRecord.change_pct);
-  const week52Low = asNumber(stock?.fifty_two_week_low ?? stockRecord["52w_low"] ?? stockRecord.low_52_week);
-  const week52High = asNumber(stock?.fifty_two_week_high ?? stockRecord["52w_high"] ?? stockRecord.high_52_week);
-  const dayOpen = asNumber(stockRecord.open);
-  const dayHigh = asNumber(stockRecord.day_high ?? stockRecord.high);
-  const dayLow = asNumber(stockRecord.day_low ?? stockRecord.low);
+  // Snapshot fields are often missing; fall back to the loaded 6M daily history
+  // (range is then labelled 6M, since the chart does not cover 52 weeks).
+  const lastBar = chartPoints.length ? chartPoints[chartPoints.length - 1] : null;
+  const historyLows = chartPoints.map((p) => asNumber(p.l)).filter((v): v is number => v != null);
+  const historyHighs = chartPoints.map((p) => asNumber(p.h)).filter((v): v is number => v != null);
+  const snapshot52Low = asNumber(stock?.fifty_two_week_low ?? stockRecord["52w_low"] ?? stockRecord.low_52_week);
+  const snapshot52High = asNumber(stock?.fifty_two_week_high ?? stockRecord["52w_high"] ?? stockRecord.high_52_week);
+  const rangeFromHistory = snapshot52Low == null && snapshot52High == null && historyLows.length > 0;
+  const week52Low = snapshot52Low ?? (historyLows.length ? Math.min(...historyLows) : null);
+  const week52High = snapshot52High ?? (historyHighs.length ? Math.max(...historyHighs) : null);
+  const dayOpen = asNumber(stockRecord.open) ?? asNumber(lastBar?.o);
+  const dayHigh = asNumber(stockRecord.day_high ?? stockRecord.high) ?? asNumber(lastBar?.h);
+  const dayLow = asNumber(stockRecord.day_low ?? stockRecord.low) ?? asNumber(lastBar?.l);
   const portfolioValue = asNumber(portfolio.summary.total_value) ?? asNumber(cockpit?.portfolio_snapshot?.total_value);
   const lifetimePnl = asNumber(portfolio.summary.overall_pnl);
   const dailyPnl = asNumber(cockpit?.portfolio_snapshot?.daily_pnl);
   const activeJobs = asNumber(cockpit?.portfolio_snapshot?.active_jobs);
   const focusBeta = asNumber(focusRisk.beta ?? cockpit?.risk_summary?.beta ?? stock?.beta);
+  // Portfolio-labelled risk must come from the portfolio, never the focus stock.
+  const hasHoldings = portfolio.items.length > 0;
+  const portfolioBeta = asNumber(portfolioRiskQuery.data?.beta);
+  const portfolioRiskLabel = !hasHoldings ? "No positions" : portfolioBeta != null ? `Beta ${fmtNumber(portfolioBeta, 2)}` : "—";
   const focusVar95 = asNumber(focusRisk.var_95 ?? cockpit?.risk_summary?.var_95);
   const focusEwmaVol = asNumber(focusRisk.ewma_vol ?? cockpit?.risk_summary?.ewma_vol);
   const marketToneBadge = marketTone(sentimentSummaryQuery.data?.overall_label ?? null, asNumber(sentimentSummaryQuery.data?.average_score));
@@ -610,8 +622,8 @@ export function CockpitDashboard() {
         {
           rank: 1,
           title: "Portfolio Risk",
-          value: focusVar95 != null ? `${fmtNumber(focusVar95, 2)} VaR95` : `Beta ${fmtNumber(focusBeta, 2)}`,
-          detail: portfolioRiskQuery.data?.max_drawdown != null ? `Max DD ${fmtPct(portfolioRiskQuery.data.max_drawdown, 2, true)}` : "Open risk dashboard",
+          value: portfolioRiskLabel,
+          detail: !hasHoldings ? "Add holdings to track portfolio risk." : portfolioRiskQuery.data?.max_drawdown != null ? `Max DD ${fmtPct(portfolioRiskQuery.data.max_drawdown, 2, true)}` : "Open risk dashboard",
           tone: "text-terminal-warn",
           action: () => openDeskRoute("risk"),
         },
@@ -661,12 +673,12 @@ export function CockpitDashboard() {
       currency,
       currentPrice,
       deskEvents,
-      focusBeta,
       focusTicker,
-      focusVar95,
+      hasHoldings,
       headlines,
       marketToneBadge.label,
       navigate,
+      portfolioRiskLabel,
       portfolioRiskQuery.data?.max_drawdown,
       primaryError,
       resultsQuery.data?.modelLab,
@@ -810,7 +822,7 @@ export function CockpitDashboard() {
           />
           <MetricCard
             label="Desk Risk"
-            value={focusVar95 != null ? `${fmtNumber(focusVar95, 2)} VaR95` : fmtNumber(focusBeta, 2)}
+            value={portfolioRiskLabel}
             context={activeJobs != null ? `${fmtNumber(activeJobs, 0)} active jobs` : "Risk snapshot"}
             tone="text-terminal-warn"
           />
@@ -866,8 +878,8 @@ export function CockpitDashboard() {
               bodyClassName="space-y-3"
             >
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                <MetricCard label="52W Low" value={fmtCurrency(week52Low, currency, 2)} />
-                <MetricCard label="52W High" value={fmtCurrency(week52High, currency, 2)} />
+                <MetricCard label={rangeFromHistory ? "6M Low" : "52W Low"} value={fmtCurrency(week52Low, currency, 2)} />
+                <MetricCard label={rangeFromHistory ? "6M High" : "52W High"} value={fmtCurrency(week52High, currency, 2)} />
                 <MetricCard label="Open" value={fmtCurrency(dayOpen, currency, 2)} />
                 <MetricCard label="Day Range" value={`${fmtCurrency(dayLow, currency, 2)} / ${fmtCurrency(dayHigh, currency, 2)}`} />
               </div>

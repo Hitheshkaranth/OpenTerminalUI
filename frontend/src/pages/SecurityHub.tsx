@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   fetchNewsByTicker,
@@ -30,6 +30,7 @@ import { isExchange, countryForExchange } from "../lib/instrument";
 import { quickAddToFirstPortfolio } from "../shared/portfolioQuickAdd";
 import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
+import { normalizeTicker } from "../utils/ticker";
 import type { ChartPoint } from "../types";
 import { ProvenanceChip } from "../components/common/ProvenanceChip";
 
@@ -215,16 +216,20 @@ export function SecurityHubPage() {
   const setSelectedMarket = useSettingsStore((s) => s.setSelectedMarket);
   const setSelectedCountry = useSettingsStore((s) => s.setSelectedCountry);
   const setInstrument = useStockStore((s) => s.setInstrument);
+  const queryClient = useQueryClient();
   useEffect(() => {
     const ex = stockQuery.data?.exchange;
     if (!isExchange(ex)) return;
     setInstrument({ symbol: activeTicker, exchange: ex });
     if (ex !== selectedMarket) {
+      // Seed the snapshot under the resolved market so the header doesn't drop back to "Loading" while
+      // useStock refetches the same symbol under its new query key.
+      queryClient.setQueryData(["quote", ex, normalizeTicker(activeTicker), "equity"], stockQuery.data);
       const country = countryForExchange(ex);
       if (country !== selectedCountry) setSelectedCountry(country);
       setSelectedMarket(ex);
     }
-  }, [stockQuery.data?.exchange, activeTicker, selectedMarket, selectedCountry, setSelectedMarket, setSelectedCountry, setInstrument]);
+  }, [stockQuery.data, activeTicker, selectedMarket, selectedCountry, setSelectedMarket, setSelectedCountry, setInstrument, queryClient]);
 
   const historyQuery = useStockHistory(activeTicker, "6mo", "1d");
   const annualFinancialsQuery = useFinancials(activeTicker, "annual");
@@ -323,8 +328,9 @@ export function SecurityHubPage() {
                   />
                 ) : null}
                 <span className="ot-type-heading-lg text-terminal-text">{activeTicker}</span>
-                <TerminalBadge variant="accent">{String(stock.exchange || selectedMarket)}</TerminalBadge>
-                <TerminalBadge variant="neutral">{String(stock.sector || "UNKNOWN")}</TerminalBadge>
+                {/* Don't guess the exchange from the desk market while the symbol is still resolving (RELIANCE on a US desk is NSE). */}
+                <TerminalBadge variant="accent">{String(stock.exchange || (stockQuery.isPending ? "RESOLVING…" : selectedMarket))}</TerminalBadge>
+                <TerminalBadge variant="neutral">{String(stock.sector || (stockQuery.isPending ? "—" : "UNKNOWN"))}</TerminalBadge>
                 {tickerSentimentQuery.data ? (
                   <SentimentBadge
                     label={tickerSentimentQuery.data.overall_label}
@@ -438,16 +444,38 @@ export function SecurityHubPage() {
 
         {tab === "financials" ? (
           <div className="grid gap-2">
-            <TerminalPanel title="Financials" subtitle="Annual (5Y) + Quarterly (8Q)">
+            <TerminalPanel
+              title="Financials"
+              subtitle={`Annual (${financialRows.length}Y) + Quarterly (${quarterlyRows.length}Q) — as reported by the provider`}
+            >
               <div className="grid gap-3">
+                {(() => {
+                  // Flag quarters the provider skipped (e.g. 2025-06-30 → 2025-12-31) instead of silently hiding the hole.
+                  const dates = quarterlyRows.map((r) => String(r.date || r.fiscalDateEnding || "")).filter(Boolean).sort();
+                  const gaps: string[] = [];
+                  for (let i = 1; i < dates.length; i += 1) {
+                    const prev = new Date(`${dates[i - 1]}T00:00:00Z`);
+                    const cur = new Date(`${dates[i]}T00:00:00Z`);
+                    const months = (cur.getUTCFullYear() - prev.getUTCFullYear()) * 12 + cur.getUTCMonth() - prev.getUTCMonth();
+                    for (let m = 3; m < months; m += 3) {
+                      const missing = new Date(Date.UTC(prev.getUTCFullYear(), prev.getUTCMonth() + m + 1, 0));
+                      gaps.push(missing.toISOString().slice(0, 10));
+                    }
+                  }
+                  return gaps.length ? (
+                    <div className="text-[11px] text-terminal-warn" data-testid="financials-quarter-gaps">
+                      Provider has no data for quarter{gaps.length > 1 ? "s" : ""} ending {gaps.join(", ")}.
+                    </div>
+                  ) : null;
+                })()}
                 <DenseTable
                   id={`sec-hub-fin-annual-${activeTicker}`}
                   rows={financialRows}
                   columns={[
-                    { key: "date", title: "Period", type: "text", frozen: true, width: 120, sortable: true, getValue: (r) => r.date || r.fiscalDateEnding || r.period },
-                    { key: "revenue", title: "Revenue", type: "large-number", align: "right", sortable: true, getValue: (r) => r.revenue || r.totalRevenue },
-                    { key: "netIncome", title: "Net Income", type: "large-number", align: "right", sortable: true, getValue: (r) => r.netIncome || r.net_income },
-                    { key: "eps", title: "EPS", type: "number", align: "right", sortable: true, getValue: (r) => r.eps || r.epsDiluted },
+                    { key: "date", title: "Period", type: "text", frozen: true, width: 150, sortable: true, getValue: (r) => r.date || r.fiscalDateEnding || r.period },
+                    { key: "revenue", title: "Revenue", type: "large-number", align: "right", width: 150, sortable: true, getValue: (r) => r.revenue || r.totalRevenue },
+                    { key: "netIncome", title: "Net Income", type: "large-number", align: "right", width: 170, sortable: true, getValue: (r) => r.netIncome || r.net_income },
+                    { key: "eps", title: "EPS", type: "number", align: "right", width: 120, sortable: true, getValue: (r) => r.eps || r.epsDiluted },
                   ]}
                   rowKey={(row, idx) => `${String(row.date || row.fiscalDateEnding || idx)}`}
                   height={300}
@@ -456,10 +484,10 @@ export function SecurityHubPage() {
                   id={`sec-hub-fin-quarter-${activeTicker}`}
                   rows={quarterlyRows}
                   columns={[
-                    { key: "date", title: "Quarter", type: "text", frozen: true, width: 120, sortable: true, getValue: (r) => r.date || r.fiscalDateEnding || r.period },
-                    { key: "revenue", title: "Revenue", type: "large-number", align: "right", sortable: true, getValue: (r) => r.revenue || r.totalRevenue },
-                    { key: "operatingIncome", title: "Operating Income", type: "large-number", align: "right", sortable: true, getValue: (r) => r.operatingIncome ?? r.ebitda },
-                    { key: "netIncome", title: "Net Income", type: "large-number", align: "right", sortable: true, getValue: (r) => r.netIncome || r.net_income },
+                    { key: "date", title: "Quarter", type: "text", frozen: true, width: 150, sortable: true, getValue: (r) => r.date || r.fiscalDateEnding || r.period },
+                    { key: "revenue", title: "Revenue", type: "large-number", align: "right", width: 150, sortable: true, getValue: (r) => r.revenue || r.totalRevenue },
+                    { key: "operatingIncome", title: "Operating Income", type: "large-number", align: "right", width: 210, sortable: true, getValue: (r) => r.operatingIncome ?? r.ebitda },
+                    { key: "netIncome", title: "Net Income", type: "large-number", align: "right", width: 170, sortable: true, getValue: (r) => r.netIncome || r.net_income },
                   ]}
                   rowKey={(row, idx) => `q-${String(row.date || row.fiscalDateEnding || idx)}`}
                   height={320}

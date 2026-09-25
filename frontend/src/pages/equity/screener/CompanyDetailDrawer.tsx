@@ -9,10 +9,23 @@ import { useStockStore } from "../../../store/stockStore";
 import { SparklineCell } from "./SparklineCell";
 import { useScreenerContext } from "./ScreenerContext";
 
-function formatNum(value: unknown) {
-  const n = Number(value || 0);
-  if (!Number.isFinite(n)) return "--";
+// Missing values render "—" (never "0"): a P/E of 0 is not a real reading.
+function formatNum(value: unknown, { zeroIsMissing = false } = {}) {
+  if (value == null || value === "") return "—";
+  const n = Number(value);
+  if (!Number.isFinite(n) || (zeroIsMissing && n === 0)) return "—";
   return n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+}
+
+// Screener market_cap is in the listing currency's base unit (INR / USD).
+function formatMarketCap(value: unknown, market: string) {
+  if (value == null || value === "") return "—";
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  if (market === "US") {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 2 }).format(n);
+  }
+  return `₹${(n / 1e7).toLocaleString("en-IN", { maximumFractionDigits: 0 })} Cr`;
 }
 
 function getTicker(row: Record<string, unknown> | null): string {
@@ -131,11 +144,11 @@ export function CompanyDetailDrawer() {
         </div>
         <div>
           <div className="text-terminal-muted">Market Cap</div>
-          <div>{formatNum(selectedRow.market_cap)}</div>
+          <div>{formatMarketCap(selectedRow.market_cap, getMarket(selectedRow))}</div>
         </div>
         <div>
           <div className="text-terminal-muted">PE</div>
-          <div>{formatNum(selectedRow.pe)}</div>
+          <div>{formatNum(selectedRow.pe, { zeroIsMissing: true })}</div>
         </div>
         <div>
           <div className="text-terminal-muted">ROE</div>

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { TerminalTable, type TerminalTableColumn } from "../terminal/TerminalTable";
 import { getAccessToken } from "../../api/base";
-import { formatPercent } from "../../lib/format";
 
 interface CommonHolding {
   symbol: string;
@@ -72,7 +71,7 @@ export function OverlapAnalysis({ tickers }: Props) {
       label: "Overlap Weight (%)",
       align: "right",
       sortable: true,
-      render: (h) => <span className="text-terminal-pos">{formatPercent(h.weight)}</span>,
+      render: (h) => <span className="text-terminal-text">{Number.isFinite(h.weight) ? `${h.weight.toFixed(2)}%` : "-"}</span>,
     },
   ];
 
@@ -88,7 +87,7 @@ export function OverlapAnalysis({ tickers }: Props) {
           Overlap: {data.tickers.join(" vs ")}
         </div>
         <div className="text-sm font-bold text-terminal-accent">
-          {formatPercent(data.overlap_pct)} Overlap
+          {Number.isFinite(data.overlap_pct) ? `${data.overlap_pct.toFixed(2)}%` : "-"} Overlap
         </div>
       </div>
       <TerminalTable

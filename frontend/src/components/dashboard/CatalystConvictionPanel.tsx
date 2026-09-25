@@ -27,15 +27,19 @@ export function CatalystConvictionPanel({
   const [data, setData] = useState<ConvictionResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [empty, setEmpty] = useState(false);
 
   useEffect(() => {
     if (!symbol) return;
     let active = true;
     setLoading(true);
     setFailed(false);
+    setEmpty(false);
     fetchSecurityConviction(symbol)
       .then((payload) => {
-        if (active) setData(payload);
+        if (!active) return;
+        setData(payload);
+        setEmpty(payload == null);
       })
       .catch(() => {
         if (active) {
@@ -75,7 +79,14 @@ export function CatalystConvictionPanel({
         </span>
       </div>
 
-      {failed ? (
+      {empty ? (
+        <GuidedEmptyState
+          title="No conviction record yet"
+          message="No catalyst notes have been ingested for this symbol. Ingest catalyst notes or open the screener to build a stock-picking candidate set."
+          icon="AI"
+          actions={onOpenScreener ? [{ label: "Open Screener", onClick: onOpenScreener }] : []}
+        />
+      ) : failed ? (
         <GuidedEmptyState
           title="Conviction feed unavailable"
           message="Ingest catalyst notes for this symbol or open the screener to build a fresh stock-picking candidate set."

@@ -1,4 +1,4 @@
-import { Fragment, startTransition, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { Fragment, startTransition, useEffect, useMemo, useRef, useState, useCallback, type CSSProperties } from "react";
 import {
   PriceScaleMode,
   CandlestickSeries,
@@ -810,6 +810,8 @@ export function TradingChart({
     [replayParsed],
   );
   const mainPriceScaleId = surfaceSettings.priceScalePlacement === "left" ? "left" : "right";
+  // Measured width of the visible price scale, so overlay toolbars never cover its labels.
+  const [priceScaleGutter, setPriceScaleGutter] = useState(72);
   useIndicators(indicatorChartApi, indicatorBars, indicatorConfigs, {
     nonOverlayPaneStartIndex: 1,
     mainPriceScaleId,
@@ -2220,9 +2222,24 @@ export function TradingChart({
     });
   })();
 
+  useEffect(() => {
+    const chart = apiRef.current;
+    if (!chart) return;
+    const frame = requestAnimationFrame(() => {
+      try {
+        const width = chart.priceScale(mainPriceScaleId).width();
+        if (Number.isFinite(width) && width > 0) setPriceScaleGutter(Math.round(width));
+      } catch {
+        // chart disposed between frames
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  });
+
   return (
     <div
       className="relative z-0 h-full w-full rounded border border-terminal-border"
+      style={{ "--ot-chart-gutter": `${priceScaleGutter}px` } as CSSProperties}
       role="region"
       aria-label={`${ticker} ${timeframe} trading chart`}
       onContextMenu={(e) => {
@@ -2254,7 +2271,14 @@ export function TradingChart({
       <ChartAccessibilityLayer summary={accessibleOhlcSummary} rows={accessibleRows} formatTime={formatInspectorTime} />
       {!compact && (
       <>
-      <div className="absolute left-2 top-2 z-[6] flex max-h-20 max-w-[calc(100%-1rem)] flex-wrap items-center gap-1 overflow-auto rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[10px] text-terminal-text sm:max-h-none">
+      {/* The two toolbars share the top edge: each gets its own half (single row, scrolls
+          horizontally when crowded) and stays clear of the price-scale gutter, so on narrow
+          charts (e.g. split compare) they never overlap each other or the axis labels. */}
+      <div
+        className={`absolute top-2 z-[6] flex max-w-[calc(100%-1rem)] flex-nowrap items-center gap-1 overflow-x-auto rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[10px] text-terminal-text [&>*]:shrink-0 sm:max-w-[calc(50%-var(--ot-chart-gutter)-1rem)] ${
+          surfaceSettings.priceScalePlacement === "left" ? "left-2 sm:left-[calc(var(--ot-chart-gutter)+0.5rem)]" : "left-2"
+        }`}
+      >
         <button
           type="button"
           className={`rounded border px-1.5 py-0.5 ${
@@ -2407,7 +2431,9 @@ export function TradingChart({
         ) : null}
       </div>
       <div
-        className="absolute right-2 top-12 z-[8] flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-1 rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[10px] text-terminal-text sm:top-2"
+        className={`absolute top-12 z-[8] flex max-w-[calc(100%-1rem)] flex-nowrap items-center gap-1 overflow-x-auto rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[10px] text-terminal-text [&>*]:shrink-0 sm:top-2 sm:max-w-[calc(50%-var(--ot-chart-gutter)-1rem)] ${
+          surfaceSettings.priceScalePlacement === "right" ? "right-2 sm:right-[calc(var(--ot-chart-gutter)+0.5rem)]" : "right-2"
+        }`}
         data-testid="chart-context-controls"
       >
         <button
@@ -3013,7 +3039,7 @@ export function TradingChart({
       )}
       {surfaceSettings.statusLineVisible ? (
         <div
-          className="pointer-events-none absolute bottom-2 left-2 right-24 z-[6] truncate rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[10px] text-terminal-text"
+          className="pointer-events-none absolute bottom-8 left-2 right-24 z-[6] truncate rounded border border-terminal-border bg-terminal-panel/95 px-2 py-1 text-[10px] text-terminal-text"
           data-testid="chart-status-line"
         >
           {statusLine}

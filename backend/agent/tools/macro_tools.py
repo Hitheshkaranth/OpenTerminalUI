@@ -253,9 +253,14 @@ async def get_yield_curve(args: dict[str, Any]) -> dict[str, Any]:
         "points": project(points, _YIELD_POINT_FIELDS),
         "spreads": spreads, "inverted_2s10s": inverted,
     }
-    quality = "live" if service.api_key else "synthetic"
-    note = None if service.api_key else "FRED_API_KEY not configured — mock yield curve returned."
-    return ok(data, source="fred" if service.api_key else "mock", quality=quality, note=note)
+    if service.api_key and not result.get("mock"):
+        return ok(data, source="fred", quality="live")
+    if result.get("source") == "yahoo" and not result.get("mock"):
+        return ok(
+            data, source="yahoo", quality="live",
+            note="FRED_API_KEY not configured — partial curve (3M/5Y/10Y/30Y) from Yahoo Treasury indices.",
+        )
+    return ok(data, source="mock", quality="synthetic", note="FRED_API_KEY not configured — mock yield curve returned.")
 
 
 def macro_tool_specs() -> list[ToolSpec]:

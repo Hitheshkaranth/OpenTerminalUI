@@ -11,6 +11,53 @@ type Props = {
   height?: number | string;
 };
 
+type LabelBox = { x: number; y: number; w: number; h: number };
+type LabelPlacement = { x: number; y: number; anchor: "start" | "end"; leader: boolean } | null;
+
+const LABEL_FONT = 0.8;
+// Invert Y: RS-Momentum > 100 plots higher (smaller SVG y).
+const mapRrgY = (y: number) => 100 - (y - 100);
+
+function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
+  return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+}
+
+/**
+ * Greedy label placement for crowded RRG points: try beside the dot, then stacked offsets
+ * (drawn with a leader line). Labels that still collide are dropped — the point keeps its
+ * hover tooltip — so symbols never render on top of each other as garbled text.
+ */
+export function placeRrgLabels(points: Array<{ symbol: string; x: number; y: number }>): Record<string, LabelPlacement> {
+  const placed: LabelBox[] = points.map((p) => ({ x: p.x - 0.6, y: p.y - 0.6, w: 1.2, h: 1.2 })); // dots are obstacles
+  const out: Record<string, LabelPlacement> = {};
+  const ordered = [...points].sort((a, b) => a.y - b.y || a.x - b.x);
+  for (const point of ordered) {
+    const w = point.symbol.length * LABEL_FONT * 0.62;
+    const h = LABEL_FONT;
+    const candidates: Array<{ dx: number; dy: number; anchor: "start" | "end" }> = [
+      { dx: 0.8, dy: 0.3, anchor: "start" },
+      { dx: -0.8, dy: 0.3, anchor: "end" },
+    ];
+    for (const step of [1.1, 2.2, 3.3]) {
+      candidates.push({ dx: 0.8, dy: 0.3 - step, anchor: "start" }, { dx: 0.8, dy: 0.3 + step, anchor: "start" });
+      candidates.push({ dx: -0.8, dy: 0.3 - step, anchor: "end" }, { dx: -0.8, dy: 0.3 + step, anchor: "end" });
+    }
+    let chosen: LabelPlacement = null;
+    for (const c of candidates) {
+      const lx = point.x + c.dx;
+      const ly = point.y + c.dy;
+      const box: LabelBox = { x: c.anchor === "start" ? lx : lx - w, y: ly - h * 0.85, w, h };
+      const selfDot = (b: LabelBox) => Math.abs(b.x + 0.6 - point.x) < 1e-6 && Math.abs(b.y + 0.6 - point.y) < 1e-6;
+      if (placed.some((b) => !selfDot(b) && boxesOverlap(box, b))) continue;
+      placed.push(box);
+      chosen = { x: lx, y: ly, anchor: c.anchor, leader: Math.abs(c.dy - 0.3) > 0.01 };
+      break;
+    }
+    out[point.symbol] = chosen;
+  }
+  return out;
+}
+
 export function SectorRotationMap({ defaultBenchmark = "SPY", width = "100%", height = 400 }: Props) {
   const navigate = useNavigate();
   const [benchmark, setBenchmark] = useState(defaultBenchmark);
@@ -43,6 +90,16 @@ export function SectorRotationMap({ defaultBenchmark = "SPY", width = "100%", he
       };
     });
   }, [data, historyIndex]);
+
+  const labelPlacements = useMemo(
+    () =>
+      placeRrgLabels(
+        processedData
+          .filter((sector) => sector.current)
+          .map((sector) => ({ symbol: sector.symbol, x: sector.current.x, y: mapRrgY(sector.current.y) })),
+      ),
+    [processedData],
+  );
 
   const maxHistory = useMemo(() => {
     if (!data?.sectors?.length) return 0;
@@ -161,7 +218,8 @@ export function SectorRotationMap({ defaultBenchmark = "SPY", width = "100%", he
             // RRG has 100,100 center.
             // SVG: higher Y is lower down. RS-Mom > 100 should be visually higher (lower Y).
             // So we map Y: SVG_Y = 100 - (RS_Mom - 100).
-            const mapY = (y: number) => 100 - (y - 100);
+            const mapY = mapRrgY;
+            const label = labelPlacements[sector.symbol];
 
             const trailPoints = sector.displayTrail.map(p => `${p.x},${mapY(p.y)}`).join(" ");
             const color = getQuadrantColor(sector.current.x, sector.current.y);
@@ -197,18 +255,34 @@ export function SectorRotationMap({ defaultBenchmark = "SPY", width = "100%", he
                   strokeWidth="0.1"
                 />
 
-                {/* Label */}
-                <text
-                  x={sector.current.x + 0.8}
-                  y={mapY(sector.current.y) + 0.3}
-                  fontSize={isHovered ? "1.2" : "0.8"}
-                  fill="#fff"
-                  fontWeight="bold"
-                  className="pointer-events-none select-none"
-                  style={{ textShadow: "0px 0px 2px #000" }}
-                >
-                  {sector.symbol}
-                </text>
+                <title>{`${sector.symbol} — RS-Ratio ${sector.current.x.toFixed(2)}, RS-Mom ${sector.current.y.toFixed(2)}`}</title>
+
+                {/* Label: collision-resolved; crowded points without room show on hover only */}
+                {label?.leader ? (
+                  <line
+                    x1={sector.current.x}
+                    y1={mapY(sector.current.y)}
+                    x2={label.x + (label.anchor === "start" ? -0.1 : 0.1)}
+                    y2={label.y - LABEL_FONT * 0.35}
+                    stroke="#888"
+                    strokeWidth="0.06"
+                    className="pointer-events-none"
+                  />
+                ) : null}
+                {label || isHovered ? (
+                  <text
+                    x={label ? label.x : sector.current.x + 0.8}
+                    y={label ? label.y : mapY(sector.current.y) + 0.3}
+                    textAnchor={label ? label.anchor : "start"}
+                    fontSize={isHovered ? "1.2" : String(LABEL_FONT)}
+                    fill="#fff"
+                    fontWeight="bold"
+                    className="pointer-events-none select-none"
+                    style={{ textShadow: "0px 0px 2px #000" }}
+                  >
+                    {sector.symbol}
+                  </text>
+                ) : null}
               </g>
             );
           })}

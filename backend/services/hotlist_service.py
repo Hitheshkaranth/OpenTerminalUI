@@ -4,8 +4,7 @@ import asyncio
 import copy
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from hashlib import sha256
-from typing import Any, Callable, Literal
+from typing import Any, Awaitable, Callable, Literal
 
 
 HotlistType = Literal[
@@ -47,82 +46,109 @@ class _UniverseRow:
     sparkline: tuple[float, ...]
 
 
-def _seed(*parts: str) -> int:
-    digest = sha256("::".join(parts).encode("utf-8")).digest()
-    return int.from_bytes(digest[:8], "big", signed=False)
+_UNIVERSE_NAMES: dict[MarketType, tuple[tuple[str, str], ...]] = {
+    "IN": (
+        ("RELIANCE", "Reliance Industries"),
+        ("TCS", "Tata Consultancy Services"),
+        ("INFY", "Infosys"),
+        ("HDFCBANK", "HDFC Bank"),
+        ("ICICIBANK", "ICICI Bank"),
+        ("SBIN", "State Bank of India"),
+        ("LT", "Larsen & Toubro"),
+        ("ITC", "ITC"),
+        ("BHARTIARTL", "Bharti Airtel"),
+        ("HINDUNILVR", "Hindustan Unilever"),
+    ),
+    "US": (
+        ("AAPL", "Apple Inc."),
+        ("MSFT", "Microsoft Corp."),
+        ("NVDA", "NVIDIA Corp."),
+        ("AMZN", "Amazon.com Inc."),
+        ("META", "Meta Platforms"),
+        ("GOOGL", "Alphabet Inc."),
+        ("TSLA", "Tesla Inc."),
+        ("JPM", "JPMorgan Chase"),
+        ("XOM", "Exxon Mobil"),
+        ("AMD", "Advanced Micro Devices"),
+    ),
+}
+
+# A bar is (open, high, low, close, volume), oldest first.
+Bar = tuple[float, float, float, float, float]
+HistoryLoader = Callable[[str, MarketType], Awaitable[list[Bar]]]
 
 
-def _stable_series(base: float, symbol: str, points: int = 5) -> tuple[float, ...]:
-    out: list[float] = []
-    current = max(0.01, float(base))
-    for index in range(points):
-        s = _seed(symbol, "spark", str(index))
-        move = ((s % 130) - 65) / 5000.0
-        current = max(0.01, current * (1.0 + move))
-        out.append(round(current, 2))
-    return tuple(out)
+async def _default_history_loader(symbol: str, market: MarketType) -> list[Bar]:
+    """Daily bars (1y) from the real provider chain (adapters -> Yahoo -> FMP)."""
+    from backend.api.deps import get_unified_fetcher
+    from backend.api.routes.chart import _parse_yahoo_chart
+
+    fetcher = await get_unified_fetcher()
+    raw = await fetcher.fetch_history(symbol, range_str="1y", interval="1d")
+    frame = _parse_yahoo_chart(raw if isinstance(raw, dict) else {})
+    if frame.empty:
+        return []
+    frame = frame.sort_index()
+    return [
+        (float(r["Open"]), float(r["High"]), float(r["Low"]), float(r["Close"]), float(r.get("Volume", 0.0) or 0.0))
+        for _, r in frame.iterrows()
+    ]
 
 
-def _build_market_universe(market: MarketType) -> list[_UniverseRow]:
-    if market == "IN":
-        base_rows = (
-            ("RELIANCE", "Reliance Industries", 2954.0, 2942.0, 3012.0, 6_200_000, 3_900_000),
-            ("TCS", "Tata Consultancy Services", 4120.0, 4108.0, 4089.0, 2_100_000, 1_450_000),
-            ("INFY", "Infosys", 1782.0, 1774.0, 1811.0, 5_100_000, 2_950_000),
-            ("HDFCBANK", "HDFC Bank", 1594.0, 1580.0, 1562.0, 4_300_000, 3_050_000),
-            ("ICICIBANK", "ICICI Bank", 1228.0, 1211.0, 1238.0, 5_800_000, 3_300_000),
-            ("SBIN", "State Bank of India", 821.0, 826.0, 808.0, 7_900_000, 5_400_000),
-            ("LT", "Larsen & Toubro", 3620.0, 3592.0, 3678.0, 1_250_000, 930_000),
-            ("ITC", "ITC", 431.0, 430.0, 438.0, 8_450_000, 4_950_000),
-            ("BHARTIARTL", "Bharti Airtel", 1315.0, 1298.0, 1336.0, 6_350_000, 3_350_000),
-            ("HINDUNILVR", "Hindustan Unilever", 2498.0, 2485.0, 2462.0, 1_680_000, 1_320_000),
-        )
-    else:
-        base_rows = (
-            ("AAPL", "Apple Inc.", 224.2, 225.1, 228.8, 69_200_000, 54_000_000),
-            ("MSFT", "Microsoft Corp.", 417.3, 416.2, 420.7, 24_800_000, 21_900_000),
-            ("NVDA", "NVIDIA Corp.", 907.0, 915.5, 936.2, 62_700_000, 41_500_000),
-            ("AMZN", "Amazon.com Inc.", 189.9, 191.2, 188.4, 39_500_000, 32_200_000),
-            ("META", "Meta Platforms", 502.2, 499.8, 513.9, 19_600_000, 14_700_000),
-            ("GOOGL", "Alphabet Inc.", 171.1, 170.2, 168.7, 33_300_000, 26_200_000),
-            ("TSLA", "Tesla Inc.", 197.0, 198.6, 192.8, 83_600_000, 66_800_000),
-            ("JPM", "JPMorgan Chase", 198.7, 197.4, 201.5, 12_800_000, 10_600_000),
-            ("XOM", "Exxon Mobil", 114.4, 115.6, 117.1, 18_900_000, 14_900_000),
-            ("AMD", "Advanced Micro Devices", 178.2, 179.1, 182.5, 52_300_000, 31_400_000),
-        )
-
-    out: list[_UniverseRow] = []
-    for symbol, name, prev_close, open_price, last_price, volume, avg_volume in base_rows:
-        drift_seed = _seed(symbol, market, "drift")
-        high_52w = round(max(prev_close, last_price) * (1.08 + (drift_seed % 18) / 100.0), 2)
-        low_52w = round(min(prev_close, last_price) * (0.78 - (drift_seed % 7) / 200.0), 2)
-        out.append(
-            _UniverseRow(
-                symbol=symbol,
-                name=name,
-                market=market,
-                prev_close=round(float(prev_close), 2),
-                open_price=round(float(open_price), 2),
-                last_price=round(float(last_price), 2),
-                volume=int(volume),
-                avg_volume=int(avg_volume),
-                high_52w=max(high_52w, round(last_price, 2)),
-                low_52w=min(low_52w, round(last_price, 2)),
-                sparkline=_stable_series(prev_close, symbol),
-            )
-        )
-    return out
+def _row_from_bars(symbol: str, name: str, market: MarketType, bars: list[Bar]) -> _UniverseRow | None:
+    bars = [b for b in bars if b[3] and b[3] > 0]
+    if len(bars) < 2:
+        return None
+    last = bars[-1]
+    prev = bars[-2]
+    history = bars[-21:-1] or bars[:-1]
+    avg_volume = int(sum(b[4] for b in history) / len(history)) if history else 0
+    return _UniverseRow(
+        symbol=symbol,
+        name=name,
+        market=market,
+        prev_close=round(prev[3], 2),
+        open_price=round(last[0], 2),
+        last_price=round(last[3], 2),
+        volume=int(last[4]),
+        avg_volume=avg_volume,
+        high_52w=round(max(b[1] for b in bars), 2),
+        low_52w=round(min(b[2] for b in bars), 2),
+        sparkline=tuple(round(b[3], 2) for b in bars[-5:]),
+    )
 
 
 class HotlistService:
-    def __init__(self, *, now_factory: Callable[[], datetime] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        now_factory: Callable[[], datetime] | None = None,
+        history_loader: HistoryLoader | None = None,
+    ) -> None:
         self._now_factory = now_factory or (lambda: datetime.now(timezone.utc))
+        self._history_loader = history_loader or _default_history_loader
         self._cache: dict[str, tuple[float, list[dict[str, Any]], str]] = {}
         self._cache_lock = asyncio.Lock()
-        self._universes: dict[MarketType, list[_UniverseRow]] = {
-            "IN": _build_market_universe("IN"),
-            "US": _build_market_universe("US"),
-        }
+        self._universe_cache: dict[str, tuple[float, list[_UniverseRow]]] = {}
+
+    async def _load_universe(self, market: MarketType) -> list[_UniverseRow]:
+        now_ts = self._now().timestamp()
+        cached = self._universe_cache.get(market)
+        if cached and cached[0] > now_ts:
+            return list(cached[1])
+
+        async def _one(symbol: str, name: str) -> _UniverseRow | None:
+            try:
+                bars = await asyncio.wait_for(self._history_loader(symbol, market), timeout=15)
+            except Exception:
+                return None
+            return _row_from_bars(symbol, name, market, bars or [])
+
+        results = await asyncio.gather(*(_one(sym, name) for sym, name in _UNIVERSE_NAMES[market]))
+        rows = [row for row in results if row is not None]
+        if rows:
+            self._universe_cache[market] = (now_ts + self._ttl_seconds(market), rows)
+        return rows
 
     def _now(self) -> datetime:
         now = self._now_factory()
@@ -175,9 +201,9 @@ class HotlistService:
 
     def _rank(self, list_type: HotlistType, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if list_type == "gainers":
-            ranked = sorted(rows, key=lambda row: row["change_pct"], reverse=True)
+            ranked = sorted((r for r in rows if r["change_pct"] > 0), key=lambda row: row["change_pct"], reverse=True)
         elif list_type == "losers":
-            ranked = sorted(rows, key=lambda row: row["change_pct"])
+            ranked = sorted((r for r in rows if r["change_pct"] < 0), key=lambda row: row["change_pct"])
         elif list_type == "most_active":
             ranked = sorted(rows, key=lambda row: row["volume"], reverse=True)
         elif list_type == "52w_high":
@@ -186,13 +212,13 @@ class HotlistService:
             ranked = sorted(rows, key=lambda row: (row["price"] / row["_low_52w"]) if row["_low_52w"] else float("inf"))
         elif list_type == "gap_up":
             ranked = sorted(
-                rows,
+                (r for r in rows if r["_open"] > r["_prev_close"]),
                 key=lambda row: ((row["_open"] - row["_prev_close"]) / row["_prev_close"]) if row["_prev_close"] else 0.0,
                 reverse=True,
             )
         elif list_type == "gap_down":
             ranked = sorted(
-                rows,
+                (r for r in rows if r["_open"] < r["_prev_close"]),
                 key=lambda row: ((row["_open"] - row["_prev_close"]) / row["_prev_close"]) if row["_prev_close"] else 0.0,
             )
         else:
@@ -213,7 +239,7 @@ class HotlistService:
             if cached and cached[0] > now.timestamp():
                 return copy.deepcopy(cached[1])
 
-        universe = self._universes[normalized_market]
+        universe = await self._load_universe(normalized_market)
         rows = [self._row_to_item(row) for row in universe]
         ranked = self._rank(normalized_type, rows)[:safe_limit]
         final = [
@@ -229,7 +255,7 @@ class HotlistService:
             for row in ranked
         ]
 
-        ttl = self._ttl_seconds(normalized_market)
+        ttl = self._ttl_seconds(normalized_market) if universe else 0
         async with self._cache_lock:
             self._cache[cache_key] = (now.timestamp() + ttl, copy.deepcopy(final), now.isoformat())
         return final

@@ -116,7 +116,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { id: "oms", label: "OMS", to: "/equity/oms", glyph: "OM" },
       { id: "ops", label: "Ops", to: "/equity/ops", glyph: "OP" },
       { id: "data-quality", label: "Data Quality", to: "/equity/data-quality", glyph: "DQ" },
-      { id: "reports", label: "Reports", to: "/reports", glyph: "RP" },
+      { id: "reports", label: "Reports", to: "/equity/reports", glyph: "RP" },
     ],
   },
   {

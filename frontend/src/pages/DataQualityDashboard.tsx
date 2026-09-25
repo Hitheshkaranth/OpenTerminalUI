@@ -14,10 +14,16 @@ const STATUS_DOT: Record<string, string> = {
   offline: "bg-terminal-neg",
 };
 
-function statusVariant(status: string): "success" | "warn" | "danger" {
-  if (status === "healthy") return "success";
-  if (status === "stale") return "warn";
+function statusVariant(status: string): "success" | "warn" | "danger" | "neutral" {
+  const s = status.toLowerCase();
+  if (s === "healthy" || s === "ok") return "success";
+  if (s === "stale" || s === "degraded" || s === "warning") return "warn";
+  if (s === "unconfigured" || s === "unknown") return "neutral";
   return "danger";
+}
+
+function formatCount(value?: number): string {
+  return value == null ? "-" : String(value);
 }
 
 function formatLatency(ms?: number): string {
@@ -96,13 +102,13 @@ export function DataQualityDashboard() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <TerminalPanel title="Stale Symbols">
-          <div className="text-2xl font-bold mt-1">{metrics.stale_symbols ?? 0}</div>
+          <div className={`text-2xl font-bold mt-1 ${metrics.stale_symbols ? "text-terminal-warn" : ""}`}>{formatCount(metrics.stale_symbols)}</div>
         </TerminalPanel>
         <TerminalPanel title="Missing Bars (24h)">
-          <div className="text-2xl font-bold mt-1 text-terminal-neg">{metrics.missing_bars_24h ?? 0}</div>
+          <div className={`text-2xl font-bold mt-1 ${metrics.missing_bars_24h ? "text-terminal-neg" : ""}`}>{formatCount(metrics.missing_bars_24h)}</div>
         </TerminalPanel>
         <TerminalPanel title="Outliers">
-          <div className="text-2xl font-bold mt-1 text-terminal-warn">{metrics.outliers_detected ?? 0}</div>
+          <div className={`text-2xl font-bold mt-1 ${metrics.outliers_detected ? "text-terminal-warn" : ""}`}>{formatCount(metrics.outliers_detected)}</div>
         </TerminalPanel>
         <TerminalPanel title="Cache Hit Rate">
           <div className="text-2xl font-bold mt-1 text-terminal-pos">

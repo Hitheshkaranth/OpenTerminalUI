@@ -319,7 +319,7 @@ export function CommoditiesPage() {
         if (cancelled) return;
         const normalized = normalizeCategories(payload);
         setCategories(normalized);
-        setQuotesFallback(false);
+        setQuotesFallback(normalized === FALLBACK_CATEGORIES);
       } catch {
         if (cancelled) return;
         setCategories(FALLBACK_CATEGORIES);
@@ -414,8 +414,8 @@ export function CommoditiesPage() {
         subtitle="Energy, metals, and agriculture futures with curve and seasonality context"
         actions={
           <div className="flex items-center gap-2">
-            <TerminalBadge variant={quotesFallback || detailsFallback ? "warn" : "live"} dot>
-              {quotesFallback || detailsFallback ? "Seeded fallback" : "Backend live"}
+            <TerminalBadge variant={quotesLoading ? "info" : quotesFallback || detailsFallback ? "warn" : "live"} dot>
+              {quotesLoading ? "Loading" : quotesFallback || detailsFallback ? "Seeded fallback" : "Backend live"}
             </TerminalBadge>
             <TerminalBadge variant="accent">CMDTY</TerminalBadge>
           </div>
@@ -449,7 +449,9 @@ export function CommoditiesPage() {
           </div>
           {(quotesFallback || detailsFallback) ? (
             <div className="rounded border border-terminal-warn/40 bg-terminal-warn/10 px-3 py-2 text-xs text-terminal-warn">
-              Commodities backend routes can render seeded fixtures until router registration is wired into the main backend app.
+              {quotesFallback
+                ? "Live commodity quotes are unavailable — prices below are seeded sample values, not market data."
+                : "Futures curve or seasonality is unavailable — those panels show seeded sample values, not market data."}
             </div>
           ) : null}
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
@@ -458,7 +460,7 @@ export function CommoditiesPage() {
                 <div>
                   <div className="text-xs uppercase tracking-[0.16em] text-terminal-muted">{activeCategory.label}</div>
                   <div className="mt-1 text-[11px] text-terminal-muted">
-                    Spot watchlist with mini trend, daily move, and liquidity
+                    Front-month futures (Yahoo continuous contract) with daily move and liquidity
                   </div>
                 </div>
                 {quotesLoading ? <TerminalBadge variant="info" dot>Refreshing</TerminalBadge> : null}

@@ -338,7 +338,10 @@ async def _load_rows(limit: int = 100) -> list[_Row]:
             continue
         change_pct = _f(q.get("regularMarketChangePercent"))
         volume = _f(q.get("regularMarketVolume"))
-        market_cap_proxy = max(price * max(volume, 1.0), price * 1_000_000.0)
+        # Yahoo's regularMarketVolume for crypto pairs is already quoted in USD, so
+        # price * volume is meaningless as a cap. Use Yahoo's reported marketCap;
+        # leave it at 0 (unknown) rather than inventing a proxy.
+        market_cap = max(_f(q.get("marketCap")), 0.0)
         rows.append(
             _Row(
                 symbol=sym,
@@ -346,7 +349,7 @@ async def _load_rows(limit: int = 100) -> list[_Row]:
                 price=price,
                 change_24h=change_pct,
                 volume_24h=volume,
-                market_cap=market_cap_proxy,
+                market_cap=market_cap,
                 sector=str(meta.get("sector") or "Other"),
             )
         )

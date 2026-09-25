@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { TerminalTable, type TerminalTableColumn } from "../terminal/TerminalTable";
 import { getAccessToken } from "../../api/base";
-import { formatCurrency, formatPercent } from "../../lib/format";
 
 interface Holding {
   symbol: string;
@@ -66,7 +65,7 @@ export function HoldingsViewer({ ticker }: Props) {
       label: "Weight (%)",
       align: "right",
       sortable: true,
-      render: (h) => <span className="text-terminal-pos">{formatPercent(h.weight / 100)}</span>,
+      render: (h) => <span className="text-terminal-text">{Number.isFinite(h.weight) ? `${h.weight.toFixed(2)}%` : "-"}</span>,
     },
   ];
 

@@ -79,7 +79,9 @@ describe("ETFAnalyticsPage", () => {
     await waitFor(() => {
       expect(screen.getAllByText("AAPL").length).toBeGreaterThan(0);
       expect(screen.getAllByText("Apple Inc.").length).toBeGreaterThan(0);
-      expect(screen.getByText("+95.20% Overlap")).toBeInTheDocument();
+      expect(screen.getByText("95.20% Overlap")).toBeInTheDocument();
+      // Weights are already percent units: 7.10%, not 0.07% and no "+" sign.
+      expect(screen.getByText("7.10%")).toBeInTheDocument();
     });
   });
 });

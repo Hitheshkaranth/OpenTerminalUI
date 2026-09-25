@@ -28,7 +28,8 @@ export function StrikeSummaryBar({ symbol, expiry, spotPrice, summary }: Props) 
       </div>
       <div>
         <div className="text-[10px] uppercase text-terminal-muted">ATM IV</div>
-        <div className="text-sm font-semibold">{summary ? `${Number(summary.atm_iv || 0).toFixed(2)}%` : "-"}</div>
+        {/* atm_iv is in percent points (14.25 = 14.25%) for both NSE and US chains */}
+        <div className="text-sm font-semibold">{typeof summary?.atm_iv === "number" && summary.atm_iv > 0 ? `${summary.atm_iv.toFixed(2)}%` : "-"}</div>
       </div>
       <div>
         <div className="text-[10px] uppercase text-terminal-muted">IV Rank</div>
@@ -40,11 +41,11 @@ export function StrikeSummaryBar({ symbol, expiry, spotPrice, summary }: Props) 
       </div>
       <div>
         <div className="text-[10px] uppercase text-terminal-muted">PCR</div>
-        <div className="text-sm font-semibold">{summary ? Number(summary.pcr?.pcr_oi || 0).toFixed(2) : "-"}</div>
+        <div className="text-sm font-semibold">{typeof summary?.pcr?.pcr_oi === "number" ? summary.pcr.pcr_oi.toFixed(2) : "-"}</div>
       </div>
       <div>
         <div className="text-[10px] uppercase text-terminal-muted">Max Pain</div>
-        <div className="text-sm font-semibold">{typeof summary?.max_pain === "number" ? formatDisplayMoney(summary.max_pain) : "-"}</div>
+        <div className="text-sm font-semibold">{typeof summary?.max_pain === "number" && summary.max_pain > 0 ? formatDisplayMoney(summary.max_pain) : "-"}</div>
       </div>
     </div>
   );

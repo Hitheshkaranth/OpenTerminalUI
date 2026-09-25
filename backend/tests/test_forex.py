@@ -287,6 +287,32 @@ def test_central_banks_endpoint_returns_rate_decision_calendar() -> None:
     assert body["banks"][0]["days_since_last_decision"] == 32
 
 
+def test_central_banks_never_reports_past_next_decision_and_flags_stale_snapshot() -> None:
+    later = datetime(2026, 9, 25, 12, 0, tzinfo=timezone.utc)
+    service = ForexService(
+        yahoo=_FakeYahoo(),
+        finnhub=_FakeFinnhub(),
+        cache_backend=_FakeCache(),
+        now_factory=lambda: later,
+    )
+    client = TestClient(_build_app(service))
+
+    body = client.get("/api/forex/central-banks").json()
+
+    assert body["stale"] is True
+    assert body["snapshot_as_of"] == "2026-03-19"
+    for bank in body["banks"]:
+        assert bank["next_decision_date"] is None
+        assert bank["days_until_next_decision"] is None
+
+    fresh = _build_service(yahoo=_FakeYahoo(), finnhub=_FakeFinnhub(), cache=_FakeCache())
+    fresh_body = TestClient(_build_app(fresh)).get("/api/forex/central-banks").json()
+    assert fresh_body["stale"] is False
+    fed = fresh_body["banks"][0]
+    assert fed["next_decision_date"] == "2026-03-31"
+    assert fed["days_until_next_decision"] == 9
+
+
 def test_service_uses_stale_pair_cache_when_live_sources_fail() -> None:
     cache = _FakeCache()
     stale_key = cache.build_key("forex_pair_chart_stale", "EURUSD", {"interval": "1d", "range": "3mo"})

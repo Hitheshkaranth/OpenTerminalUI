@@ -418,8 +418,10 @@ export function NewsPage() {
     };
   }, [periodItems]);
 
+  // Article counts always come from the same filtered list the headlines panel renders,
+  // so the "Articles" tile and "N articles in the last Xd" can't disagree.
   const summary = isTickerMode && sentimentQuery.data
-    ? sentimentQuery.data
+    ? { ...sentimentQuery.data, total_articles: periodItems.length }
     : {
         ticker: currentTicker,
         period_days: periodDays,

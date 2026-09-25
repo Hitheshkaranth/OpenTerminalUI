@@ -198,8 +198,8 @@ class OptionChainFetcher:
                 "pe_oi_total": int(pe_oi_total),
                 "ce_volume_total": int(ce_vol_total),
                 "pe_volume_total": int(pe_vol_total),
-                "pcr_oi": round((pe_oi_total / ce_oi_total), 4) if ce_oi_total > 0 else 0.0,
-                "pcr_volume": round((pe_vol_total / ce_vol_total), 4) if ce_vol_total > 0 else 0.0,
+                "pcr_oi": round((pe_oi_total / ce_oi_total), 4) if ce_oi_total > 0 else None,
+                "pcr_volume": round((pe_vol_total / ce_vol_total), 4) if ce_vol_total > 0 else None,
             },
         }
 
@@ -267,7 +267,7 @@ class OptionChainFetcher:
                 "available_expiries": [],
                 "atm_strike": 0.0,
                 "strikes": [],
-                "totals": {"ce_oi_total": 0, "pe_oi_total": 0, "ce_volume_total": 0, "pe_volume_total": 0, "pcr_oi": 0.0, "pcr_volume": 0.0},
+                "totals": {"ce_oi_total": 0, "pe_oi_total": 0, "ce_volume_total": 0, "pe_volume_total": 0, "pcr_oi": None, "pcr_volume": None},
             }
 
         market_classifier = self._get_market_classifier()
@@ -310,7 +310,7 @@ class OptionChainFetcher:
                     "available_expiries": [expiry] if expiry else [],
                     "atm_strike": 0.0,
                     "strikes": [],
-                    "totals": {"ce_oi_total": 0, "pe_oi_total": 0, "ce_volume_total": 0, "pe_volume_total": 0, "pcr_oi": 0.0, "pcr_volume": 0.0},
+                    "totals": {"ce_oi_total": 0, "pe_oi_total": 0, "ce_volume_total": 0, "pe_volume_total": 0, "pcr_oi": None, "pcr_volume": None},
                 }
             chain["market"] = "NSE"
 
@@ -324,8 +324,8 @@ class OptionChainFetcher:
             chain["iv_percentile"] = iv_percentile
             chain["atm_iv"] = atm_iv
         except Exception:
-            chain["iv_rank"] = 0.0
-            chain["iv_percentile"] = 0.0
+            chain["iv_rank"] = None
+            chain["iv_percentile"] = None
             chain["atm_iv"] = 0.0
 
         ttl = 60 if market_open_now() else 120

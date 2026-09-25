@@ -62,6 +62,13 @@ export function OptionGreeksCalculator() {
     </div>
   );
 
+  // /api/options/greeks returns theta per YEAR and vega/rho per 1.00 (100%) change in
+  // vol/rate. Convert to trader conventions so values match their labels.
+  const g = greeksMutation.data;
+  const thetaDaily = g ? g.theta / 365 : 0;
+  const vegaPer1Pct = g ? g.vega / 100 : 0;
+  const rhoPer1Pct = g ? g.rho / 100 : 0;
+
   const getDeltaColor = (delta: number) => {
     if (delta > 0) return "text-green-400";
     if (delta < 0) return "text-red-400";
@@ -262,9 +269,9 @@ export function OptionGreeksCalculator() {
                   
                   <GreekItem label="Delta" value={greeksMutation.data.delta} color={getDeltaColor(greeksMutation.data.delta)} />
                   <GreekItem label="Gamma" value={greeksMutation.data.gamma} />
-                  <GreekItem label="Vega" value={greeksMutation.data.vega} />
-                  <GreekItem label="Theta (Daily)" value={greeksMutation.data.theta} />
-                  <GreekItem label="Rho" value={greeksMutation.data.rho} />
+                  <GreekItem label="Vega (per 1% IV)" value={vegaPer1Pct} />
+                  <GreekItem label="Theta (Daily)" value={thetaDaily} />
+                  <GreekItem label="Rho (per 1% rate)" value={rhoPer1Pct} />
                   
                   <div className="flex flex-col border border-terminal-border bg-terminal-panel/30 p-3">
                     <span className="text-[10px] uppercase tracking-wider text-terminal-muted">d1 / d2</span>
@@ -290,9 +297,9 @@ export function OptionGreeksCalculator() {
               <div className="rounded border border-terminal-border bg-terminal-panel/20 p-4">
                 <h3 className="mb-2 text-xs font-bold text-terminal-accent uppercase">Time & Volatility</h3>
                 <p className="text-xs leading-relaxed text-terminal-muted">
-                  The option loses <span className="text-terminal-text">{Math.abs(greeksMutation.data.theta).toFixed(4)}</span> in value every day 
+                  The option loses <span className="text-terminal-text">{Math.abs(thetaDaily).toFixed(4)}</span> in value every calendar day 
                   due to time decay (Theta). A 1% increase in implied volatility will increase the option price 
-                  by <span className="text-terminal-text">{greeksMutation.data.vega.toFixed(4)}</span> (Vega).
+                  by <span className="text-terminal-text">{vegaPer1Pct.toFixed(4)}</span> (Vega).
                 </p>
               </div>
             </div>

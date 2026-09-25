@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from backend.shared.cache import cache
@@ -30,7 +30,10 @@ class BondService:
             {"isin": "INE261F07632", "issuer": "NABARD", "coupon": 7.5, "maturity_date": "2032-11-05", "rating": "AAA", "yield": 7.4, "price": 100.8, "type": "PSU"},
         ]
 
-        filtered = bonds
+        # Sample rows, not quotes: flag them, and drop bonds that have already
+        # matured -- a matured bond has no live yield.
+        today = date.today().isoformat()
+        filtered = [{**b, "mock": True} for b in bonds if b["maturity_date"] >= today]
         if rating:
             filtered = [b for b in filtered if b["rating"] == rating]
         if issuer_type:
@@ -51,7 +54,7 @@ class BondService:
                 "hy_yield": 10.2 + (i * 0.01),
                 "spread": 2.7 + (i * 0.005)
             })
-        return {"history": history}
+        return {"history": history, "mock": True}
 
     async def get_ratings_migration(self) -> List[Dict[str, Any]]:
         """Track recent upgrades/downgrades."""

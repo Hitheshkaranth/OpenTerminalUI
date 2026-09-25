@@ -78,7 +78,10 @@ class IVEngine:
                 },
             )
 
-    async def _iv_rank_percentile(self, symbol: str, current_iv: float) -> tuple[float, float]:
+    async def _iv_rank_percentile(self, symbol: str, current_iv: float) -> tuple[float | None, float | None]:
+        """(iv_percentile, iv_rank); both None when there is no usable IV history."""
+        if current_iv <= 0:
+            return None, None
         cutoff = (date.today() - timedelta(days=365)).isoformat()
         with engine.begin() as conn:
             rows = conn.execute(
@@ -93,13 +96,14 @@ class IVEngine:
                 {"symbol": symbol.upper(), "cutoff": cutoff},
             ).fetchall()
         vals = [self._to_float(row[0], 0.0) for row in rows if row and self._to_float(row[0], 0.0) > 0]
-        if current_iv > 0:
-            vals.append(current_iv)
-        if not vals:
-            return 0.0, 0.0
+        vals.append(current_iv)
         low = min(vals)
         high = max(vals)
-        iv_rank = ((current_iv - low) / (high - low) * 100.0) if high > low else 0.0
+        if high <= low:
+            # A single snapshot (or a flat history) has no range: rank/percentile are
+            # undefined, not 0% / 100%.
+            return None, None
+        iv_rank = (current_iv - low) / (high - low) * 100.0
         pct = (sum(1 for v in vals if v <= current_iv) / len(vals)) * 100.0
         return round(max(0.0, min(100.0, pct)), 2), round(max(0.0, min(100.0, iv_rank)), 2)
 

@@ -18,6 +18,9 @@ PeriodCode = Literal["1d", "1w", "1m", "3m", "ytd", "1y"]
 SizeBy = Literal["market_cap", "volume", "turnover"]
 
 _TTL_SECONDS = 300
+# Per-provider-call bound: a hung upstream must degrade to flagged sample data,
+# not keep the treemap request (and the UI's loading state) open indefinitely.
+_PROVIDER_TIMEOUT_SECONDS = 8.0
 _CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
 
@@ -110,12 +113,15 @@ async def _fetch_snapshot(item: HeatmapUniverseRow, period: PeriodCode) -> dict[
     quote_symbol = item.symbol
 
     try:
-        quote = await registry.invoke(item.exchange, "get_quote", quote_symbol)
+        quote = await asyncio.wait_for(
+            registry.invoke(item.exchange, "get_quote", quote_symbol), timeout=_PROVIDER_TIMEOUT_SECONDS
+        )
     except Exception:
         quote = None
 
     price = fallback["price"]
     change_pct = fallback["change_pct"]
+    has_live_change = False
     volume = fallback["volume"]
     turnover = fallback["turnover"]
 
@@ -123,11 +129,15 @@ async def _fetch_snapshot(item: HeatmapUniverseRow, period: PeriodCode) -> dict[
         price = float(quote.price)
         if period == "1d":
             change_pct = round(float(quote.change_pct), 2)
+            has_live_change = True
 
     if period != "1d":
         try:
             start, end = _period_window(period)
-            history = await registry.invoke(item.exchange, "get_history", quote_symbol, "1d", start, end)
+            history = await asyncio.wait_for(
+                registry.invoke(item.exchange, "get_history", quote_symbol, "1d", start, end),
+                timeout=_PROVIDER_TIMEOUT_SECONDS,
+            )
         except Exception:
             history = []
         if history:
@@ -135,6 +145,7 @@ async def _fetch_snapshot(item: HeatmapUniverseRow, period: PeriodCode) -> dict[
             last_close = float(history[-1].c)
             if first_close > 0:
                 change_pct = round(((last_close - first_close) / first_close) * 100.0, 2)
+                has_live_change = True
             volume = float(sum(float(c.v or 0.0) for c in history[-20:]) or volume)
             turnover = round(volume * price, 2)
 
@@ -148,6 +159,9 @@ async def _fetch_snapshot(item: HeatmapUniverseRow, period: PeriodCode) -> dict[
         "change_pct": change_pct,
         "volume": volume,
         "turnover": turnover,
+        # True when no provider returned a price/change for this row and the
+        # values are the deterministic placeholder — the UI must not show it as live.
+        "synthetic": quote is None or not has_live_change,
     }
 
 
@@ -204,6 +218,7 @@ async def heatmap_treemap(
         "period": period,
         "size_by": size_by,
         "total_value": total_size,
+        "synthetic_count": sum(1 for row in rows if row.get("synthetic")),
         "data": sorted(rows, key=lambda item: float(item.get(size_by) or 0.0), reverse=True),
         "groups": sorted(groups.values(), key=lambda item: float(item.get("value") or 0.0), reverse=True),
     }

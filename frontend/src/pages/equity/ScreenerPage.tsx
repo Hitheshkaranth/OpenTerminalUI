@@ -108,7 +108,7 @@ function ScreenerWorkspace() {
   const activeLabel = activeSavedScreen?.name ?? activePreset?.name ?? "Custom query";
   const filters = useMemo(() => splitFilters(query), [query]);
   const resultCount = result?.total_results ?? result?.results.length ?? 0;
-  const executionMs = result?.execution_time_ms ?? 0;
+  const executionMs = result?.execution_time_ms;
   const filteredPresets = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     const base = q
@@ -187,7 +187,9 @@ function ScreenerWorkspace() {
               </div>
               <div className="rounded-md border border-terminal-border bg-terminal-bg/70 p-3">
                 <div className="font-sans text-[11px] text-terminal-muted">Runtime</div>
-                <div className="mt-1 text-xl font-semibold text-terminal-text">{executionMs ? `${executionMs} ms` : "--"}</div>
+                <div className="mt-1 text-xl font-semibold text-terminal-text">{typeof executionMs === "number" && Number.isFinite(executionMs)
+                    ? `${executionMs < 1 ? "<1" : executionMs < 10 ? executionMs.toFixed(1) : Math.round(executionMs)} ms`
+                    : "--"}</div>
               </div>
             </div>
           </div>

@@ -6,7 +6,6 @@ import { createScheduledReport, deleteScheduledReport, fetchScheduledReports } f
 import type { ScheduledReport } from "../types";
 import { TerminalButton } from "../components/terminal/TerminalButton";
 import { TerminalInput } from "../components/terminal/TerminalInput";
-import { TerminalPanel } from "../components/terminal/TerminalPanel";
 
 const REPORT_TYPES = [
   { value: "tearsheet", label: "Tearsheet" },
@@ -33,7 +32,6 @@ export function ReportsSchedulePage() {
     frequency: "daily",
     email: "",
   });
-  const [emailInput, setEmailInput] = useState("");
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const { data: reports = [], isLoading } = useQuery<ScheduledReport[]>({
@@ -69,14 +67,6 @@ export function ReportsSchedulePage() {
   const handleDelete = (id: string) => {
     deleteMutation.mutate(id);
   };
-
-  const handleScheduleClick = () => {
-    if (!emailInput.trim()) return;
-    createMutation.mutate({ ...formData, email: emailInput.trim() });
-  };
-
-  const reportTypeLabel = REPORT_TYPES.find((t) => t.value === formData.report_type)?.label ?? "Tearsheet";
-  const frequencyLabel = FREQUENCIES.find((f) => f.value === formData.frequency)?.label ?? "Daily";
 
   return (
     <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(255,107,0,0.06),transparent_30rem)] p-3 md:p-5">
@@ -114,11 +104,9 @@ export function ReportsSchedulePage() {
               />
             </label>
 
-            <button type="submit" disabled={createMutation.isPending} className="mt-auto">
-              <TerminalButton variant="accent" loading={createMutation.isPending} leftIcon={<Plus className="h-3.5 w-3.5" />}>
-                Schedule
-              </TerminalButton>
-            </button>
+            <TerminalButton type="submit" disabled={createMutation.isPending} className="mt-auto" variant="accent" loading={createMutation.isPending} leftIcon={<Plus className="h-3.5 w-3.5" />}>
+              Schedule
+            </TerminalButton>
           </form>
 
           {actionMessage ? (
@@ -189,31 +177,6 @@ export function ReportsSchedulePage() {
           )}
         </section>
 
-        <TerminalPanel title="Quick Schedule" subtitle="Add a new report" bodyClassName="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-[140px_1fr_auto]">
-            <div>
-              <span className="mb-1 block font-sans text-xs text-terminal-muted">Type</span>
-              <div className="rounded-sm border border-terminal-border bg-terminal-bg px-2 py-1.5 font-sans text-xs text-terminal-text">
-                {reportTypeLabel}
-              </div>
-            </div>
-            <div>
-              <span className="mb-1 block font-sans text-xs text-terminal-muted">Email</span>
-              <TerminalInput
-                tone="ui"
-                value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
-                type="email"
-                placeholder="recipient@example.com"
-              />
-            </div>
-            <button type="button" onClick={handleScheduleClick} disabled={createMutation.isPending} className="mt-auto">
-              <TerminalButton variant="accent" size="sm" loading={createMutation.isPending} leftIcon={<Plus className="h-3.5 w-3.5" />}>
-                Quick Schedule
-              </TerminalButton>
-            </button>
-          </div>
-        </TerminalPanel>
       </main>
     </div>
   );

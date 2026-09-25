@@ -122,19 +122,23 @@ class OIAnalyzer:
             ce_oi_change += self._to_float(ce.get("oi_change"))
             pe_oi_change += self._to_float(pe.get("oi_change"))
 
-        pcr_oi = (pe_oi / ce_oi) if ce_oi > 0 else 0.0
-        pcr_volume = (pe_vol / ce_vol) if ce_vol > 0 else 0.0
-        pcr_oi_change = (pe_oi_change / ce_oi_change) if ce_oi_change not in (0.0, -0.0) else 0.0
-        if pcr_oi > 1.0:
+        # No call OI means the ratio is undefined (empty/missing chain) — report
+        # null + "No data" instead of a 0.0 PCR that would read as Bearish.
+        pcr_oi = (pe_oi / ce_oi) if ce_oi > 0 else None
+        pcr_volume = (pe_vol / ce_vol) if ce_vol > 0 else None
+        pcr_oi_change = (pe_oi_change / ce_oi_change) if ce_oi_change not in (0.0, -0.0) else None
+        if pcr_oi is None:
+            signal = "No data"
+        elif pcr_oi > 1.0:
             signal = "Bullish"
         elif pcr_oi < 0.7:
             signal = "Bearish"
         else:
             signal = "Neutral"
         return {
-            "pcr_oi": round(pcr_oi, 4),
-            "pcr_volume": round(pcr_volume, 4),
-            "pcr_oi_change": round(pcr_oi_change, 4),
+            "pcr_oi": round(pcr_oi, 4) if pcr_oi is not None else None,
+            "pcr_volume": round(pcr_volume, 4) if pcr_volume is not None else None,
+            "pcr_oi_change": round(pcr_oi_change, 4) if pcr_oi_change is not None else None,
             "signal": signal,
         }
 

@@ -8,6 +8,7 @@ import {
   fetchPortfolioBenchmarkOverlay,
   fetchQuotesBatch,
   fetchWatchlist,
+  fetchWatchlists,
   type NewsLatestApiItem,
 } from "../api/client";
 import { fetchDashboardResults, type DashboardResults } from "../api/intelligence";
@@ -27,6 +28,7 @@ import { TerminalShell } from "../components/layout/TerminalShell";
 import { useAuth } from "../contexts/AuthContext";
 import { fetchChainSummary } from "../fno/api/fnoApi";
 import { fetchCollectionBriefing } from "../api/client";
+import { loadStoredProfileCompletion } from "../lib/profileCompletion";
 import { useSettingsStore } from "../store/settingsStore";
 import type { PortfolioItem } from "../types";
 import { getWorkspacePresetConfig, readWorkspacePreset } from "../workspace/presets";
@@ -163,12 +165,6 @@ const INITIAL_MARKET_ROWS: MarketRow[] = [
 
 const MARKET_PULSE_SYMBOLS = INITIAL_MARKET_ROWS.map((row) => row.symbol);
 
-const FALLBACK_PERFORMANCE_POINTS = [
-  24300000, 24200000, 24400000, 24500000, 24450000, 24680000, 24720000, 24610000, 24790000, 24840000,
-  24770000, 24890000, 24950000, 24810000, 24780000, 24910000, 25030000, 24980000, 25120000, 25190000,
-  25150000, 25230000, 25310000, 25280000, 25390000, 25470000, 25420000, 25510000, 25590000, 25670000,
-];
-
 const EMPTY_SNAPSHOT: DashboardSnapshot = {
   equityValue: null,
   equityCost: 0,
@@ -256,22 +252,24 @@ export function HomePage() {
   const [dashboardResults, setDashboardResults] = useState<DashboardResults | null>(null);
   const [activePreset, setActivePreset] = useState(readWorkspacePreset);
   const [resultsLoading, setResultsLoading] = useState(false);
-  const [performancePoints, setPerformancePoints] = useState<number[]>(FALLBACK_PERFORMANCE_POINTS);
+  const [performancePoints, setPerformancePoints] = useState<number[]>([]);
   const [performanceBenchmarkPoints, setPerformanceBenchmarkPoints] = useState<number[]>([]);
   const [performanceLabels, setPerformanceLabels] = useState<string[]>([]);
   const [selectedHeatId, setSelectedHeatId] = useState<string | null>(INITIAL_MARKET_ROWS[0]?.symbol ?? null);
   const [initializing, setInitializing] = useState(() => sessionStorage.getItem(TRANSITION_FLAG_KEY) === "1");
 
   const loadSnapshot = useCallback(async () => {
-    const [portfolioRes, watchlistRes, backtestRes, chainRes, benchmarkRes] = await Promise.allSettled([
+    const [portfolioRes, watchlistRes, backtestRes, chainRes, benchmarkRes, watchlistsRes] = await Promise.allSettled([
       fetchPortfolio(),
       fetchWatchlist(),
       fetchBacktestV1Presets(),
       fetchChainSummary("NIFTY"),
       fetchPortfolioBenchmarkOverlay(),
+      fetchWatchlists(),
     ]);
 
     let next = { ...EMPTY_SNAPSHOT };
+    let nextPerformancePoints: number[] = [];
     let nextBenchmarkPoints: number[] = [];
     let nextPerformanceLabels: string[] = [];
 
@@ -295,15 +293,24 @@ export function HomePage() {
       next.watchlistCount = items.length;
       next.watchlistDerivativesCount = items.filter((row) => row.has_futures || row.has_options).length;
     }
+    // The Watchlist page uses the per-user multi-watchlist store; count those symbols so Home agrees with it.
+    if (watchlistsRes.status === "fulfilled") {
+      const symbols = new Set(watchlistsRes.value.flatMap((wl) => (wl.symbols || []).map((sym) => sym.toUpperCase())));
+      next.watchlistCount = Math.max(next.watchlistCount, symbols.size);
+    }
 
     if (backtestRes.status === "fulfilled") {
       next.backtestPresetCount = backtestRes.value.length;
     }
 
     if (chainRes.status === "fulfilled") {
-      next.fnoSpot = Number.isFinite(chainRes.value.spot_price) ? chainRes.value.spot_price : null;
-      next.fnoPcr = Number.isFinite(chainRes.value.pcr?.pcr_oi) ? chainRes.value.pcr.pcr_oi : null;
-      next.fnoSignal = String(chainRes.value.pcr?.signal || "NA").toUpperCase();
+      const spot = Number(chainRes.value.spot_price);
+      const pcr = chainRes.value.pcr?.pcr_oi == null ? NaN : Number(chainRes.value.pcr.pcr_oi);
+      next.fnoSpot = Number.isFinite(spot) && spot > 0 ? spot : null;
+      next.fnoPcr = Number.isFinite(pcr) && pcr > 0 ? pcr : null;
+      // An empty chain (no spot / no OI, backend signal "No data") must not yield a regime verdict.
+      const signal = String(chainRes.value.pcr?.signal || "NA").toUpperCase();
+      next.fnoSignal = next.fnoSpot != null && next.fnoPcr != null && signal !== "NO DATA" ? signal : "NA";
     }
 
     if (benchmarkRes.status === "fulfilled" && benchmarkRes.value?.equity_curve?.length > 0) {
@@ -343,7 +350,7 @@ export function HomePage() {
         .filter((value) => Number.isFinite(value) && value > 0);
 
       if (scaledPoints.length >= 2) {
-        setPerformancePoints(scaledPoints);
+        nextPerformancePoints = scaledPoints;
         nextPerformanceLabels = windowCurve.map((pt) => formatCompactDateLabel(pt.date));
       }
 
@@ -352,6 +359,8 @@ export function HomePage() {
       }
     }
 
+    // No portfolio history -> empty series (charts render their empty state); never a synthetic curve.
+    setPerformancePoints(nextPerformancePoints);
     setPerformanceBenchmarkPoints(nextBenchmarkPoints);
     setPerformanceLabels(nextPerformanceLabels);
     next.updatedAt = Date.now();
@@ -557,16 +566,8 @@ export function HomePage() {
     ? new Date(snapshot.updatedAt).toLocaleTimeString("en-IN", { hour12: false })
     : "--:--:--";
 
-  const profileMissingFields = useMemo(() => {
-    const missing: string[] = [];
-    if (!user?.email) missing.push("Email");
-    if (!user?.role) missing.push("Role");
-    if (snapshot.updatedAt == null) missing.push("Snapshot");
-    if (newsLog.length === 0) missing.push("News");
-    return missing;
-  }, [newsLog.length, snapshot.updatedAt, user?.email, user?.role]);
-
-  const profileCompletion = Math.round(((4 - profileMissingFields.length) / 4) * 100);
+  // Same computation as the Account page (saved profile fields), so both screens agree.
+  const { value: profileCompletion, missingFields: profileMissingFields } = useMemo(() => loadStoredProfileCompletion(), []);
 
   const systemHealthItems = useMemo<SystemHealthItem[]>(
     () => [
@@ -790,17 +791,17 @@ export function HomePage() {
 
                     <MetricCard
                       label="F&O Regime"
-                      value={snapshot.fnoSignal}
+                      value={snapshot.fnoSignal === "NA" ? "NO DATA" : snapshot.fnoSignal}
                       tone={getSignalTone(snapshot.fnoSignal)}
                       details={[
                         {
                           label: "PCR",
-                          value: snapshot.fnoPcr != null ? snapshot.fnoPcr.toFixed(2) : "--",
+                          value: snapshot.fnoPcr != null ? snapshot.fnoPcr.toFixed(2) : "—",
                           tone: getSignalTone(snapshot.fnoSignal),
                         },
                         {
                           label: "Spot",
-                          value: snapshot.fnoSpot != null ? formatPrice(snapshot.fnoSpot) : "--",
+                          value: snapshot.fnoSpot != null ? formatPrice(snapshot.fnoSpot) : "—",
                         },
                       ]}
                     />

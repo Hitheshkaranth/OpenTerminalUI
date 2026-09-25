@@ -99,6 +99,7 @@ function toneClass(cell: ExposureCell): string {
 export function ExposureHeatmap({
   title = "Exposure Heatmap",
   market,
+  scopeLabel,
   items,
   factorExposures,
   correlation,
@@ -108,6 +109,8 @@ export function ExposureHeatmap({
 }: {
   title?: string;
   market: string;
+  /** What the exposures describe (e.g. "Portfolio"); defaults to the market desk. */
+  scopeLabel?: string;
   items: PortfolioItem[];
   factorExposures?: Record<string, unknown> | null;
   correlation?: Record<string, unknown> | null;
@@ -130,7 +133,7 @@ export function ExposureHeatmap({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="ot-type-panel-title uppercase tracking-[0.14em] text-terminal-accent">{title}</h3>
-          <p className="mt-1 text-xs text-terminal-muted">Sector, factor, currency, and correlation concentration for {market} and US desks.</p>
+          <p className="mt-1 text-xs text-terminal-muted">Sector, factor, currency, and correlation concentration for {scopeLabel ? `${scopeLabel} (${market} desk)` : `the ${market} desk`}.</p>
         </div>
         <div className="flex flex-wrap gap-1">
           {modes.map((mode) => (

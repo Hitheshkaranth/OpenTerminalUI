@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from backend.api.routes import crypto
 from backend.realtime.binance_ws import get_binance_derivatives_state
 
@@ -35,11 +37,11 @@ def _chart_payload(days: int = 8, start_price: float = 40000.0) -> dict:
 
 def _quotes_payload() -> list[dict]:
     return [
-        {"symbol": "BTC-USD", "regularMarketPrice": 50000, "regularMarketChangePercent": 2.1, "regularMarketVolume": 1000},
-        {"symbol": "ETH-USD", "regularMarketPrice": 3000, "regularMarketChangePercent": 1.5, "regularMarketVolume": 800},
-        {"symbol": "UNI-USD", "regularMarketPrice": 12, "regularMarketChangePercent": -1.2, "regularMarketVolume": 3200},
-        {"symbol": "AAVE-USD", "regularMarketPrice": 95, "regularMarketChangePercent": 3.4, "regularMarketVolume": 700},
-        {"symbol": "DOGE-USD", "regularMarketPrice": 0.18, "regularMarketChangePercent": -3.1, "regularMarketVolume": 25000},
+        {"symbol": "BTC-USD", "regularMarketPrice": 50000, "regularMarketChangePercent": 2.1, "regularMarketVolume": 1000, "marketCap": 1_700_000_000_000},
+        {"symbol": "ETH-USD", "regularMarketPrice": 3000, "regularMarketChangePercent": 1.5, "regularMarketVolume": 800, "marketCap": 360_000_000_000},
+        {"symbol": "UNI-USD", "regularMarketPrice": 12, "regularMarketChangePercent": -1.2, "regularMarketVolume": 3200, "marketCap": 7_000_000_000},
+        {"symbol": "AAVE-USD", "regularMarketPrice": 95, "regularMarketChangePercent": 3.4, "regularMarketVolume": 700, "marketCap": 1_400_000_000},
+        {"symbol": "DOGE-USD", "regularMarketPrice": 0.18, "regularMarketChangePercent": -3.1, "regularMarketVolume": 25000, "marketCap": 26_000_000_000},
     ]
 
 
@@ -151,6 +153,19 @@ def test_crypto_dominance_fields_exist(monkeypatch) -> None:
     assert 99.0 <= total <= 101.0
 
 
+def test_crypto_market_cap_uses_reported_cap_not_price_times_volume(monkeypatch) -> None:
+    _patch_fetcher(monkeypatch)
+    _clear_crypto_quote_cache(limit=10)
+    markets = asyncio.run(crypto.crypto_markets(limit=10))
+    btc = next(item for item in markets["items"] if item["symbol"] == "BTC-USD")
+    assert btc["market_cap"] == 1_700_000_000_000
+    _clear_crypto_quote_cache(limit=300)
+    dom = asyncio.run(crypto.crypto_dominance())
+    total = 1_700_000_000_000 + 360_000_000_000 + 7_000_000_000 + 1_400_000_000 + 26_000_000_000
+    assert abs(dom["total_market_cap"] - total) < 1
+    assert abs(dom["btc_pct"] - 1_700_000_000_000 / total * 100) < 1e-6
+
+
 def test_crypto_heatmap_has_buckets_and_depth(monkeypatch) -> None:
     _patch_fetcher(monkeypatch)
     result = asyncio.run(crypto.crypto_heatmap(limit=5))
@@ -169,7 +184,7 @@ def test_crypto_derivatives_aggregates_liquidations(monkeypatch) -> None:
 
     result = asyncio.run(crypto.crypto_derivatives(limit=4))
     assert len(result["items"]) >= 2
-    assert result["totals"]["liquidations_24h"] == (
+    assert result["totals"]["liquidations_24h"] == pytest.approx(
         result["totals"]["long_liquidations_24h"] + result["totals"]["short_liquidations_24h"]
     )
     assert any(item["funding_rate_8h"] != 0 for item in result["items"])

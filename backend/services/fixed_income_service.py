@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -26,6 +26,15 @@ MATURITIES = [
     {"label": "30Y", "series_id": "DGS30", "order": 12},
 ]
 
+# No-key fallback: Yahoo's CBOE Treasury yield indices (quoted in percent).
+YAHOO_TREASURY_TICKERS = [
+    {"label": "3M", "series_id": "^IRX", "order": 3},
+    {"label": "5Y", "series_id": "^FVX", "order": 8},
+    {"label": "10Y", "series_id": "^TNX", "order": 10},
+    {"label": "30Y", "series_id": "^TYX", "order": 12},
+]
+
+
 class FixedIncomeService:
     def __init__(self):
         self.settings = get_settings()
@@ -35,7 +44,10 @@ class FixedIncomeService:
     async def get_yield_curve(self) -> Dict[str, Any]:
         """Fetch current yield curve data."""
         if not self.api_key:
-            logger.warning("FRED_API_KEY not set. Returning mock data.")
+            live = await self._get_yahoo_yield_curve()
+            if live:
+                return live
+            logger.warning("FRED_API_KEY not set and Yahoo Treasury quotes unavailable. Returning mock data.")
             return self._get_mock_yield_curve()
 
         cache_key = cache.build_key("fixed_income", "yield_curve", {"type": "current"})
@@ -64,6 +76,61 @@ class FixedIncomeService:
         }
 
         await cache.set(cache_key, response, ttl=3600)  # 1 hour cache
+        return response
+
+    async def _get_yahoo_yield_curve(self) -> Optional[Dict[str, Any]]:
+        """Partial live curve (3M/5Y/10Y/30Y) from Yahoo when FRED is not configured."""
+        cache_key = cache.build_key("fixed_income", "yield_curve", {"type": "yahoo"})
+        cached = await cache.get(cache_key)
+        if cached:
+            return cached
+        try:
+            from backend.api.deps import get_unified_fetcher
+
+            fetcher = await get_unified_fetcher()
+            quotes = await fetcher.yahoo.get_quotes([t["series_id"] for t in YAHOO_TREASURY_TICKERS])
+        except Exception as e:
+            logger.error(f"Error fetching Yahoo Treasury yields: {e}")
+            return None
+
+        by_symbol = {str(q.get("symbol") or "").upper(): q for q in quotes or [] if isinstance(q, dict)}
+        results: List[Dict[str, Any]] = []
+        latest_ts = 0
+        for t in YAHOO_TREASURY_TICKERS:
+            q = by_symbol.get(t["series_id"])
+            if not q:
+                continue
+            try:
+                y = float(q.get("regularMarketPrice"))
+            except (TypeError, ValueError):
+                continue
+            if not (y > 0):
+                continue
+            ts = int(q.get("regularMarketTime") or 0)
+            latest_ts = max(latest_ts, ts)
+            chg = q.get("regularMarketChange")
+            results.append({
+                "label": t["label"],
+                "series_id": t["series_id"],
+                "order": t["order"],
+                "yield": y,
+                "date": datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d") if ts else None,
+                "chg_1d": float(chg) if isinstance(chg, (int, float)) else None,
+                "chg_1w": None,
+                "chg_1m": None,
+                "chg_1y": None,
+            })
+        if not results:
+            return None
+
+        response = {
+            "date": datetime.fromtimestamp(latest_ts, tz=timezone.utc).strftime("%Y-%m-%d") if latest_ts else None,
+            "data": results,
+            "spreads": self._calculate_spreads(results),
+            "source": "yahoo",
+            "partial": True,
+        }
+        await cache.set(cache_key, response, ttl=900)
         return response
 
     async def get_historical_yield_curve(self, date_str: str) -> Dict[str, Any]:
@@ -271,9 +338,7 @@ class FixedIncomeService:
             "20Y": 4.55, "30Y": 4.45
         }
 
-        # Invert if date is current-ish (mocking current inverted curve)
-        if not date_str:
-            date_str = datetime.now().strftime("%Y-%m-%d")
+        # Sample values, not a real observation: never stamp them with today's date.
 
         results = []
         for m in MATURITIES:
@@ -291,7 +356,7 @@ class FixedIncomeService:
             })
 
         spreads = {"2s10s": 4.30 - 4.65, "3m10y": 4.30 - 5.42}
-        return {"date": date_str, "data": results, "spreads": spreads, "mock": True}
+        return {"date": date_str, "data": results, "spreads": spreads, "mock": True, "source": "sample"}
 
     def _get_mock_2s10s_history(self) -> Dict[str, Any]:
         """Generate mock 2s10s history."""

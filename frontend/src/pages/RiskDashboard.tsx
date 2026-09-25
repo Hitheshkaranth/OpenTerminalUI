@@ -35,6 +35,7 @@ import { StressTestPanel } from "../components/risk/StressTestPanel";
 import { AiInsightCard } from "../components/terminal/AiInsightCard";
 import { TerminalButton } from "../components/terminal/TerminalButton";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
+import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
 import type { PortfolioItem } from "../types";
 import type {
@@ -78,8 +79,17 @@ function fmtPct(value: number | null | undefined, digits = 2): string {
   return `${value >= 0 ? "+" : ""}${(value * 100).toFixed(digits)}%`;
 }
 
+function PanelEmptyState({ message }: { message: string }) {
+  return (
+    <div className="flex h-64 w-full items-center justify-center px-4 text-center text-xs text-terminal-muted">
+      {message}
+    </div>
+  );
+}
+
 export function RiskDashboardPage() {
   const storeTicker = useStockStore((s) => s.ticker);
+  const selectedMarket = useSettingsStore((s) => s.selectedMarket);
   const [tab, setTab] = useState<"overview" | "factors" | "stress">("overview");
   const [mode, setMode] = useState<"portfolio" | "ticker">("portfolio");
   const [factorPeriod, setFactorPeriod] = useState<(typeof PERIODS)[number]>("1Y");
@@ -410,6 +420,11 @@ export function RiskDashboardPage() {
             </TerminalPanel>
 
             <TerminalPanel title="FACTOR EXPOSURES (PCA)" subtitle="Variance decomposition by latent factors">
+              {loading && !pcaData.length ? (
+                <PanelEmptyState message="Loading factor decomposition..." />
+              ) : pcaData.length < 2 ? (
+                <PanelEmptyState message={mode === "ticker" ? "Not enough overlapping price history across the ticker and peers for a PCA decomposition." : "PCA needs at least two holdings with overlapping price history. Add holdings or switch to ticker mode."} />
+              ) : (
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={pcaData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -425,9 +440,15 @@ export function RiskDashboardPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+              )}
             </TerminalPanel>
 
             <TerminalPanel title="EXPOSURE CLUSTERING" subtitle={mode === "ticker" ? "Regional/Industry Breakdown" : "Sector Concentration (%)"}>
+              {loading && !sectorData.length ? (
+                <PanelEmptyState message="Loading sector concentration..." />
+              ) : !sectorData.length ? (
+                <PanelEmptyState message={mode === "ticker" ? "No sector classification available for this ticker and its peers." : "No holdings to cluster. Add positions to see sector concentration."} />
+              ) : (
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -455,12 +476,14 @@ export function RiskDashboardPage() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
+              )}
             </TerminalPanel>
           </div>
 
           <ExposureHeatmap
             title="Risk Exposure Heatmap"
-            market={mode === "ticker" ? storeTicker : "PORTFOLIO"}
+            market={selectedMarket}
+            scopeLabel={mode === "ticker" ? `${storeTicker} + peers` : "Portfolio"}
             items={heatmapItems}
             factorExposures={factorExposures}
             correlation={correlation}
@@ -468,6 +491,9 @@ export function RiskDashboardPage() {
           />
 
           <TerminalPanel title="CORRELATION DYNAMICS" subtitle="Rolling pairwise correlation matrix (60D window)">
+            {(correlation?.assets?.length ?? 0) < 2 ? (
+              <PanelEmptyState message={loading ? "Loading correlation matrix..." : "Correlation needs at least two assets with overlapping price history."} />
+            ) : (
             <div className="overflow-x-auto p-1">
               <table className="w-full border-collapse text-right text-[10px]">
                 <thead>
@@ -500,6 +526,7 @@ export function RiskDashboardPage() {
                 </tbody>
               </table>
             </div>
+            )}
           </TerminalPanel>
         </>
       ) : null}

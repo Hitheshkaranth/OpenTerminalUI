@@ -20,7 +20,7 @@ export function RelativeStrengthPage() {
     setLoading(true);
     try {
       if (activeTab === "rankings") {
-        const res = await api.get(`/rs/rankings?universe=${universe}`);
+        const res = await api.get("/rs/rankings", { params: { universe } });
         setRankings(res.data);
       } else if (activeTab === "sector") {
         const res = await api.get("/rs/sector-rs");
@@ -73,9 +73,16 @@ export function RelativeStrengthPage() {
       </div>
 
       {activeTab === "rankings" && (
-        <TerminalPanel title="Relative Strength Rankings" actions={
-          <TerminalInput size="sm" value={universe} onChange={e => setUniverse(e.target.value)} />
+        <TerminalPanel title="Relative Strength Rankings" subtitle="1-99 percentile of weighted 3/6/9/12M returns" actions={
+          <div className="flex gap-2">
+            <TerminalInput size="sm" value={universe} onChange={e => setUniverse(e.target.value)} />
+            <button onClick={loadData} className="px-2 py-1 bg-terminal-accent text-terminal-bg text-[10px] rounded">Go</button>
+          </div>
         }>
+          {loading ? <div className="py-2 text-xs text-terminal-muted">Computing RS from price history…</div> : null}
+          {!loading && rankings.length === 0 ? (
+            <div className="py-2 text-xs text-terminal-muted">No RS data — price history unavailable or unsupported universe (try "Nifty 50").</div>
+          ) : null}
           <TerminalTable
             rows={rankings}
             rowKey={(r) => r.symbol}
@@ -83,14 +90,15 @@ export function RelativeStrengthPage() {
               { key: "rank", label: "Rank", align: "right", render: (r) => r.rank },
               { key: "symbol", label: "Symbol", render: (r) => r.symbol },
               { key: "rs_score", label: "RS Score", align: "right", render: (r) => <TerminalBadge variant={r.rs_score > 80 ? "success" : "neutral"}>{r.rs_score}</TerminalBadge> },
-              { key: "prev_rank", label: "Prev Rank", align: "right", render: (r) => r.prev_rank },
+              { key: "prev_rank", label: "Prev Rank", align: "right", render: (r) => r.prev_rank ?? "—" },
             ]}
           />
         </TerminalPanel>
       )}
 
       {activeTab === "sector" && (
-        <TerminalPanel title="Sector Relative Strength">
+        <TerminalPanel title="Sector Relative Strength" subtitle="NSE sector indices">
+          {!loading && sectorRS.length === 0 ? <div className="py-2 text-xs text-terminal-muted">Sector index history unavailable.</div> : null}
           <div className="h-64 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={sectorRS} layout="vertical">
@@ -112,6 +120,7 @@ export function RelativeStrengthPage() {
             <button onClick={loadData} className="px-2 py-1 bg-terminal-accent text-terminal-bg text-[10px] rounded">Go</button>
           </div>
         }>
+          {!loading && chartData.length === 0 ? <div className="py-2 text-xs text-terminal-muted">No price history for {symbol} vs NIFTY 50.</div> : null}
           <div className="h-80 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
@@ -130,7 +139,8 @@ export function RelativeStrengthPage() {
       )}
 
       {activeTab === "highs" && (
-        <TerminalPanel title="RS Leaders at New Highs">
+        <TerminalPanel title="RS Leaders at New Highs" subtitle="Within 2% of 52W high, RS ≥ 80">
+          {!loading && highs.length === 0 ? <div className="py-2 text-xs text-terminal-muted">No RS leaders at new highs right now.</div> : null}
           <TerminalTable
             rows={highs}
             rowKey={(r) => r.symbol}

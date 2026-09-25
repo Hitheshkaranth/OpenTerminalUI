@@ -271,19 +271,20 @@ export function LaunchpadYieldCurvePanel(_: PanelProps) {
       <div className="mt-1 grid grid-cols-3 gap-1">
         <div className="rounded border border-terminal-border bg-terminal-bg p-1 text-center">
           <div className="text-[8px] uppercase text-terminal-muted">2Y</div>
-          <div className="text-[10px] font-mono text-terminal-text">{(data?.data || []).find(d => d.label === "2Y")?.yield.toFixed(2) || "0.00"}%</div>
+          <div className="text-[10px] font-mono text-terminal-text">{((y) => (y != null ? `${y.toFixed(2)}%` : "--"))((data?.data || []).find(d => d.label === "2Y")?.yield)}</div>
         </div>
         <div className="rounded border border-terminal-border bg-terminal-bg p-1 text-center">
           <div className="text-[8px] uppercase text-terminal-muted">10Y</div>
-          <div className="text-[10px] font-mono text-terminal-text">{(data?.data || []).find(d => d.label === "10Y")?.yield.toFixed(2) || "0.00"}%</div>
+          <div className="text-[10px] font-mono text-terminal-text">{((y) => (y != null ? `${y.toFixed(2)}%` : "--"))((data?.data || []).find(d => d.label === "10Y")?.yield)}</div>
         </div>
         <div className={`rounded border border-terminal-border bg-terminal-bg p-1 text-center ${Number(data?.spreads?.["2s10s"]) < 0 ? "border-terminal-neg/40" : ""}`}>
           <div className="text-[8px] uppercase text-terminal-muted">2s10s</div>
           <div className={`text-[10px] font-mono ${Number(data?.spreads?.["2s10s"]) < 0 ? "text-terminal-neg" : "text-terminal-pos"}`}>
-            {(data?.spreads?.["2s10s"] || 0).toFixed(3)}%
+            {data?.spreads?.["2s10s"] != null ? `${data.spreads["2s10s"].toFixed(3)}%` : "--"}
           </div>
         </div>
       </div>
+      {data?.mock ? <div className="mt-1 text-center text-[8px] uppercase text-terminal-warn">Sample data — configure FRED</div> : null}
     </div>
   );
 }
@@ -397,7 +398,10 @@ export function LaunchpadNewsFeedPanel({ panel }: PanelProps) {
 
   return (
     <div className="h-full overflow-auto p-2" tabIndex={0} onKeyDown={nav.onKeyDown}>
-      <div className="mb-1 text-[10px] uppercase text-terminal-muted">j/k navigation</div>
+      <div className="mb-1 text-[10px] uppercase text-terminal-muted">{symbol} news · j/k navigation</div>
+      {news.isLoading ? <div className="text-xs text-terminal-muted">Loading news…</div> : null}
+      {news.isError ? <div className="text-xs text-terminal-neg">News feed unavailable.</div> : null}
+      {!news.isLoading && !news.isError && !rows.length ? <div className="text-xs text-terminal-muted">No recent news for {symbol}.</div> : null}
       <div className="space-y-1">
         {rows.map((row, idx) => (
           <a

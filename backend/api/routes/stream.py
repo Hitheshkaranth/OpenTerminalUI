@@ -135,9 +135,13 @@ async def _authenticate_ws(websocket: WebSocket) -> bool:
     return True
 
 
-async def _send_depth_snapshots(websocket: WebSocket, symbols: list[str], market: str, levels: int = 10) -> None:
+async def _send_depth_snapshots(
+    websocket: WebSocket, symbols: list[str], market: str, levels: int = 10, ref_price: float | None = None
+) -> None:
     for symbol in symbols:
-        snapshot = service.stream_message(symbol, market_hint=market, levels=levels)
+        # ref_price only applies to a single-symbol subscription (it is that symbol's real last price).
+        ref = ref_price if len(symbols) == 1 else None
+        snapshot = service.stream_message(symbol, market_hint=market, levels=levels, ref_price=ref)
         await websocket.send_json(snapshot)
 
 
@@ -277,7 +281,11 @@ async def ws_depth(websocket: WebSocket) -> None:
                     continue
                 market = _market_from_payload(payload)
                 await websocket.send_json({"type": "subscribed", "symbols": symbols, "market": market, "channels": ["depth"]})
-                await _send_depth_snapshots(websocket, symbols, market)
+                try:
+                    ref_price = float(payload.get("ref_price")) if payload.get("ref_price") is not None else None
+                except (TypeError, ValueError):
+                    ref_price = None
+                await _send_depth_snapshots(websocket, symbols, market, ref_price=ref_price if ref_price and ref_price > 0 else None)
                 continue
 
             if op == "unsubscribe":

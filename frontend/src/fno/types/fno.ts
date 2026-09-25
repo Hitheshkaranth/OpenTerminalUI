@@ -32,16 +32,16 @@ export type OptionChainResponse = {
   expiry_date: string;
   available_expiries: string[];
   atm_strike: number;
-  iv_rank?: number;
-  iv_percentile?: number;
+  iv_rank?: number | null;
+  iv_percentile?: number | null;
   strikes: StrikeData[];
   totals: {
     ce_oi_total: number;
     pe_oi_total: number;
     ce_volume_total: number;
     pe_volume_total: number;
-    pcr_oi: number;
-    pcr_volume: number;
+    pcr_oi: number | null;
+    pcr_volume: number | null;
   };
 };
 
@@ -51,7 +51,7 @@ export type OIAnalysis = {
   spot_price: number;
   max_pain: number;
   support_resistance: { support: number[]; resistance: number[] };
-  pcr: { pcr_oi: number; pcr_volume: number; pcr_oi_change: number; signal: string };
+  pcr: { pcr_oi: number | null; pcr_volume: number | null; pcr_oi_change: number | null; signal: string };
   buildup: Array<{
     strike_price: number;
     ce_pattern: string;
@@ -70,9 +70,9 @@ export type ChainSummary = {
   spot_price: number;
   atm_strike: number;
   atm_iv: number;
-  iv_rank?: number;
-  iv_percentile?: number;
-  pcr: { pcr_oi: number; pcr_volume: number; pcr_oi_change: number; signal: string };
+  iv_rank?: number | null;
+  iv_percentile?: number | null;
+  pcr: { pcr_oi: number | null; pcr_volume: number | null; pcr_oi_change: number | null; signal: string };
   max_pain: number;
   support_resistance: { support: number[]; resistance: number[] };
 };
@@ -121,9 +121,9 @@ export type PCRCurrentResponse = {
   symbol: string;
   expiry_date: string;
   timestamp: string;
-  pcr_oi: number;
-  pcr_vol: number;
-  pcr_oi_change: number;
+  pcr_oi: number | null;
+  pcr_vol: number | null;
+  pcr_oi_change: number | null;
   signal: string;
   total_ce_oi: number;
   total_pe_oi: number;
@@ -152,8 +152,8 @@ export type IvSkewResponse = {
   spot: number;
   atm_iv: number;
   iv_skew: Array<{ strike: number; ce_iv: number; pe_iv: number; moneyness: number }>;
-  iv_percentile: number;
-  iv_rank: number;
+  iv_percentile: number | null;
+  iv_rank: number | null;
 };
 
 export type IvSurfaceResponse = {

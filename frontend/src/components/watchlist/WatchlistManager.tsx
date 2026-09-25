@@ -78,18 +78,37 @@ export function WatchlistManager() {
   // show the last/snapshot price so the watchlist is never blank.
   const restQuotesQuery = useQuery({
     queryKey: ["watchlist-quotes", selectedMarket, activeWl?.symbols.join(",") || ""],
-    queryFn: () => fetchQuotesBatch(activeWl?.symbols || [], selectedMarket),
+    queryFn: async () => {
+      const symbols = activeWl?.symbols || [];
+      const primary = await fetchQuotesBatch(symbols, selectedMarket);
+      const quotes = (primary.quotes || []).map((q) => ({ ...q, market: selectedMarket as string }));
+      // A watchlist can mix exchanges (AAPL on an NSE desk): resolve symbols the desk market
+      // didn't price against the other country's market instead of leaving them blank.
+      const priced = new Set(quotes.map((q) => String(q.symbol).toUpperCase()));
+      const missing = symbols.filter((sym) => !priced.has(sym.toUpperCase()));
+      if (missing.length) {
+        const altMarket = selectedMarket === "NSE" || selectedMarket === "BSE" ? "NASDAQ" : "NSE";
+        const alt = await fetchQuotesBatch(missing, altMarket).catch(() => ({ quotes: [] as typeof primary.quotes }));
+        quotes.push(...(alt.quotes || []).map((q) => ({ ...q, market: altMarket })));
+      }
+      return { quotes };
+    },
     enabled: Boolean(activeWl?.symbols.length),
     refetchInterval: 30_000,
     staleTime: 15_000,
   });
   const restBySymbol = useMemo(() => {
-    const map: Record<string, { ltp: number; change_pct: number }> = {};
+    const map: Record<string, { ltp: number; change_pct: number; market: string }> = {};
     for (const q of restQuotesQuery.data?.quotes || []) {
-      map[String(q.symbol).toUpperCase()] = { ltp: q.last, change_pct: q.changePct };
+      map[String(q.symbol).toUpperCase()] = { ltp: q.last, change_pct: q.changePct, market: q.market };
     }
     return map;
   }, [restQuotesQuery.data]);
+  // Markets the rows are actually priced from (e.g. "NASDAQ" for a US list on an NSE desk).
+  const quoteMarketsLabel = useMemo(() => {
+    const markets = Array.from(new Set(Object.values(restBySymbol).map((q) => q.market)));
+    return markets.length ? markets.join("/") : selectedMarket;
+  }, [restBySymbol, selectedMarket]);
   // Merge a live tick with the REST fallback so callers get a single quote view.
   const quoteFor = (symbol: string) => {
     const live = ticksByToken[`${selectedMarket}:${symbol}`];
@@ -265,7 +284,7 @@ export function WatchlistManager() {
               <>
                 <h1 className="text-sm font-bold uppercase text-terminal-accent">{activeWl.name}</h1>
                 <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-0.5 text-[10px] uppercase text-terminal-muted" data-testid="watchlist-route-status">
-                  {selectedMarket} {connectionState}
+                  {quoteMarketsLabel} {connectionState}
                 </div>
                 <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-0.5 text-[10px] uppercase text-terminal-muted">
                   {activeWl.symbols.length} symbols
@@ -364,7 +383,7 @@ export function WatchlistManager() {
                     <tbody className="divide-y divide-terminal-border/30">
                       {activeWl.symbols.map(s => {
                         const live = quoteFor(s);
-                        const changePct = live?.change_pct || 0;
+                        const changePct = Number.isFinite(Number(live?.change_pct)) && live?.ltp != null ? Number(live.change_pct) : null;
                         return (
                           <tr
                             key={s}
@@ -390,8 +409,8 @@ export function WatchlistManager() {
                           >
                             <td className="px-3 py-2 font-bold text-terminal-accent">{s}</td>
                             <td className="px-3 py-2 text-right text-terminal-text">{live?.ltp?.toFixed(2) || '--'}</td>
-                            <td className={`px-3 py-2 text-right ${changePct >= 0 ? 'text-terminal-pos' : 'text-terminal-neg'}`}>
-                              {changePct >= 0 ? '+' : ''}{changePct.toFixed(2)}%
+                            <td className={`px-3 py-2 text-right ${changePct == null || changePct === 0 ? 'text-terminal-muted' : changePct > 0 ? 'text-terminal-pos' : 'text-terminal-neg'}`}>
+                              {changePct == null ? '--' : `${changePct > 0 ? '+' : ''}${changePct.toFixed(2)}%`}
                             </td>
                             <td className="px-3 py-2 text-right text-terminal-muted">{live?.volume?.toLocaleString() || '--'}</td>
                             <td className="px-3 py-2 text-center">

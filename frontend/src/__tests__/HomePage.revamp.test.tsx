@@ -71,6 +71,7 @@ vi.mock("../store/settingsStore", () => ({
 vi.mock("../api/client", () => ({
   fetchPortfolio: vi.fn(),
   fetchWatchlist: vi.fn(),
+  fetchWatchlists: vi.fn().mockResolvedValue([]),
   fetchBacktestV1Presets: vi.fn(),
   fetchPortfolioBenchmarkOverlay: vi.fn(),
   fetchLatestNews: vi.fn(),

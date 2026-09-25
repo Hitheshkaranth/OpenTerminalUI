@@ -854,25 +854,57 @@ export function BacktestingPage() {
     const skewness = stdRet ? returnsPct.reduce((a: number, b: number) => a + (((b - meanRet) / stdRet) ** 3), 0) / Math.max(returnsPct.length, 1) : 0;
     const kurtosis = stdRet ? returnsPct.reduce((a: number, b: number) => a + (((b - meanRet) / stdRet) ** 4), 0) / Math.max(returnsPct.length, 1) - 3 : 0;
 
+    // Round trips (flat -> position -> flat) with average-cost accounting; mirrors
+    // backend pair_round_trips so fallback and server analytics agree.
     const scatter: Analytics["trade_analytics"]["scatter"] = [];
-    let openTrade: { date: string; price: number; quantity: number } | null = null;
+    const EPS = 1e-9;
+    let pos = 0;
+    let avgCost = 0;
+    let trip: { entry: string; entryQty: number; entryNotional: number; exitQty: number; exitNotional: number; pnl: number } | null = null;
     for (const trade of trades) {
       const action = String(trade.action).toUpperCase();
-      if (action === "BUY") {
-        openTrade = { date: trade.date, price: Number(trade.price), quantity: Number(trade.quantity) };
-      } else if (action === "SELL" && openTrade) {
-        const qty = Math.min(Math.abs(Number(trade.quantity)), Math.abs(openTrade.quantity)) || 1;
-        const pnl = (Number(trade.price) - openTrade.price) * qty;
-        const entry = parseBacktestDate(openTrade.date);
-        const exit = parseBacktestDate(trade.date);
-        if (!entry || !exit) {
-          openTrade = null;
+      const side = action === "BUY" ? 1 : action === "SELL" ? -1 : 0;
+      const price = Number(trade.price);
+      let remaining = Math.abs(Number(trade.quantity));
+      if (!side || !Number.isFinite(price) || !(remaining > 0)) continue;
+      while (remaining > EPS) {
+        if (Math.abs(pos) <= EPS || Math.sign(pos) === side) {
+          if (!trip) {
+            trip = { entry: trade.date, entryQty: 0, entryNotional: 0, exitQty: 0, exitNotional: 0, pnl: 0 };
+            pos = 0;
+            avgCost = 0;
+          }
+          avgCost = (avgCost * Math.abs(pos) + price * remaining) / (Math.abs(pos) + remaining);
+          pos += side * remaining;
+          trip.entryQty += remaining;
+          trip.entryNotional += price * remaining;
+          remaining = 0;
           continue;
         }
-        const days = Math.max(1, Math.round((exit.getTime() - entry.getTime()) / 86400000));
-        const return_pct = openTrade.price ? ((Number(trade.price) - openTrade.price) / openTrade.price) * 100 : 0;
-        scatter.push({ entry_date: openTrade.date, exit_date: trade.date, pnl, return_pct, holding_days: days });
-        openTrade = null;
+        const closeQty = Math.min(remaining, Math.abs(pos));
+        if (!trip) break;
+        trip.pnl += (price - avgCost) * closeQty * Math.sign(pos);
+        trip.exitQty += closeQty;
+        trip.exitNotional += price * closeQty;
+        pos += side * closeQty;
+        remaining -= closeQty;
+        if (Math.abs(pos) <= EPS) {
+          const entry = parseBacktestDate(trip.entry);
+          const exit = parseBacktestDate(trade.date);
+          const costBasis = trip.entryNotional * (trip.exitQty / trip.entryQty);
+          if (entry && exit) {
+            scatter.push({
+              entry_date: trip.entry,
+              exit_date: trade.date,
+              pnl: trip.pnl,
+              return_pct: costBasis ? (trip.pnl / costBasis) * 100 : 0,
+              holding_days: Math.max(0, Math.round((exit.getTime() - entry.getTime()) / 86400000)),
+            });
+          }
+          trip = null;
+          pos = 0;
+          avgCost = 0;
+        }
       }
     }
     let max_win_streak = 0;
@@ -880,6 +912,11 @@ export function BacktestingPage() {
     let current_streak = 0;
     let current_streak_type = "none";
     for (const pt of scatter) {
+      if (pt.pnl === 0) {
+        current_streak_type = "none";
+        current_streak = 0;
+        continue;
+      }
       const nextType = pt.pnl > 0 ? "win" : "loss";
       if (nextType === current_streak_type) current_streak += 1;
       else {
@@ -890,7 +927,8 @@ export function BacktestingPage() {
       else max_loss_streak = Math.max(max_loss_streak, current_streak);
     }
     const winning = scatter.filter((s) => s.pnl > 0);
-    const losing = scatter.filter((s) => s.pnl <= 0);
+    const losing = scatter.filter((s) => s.pnl < 0);
+    const decisive = winning.length + losing.length;
     const totalWinPnl = winning.reduce((a: number, b) => a + b.pnl, 0);
     const totalLossPnl = Math.abs(losing.reduce((a: number, b) => a + b.pnl, 0));
     const totalTrades = scatter.length;
@@ -898,7 +936,9 @@ export function BacktestingPage() {
       total_trades: totalTrades,
       winning_trades: winning.length,
       losing_trades: losing.length,
-      win_rate: totalTrades ? (winning.length / totalTrades) * 100 : 0,
+      breakeven_trades: totalTrades - decisive,
+      fill_count: trades.length,
+      win_rate: decisive ? (winning.length / decisive) * 100 : 0,
       avg_win: winning.length ? totalWinPnl / winning.length : 0,
       avg_loss: losing.length ? losing.reduce((a: number, b) => a + b.pnl, 0) / losing.length : 0,
       profit_factor: totalLossPnl ? totalWinPnl / totalLossPnl : 0,
@@ -1657,7 +1697,7 @@ export function BacktestingPage() {
           {strategyMode === CUSTOM_STRATEGY_VALUE && <label className="mt-2 block"><span className="mb-1 block text-[11px] uppercase tracking-wide text-terminal-muted">Python Strategy Script</span><textarea className="h-36 w-full resize-none rounded border border-terminal-border bg-terminal-bg px-2 py-1 font-mono text-[11px] text-terminal-text" value={script} onChange={(e) => setScript(e.target.value)} /></label>}
           {error && <div className="mt-2 rounded border border-terminal-neg bg-terminal-neg/10 p-2 text-xs text-terminal-neg">{error}</div>}
         </TerminalPanel>
-        <TerminalPanel title="Backtest Performance" subtitle="Model result summary"><div className="space-y-2"><div className={`text-5xl font-bold tracking-tight ${returnClass}`}>{result?.result ? fmtPct(result.result.total_return) : "-"}</div><div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-terminal-text"><div className="text-terminal-muted">Initial Capital</div><div>{fmtMoney(initialCapital)}</div><div className="text-terminal-muted">Final Equity</div><div>{fmtMoney(finalEquity)}</div><div className="text-terminal-muted">Net P/L</div><div className={pnlAmount >= 0 ? "text-terminal-pos" : "text-terminal-neg"}>{fmtMoney(pnlAmount)}</div><div className="text-terminal-muted">Cash Left</div><div>{fmtMoney(endingCash)}</div><div className="text-terminal-muted">Sharpe</div><div>{result?.result ? result.result.sharpe.toFixed(2) : "-"}</div><div className="text-terminal-muted">Max Drawdown</div><div>{result?.result ? fmtPct(result.result.max_drawdown) : "-"}</div><div className="text-terminal-muted">Trades</div><div>{trades.length}</div><div className="text-terminal-muted">Total Qty</div><div>{totalTradeQty.toFixed(2)}</div></div><div className="border-t border-terminal-border/40 pt-2"><div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-terminal-text"><div className="text-terminal-muted">Win Rate</div><div>{(Number(analyticsSummary.win_rate) || 0).toFixed(2)}%</div><div className="text-terminal-muted">Profit Factor</div><div>{(Number(analyticsSummary.profit_factor) || 0).toFixed(2)}</div><div className="text-terminal-muted">Expectancy</div><div>{fmtMoney(Number(analyticsSummary.expectancy) || 0)}</div>{result?.result && (result.result.max_intraday_drawdown ?? 0) < 0 && (<><div className="text-terminal-muted">Max Intraday DD</div><div>{fmtPct(result.result.max_intraday_drawdown ?? 0)}</div><div className="text-terminal-muted">Avg Hold (Min)</div><div>{(result.result.average_hold_time_minutes || 0).toFixed(1)}m</div><div className="text-terminal-muted">Trades / Day</div><div>{(result.result.trades_per_day || 0).toFixed(1)}</div><div className="text-terminal-muted">Win Rate (AM/PM)</div><div>{(result.result.win_rate_morning || 0).toFixed(1)}% / {(result.result.win_rate_afternoon || 0).toFixed(1)}%</div></>)}</div></div></div></TerminalPanel>
+        <TerminalPanel title="Backtest Performance" subtitle="Model result summary"><div className="space-y-2"><div className={`text-5xl font-bold tracking-tight ${returnClass}`}>{result?.result ? fmtPct(result.result.total_return) : "-"}</div><div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-terminal-text"><div className="text-terminal-muted">Initial Capital</div><div>{fmtMoney(initialCapital)}</div><div className="text-terminal-muted">Final Equity</div><div>{fmtMoney(finalEquity)}</div><div className="text-terminal-muted">Net P/L</div><div className={pnlAmount >= 0 ? "text-terminal-pos" : "text-terminal-neg"}>{fmtMoney(pnlAmount)}</div><div className="text-terminal-muted">Cash Left</div><div>{fmtMoney(endingCash)}</div><div className="text-terminal-muted">Sharpe</div><div>{result?.result ? result.result.sharpe.toFixed(2) : "-"}</div><div className="text-terminal-muted">Max Drawdown</div><div>{result?.result ? fmtPct(result.result.max_drawdown) : "-"}</div><div className="text-terminal-muted">Round Trips</div><div>{Number(analyticsSummary.total_trades) || 0}</div><div className="text-terminal-muted">Fills</div><div>{trades.length}</div><div className="text-terminal-muted">Total Qty</div><div>{totalTradeQty.toFixed(2)}</div></div><div className="border-t border-terminal-border/40 pt-2"><div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-terminal-text"><div className="text-terminal-muted">Win Rate</div><div>{(Number(analyticsSummary.win_rate) || 0).toFixed(2)}%</div><div className="text-terminal-muted">Profit Factor</div><div>{(Number(analyticsSummary.profit_factor) || 0).toFixed(2)}</div><div className="text-terminal-muted">Expectancy</div><div>{fmtMoney(Number(analyticsSummary.expectancy) || 0)}</div>{result?.result && (result.result.max_intraday_drawdown ?? 0) < 0 && (<><div className="text-terminal-muted">Max Intraday DD</div><div>{fmtPct(result.result.max_intraday_drawdown ?? 0)}</div><div className="text-terminal-muted">Avg Hold (Min)</div><div>{(result.result.average_hold_time_minutes || 0).toFixed(1)}m</div><div className="text-terminal-muted">Trades / Day</div><div>{(result.result.trades_per_day || 0).toFixed(1)}</div><div className="text-terminal-muted">Win Rate (AM/PM)</div><div>{(result.result.win_rate_morning || 0).toFixed(1)}% / {(result.result.win_rate_afternoon || 0).toFixed(1)}%</div></>)}</div></div></div></TerminalPanel>
       </div>
 
       {result?.result && (

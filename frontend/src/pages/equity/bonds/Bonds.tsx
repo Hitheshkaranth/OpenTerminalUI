@@ -12,6 +12,7 @@ interface Bond {
   yield: number;
   price: number;
   type: string;
+  mock?: boolean;
 }
 
 interface CreditSpreadPoint {
@@ -34,6 +35,7 @@ export function BondsPage() {
   const [bonds, setBonds] = useState<Bond[]>([]);
   const [creditSpreads, setCreditSpreads] = useState<CreditSpreadPoint[]>([]);
   const [migrations, setMigrations] = useState<RatingMigration[]>([]);
+  const [spreadsMock, setSpreadsMock] = useState(false);
   const [ratingFilter, setRatingFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
 
@@ -49,8 +51,11 @@ export function BondsPage() {
 
   useEffect(() => {
     api
-      .get<{ history: CreditSpreadPoint[] }>("/bonds/credit-spreads")
-      .then((r) => setCreditSpreads(r.data.history ?? []))
+      .get<{ history: CreditSpreadPoint[]; mock?: boolean }>("/bonds/credit-spreads")
+      .then((r) => {
+        setCreditSpreads(r.data.history ?? []);
+        setSpreadsMock(Boolean(r.data.mock));
+      })
       .catch(() => {});
     api
       .get<RatingMigration[]>("/bonds/ratings-migration")
@@ -59,6 +64,7 @@ export function BondsPage() {
   }, []);
 
   const tabs = ["screener", "credit-spreads", "migrations"] as const;
+  const bondsMock = bonds.some((b) => b.mock);
 
   const latestSpread = creditSpreads.length > 0 ? creditSpreads[creditSpreads.length - 1] : null;
   const spreadRange = creditSpreads.length > 10 ? creditSpreads.slice(-30) : creditSpreads;
@@ -116,6 +122,11 @@ export function BondsPage() {
               </select>
             </div>
           </div>
+          {bondsMock ? (
+            <div className="rounded border border-terminal-warn/40 bg-terminal-warn/10 px-3 py-2 text-xs text-terminal-warn">
+              SAMPLE DATA — no bond price feed is configured; yields and prices below are illustrative, not live quotes.
+            </div>
+          ) : null}
           <TerminalPanel title={`Bond Screener (${bonds.length} results)`}>
             <div className="overflow-auto">
               <table className="w-full text-xs">
@@ -185,7 +196,7 @@ export function BondsPage() {
               )}
             </div>
           </TerminalPanel>
-          <TerminalPanel title="IG vs HY Credit Spread Timeline (90D)" className="xl:col-span-2">
+          <TerminalPanel title={`IG vs HY Credit Spread Timeline (90D)${spreadsMock ? " — SAMPLE DATA" : ""}`} className="xl:col-span-2">
             <div className="flex h-56 flex-col gap-1 overflow-x-auto p-2">
               <div className="flex h-full items-end gap-[2px]">
                 {spreadRange.map((pt, i) => (

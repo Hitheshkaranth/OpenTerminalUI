@@ -58,3 +58,21 @@ def test_iv_rejects_price_outside_bs_range():
     spec = OptionSpec(spot=100, strike=100, time_to_expiry=1, rate=0.05, volatility=0.2, option_type="call")
     with pytest.raises(ValueError):
         implied_volatility(spec, 150.0)
+
+
+def test_greek_units_theta_annual_vega_rho_per_unit():
+    """Contract the Greeks calculator UI relies on: theta is per YEAR, vega/rho per 1.00
+    change in vol/rate (the UI divides by 365 / 100 / 100 for daily and per-1% display)."""
+    spec = OptionSpec(spot=100, strike=100, time_to_expiry=1, rate=0.05, volatility=0.2)
+    g = greeks(spec)
+    h = 1e-4
+    bump = lambda **kw: bs_price(OptionSpec(**{**spec.__dict__, **kw}))  # noqa: E731
+    dp_dt = (bump(time_to_expiry=1 - h) - bump(time_to_expiry=1 + h)) / (2 * h)
+    dp_dvol = (bump(volatility=0.2 + h) - bump(volatility=0.2 - h)) / (2 * h)
+    dp_dr = (bump(rate=0.05 + h) - bump(rate=0.05 - h)) / (2 * h)
+    assert g["theta"] == pytest.approx(dp_dt, rel=1e-3)
+    assert g["vega"] == pytest.approx(dp_dvol, rel=1e-3)
+    assert g["rho"] == pytest.approx(dp_dr, rel=1e-3)
+    # ~-6.41/yr -> ~-0.0176/day; vega ~37.5 -> ~0.375 per 1% IV
+    assert g["theta"] / 365 == pytest.approx(-0.01757, abs=1e-4)
+    assert g["vega"] / 100 == pytest.approx(0.3752, abs=1e-3)

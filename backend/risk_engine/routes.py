@@ -18,7 +18,6 @@ from backend.risk_engine.compute import (
 
 from typing import List, Optional
 from fastapi import Query
-from backend.api.routes.peers import get_peers
 
 router = APIRouter(prefix="/risk", tags=["risk"])
 
@@ -47,16 +46,9 @@ async def _load_symbols_returns(symbols: List[str]) -> pd.DataFrame:
 
 async def _get_target_symbols(db: Session, ticker: Optional[str] = None) -> List[str]:
     if ticker:
-        ticker = ticker.strip().upper()
-        try:
-            # Get peers for the ticker
-            peers_data = await get_peers(ticker)
-            peers = peers_data.get("peers", [])
-            # Limit to top 5 peers for comparison
-            symbols = [ticker] + peers[:5]
-            return symbols
-        except Exception:
-            return [ticker]
+        # PeerResponse carries peer metrics, not peer symbols, and no peer-symbol source
+        # is wired up, so single-ticker risk runs on the ticker alone.
+        return [ticker.strip().upper()]
 
     rows = db.query(Holding).all()
     return sorted({str(row.ticker).strip().upper() for row in rows if str(row.ticker).strip()})
@@ -73,9 +65,10 @@ async def get_risk_summary(
     if df.empty:
         return RiskSummary(ewma_vol=0, beta=0, marginal_contribution={})
 
-    # If single ticker mode, port_returns is just that ticker
-    # If portfolio mode, it's the equal-weighted mean
-    port_returns = df.mean(axis=1).values
+    # Single ticker mode: the ticker's own returns (not a peer basket).
+    # Portfolio mode: the equal-weighted mean.
+    focus = ticker.strip().upper() if ticker else None
+    port_series = df[focus] if focus and focus in df.columns else df.mean(axis=1)
 
     # Use first symbol or benchmark for beta (simplification)
     # Beta must be against a market index; using `ticker` compared the basket to one of its own members.
@@ -87,15 +80,22 @@ async def get_risk_summary(
         except Exception:
             pass
     bm_df = await _load_symbols_returns([bm_symbol])
-    bm_returns = bm_df.iloc[:, 0].values if not bm_df.empty else port_returns
+    bm_series = bm_df.iloc[:, 0] if not bm_df.empty else port_series
 
-    # Align lengths
-    min_len = min(len(port_returns), len(bm_returns))
-    if min_len > 0:
-        port_returns = port_returns[-min_len:]
-        bm_returns = bm_returns[-min_len:]
+    # Align on trading date. Trailing-length alignment paired returns from
+    # different days whenever the two calendars differed (e.g. 251 vs 245 bars),
+    # which drove beta to ~0.
+    def _by_date(series: pd.Series) -> pd.Series:
+        idx = pd.DatetimeIndex(series.index)
+        out = series.copy()
+        out.index = idx.normalize() if isinstance(idx, pd.DatetimeIndex) else idx
+        return out[~out.index.duplicated(keep="last")]
 
-    vol = ewma_volatility(port_returns)
+    aligned = pd.concat([_by_date(port_series), _by_date(bm_series)], axis=1, join="inner").dropna()
+    port_returns = aligned.iloc[:, 0].values
+    bm_returns = aligned.iloc[:, 1].values
+
+    vol = ewma_volatility(port_series.values)
     beta = calculate_beta(port_returns, bm_returns)
 
     cov = df.cov().values

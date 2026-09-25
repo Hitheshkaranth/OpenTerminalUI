@@ -569,13 +569,17 @@ export type YieldCurveDataPoint = {
 };
 
 export type YieldCurveResponse = {
-  date: string;
+  date: string | null;
   data: YieldCurveDataPoint[];
   spreads?: Record<string, number>;
+  mock?: boolean;
+  source?: string;
+  partial?: boolean;
 };
 
 export type SpreadHistoryResponse = {
   history: Array<{ date: string; value: number }>;
+  mock?: boolean;
 };
 
 export type EconomicEvent = {
@@ -1035,6 +1039,8 @@ export type InsiderTrade = {
   price?: number | null;
   value?: number | null;
   post_holding_pct?: number | null;
+  currency?: string | null;
+  source?: string | null;
 };
 
 export type InsiderStockSummary = {
@@ -1052,6 +1058,7 @@ export type InsiderStockResponse = {
 export type InsiderTopActivityRow = {
   symbol: string;
   name: string;
+  currency?: string | null;
   total_value: number;
   trade_count: number;
   avg_price: number;
@@ -1061,6 +1068,7 @@ export type InsiderTopActivityRow = {
 export type InsiderClusterRow = {
   symbol: string;
   name: string;
+  currency?: string | null;
   insider_count: number;
   total_value: number;
   insiders: Array<{

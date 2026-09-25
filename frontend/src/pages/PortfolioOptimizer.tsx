@@ -330,7 +330,7 @@ export function PortfolioOptimizer() {
                   { label: "Sharpe Ratio", val: result.metrics.sharpe, fmt: "" },
                   { label: "Sortino Ratio", val: result.metrics.sortino, fmt: "" },
                   { label: "Max Drawdown", val: result.metrics.max_drawdown, fmt: "%", color: "text-terminal-neg" },
-                  { label: "CVaR (95%)", val: result.metrics.cvar, fmt: "%", color: "text-terminal-neg" },
+                  { label: "CVaR 95% (Daily)", val: result.metrics.cvar, fmt: "%", color: "text-terminal-neg" },
                   { label: "Ulcer Index", val: result.metrics.ulcer_index, fmt: "" },
                   { label: "CDaR", val: result.metrics.cdar, fmt: "%" },
                 ].map((m, i) => (

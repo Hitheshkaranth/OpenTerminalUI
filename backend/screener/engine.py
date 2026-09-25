@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,10 @@ from backend.services.materialized_store import load_screener_df
 from .fields import has_field
 from .models import compute_many
 from .parser import ParsedQuery, parse_query
+
+
+def _elapsed_ms(started: float) -> float:
+    return round((time.perf_counter() - started) * 1000.0, 2)
 
 
 @dataclass
@@ -238,6 +243,7 @@ class ScreenerEngine:
         }
 
     def run(self, config: RunConfig) -> dict[str, Any]:
+        started = time.perf_counter()
         parsed = parse_query(config.query)
         parsed_sort = config.sort_by or parsed.sort_by
         parsed_order = config.sort_order or parsed.sort_order
@@ -246,7 +252,8 @@ class ScreenerEngine:
         market = (config.market or "IN").upper()
         cache_key = f"{market}|{config.universe}|{parsed.normalized}|{parsed_sort}|{parsed_order}|{parsed_limit}|{config.offset}|{','.join(config.include_scores or [])}"
         if cache_key in self._cache:
-            return self._cache[cache_key]
+            # Shallow copy: callers (e.g. column trimming) must not mutate the cached entry.
+            return {**self._cache[cache_key], "execution_time_ms": _elapsed_ms(started)}
 
         data = self._load_data(config.universe, market=market)
         filtered = self._apply_filter(data, parsed)
@@ -274,4 +281,4 @@ class ScreenerEngine:
         self._cache[cache_key] = output
         if len(self._cache) > 256:
             self._cache.pop(next(iter(self._cache)))
-        return output
+        return {**output, "execution_time_ms": _elapsed_ms(started)}

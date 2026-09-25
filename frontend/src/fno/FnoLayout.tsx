@@ -229,7 +229,8 @@ export function FnoLayout() {
             <div className="text-[11px]">
               <span className="mb-1 block uppercase tracking-wide text-terminal-muted">Universe</span>
               <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs">
-                {market} F&O
+                {/* Heatmap & Expiry dashboards always cover the tracked NSE list, whatever symbol is selected. */}
+                {/\/(heatmap|expiry)\/?$/.test(location.pathname) ? "NSE" : market} F&O
               </div>
             </div>
           </div>

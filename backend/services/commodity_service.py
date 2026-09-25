@@ -284,22 +284,13 @@ class CommodityService:
             source="fmp",
         )
 
-    def _build_sparkline(self, symbol: str, price: float, previous_close: float) -> list[float]:
+    def _build_sparkline(self, symbol: str, price: float, previous_close: float) -> list[float]:  # noqa: ARG002
+        # Only the prior close and last price are known from a quote; don't
+        # interpolate a fabricated intraday path between them.
         if price <= 0:
             return []
         start = previous_close if previous_close > 0 else price
-        amplitude = max(abs(price - start) * 0.12, price * 0.0025)
-        seed = sum(ord(char) for char in symbol) % 11
-        points: list[float] = []
-        for index in range(7):
-            progress = index / 6.0
-            baseline = start + (price - start) * progress
-            wiggle = math.sin(seed + index * 0.8) * amplitude
-            if index in {0, 6}:
-                wiggle = 0.0
-            points.append(round(max(0.01, baseline + wiggle), 4))
-        points[-1] = round(price, 4)
-        return points
+        return [round(start, 4), round(price, 4)]
 
     async def _fetch_fmp_quote(self, fetcher: Any, item: CommodityDefinition) -> dict[str, Any]:
         fmp = getattr(fetcher, "fmp", None)

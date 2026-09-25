@@ -64,7 +64,9 @@ class PCRTracker:
             )
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_pcr_snapshots_symbol_date ON pcr_snapshots(symbol, snapshot_date)"))
 
-    def _signal_for_pcr(self, pcr_oi: float) -> str:
+    def _signal_for_pcr(self, pcr_oi: float | None) -> str:
+        if pcr_oi is None or pcr_oi <= 0:
+            return "No data"
         if pcr_oi > 1.0:
             return "Bullish"
         if pcr_oi < 0.7:
@@ -76,10 +78,10 @@ class PCRTracker:
             "symbol": symbol.strip().upper(),
             "expiry_date": expiry or "",
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "pcr_oi": 0.0,
-            "pcr_vol": 0.0,
-            "pcr_oi_change": 0.0,
-            "signal": "Neutral",
+            "pcr_oi": None,
+            "pcr_vol": None,
+            "pcr_oi_change": None,
+            "signal": "No data",
             "total_ce_oi": 0,
             "total_pe_oi": 0,
         }
@@ -102,6 +104,8 @@ class PCRTracker:
         if not row:
             return None
         pcr_oi = float(row[1] or 0.0)
+        if pcr_oi <= 0:
+            return None
         return {
             "symbol": symbol.strip().upper(),
             "expiry_date": "",
@@ -125,10 +129,10 @@ class PCRTracker:
                 "symbol": chain.get("symbol") or symbol_u,
                 "expiry_date": chain.get("expiry_date"),
                 "timestamp": chain.get("timestamp"),
-                "pcr_oi": pcr.get("pcr_oi", 0.0),
-                "pcr_vol": pcr.get("pcr_volume", 0.0),
-                "pcr_oi_change": pcr.get("pcr_oi_change", 0.0),
-                "signal": pcr.get("signal", "Neutral"),
+                "pcr_oi": pcr.get("pcr_oi"),
+                "pcr_vol": pcr.get("pcr_volume"),
+                "pcr_oi_change": pcr.get("pcr_oi_change"),
+                "signal": pcr.get("signal", "No data"),
                 "total_ce_oi": totals.get("ce_oi_total", 0),
                 "total_pe_oi": totals.get("pe_oi_total", 0),
             }
@@ -167,6 +171,9 @@ class PCRTracker:
     async def store_snapshot(self, symbol: str, expiry: str | None = None, snapshot_date: str | None = None) -> dict[str, Any]:
         snapshot_day = snapshot_date or date.today().isoformat()
         current = await self.get_current_pcr(symbol, expiry=expiry)
+        if current.get("pcr_oi") is None:
+            # Nothing to record — persisting 0.0 would later read back as a Bearish PCR.
+            return current
         with engine.begin() as conn:
             conn.execute(
                 text(
@@ -306,13 +313,15 @@ class PCRTracker:
                 if last:
                     rows = [(date.today().isoformat(), last.get("pcr_oi", 0.0), last.get("pcr_vol", 0.0))]
                 else:
-                    rows = [(date.today().isoformat(), 0.0, 0.0)]
+                    rows = []
 
         out = []
         for row in rows:
             day = str(row[0])
             pcr_oi = float(row[1] or 0.0)
             pcr_vol = float(row[2] or 0.0)
+            if pcr_oi <= 0:
+                continue  # no-data snapshot; skip rather than plot a fake 0 PCR
             signal = self._signal_for_pcr(pcr_oi)
             out.append({"date": day, "pcr_oi": round(pcr_oi, 4), "pcr_vol": round(pcr_vol, 4), "signal": signal})
         return out

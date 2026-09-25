@@ -88,6 +88,8 @@ class OrderBookService:
     def __init__(self, cache_ttl_seconds: int = 3) -> None:
         self._cache_ttl_seconds = max(1, int(cache_ttl_seconds))
         self._cache: dict[str, tuple[float, DepthSnapshot]] = {}
+        # Last real price seen per symbol/market, so stream frames stay centred on it too.
+        self._last_ref: dict[str, float] = {}
 
     @staticmethod
     def _normalize_symbol(symbol: str) -> str:
@@ -232,6 +234,8 @@ class OrderBookService:
         normalized_market = self._normalize_market(market_hint, normalized_symbol)
         safe_levels = max(1, min(int(levels), 40))
         ref = float(ref_price) if ref_price is not None and float(ref_price) > 0 else None
+        if ref is not None:
+            self._last_ref[f"{normalized_symbol}:{normalized_market}"] = ref
         cache_key = f"{normalized_symbol}:{normalized_market}:{safe_levels}:{round(ref, 4) if ref else '-'}"
         now = datetime.now(timezone.utc).timestamp()
         cached = self._cache.get(cache_key)
@@ -242,8 +246,14 @@ class OrderBookService:
         self._cache[cache_key] = (now + self._cache_ttl_seconds, snapshot)
         return snapshot
 
-    def stream_message(self, symbol: str, market_hint: str | None = None, levels: int = 10) -> dict[str, Any]:
-        snapshot = self.get_snapshot(symbol, market_hint=market_hint, levels=levels)
+    def stream_message(
+        self, symbol: str, market_hint: str | None = None, levels: int = 10, ref_price: float | None = None
+    ) -> dict[str, Any]:
+        if ref_price is None:
+            # Keep stream frames on the same real price a REST caller already anchored this book to.
+            sym = self._normalize_symbol(symbol)
+            ref_price = self._last_ref.get(f"{sym}:{self._normalize_market(market_hint, sym)}")
+        snapshot = self.get_snapshot(symbol, market_hint=market_hint, levels=levels, ref_price=ref_price)
         return {
             "type": "depth",
             "symbol": snapshot.symbol,

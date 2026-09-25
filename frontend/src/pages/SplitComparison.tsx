@@ -18,13 +18,22 @@ const RANGE_BY_TIMEFRAME: Record<Timeframe, string> = {
   "1Y": "1y",
 };
 
-function readNumeric(snapshot: unknown, keys: string[]) {
+// Missing fields are null (rendered "-"), never 0 — a 0 dividend yield / 52W high is a real-looking lie.
+function readNumeric(snapshot: unknown, keys: string[]): number | null {
   const row = (snapshot ?? {}) as Record<string, unknown>;
   for (const key of keys) {
-    const value = Number(row[key]);
+    const raw = row[key];
+    if (raw == null || raw === "") continue;
+    const value = Number(raw);
     if (Number.isFinite(value)) return value;
   }
-  return 0;
+  return null;
+}
+
+function extreme(data: ChartPoint[], pick: "h" | "l"): number | null {
+  const values = data.map((d) => Number(d[pick])).filter((v) => Number.isFinite(v) && v > 0);
+  if (!values.length) return null;
+  return pick === "h" ? Math.max(...values) : Math.min(...values);
 }
 
 function normalizeSeries(data: ChartPoint[]) {
@@ -81,6 +90,9 @@ export function SplitComparisonPage() {
   const rightHistory = useStockHistory(rightTicker, range, "1d");
   const leftSnapshot = useStock(leftTicker);
   const rightSnapshot = useStock(rightTicker);
+  // 52W range: snapshot when the provider supplies it, else derived from a real 1Y daily history.
+  const leftYear = (useStockHistory(leftTicker, "1y", "1d").data?.data ?? []) as ChartPoint[];
+  const rightYear = (useStockHistory(rightTicker, "1y", "1d").data?.data ?? []) as ChartPoint[];
 
   const leftData = (leftHistory.data?.data ?? []) as ChartPoint[];
   const rightData = (rightHistory.data?.data ?? []) as ChartPoint[];
@@ -231,19 +243,19 @@ export function SplitComparisonPage() {
               right: readNumeric(rightSnapshot.data, ["pe", "pe_ratio"]),
             },
             {
-              metric: "Dividend Yield",
-              left: readNumeric(leftSnapshot.data, ["dividend_yield"]),
-              right: readNumeric(rightSnapshot.data, ["dividend_yield"]),
+              metric: "Dividend Yield %",
+              left: readNumeric(leftSnapshot.data, ["div_yield_pct", "dividend_yield"]),
+              right: readNumeric(rightSnapshot.data, ["div_yield_pct", "dividend_yield"]),
             },
             {
               metric: "52W High",
-              left: readNumeric(leftSnapshot.data, ["52w_high", "high_52_week"]),
-              right: readNumeric(rightSnapshot.data, ["52w_high", "high_52_week"]),
+              left: readNumeric(leftSnapshot.data, ["fifty_two_week_high", "52w_high", "high_52_week"]) ?? extreme(leftYear, "h"),
+              right: readNumeric(rightSnapshot.data, ["fifty_two_week_high", "52w_high", "high_52_week"]) ?? extreme(rightYear, "h"),
             },
             {
               metric: "52W Low",
-              left: readNumeric(leftSnapshot.data, ["52w_low", "low_52_week"]),
-              right: readNumeric(rightSnapshot.data, ["52w_low", "low_52_week"]),
+              left: readNumeric(leftSnapshot.data, ["fifty_two_week_low", "52w_low", "low_52_week"]) ?? extreme(leftYear, "l"),
+              right: readNumeric(rightSnapshot.data, ["fifty_two_week_low", "52w_low", "low_52_week"]) ?? extreme(rightYear, "l"),
             },
             {
               metric: `${timeframe} Return %`,
@@ -267,7 +279,7 @@ export function SplitComparisonPage() {
               type: "large-number",
               align: "right",
               sortable: true,
-              getValue: (r) => Number(r.left) - Number(r.right),
+              getValue: (r) => (r.left == null || r.right == null ? null : Number(r.left) - Number(r.right)),
             },
             {
               key: "deltaPct",
@@ -276,8 +288,9 @@ export function SplitComparisonPage() {
               align: "right",
               sortable: true,
               getValue: (r) => {
+                if (r.left == null || r.right == null) return null;
                 const denom = Number(r.right);
-                if (!Number.isFinite(denom) || denom === 0) return 0;
+                if (!Number.isFinite(denom) || denom === 0) return null;
                 return ((Number(r.left) - denom) / Math.abs(denom)) * 100;
               },
             },

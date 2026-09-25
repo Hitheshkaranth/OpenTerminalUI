@@ -56,16 +56,19 @@ class CentralBankSnapshot(BaseModel):
     bank: str
     policy_rate: float
     last_decision_date: date
-    next_decision_date: date
+    next_decision_date: date | None = None
     last_action: str
     last_change_bps: int
     days_since_last_decision: int
-    days_until_next_decision: int
+    days_until_next_decision: int | None = None
     decision_cycle: str
 
 
 class CentralBanksResponse(BaseModel):
     as_of: datetime
+    snapshot_as_of: date | None = None
+    stale: bool = False
+    source: str | None = None
     banks: list[CentralBankSnapshot]
 
 

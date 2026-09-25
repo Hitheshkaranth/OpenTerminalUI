@@ -105,3 +105,13 @@ def test_ratings_migration_route(client: TestClient):
     data = resp.json()
     assert isinstance(data, list)
     assert len(data) >= 2
+
+
+@pytest.mark.asyncio
+async def test_bond_screener_excludes_matured_and_flags_sample(bond_service: BondService):
+    from datetime import date
+
+    result = await bond_service.get_bond_screener()
+    today = date.today().isoformat()
+    assert all(b["maturity_date"] >= today for b in result)
+    assert all(b.get("mock") is True for b in result)

@@ -106,8 +106,9 @@ function formatCurrencyCompact(value: number): string {
 
 function formatPrice(value: number): string {
   if (!Number.isFinite(value)) return "--";
-  const maximumFractionDigits = value >= 1000 ? 2 : value >= 1 ? 2 : 4;
-  return value.toLocaleString("en-US", { maximumFractionDigits });
+  if (value >= 1) return value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  // Sub-dollar coins (SHIB ~0.00001) need significant digits, not a fixed 4 decimals.
+  return value.toLocaleString("en-US", { maximumSignificantDigits: 4 });
 }
 
 function signedPct(value: number): string {
@@ -358,7 +359,7 @@ export function CryptoWorkspacePage() {
                   <th className="pb-2 text-right">24h</th>
                   <th className="pb-2 text-right">Volume</th>
                   <th className="pb-2 text-right">Mkt Cap</th>
-                  <th className="pb-2 text-left">Sector</th>
+                  <th className="pb-2 pl-4 text-left">Sector</th>
                   <th className="pb-2 text-right">Route</th>
                 </tr>
               </thead>
@@ -387,8 +388,8 @@ export function CryptoWorkspacePage() {
                       <td className="py-2 text-right text-terminal-text">{formatPrice(row.price)}</td>
                       <td className={`py-2 text-right ${pctClass(row.change_24h)}`}>{signedPct(row.change_24h)}</td>
                       <td className="py-2 text-right">{formatCurrencyCompact(row.volume_24h)}</td>
-                      <td className="py-2 text-right">{formatCurrencyCompact(row.market_cap)}</td>
-                      <td className="py-2">
+                      <td className="py-2 text-right">{row.market_cap > 0 ? formatCurrencyCompact(row.market_cap) : "--"}</td>
+                      <td className="py-2 pl-4">
                         <span className="rounded border border-terminal-border px-2 py-1 text-[10px] uppercase tracking-wide text-terminal-muted">
                           {row.sector || "General"}
                         </span>

@@ -26,6 +26,7 @@ type PairCandle = {
 
 type PairResponse = {
   pair: string;
+  interval: string;
   current_rate: number;
   candles: PairCandle[];
 };
@@ -42,16 +43,6 @@ const USD_QUOTE_RATES: Record<string, number> = {
   CAD: 1.3574,
   INR: 83.14,
 };
-const FALLBACK_BANKS: CentralBankEntry[] = [
-  { currency: "USD", bank: "Federal Reserve", policy_rate: 5.25, last_decision_date: "2026-02-18", next_decision_date: "2026-03-31", last_action: "Hold", last_change_bps: 0, days_since_last_decision: 31, days_until_next_decision: 11, decision_cycle: "6 weeks" },
-  { currency: "EUR", bank: "European Central Bank", policy_rate: 3.0, last_decision_date: "2026-03-05", next_decision_date: "2026-04-16", last_action: "Cut", last_change_bps: -25, days_since_last_decision: 14, days_until_next_decision: 27, decision_cycle: "6 weeks" },
-  { currency: "GBP", bank: "Bank of England", policy_rate: 4.5, last_decision_date: "2026-02-06", next_decision_date: "2026-03-20", last_action: "Hold", last_change_bps: 0, days_since_last_decision: 42, days_until_next_decision: 0, decision_cycle: "6 weeks" },
-  { currency: "JPY", bank: "Bank of Japan", policy_rate: 0.25, last_decision_date: "2026-01-23", next_decision_date: "2026-03-21", last_action: "Hike", last_change_bps: 10, days_since_last_decision: 57, days_until_next_decision: 1, decision_cycle: "2 months" },
-  { currency: "CHF", bank: "Swiss National Bank", policy_rate: 1.25, last_decision_date: "2026-03-14", next_decision_date: "2026-06-13", last_action: "Hold", last_change_bps: 0, days_since_last_decision: 5, days_until_next_decision: 86, decision_cycle: "Quarterly" },
-  { currency: "AUD", bank: "Reserve Bank of Australia", policy_rate: 4.1, last_decision_date: "2026-03-03", next_decision_date: "2026-04-07", last_action: "Hold", last_change_bps: 0, days_since_last_decision: 16, days_until_next_decision: 18, decision_cycle: "Monthly" },
-  { currency: "CAD", bank: "Bank of Canada", policy_rate: 4.0, last_decision_date: "2026-03-12", next_decision_date: "2026-04-23", last_action: "Cut", last_change_bps: -25, days_since_last_decision: 7, days_until_next_decision: 34, decision_cycle: "6 weeks" },
-  { currency: "INR", bank: "Reserve Bank of India", policy_rate: 6.5, last_decision_date: "2026-02-07", next_decision_date: "2026-04-05", last_action: "Hold", last_change_bps: 0, days_since_last_decision: 41, days_until_next_decision: 16, decision_cycle: "Bi-monthly" },
-];
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -127,7 +118,7 @@ function buildFallbackPair(pair: string, currencies: string[], matrix: number[][
       v: 1000 + index * 37,
     };
   });
-  return { pair, current_rate: currentRate, candles };
+  return { pair, interval: "1h", current_rate: currentRate, candles };
 }
 
 function normalizePairResponse(payload: unknown, pair: string, currencies: string[], matrix: number[][]): PairResponse {
@@ -153,14 +144,17 @@ function normalizePairResponse(payload: unknown, pair: string, currencies: strin
     : [];
   return {
     pair: String(raw.pair || pair).toUpperCase(),
+    interval: String(raw.interval || "1d"),
     current_rate: Number(raw.current_rate ?? raw.currentRate ?? candles[candles.length - 1]?.c ?? 0),
-    candles: candles.length ? candles : buildFallbackPair(pair, currencies, matrix).candles,
+    candles,
   };
 }
 
-function normalizeBanks(payload: unknown): CentralBankEntry[] {
+type BanksState = { banks: CentralBankEntry[]; snapshotAsOf: string | null; stale: boolean };
+
+function normalizeBanks(payload: unknown): BanksState {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return FALLBACK_BANKS;
+    return { banks: [], snapshotAsOf: null, stale: false };
   }
   const raw = payload as Record<string, unknown>;
   const banks = Array.isArray(raw.banks)
@@ -173,17 +167,21 @@ function normalizeBanks(payload: unknown): CentralBankEntry[] {
             bank: String(row.bank || ""),
             policy_rate: Number(row.policy_rate),
             last_decision_date: String(row.last_decision_date || ""),
-            next_decision_date: String(row.next_decision_date || ""),
+            next_decision_date: row.next_decision_date ? String(row.next_decision_date) : null,
             last_action: String(row.last_action || ""),
             last_change_bps: Number(row.last_change_bps || 0),
             days_since_last_decision: Number(row.days_since_last_decision || 0),
-            days_until_next_decision: Number(row.days_until_next_decision || 0),
+            days_until_next_decision: row.days_until_next_decision == null ? null : Number(row.days_until_next_decision),
             decision_cycle: String(row.decision_cycle || ""),
           };
         })
         .filter((entry): entry is CentralBankEntry => entry !== null && Boolean(entry.currency) && Boolean(entry.bank))
     : [];
-  return banks.length ? banks : FALLBACK_BANKS;
+  return {
+    banks,
+    snapshotAsOf: raw.snapshot_as_of ? String(raw.snapshot_as_of) : null,
+    stale: Boolean(raw.stale),
+  };
 }
 
 function currencyStrengthRows(currencies: string[], matrix: number[][]) {
@@ -216,8 +214,8 @@ export function ForexPage() {
     currencies: FALLBACK_CURRENCIES,
     matrix: buildFallbackMatrix(FALLBACK_CURRENCIES),
   });
-  const [banks, setBanks] = useState<CentralBankEntry[]>(FALLBACK_BANKS);
-  const [pairData, setPairData] = useState<PairResponse>(buildFallbackPair("EURUSD", FALLBACK_CURRENCIES, buildFallbackMatrix(FALLBACK_CURRENCIES)));
+  const [banksState, setBanksState] = useState<BanksState>({ banks: [], snapshotAsOf: null, stale: false });
+  const [pairData, setPairData] = useState<PairResponse>({ pair: "EURUSD", interval: "1d", current_rate: 0, candles: [] });
   const [ratesLoading, setRatesLoading] = useState(true);
   const [pairLoading, setPairLoading] = useState(false);
   const [fallbackMode, setFallbackMode] = useState(false);
@@ -236,7 +234,7 @@ export function ForexPage() {
         ? normalizeCrossRates(ratesResult.value)
         : { currencies: FALLBACK_CURRENCIES, matrix: buildFallbackMatrix(FALLBACK_CURRENCIES) };
       setCrossRates(nextCrossRates);
-      setBanks(banksResult.status === "fulfilled" ? normalizeBanks(banksResult.value) : FALLBACK_BANKS);
+      setBanksState(banksResult.status === "fulfilled" ? normalizeBanks(banksResult.value) : { banks: [], snapshotAsOf: null, stale: false });
       setFallbackMode(!(ratesResult.status === "fulfilled" && banksResult.status === "fulfilled"));
       setRatesLoading(false);
     })();
@@ -274,16 +272,19 @@ export function ForexPage() {
     };
   }, [crossRates.currencies, crossRates.matrix, selectedPair]);
 
+  const intradayPair = /^\d+(m|h)$/.test(pairData.interval);
   const chartRows = useMemo(
     () =>
       pairData.candles.map((row) => ({
-        time: new Date(row.t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        time: intradayPair
+          ? new Date(row.t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          : new Date(row.t * 1000).toLocaleDateString([], { month: "short", day: "numeric", timeZone: "UTC" }),
         close: row.c,
         high: row.h,
         low: row.l,
         volume: row.v,
       })),
-    [pairData.candles],
+    [pairData.candles, intradayPair],
   );
   const lastCandle = pairData.candles[pairData.candles.length - 1];
   const firstCandle = pairData.candles[0];
@@ -357,7 +358,7 @@ export function ForexPage() {
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded border border-terminal-border bg-terminal-panel/50 px-3 py-2">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-terminal-muted">Spot</div>
-                <div className="mt-1 ot-type-data text-lg text-terminal-text">{pairData.current_rate.toFixed(4)}</div>
+                <div className="mt-1 ot-type-data text-lg text-terminal-text">{pairData.current_rate > 0 ? pairData.current_rate.toFixed(4) : "--"}</div>
               </div>
               <div className="rounded border border-terminal-border bg-terminal-panel/50 px-3 py-2">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-terminal-muted">Window Change</div>
@@ -398,13 +399,18 @@ export function ForexPage() {
           subtitle="Policy rates, recent decisions, and upcoming meetings"
           actions={pairLoading ? <TerminalBadge variant="info" dot>Pair updating</TerminalBadge> : null}
         >
-          <CentralBankMonitor banks={banks} loading={ratesLoading} />
+          <CentralBankMonitor
+            banks={banksState.banks}
+            loading={ratesLoading}
+            snapshotAsOf={banksState.snapshotAsOf}
+            stale={banksState.stale}
+          />
         </TerminalPanel>
       </div>
 
       {fallbackMode ? (
         <div className="rounded border border-terminal-warn/40 bg-terminal-warn/10 px-3 py-2 text-xs text-terminal-warn">
-          Forex backend routes are implemented in the workspace, but global router registration is still outside this packet scope, so the page can fall back to seeded data.
+          Live forex data is unavailable — cross rates and the pair chart are showing seeded sample values, not market data.
         </div>
       ) : null}
     </div>

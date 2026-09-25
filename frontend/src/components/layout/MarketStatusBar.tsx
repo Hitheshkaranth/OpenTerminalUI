@@ -18,8 +18,13 @@ function formatZone(now: Date, timeZone: string) {
 }
 
 function marketLabel(value: unknown): "OPEN" | "CLOSED" {
-  const raw = String(value || "").toUpperCase();
-  return raw.includes("OPEN") ? "OPEN" : "CLOSED";
+  // Exact match: "Pre-Open"/"Reopen" style labels must not read as a regular session.
+  return String(value || "").trim().toUpperCase() === "OPEN" ? "OPEN" : "CLOSED";
+}
+
+/** NSE's marketState lists several segments (Capital Market, Currency, Commodity…); only the equity one matters. */
+function nseCapitalMarketStatus(state: Array<{ market?: string; marketStatus?: string }> | undefined) {
+  return state?.find((row) => String(row?.market || "").trim().toLowerCase() === "capital market")?.marketStatus;
 }
 
 function Dot({ tone }: { tone: "green" | "yellow" | "red" | "gray" }) {
@@ -69,14 +74,15 @@ export function MarketStatusBar(_props: { tickerOverride?: string | null } = {})
   }, [lagMs, now]);
 
   const marketPayload = (marketStatus ?? {}) as {
-    marketState?: Array<{ marketStatus?: string }>;
+    marketState?: Array<{ market?: string; marketStatus?: string }>;
     nseStatus?: string;
     nyseStatus?: string;
     nextOpenTime?: string;
     fallbackEnabled?: boolean;
   };
 
-  const nseOpen = marketLabel(marketPayload.marketState?.[0]?.marketStatus ?? marketPayload.nseStatus);
+  // Backend nseStatus/nyseStatus are computed from exchange hours in the exchange timezone.
+  const nseOpen = marketLabel(marketPayload.nseStatus ?? nseCapitalMarketStatus(marketPayload.marketState));
   const nyseOpen = marketLabel(marketPayload.nyseStatus);
   const connectionTone =
     connectionState === "connected" ? "green" : connectionState === "connecting" ? "yellow" : "red";

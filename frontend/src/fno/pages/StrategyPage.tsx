@@ -146,6 +146,15 @@ export function StrategyPage() {
         <div className="space-y-3">
           <div className="rounded border border-terminal-border bg-terminal-panel p-3">
             <div className="h-72 w-full">
+              {!chartData.length ? (
+                <div className="flex h-full items-center justify-center text-sm text-terminal-muted">
+                  {payoffQuery.isFetching
+                    ? "Calculating payoff…"
+                    : payoffQuery.isError
+                      ? "Could not calculate the payoff for these legs."
+                      : "Add legs or pick a preset to see the payoff at expiry."}
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#2a2f3a" />
@@ -161,6 +170,7 @@ export function StrategyPage() {
                   ))}
                 </AreaChart>
               </ResponsiveContainer>
+              )}
             </div>
           </div>
 

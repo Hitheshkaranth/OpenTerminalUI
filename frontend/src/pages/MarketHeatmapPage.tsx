@@ -365,7 +365,7 @@ export function MarketHeatmapPage() {
                         }}
                         onMouseLeave={() => setTooltip(null)}
                       >
-                        <rect width={rectWidth} height={rectHeight} rx={2} fill={heatColor(item.change_pct)} data-testid="heatmap-rect" />
+                        <rect width={rectWidth} height={rectHeight} rx={2} fill={heatColor(item.change_pct)} opacity={item.synthetic ? 0.35 : 1} data-testid="heatmap-rect" />
                         {rectWidth > 56 && rectHeight > 28 ? (
                           <text x={8} y={18} fill="#f8fafc" fontSize={12} fontWeight={700}>
                             {item.symbol}
@@ -438,6 +438,11 @@ export function MarketHeatmapPage() {
                 <span className="text-terminal-muted">Constituents</span>
                 <span className="text-terminal-text">{query.data?.data.length ?? 0}</span>
               </div>
+              {query.data?.synthetic_count ? (
+                <div className="rounded border border-terminal-warn/40 bg-terminal-warn/10 px-2 py-1 text-terminal-warn" data-testid="heatmap-sample-badge">
+                  Sample data: {query.data.synthetic_count} of {query.data.data.length} constituents have no live quote (dimmed).
+                </div>
+              ) : null}
               <div className="flex items-center justify-between">
                 <span className="text-terminal-muted">Grouping</span>
                 <span className="capitalize text-terminal-text">{group}</span>

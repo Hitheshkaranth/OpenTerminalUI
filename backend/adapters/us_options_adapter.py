@@ -122,7 +122,9 @@ class USOptionsAdapter:
                 mibian_type = "PE"
 
             # Normalize values
-            iv = self._to_float(opt.get("impliedVolatility", 0.0))
+            # yfinance/FMP quote IV as a fraction (0.25); the F&O stack (NSE chains,
+            # mibian greeks, UI) uses percent points (25.0).
+            iv = self._to_float(opt.get("impliedVolatility", 0.0)) * 100.0
             ltp = self._to_float(opt.get("lastPrice", opt.get("price", 0.0)))
 
             # Recalculate IV if missing/low using mibian if possible
@@ -177,8 +179,8 @@ class USOptionsAdapter:
             "pe_oi_total": pe_oi,
             "ce_volume_total": ce_vol,
             "pe_volume_total": pe_vol,
-            "pcr_oi": round(pe_oi / ce_oi, 4) if ce_oi > 0 else 0.0,
-            "pcr_volume": round(pe_vol / ce_vol, 4) if ce_vol > 0 else 0.0
+            "pcr_oi": round(pe_oi / ce_oi, 4) if ce_oi > 0 else None,
+            "pcr_volume": round(pe_vol / ce_vol, 4) if ce_vol > 0 else None
         }
 
     def _empty_leg(self) -> Dict[str, Any]:
@@ -194,5 +196,5 @@ class USOptionsAdapter:
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "expiry_date": expiry, "available_expiries": [],
             "atm_strike": 0.0, "strikes": [],
-            "totals": {"ce_oi_total": 0, "pe_oi_total": 0, "ce_volume_total": 0, "pe_volume_total": 0, "pcr_oi": 0.0, "pcr_volume": 0.0}
+            "totals": {"ce_oi_total": 0, "pe_oi_total": 0, "ce_volume_total": 0, "pe_volume_total": 0, "pcr_oi": None, "pcr_volume": None}
         }

@@ -7,6 +7,7 @@ import { TerminalBadge } from "../components/terminal/TerminalBadge";
 import { TerminalButton } from "../components/terminal/TerminalButton";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { useAuth } from "../contexts/AuthContext";
+import { computeProfileCompletion, PROFILE_STORAGE_KEY } from "../lib/profileCompletion";
 import { useSettingsStore } from "../store/settingsStore";
 import {
   COUNTRY_MARKETS,
@@ -21,7 +22,6 @@ import {
   type MarketCode,
 } from "../types";
 
-const PROFILE_STORAGE_KEY = "ot.account.profile";
 const CONNECTED_STORAGE_KEY = "ot.account.connected";
 const AGGREGATORS_STORAGE_KEY = "ot.account.aggregators";
 
@@ -71,21 +71,6 @@ const SHORTCUTS: readonly AccountShortcutCard[] = [
     to: "/equity/settings",
     tone: "warn",
   },
-] as const;
-
-const PROFILE_COMPLETION_FIELDS: ReadonlyArray<{
-  key: keyof AccountProfile;
-  label: string;
-  isComplete: (profile: AccountProfile) => boolean;
-}> = [
-  { key: "firstName", label: "First Name", isComplete: (profile) => Boolean(profile.firstName.trim()) },
-  { key: "lastName", label: "Last Name", isComplete: (profile) => Boolean(profile.lastName.trim()) },
-  { key: "displayName", label: "Display Name", isComplete: (profile) => Boolean(profile.displayName.trim()) },
-  { key: "phone", label: "Phone", isComplete: (profile) => Boolean(profile.phone.trim()) },
-  { key: "location", label: "Location", isComplete: (profile) => Boolean(profile.location.trim()) },
-  { key: "deskFocus", label: "Desk Focus", isComplete: (profile) => Boolean(profile.deskFocus.trim()) },
-  { key: "bio", label: "Bio", isComplete: (profile) => Boolean(profile.bio.trim()) },
-  { key: "avatarDataUrl", label: "Avatar", isComplete: (profile) => Boolean(profile.avatarDataUrl) },
 ] as const;
 
 function getLocalTimezone(): string {
@@ -324,13 +309,7 @@ export function AccountPage() {
     [profile.firstName.trim(), profile.lastName.trim()].filter(Boolean).join(" ") ||
     user.email.split("@")[0];
   const userInitials = initials(profile, user.email);
-  const missingFields = PROFILE_COMPLETION_FIELDS.filter((field) => !field.isComplete(profile)).map((field) => field.label);
-  const completionSummary = {
-    value: Math.round(((PROFILE_COMPLETION_FIELDS.length - missingFields.length) / PROFILE_COMPLETION_FIELDS.length) * 100),
-    missingFields,
-    completed: PROFILE_COMPLETION_FIELDS.length - missingFields.length,
-    total: PROFILE_COMPLETION_FIELDS.length,
-  };
+  const completionSummary = computeProfileCompletion(profile);
   const integrationCount = configuredIntegrations(aggregators);
   const persistedSlots = [PROFILE_STORAGE_KEY, CONNECTED_STORAGE_KEY, AGGREGATORS_STORAGE_KEY].filter((key) =>
     Boolean(localStorage.getItem(key)),

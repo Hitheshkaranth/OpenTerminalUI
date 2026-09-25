@@ -761,6 +761,8 @@ export type HeatmapLeaf = {
   volume: number;
   turnover: number;
   value: number;
+  /** No live quote: price/change are placeholder values and must not be shown as live. */
+  synthetic?: boolean;
 };
 
 export type HeatmapGroup = {
@@ -777,6 +779,7 @@ export type HeatmapTreemapResponse = {
   period: HeatmapPeriod;
   size_by: HeatmapSizeBy;
   total_value: number;
+  synthetic_count?: number;
   data: HeatmapLeaf[];
   groups: HeatmapGroup[];
 };
