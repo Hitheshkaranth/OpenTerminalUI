@@ -94,7 +94,7 @@ export function IntelligenceTimeline({
             );
             return (
               <li key={item.id} className="relative rounded-sm border border-terminal-border bg-terminal-bg/60 px-3 py-2">
-                {item.url ? (
+                {item.url && /^https?:\/\//i.test(item.url) ? (
                   <a href={item.url} target="_blank" rel="noreferrer" className="block hover:text-terminal-accent">
                     {content}
                   </a>

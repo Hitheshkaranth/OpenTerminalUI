@@ -64,7 +64,9 @@ def to_mql5(spec: StrategySpec) -> tuple[str, list[str]]:
         "{",
     ]
     for indicator in spec.indicators:
-        if indicator.id in rendered:
+        # highest/lowest are computed inline (iHighest/iLowest) and never declare a handle;
+        # releasing one would reference an undeclared identifier and fail to compile.
+        if indicator.id in rendered and indicator.type not in {"highest", "lowest"}:
             lines.append(f"   IndicatorRelease({_handle(indicator.id)});")
     lines.extend(
         [
@@ -242,7 +244,15 @@ def _applied_price(source: str) -> str:
 
 
 def _quote(value: str) -> str:
-    return value.replace("\\", "\\\\").replace('"', '\\"')
+    # Escape control chars too: a raw newline in the name would end the
+    # `#property description "..."` line and break (or inject into) the EA source.
+    return (
+        value.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\r", "\\r")
+        .replace("\n", "\\n")
+        .replace("\t", "\\t")
+    )
 
 
 def _num(value: float | int) -> str:

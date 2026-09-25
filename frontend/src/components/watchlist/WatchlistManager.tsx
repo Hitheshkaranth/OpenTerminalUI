@@ -132,16 +132,23 @@ export function WatchlistManager() {
   // Search logic
   useEffect(() => {
     if (!searchQuery) return;
+    let cancelled = false;
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
         const results = await searchSymbols(searchQuery, selectedMarket === "NASDAQ" ? "NASDAQ" : "NSE");
-        setTickerResults(results.slice(0, 10));
+        // Drop responses for a query the user has already typed past.
+        if (!cancelled) setTickerResults(results.slice(0, 10));
+      } catch {
+        if (!cancelled) setTickerResults([]);
       } finally {
-        setIsSearching(false);
+        if (!cancelled) setIsSearching(false);
       }
     }, 300);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [searchQuery, selectedMarket]);
 
   // Attach native touch listeners so custom Events dispatched via dispatchEvent() are handled

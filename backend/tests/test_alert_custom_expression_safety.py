@@ -16,3 +16,9 @@ def test_custom_expression_blocks_function_calls() -> None:
 def test_custom_expression_blocks_unknown_names() -> None:
     ok = AlertEvaluatorService._eval_custom("secret > 0", {"ltp": 101, "change_pct": 1.2, "volume": 50})
     assert ok is False
+
+
+def test_custom_expression_chained_comparison_uses_each_operator() -> None:
+    ctx = {"ltp": 200, "change_pct": 0.0, "volume": 50}
+    assert AlertEvaluatorService._eval_custom("100 < ltp <= 200", ctx) is True
+    assert AlertEvaluatorService._eval_custom("100 < ltp < 200", ctx) is False

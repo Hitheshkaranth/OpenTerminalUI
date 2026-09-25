@@ -381,7 +381,7 @@ class ModelLabService:
             validation = run_walk_forward_validation(
                 equity_curve=payload.get("equity_curve", []),
                 folds=max(2, min(12, int((train_window_days + test_window_days) / max(test_window_days, 1)))),
-                in_sample_ratio=max(0.1, min(0.95, ratio)),
+                in_sample_ratio=max(0.11, min(0.94, ratio)),  # validator rejects the 0.1/0.95 bounds themselves
             )
             return {
                 "experiment_id": experiment_id,

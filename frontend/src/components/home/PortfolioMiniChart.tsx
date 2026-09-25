@@ -127,8 +127,8 @@ export function PortfolioMiniChart({
         }}
       >
         <div className="ot-home-widget-chart-axis ot-home-widget-chart-axis-y" aria-hidden="true">
-          {yAxisLabels.map((label) => (
-            <span key={label}>{label}</span>
+          {yAxisLabels.map((label, index) => (
+            <span key={`${index}-${label}`}>{label}</span>
           ))}
         </div>
 
@@ -199,8 +199,8 @@ export function PortfolioMiniChart({
 
       <figcaption className="ot-home-widget-chart-meta">
         <div className="ot-home-widget-chart-axis ot-home-widget-chart-axis-x" aria-hidden="true">
-          {xAxisLabels.map((label) => (
-            <span key={label}>{label}</span>
+          {xAxisLabels.map((label, index) => (
+            <span key={`${index}-${label}`}>{label}</span>
           ))}
         </div>
         <div className="ot-home-widget-chart-summary">

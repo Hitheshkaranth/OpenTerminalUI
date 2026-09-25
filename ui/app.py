@@ -339,6 +339,8 @@ def _render_phase3_tab(df: pd.DataFrame) -> None:
             op = st.selectbox("Operator", options=[">", "<", ">=", "<=", "==", "!="], index=0)
         with c4:
             default_threshold = float(pd.to_numeric(df[field], errors="coerce").median())
+            if pd.isna(default_threshold):  # all-NaN column -> median is NaN, which number_input rejects
+                default_threshold = 0.0
             threshold = st.number_input("Threshold", value=default_threshold)
         sev = st.selectbox("Severity", options=["low", "medium", "high"], index=1)
 

@@ -208,7 +208,8 @@ class AlpacaAdapter(DataAdapter):
             price = _coerce_float(latest_trade.get("p")) or _coerce_float(daily_bar.get("c"))
             if price is None:
                 continue
-            prev_close = _coerce_float(daily_bar.get("o")) or price
+            prev_bar = snap.get("prevDailyBar") if isinstance(snap.get("prevDailyBar"), dict) else {}
+            prev_close = _coerce_float(prev_bar.get("c")) or _coerce_float(daily_bar.get("o")) or price
             change = float(price - prev_close)
             pct = (change / prev_close * 100.0) if prev_close else 0.0
             out[ticker] = QuoteResponse(

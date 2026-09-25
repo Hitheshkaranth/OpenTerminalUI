@@ -107,10 +107,12 @@ def run_portfolio_engine(
 
     if rebalance_frequency == "DAILY":
         rebalance_idx = set(returns.index)
-    elif rebalance_frequency == "MONTHLY":
-        rebalance_idx = set(returns.resample("ME").last().index)
     else:
-        rebalance_idx = set(returns.resample("W-FRI").last().index)
+        # Last actual trading date of each period; resample labels are calendar
+        # period ends, which never match when the period ends on a weekend/holiday.
+        period = "M" if rebalance_frequency == "MONTHLY" else "W-FRI"
+        dates = returns.index.to_series()
+        rebalance_idx = set(dates.groupby(returns.index.to_period(period)).max())
 
     current_w = _equal_weights(len(assets), cap=max_weight)
     if cash_buffer > 0:
@@ -197,7 +199,8 @@ def run_portfolio_engine(
 
     corr = returns.corr().fillna(0.0)
     labels = list(corr.columns)
-    values = [[float(corr.iloc[i, j]) for j in range(len(labels))] for i in range(len(labels))]
+    # Zero-variance assets give NaN self-correlation; the diagonal is 1 by definition.
+    values = [[1.0 if i == j else float(corr.iloc[i, j]) for j in range(len(labels))] for i in range(len(labels))]
     order = sorted(range(len(labels)), key=lambda i: float(np.sum(values[i])), reverse=True)
 
     return PortfolioEngineResult(

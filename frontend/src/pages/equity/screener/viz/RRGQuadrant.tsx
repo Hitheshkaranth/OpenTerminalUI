@@ -13,7 +13,7 @@ export function RRGQuadrant({ data }: RRGQuadrantProps) {
           className="absolute text-[10px] text-terminal-accent"
           style={{ left: `${50 + item.x}%`, top: `${50 - item.y}%` }}
         >
-          ? {item.label}
+          ● {item.label}
         </div>
       ))}
     </div>

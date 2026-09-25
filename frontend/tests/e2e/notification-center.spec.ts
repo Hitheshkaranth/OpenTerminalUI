@@ -1,9 +1,11 @@
 import { expect, test } from "@playwright/test";
 
-test("notification center opens from the top bar", async ({ page, request }) => {
-  const notificationTitle = `Alert: AAPL price_above ${Date.now()}`;
+test("notification center opens from the top bar", async ({ page, request }, testInfo) => {
+  // Projects run in parallel workers against one backend; Date.now() alone can collide
+  // across workers, seeding two identical notifications and tripping strict mode below.
+  const notificationTitle = `Alert: AAPL price_above ${Date.now()}-${testInfo.project.name}-${testInfo.workerIndex}`;
 
-  await request.post(`http://127.0.0.1:${process.env.E2E_BACKEND_PORT || "8010"}/api/notifications`, {
+  const seeded = await request.post(`http://127.0.0.1:${process.env.E2E_BACKEND_PORT || "8010"}/api/notifications`, {
     data: {
       type: "alert",
       title: notificationTitle,
@@ -13,6 +15,7 @@ test("notification center opens from the top bar", async ({ page, request }) => 
       priority: "high",
     },
   });
+  expect(seeded.ok(), `seeding notification failed: ${seeded.status()}`).toBeTruthy();
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
@@ -30,7 +33,8 @@ test("notification center opens from the top bar", async ({ page, request }) => 
   await expect(panel.getByRole("button", { name: "Trades" })).toBeVisible();
   await expect(panel.getByRole("button", { name: "Mark all read" })).toBeVisible();
   await expect(panel.getByText(notificationTitle, { exact: true })).toBeVisible();
-  await expect(notificationItem).toContainText(/ago|about/i);
+  // Freshly seeded: a naive-UTC timestamp parsed as local time would read "about N hours ago".
+  await expect(notificationItem).toContainText(/less than a minute ago|\b[12] minutes? ago/i);
 
   await page.mouse.click(20, 20);
   await expect(panel).toBeHidden();

@@ -25,6 +25,7 @@ export function FlowTracker({ ticker }: Props) {
   useEffect(() => {
     if (!ticker) return;
 
+    let cancelled = false;
     const fetchFlows = async () => {
       setLoading(true);
       setError(null);
@@ -34,15 +35,21 @@ export function FlowTracker({ ticker }: Props) {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (!response.ok) throw new Error(`Failed to load flows (${response.status})`);
-        setData(await response.json());
+        const payload = await response.json();
+        if (cancelled) return;
+        setData(payload);
       } catch (err) {
+        if (cancelled) return;
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchFlows();
+    return () => {
+      cancelled = true;
+    };
   }, [ticker]);
 
   const columns: TerminalTableColumn<FlowPoint>[] = [

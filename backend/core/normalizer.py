@@ -7,7 +7,7 @@ import pandas as pd
 
 def _safe_get(info: dict[str, Any], *keys: str) -> Any:
     for key in keys:
-        if key in info:
+        if info.get(key) is not None:
             return info[key]
     return None
 

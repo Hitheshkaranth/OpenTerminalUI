@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from statistics import NormalDist
 from typing import Any
 
 import numpy as np
@@ -18,7 +19,7 @@ def compute_parametric_var_es(returns: np.ndarray, confidence: float = 0.95) -> 
     mu = float(np.mean(returns))
     sigma = float(np.std(returns, ddof=1)) if len(returns) > 1 else 0.0
     alpha = 1.0 - confidence
-    z = float(abs(np.quantile(np.random.default_rng(42).normal(size=200000), alpha)))
+    z = float(abs(NormalDist().inv_cdf(alpha)))
     var = -(mu - z * sigma)
     # normal ES approximation
     phi = float(np.exp(-0.5 * z * z) / np.sqrt(2.0 * np.pi))
@@ -52,7 +53,7 @@ def compute_factor_exposures(returns_df: pd.DataFrame, market_col: str | None = 
         return {"market_beta": 0.0, "momentum": 0.0, "low_vol": 0.0, "sector_tilt": 0.0}
     port = returns_df.mean(axis=1)
     market = returns_df[market_col] if market_col and market_col in returns_df.columns else returns_df.mean(axis=1)
-    cov = float(np.cov(port, market)[0, 1]) if len(port) > 1 else 0.0
+    cov = float(np.cov(port, market, ddof=0)[0, 1]) if len(port) > 1 else 0.0
     var_m = float(np.var(market)) if len(market) > 1 else 0.0
     beta = cov / var_m if var_m > 0 else 0.0
     momentum = float(port.tail(20).mean() - port.head(20).mean()) if len(port) >= 40 else float(port.mean())

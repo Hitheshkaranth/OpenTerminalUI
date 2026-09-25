@@ -338,7 +338,8 @@ def _sortino(values: np.ndarray, periods_per_year: int) -> float:
 def _max_drawdown(values: np.ndarray) -> float:
     equity = np.cumprod(1.0 + values)
     peaks = np.maximum.accumulate(equity)
-    drawdowns = (equity / peaks) - 1.0
+    # A path wiped out before any positive peak has equity == peak == 0: a 100% loss, not NaN.
+    drawdowns = np.where(peaks > 0, equity / np.where(peaks > 0, peaks, 1.0) - 1.0, -1.0)
     return float(np.min(drawdowns))
 
 

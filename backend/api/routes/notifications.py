@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -35,7 +35,13 @@ def _resolve_user_id(request: Request) -> str:
 
 
 def _serialize_notification(row: Notification) -> dict[str, object]:
-    created_at = row.created_at.isoformat() if isinstance(row.created_at, datetime) else str(row.created_at)
+    if isinstance(row.created_at, datetime):
+        # The column is naive and filled by the DB's CURRENT_TIMESTAMP (UTC). Emit an explicit
+        # offset so browsers don't parse it as local time ("about 6 hours ago" in IST).
+        stamp = row.created_at if row.created_at.tzinfo else row.created_at.replace(tzinfo=timezone.utc)
+        created_at = stamp.isoformat()
+    else:
+        created_at = str(row.created_at)
     return {
         "id": row.id,
         "type": row.type,

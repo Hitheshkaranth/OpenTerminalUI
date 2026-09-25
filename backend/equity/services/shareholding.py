@@ -158,7 +158,11 @@ class ShareholdingService:
             timeout=15.0,
             trust_env=False,
         )
-        await client.get(self.NSE_BASE)
+        try:
+            await client.get(self.NSE_BASE)
+        except Exception:
+            await client.aclose()
+            raise
         return client
 
     def _extract_rows(self, payload: Any) -> list[dict[str, Any]]:

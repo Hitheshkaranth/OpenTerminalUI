@@ -6,28 +6,33 @@ interface Props {
   exchange: Exchange;
 }
 
+// Weekday + minutes-since-midnight in the exchange's own zone (DST-aware), not the viewer's.
+function zonedClock(now: Date, timeZone: string): { day: number; minutes: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  const day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
+  return { day, minutes: Number(get("hour")) * 60 + Number(get("minute")) };
+}
+
 function getMarketStatus(exchange: Exchange): MarketStatus {
   const now = new Date();
-  const day = now.getDay();
-
-  if (day === 0 || day === 6) return "closed";
 
   if (["NSE", "BSE", "NFO"].includes(exchange)) {
-    const istOffset = 5.5 * 60;
-    const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
-    const istMinutes = utcMinutes + istOffset;
-    const istHour = Math.floor(istMinutes / 60) % 24;
-    const istMin = istMinutes % 60;
-    if (istHour > 9 || (istHour === 9 && istMin >= 15)) {
-      if (istHour < 15 || (istHour === 15 && istMin < 30)) return "open";
-    }
+    const { day, minutes } = zonedClock(now, "Asia/Kolkata");
+    if (day === 0 || day === 6) return "closed";
+    if (minutes >= 9 * 60 + 15 && minutes < 15 * 60 + 30) return "open";
     return "closed";
   }
 
   if (["NYSE", "NASDAQ", "AMEX"].includes(exchange)) {
-    const etOffset = -5 * 60;
-    const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
-    const etMinutes = ((utcMinutes + etOffset) % 1440 + 1440) % 1440;
+    const { day, minutes: etMinutes } = zonedClock(now, "America/New_York");
+    if (day === 0 || day === 6) return "closed";
     if (etMinutes >= 4 * 60 && etMinutes < 9 * 60 + 30) return "pre_market";
     if (etMinutes >= 9 * 60 + 30 && etMinutes < 16 * 60) return "open";
     if (etMinutes >= 16 * 60 && etMinutes < 20 * 60) return "after_hours";
@@ -38,8 +43,9 @@ function getMarketStatus(exchange: Exchange): MarketStatus {
 }
 
 function stalenessSec(lastUpdate: string | null): number {
-  if (!lastUpdate) return 9999;
-  return Math.floor((Date.now() - new Date(lastUpdate).getTime()) / 1000);
+  const ts = lastUpdate ? new Date(lastUpdate).getTime() : NaN;
+  if (!Number.isFinite(ts)) return 9999;
+  return Math.floor((Date.now() - ts) / 1000);
 }
 
 export function FreshnessBadge({ lastUpdate, exchange }: Props) {
@@ -70,7 +76,7 @@ export function FreshnessBadge({ lastUpdate, exchange }: Props) {
     label = stale > 600 ? "Offline — cached" : `${Math.floor(stale / 60)}m ago`;
   }
 
-  const timeStr = lastUpdate
+  const timeStr = lastUpdate && Number.isFinite(new Date(lastUpdate).getTime())
     ? new Date(lastUpdate).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",

@@ -16,6 +16,7 @@ def test_all_presets_generate_pine_and_mql5() -> None:
         assert pine["code"].startswith("//@version=6")
         assert "strategy(" in pine["code"]
         assert "strategy.entry" in pine["code"]
+        assert "when=" not in pine["code"]  # removed in Pine v6
         assert _balanced_parentheses(pine["code"])
 
         mql5 = generate(spec, "mql5")
@@ -59,3 +60,24 @@ def _balanced_parentheses(code: str) -> bool:
         if depth < 0:
             return False
     return depth == 0
+
+
+def test_mql5_only_releases_declared_handles_and_escapes_name() -> None:
+    """highest/lowest have no indicator handle, and control chars in the name must not break the source."""
+    import re
+
+    spec = {
+        "name": 'Breakout\n"v2"',
+        "indicators": [{"id": "hh", "type": "highest", "params": {"length": 20}}],
+        "entry_long": [
+            {
+                "left": {"kind": "price", "ref": "close"},
+                "op": ">",
+                "right": {"kind": "indicator", "ref": "hh"},
+            }
+        ],
+    }
+    code = generate(spec, "mql5")["code"]
+    for handle in re.findall(r"IndicatorRelease\((\w+)\)", code):
+        assert f"int {handle} " in code
+    assert '#property description "Breakout\\n\\"v2\\""' in code

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
+import math
 from typing import Any
 
 
@@ -129,7 +130,7 @@ class OrderBookService:
             return 0
         if tick_size >= 0.1:
             return 1
-        return 2
+        return max(2, -math.floor(math.log10(tick_size)))
 
     def _build_snapshot(self, symbol: str, market: str, levels: int, ref_price: float | None = None) -> DepthSnapshot:
         provider_key = self._provider_key_for_market(market)
@@ -151,6 +152,9 @@ class OrderBookService:
         if ref_price:
             base_price = ref_price
             tick_size = 0.01 if base_price < 25 else (0.05 if base_price < 1_000 else 0.10)
+            if base_price < 1:
+                # Sub-dollar symbols (e.g. DOGE, SHIB): scale the tick so the book stays positive.
+                tick_size = 10 ** (math.floor(math.log10(base_price)) - 2)
             spread = tick_size * (4 + seed % 3)
         precision = self._decimal_places(tick_size)
         mid_price = round(base_price, precision)

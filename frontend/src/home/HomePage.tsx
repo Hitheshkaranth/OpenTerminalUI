@@ -90,7 +90,7 @@ export function HomePage() {
                 <li>News & Sentiment</li>
                 <li>Alerts</li>
               </ul>
-              <div className="mt-4 inline-block rounded border border-terminal-border px-3 py-1 text-xs text-terminal-accent group-hover:border-terminal-accent">OPEN ?</div>
+              <div className="mt-4 inline-block rounded border border-terminal-border px-3 py-1 text-xs text-terminal-accent group-hover:border-terminal-accent">OPEN →</div>
             </button>
 
             <button
@@ -108,7 +108,7 @@ export function HomePage() {
                 <li>F&O Heatmap</li>
                 <li>Expiry Dashboard</li>
               </ul>
-              <div className="mt-4 inline-block rounded border border-terminal-border px-3 py-1 text-xs text-terminal-accent group-hover:border-terminal-accent">OPEN ?</div>
+              <div className="mt-4 inline-block rounded border border-terminal-border px-3 py-1 text-xs text-terminal-accent group-hover:border-terminal-accent">OPEN →</div>
             </button>
 
             <button
@@ -126,7 +126,7 @@ export function HomePage() {
                 <li>Trade blotter + logs</li>
                 <li>Paper trading isolation</li>
               </ul>
-              <div className="mt-4 inline-block rounded border border-terminal-border px-3 py-1 text-xs text-terminal-accent group-hover:border-terminal-accent">OPEN ?</div>
+              <div className="mt-4 inline-block rounded border border-terminal-border px-3 py-1 text-xs text-terminal-accent group-hover:border-terminal-accent">OPEN →</div>
             </button>
           </div>
         </div>
@@ -134,7 +134,7 @@ export function HomePage() {
 
       <div className="border-t border-terminal-border bg-terminal-panel px-4 py-2 text-xs">
         <div className="flex flex-wrap items-center gap-3">
-          <span className={marketOpen ? "text-terminal-pos" : "text-terminal-neg"}>? {marketOpen ? "OPEN" : "CLOSED"}</span>
+          <span className={marketOpen ? "text-terminal-pos" : "text-terminal-neg"}>● {marketOpen ? "OPEN" : "CLOSED"}</span>
           <span>NIFTY: {fmt(nifty)} ({niftyPct === null || niftyPct === undefined ? "-" : `${niftyPct >= 0 ? "+" : ""}${niftyPct.toFixed(2)}%`})</span>
           <span>BANKNIFTY: {fmt(bank)} ({bankPct === null || bankPct === undefined ? "-" : `${bankPct >= 0 ? "+" : ""}${bankPct.toFixed(2)}%`})</span>
           <span>India VIX: {fmt(vix)}</span>

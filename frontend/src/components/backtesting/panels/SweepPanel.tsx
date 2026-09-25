@@ -152,9 +152,10 @@ export function SweepPanel(props: { symbol: string; market: string }): JSX.Eleme
                 </div>
                 {x_values.map((x, xIdx) => {
                   const val = z[yIdx][xIdx];
-                  const isBest = data.sweep.best && 
-                    Object.values(data.sweep.best.params).includes(x) && 
-                    Object.values(data.sweep.best.params).includes(y); // Approximation for "best" highlight
+                  const isBest =
+                    data.sweep.best &&
+                    Number(data.sweep.best.params[x_param]) === x &&
+                    Number(data.sweep.best.params[y_param]) === y;
 
                   return (
                     <div

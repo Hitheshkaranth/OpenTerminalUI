@@ -67,7 +67,9 @@ if ($Redis) {
     }
   }
   if (-not $hasRedis) {
-    Add-Content ".env" "REDIS_URL=redis://redis:6379/0"
+    $raw = Get-Content ".env" -Raw
+    $sep = if ($raw -and -not $raw.EndsWith("`n")) { "`n" } else { "" }
+    Add-Content ".env" "${sep}REDIS_URL=redis://redis:6379/0"
   }
 }
 

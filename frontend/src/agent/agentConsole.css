@@ -35,3 +35,10 @@
   padding: var(--ot-space-2) var(--ot-space-3);
   cursor: pointer;
 }
+/* Below md the shell shows a fixed MobileBottomNav (~58px + safe area); lift the
+   launcher above it so it never covers the nav's rightmost (Portfolio) tab. */
+@media (max-width: 767px) {
+  .ot-agent-launcher {
+    bottom: calc(4.25rem + env(safe-area-inset-bottom));
+  }
+}

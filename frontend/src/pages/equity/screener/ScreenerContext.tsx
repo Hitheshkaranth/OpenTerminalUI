@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   fetchPublicScreensV3,
@@ -74,6 +74,8 @@ export function ScreenerProvider({ children }: { children: React.ReactNode }) {
     if (activeTabs.view === "table" || activeTabs.view === "charts" || activeTabs.view === "treemap" || activeTabs.view === "scatter" || activeTabs.view === "scorecard" || activeTabs.view === "split") setView(activeTabs.view);
   }, []);
 
+  const defaultPresetAppliedRef = useRef(false);
+
   const refreshScreens = useCallback(async () => {
     const [presetItems, savedItems, publicItems, universeItems] = await Promise.all([
       fetchScreenerPresetsV3(),
@@ -87,11 +89,13 @@ export function ScreenerProvider({ children }: { children: React.ReactNode }) {
     if (universeItems.length > 0) {
       setUniverses(universeItems);
     }
-    if (!selectedPresetId && presetItems.length > 0) {
-      setSelectedPresetId(presetItems[0].id);
-      setQuery(presetItems[0].query);
+    // Default to the first preset only on the initial load; later refreshes (and loading a
+    // saved screen, which clears the preset) must not clobber the user's current query.
+    if (!defaultPresetAppliedRef.current && presetItems.length > 0) {
+      defaultPresetAppliedRef.current = true;
+      setSelectedPresetId((current) => current ?? presetItems[0].id);
     }
-  }, [selectedPresetId]);
+  }, []);
 
   useEffect(() => {
     void refreshScreens();
@@ -135,9 +139,7 @@ export function ScreenerProvider({ children }: { children: React.ReactNode }) {
           include_sparklines: true,
         });
         setResult(data);
-        if (data.results.length > 0) {
-          setSelectedRow(data.results[0]);
-        }
+        setSelectedRow(data.results[0] ?? null);
       } catch (err) {
         if (typeof err === "object" && err !== null && "response" in err) {
           const response = (err as { response?: { data?: { detail?: unknown } } }).response;

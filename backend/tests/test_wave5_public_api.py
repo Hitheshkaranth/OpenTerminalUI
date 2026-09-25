@@ -42,6 +42,10 @@ def test_public_api_key_auth():
     assert res.status_code == 200
     key_data = res.json()
     api_key = key_data["key"]
+
+    res = client.get("/api/settings/api-keys", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200
+    assert res.json()[0]["prefix"] == key_data["prefix"]
     
     # 2. Access public API without key
     res = client.get("/api/v1/quote/RELIANCE")

@@ -103,8 +103,17 @@ async def confirm_proposal(
     if p.status != "pending":
         raise ValueError("not_pending")
 
-    p.status = "confirmed"
-    p.decided_at = now
+    # Claim atomically: the executors await (market fill), so a second confirm
+    # of the same proposal could otherwise pass the pending check and run twice.
+    claimed = (
+        db.query(AgentProposal)
+        .filter(AgentProposal.id == p.id, AgentProposal.status == "pending")
+        .update({"status": "confirmed", "decided_at": now}, synchronize_session=False)
+    )
+    db.commit()
+    if not claimed:
+        raise ValueError("not_pending")
+    db.refresh(p)
     result: dict = {}
 
     try:

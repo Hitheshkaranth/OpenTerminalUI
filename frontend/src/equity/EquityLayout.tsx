@@ -282,7 +282,7 @@ function EquityRightRail() {
                 key={item.id}
                 type="button"
                 className="block w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-left hover:border-terminal-accent/60"
-                onClick={() => window.open(item.url, "_blank", "noopener,noreferrer")}
+                onClick={() => { if (/^https?:\/\//i.test(item.url || "")) window.open(item.url, "_blank", "noopener,noreferrer"); }}
               >
                 <div className="truncate text-[11px] text-terminal-text">{item.headline}</div>
                 <div className="truncate text-[10px] text-terminal-muted">{item.source}</div>

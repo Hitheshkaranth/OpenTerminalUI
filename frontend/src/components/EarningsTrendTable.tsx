@@ -7,9 +7,9 @@ function pctCell(value: number | null | undefined) {
 }
 
 function trendArrow(value: string): string {
-  if (value === "accelerating") return "?";
-  if (value === "declining" || value === "decelerating") return "?";
-  return "?";
+  if (value === "accelerating") return "▲";
+  if (value === "declining" || value === "decelerating") return "▼";
+  return "→";
 }
 
 export function EarningsTrendTable({ symbol }: { symbol: string }) {

@@ -33,10 +33,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # SECURITY: The AUTH_MIDDLEWARE_ENABLED toggle only applies in
         # development environments.  In production, auth is always enforced.
         _is_dev = _runtime_env() in _DEV_ENVS
-        if not _is_dev and not auth_enabled:
-            # In production, ignore the dev toggle and enforce auth.
-            pass
-        elif not auth_enabled or not path.startswith("/api") or auth_exempt_path(path):
+        # In production, ignore the dev toggle and enforce auth -- but still let
+        # non-API and exempt paths (health, login, refresh) through.
+        if (_is_dev and not auth_enabled) or not path.startswith("/api") or auth_exempt_path(path):
             return await call_next(request)
 
         # The public API authenticates with X-API-Key, so a bearer token is not

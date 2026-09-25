@@ -70,5 +70,7 @@ export const useChartStore = create<ChartStoreState>()((set, get) => ({
       hoveredCandle: null,
       selectedCandle: null,
       isFullscreen: false,
+      showVolume: true,
+      logarithmicScale: false,
     }),
 }));

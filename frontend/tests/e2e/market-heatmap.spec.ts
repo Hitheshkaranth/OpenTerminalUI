@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-test("market heatmap renders, drills, and navigates", async ({ page }) => {
+test("market heatmap renders, drills, and navigates", async ({ page }, testInfo) => {
+  // Below md the page deliberately swaps the SVG treemap for a grouped, tappable list.
+  const isMobile = testInfo.project.name === "mobile-chromium";
   const context = page.context();
 
   await context.route(/http:\/\/127\.0\.0\.1:\d+\/api\/heatmap\/treemap(?:\?.*)?$/, async (route) => {
@@ -134,16 +136,28 @@ test("market heatmap renders, drills, and navigates", async ({ page }) => {
   await page.goto("/equity/heatmap", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByText("Market Heatmap")).toBeVisible();
-  await expect(page.getByTestId("market-heatmap-svg")).toBeVisible();
-  await expect(page.locator('[data-testid="heatmap-rect"]').first()).toBeVisible();
+  const leaf = isMobile ? page.getByTestId("heatmap-mobile-item") : page.getByTestId("heatmap-rect");
+  if (isMobile) {
+    await expect(page.getByTestId("heatmap-mobile-list")).toBeVisible();
+  } else {
+    await expect(page.getByTestId("market-heatmap-svg")).toBeVisible();
+  }
+  await expect(leaf.first()).toBeVisible();
 
   await page.getByTestId("heatmap-period-1w").click();
   await expect(page.getByTestId("heatmap-period-1w")).toHaveClass(/text-terminal-accent/);
 
-  await page.locator('[data-testid="heatmap-rect"]').first().hover();
-  await expect(page.locator("div").filter({ hasText: /^Reliance Industries$/ }).last()).toBeVisible();
-
-  await page.getByTestId("market-heatmap-svg").getByText("Energy").click();
+  if (isMobile) {
+    await expect(leaf.filter({ hasText: "Reliance Industries" })).toBeVisible();
+    await expect(leaf).toHaveCount(4);
+    await page.getByTestId("heatmap-mobile-group").filter({ hasText: "Energy" }).click();
+    await expect(leaf).toHaveCount(2);
+    await expect(leaf.filter({ hasText: "Infosys" })).toHaveCount(0);
+  } else {
+    await leaf.first().hover();
+    await expect(page.locator("div").filter({ hasText: /^Reliance Industries$/ }).last()).toBeVisible();
+    await page.getByTestId("market-heatmap-svg").getByText("Energy").click();
+  }
   await expect(page.getByRole("button", { name: "Energy", exact: true })).toBeVisible();
 
   await context.unroute(/http:\/\/127\.0\.0\.1:\d+\/api\/heatmap\/treemap(?:\?.*)?$/);
@@ -158,6 +172,6 @@ test("market heatmap renders, drills, and navigates", async ({ page }) => {
     });
   });
 
-  await page.locator('[data-testid="heatmap-rect"]').first().click();
+  await leaf.first().click();
   await expect(page).toHaveURL(/\/equity\/security\/RELIANCE$/);
 });

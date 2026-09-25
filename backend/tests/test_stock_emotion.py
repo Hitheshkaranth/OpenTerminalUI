@@ -109,3 +109,16 @@ def test_analyze_stock_emotion_via_provider(monkeypatch) -> None:
     assert result["narrative"].startswith("TEST")
     assert "optimism" in result["narrative"]
     assert result["articles"][0]["rationale"] == "Strong quarterly results."
+
+
+def test_analyze_stock_emotion_unparseable_llm_reply_falls_back(monkeypatch) -> None:
+    class _GarbageProvider(_FakeProvider):
+        async def complete(self, messages, tools=None, *, temperature=0.1, max_tokens=1024) -> AssistantMessage:  # noqa: ANN001
+            return AssistantMessage(content="sorry, I cannot help with that")
+
+    monkeypatch.setattr(stock_emotion, "get_settings", lambda: _fake_settings(provider="openrouter"))
+    monkeypatch.setattr(stock_emotion, "get_llm_provider", lambda: _GarbageProvider(api_key="k"))
+    monkeypatch.setattr(stock_emotion, "score_article_sentiment", _stub_sentiment)
+    articles = [{"title": "Record profit", "summary": "", "source": "Wire", "url": "u1", "published_at": "2026-05-12"}]
+    result = asyncio.run(stock_emotion.analyze_stock_emotion("TEST", articles, period_days=7))
+    assert result["engine"] == "fallback"

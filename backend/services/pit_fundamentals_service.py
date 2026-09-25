@@ -128,9 +128,14 @@ def upsert_pit_records(
     version = get_active_data_version(db) if not data_version_id else None
     resolved_version_id = data_version_id or (version.id if version else "")
     changed = 0
+    # The session does not autoflush, so rows added earlier in this batch are invisible to the
+    # query below; track them so duplicate keys (e.g. netIncome in both FMP income and
+    # cash-flow statements) update one row instead of violating the unique constraint.
+    pending: dict[tuple[str, str, str], FundamentalsPitORM] = {}
     for record in records:
         release_str = record.as_of_release_date.isoformat()
-        existing = (
+        pending_key = (record.symbol.upper(), record.metric, release_str)
+        existing = pending.get(pending_key) or (
             db.query(FundamentalsPitORM)
             .filter(
                 FundamentalsPitORM.symbol == record.symbol.upper(),
@@ -149,6 +154,7 @@ def upsert_pit_records(
                 created_at=datetime.now(timezone.utc),
             )
             db.add(existing)
+        pending[pending_key] = existing
         existing.value = record.value
         existing.fiscal_period = record.fiscal_period
         existing.release_date_estimated = record.release_date_estimated

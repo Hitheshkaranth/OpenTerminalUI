@@ -88,3 +88,10 @@ def test_vectorized_sweep_edge_cases():
     res = vectorized_sweep([{"close": i} for i in range(100)], "sma_crossover", {"fast": [20], "slow": [10]})
     assert res["n_combos"] == 0
     assert res["results"] == []
+
+def test_vectorized_sweep_skips_non_positive_windows():
+    prices = [{"close": 100 + i + np.sin(i)} for i in range(100)]
+    sma = vectorized_sweep(prices, "sma_crossover", {"fast": [0, 5], "slow": [20]})
+    assert [r["params"]["fast"] for r in sma["results"]] == [5]
+    rsi = vectorized_sweep(prices, "rsi_threshold", {"period": [0, 14], "oversold": [30], "overbought": [70]})
+    assert [r["params"]["period"] for r in rsi["results"]] == [14]

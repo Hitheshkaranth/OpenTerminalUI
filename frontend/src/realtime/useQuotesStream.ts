@@ -224,6 +224,11 @@ class QuotesWsManager {
     };
 
     ws.onclose = () => {
+      // A socket we already replaced/closed must not clobber the current one.
+      if (this.socket !== ws) {
+        if (!this.socket) useQuotesStore.getState().setConnectionState("disconnected");
+        return;
+      }
       this.socket = null;
       this.sentSubscriptions.clear();
       useQuotesStore.getState().setConnectionState("disconnected");

@@ -136,7 +136,7 @@ export function RobustnessPanel(props: {
           {/* Histogram */}
           <div className="mt-auto">
             <div className="mb-1 flex justify-between text-[9px] uppercase text-terminal-muted">
-              <span>Null Distribution Distribution</span>
+              <span>Null Distribution</span>
               <span>Observed marked with |</span>
             </div>
             <div className="relative flex h-20 items-end gap-[1px]">

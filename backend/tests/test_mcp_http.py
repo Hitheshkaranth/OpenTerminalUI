@@ -137,3 +137,16 @@ def test_manifest_reports_tool_count_and_permissions():
     assert body["name"] == "openterminalui"
     assert body["permissions"] == "read_write"
     assert body["tool_count"] > 0
+
+
+def test_call_tool_malformed_body_returns_400():
+    _init_fresh_db()
+    key = _make_key("read")
+    headers = {"X-API-Key": key, "Content-Type": "application/json"}
+
+    with _client() as client:
+        bad_json = client.post("/mcp/tools/get_portfolio", content=b"{not json", headers=headers)
+        bad_args = client.post("/mcp/tools/get_portfolio", json={"arguments": [1, 2]}, headers=headers)
+
+    assert bad_json.status_code == 400
+    assert bad_args.status_code == 400

@@ -67,6 +67,9 @@ async def run_reflections(db: Session, user_id: str, provider: Any) -> dict:  # 
             logger.warning("Reflection failed for entry %s: %s", entry.id, exc)
             skipped += 1
 
+    # The route's session is never committed elsewhere; without this the notes are lost.
+    if created:
+        db.commit()
     return {"created": created, "skipped": skipped}
 
 
@@ -129,7 +132,10 @@ async def _reflect_one(db: Session, user_id: str, entry: JournalEntry, provider:
         response = await provider.complete(messages, max_tokens=256)
         reflection_text = (response.content or "").strip()
     except Exception:
-        reflection_text = "Could not generate reflection."
+        reflection_text = ""
+    if not reflection_text:
+        # Storing a placeholder would mark this trade as reflected and block every retry.
+        return False
 
     content = prefix + reflection_text
     note = AgentNote(

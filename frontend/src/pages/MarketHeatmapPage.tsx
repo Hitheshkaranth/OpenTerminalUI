@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { hierarchy, treemap, type HierarchyRectangularNode } from "d3-hierarchy";
 import { useNavigate } from "react-router-dom";
@@ -118,17 +118,21 @@ function buildTreemap(groups: HeatmapGroup[], width: number, height: number): Tr
 
 export function MarketHeatmapPage() {
   const navigate = useNavigate();
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  // Callback ref: re-attach the observer if the container node is replaced (e.g. panel pop-out).
+  const [containerNode, setContainerNode] = useState<HTMLDivElement | null>(null);
   const [market, setMarket] = useState<HeatmapMarket>("IN");
   const [period, setPeriod] = useState<HeatmapPeriod>("1d");
   const [group, setGroup] = useState<HeatmapGroupBy>("sector");
   const [sizeBy, setSizeBy] = useState<HeatmapSizeBy>("market_cap");
   const [activeGroupName, setActiveGroupName] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<TooltipState>(null);
-  const [size, setSize] = useState({ width: 960, height: 620 });
+  const [size, setSize] = useState(() => ({
+    width: typeof window === "undefined" ? 960 : Math.max(320, Math.min(960, window.innerWidth)),
+    height: 620,
+  }));
 
   useEffect(() => {
-    const node = containerRef.current;
+    const node = containerNode;
     if (!node) return;
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
@@ -140,7 +144,7 @@ export function MarketHeatmapPage() {
     });
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [containerNode]);
 
   const query = useQuery({
     queryKey: ["market-heatmap", market, group, period, sizeBy],
@@ -257,10 +261,10 @@ export function MarketHeatmapPage() {
                   </button>
                 </>
               ) : (
-                <span className="text-terminal-muted">Click a group label to drill down.</span>
+                <span className="text-terminal-muted">{isMobile ? "Tap a group to drill down." : "Click a group label to drill down."}</span>
               )}
             </div>
-            <div ref={containerRef} className="h-[620px] w-full">
+            <div ref={setContainerNode} className="h-[620px] w-full">
               {query.isLoading ? (
                 <div className="flex h-full items-center justify-center text-sm text-terminal-muted">Loading heatmap data…</div>
               ) : query.isError ? (
@@ -270,34 +274,50 @@ export function MarketHeatmapPage() {
               ) : !layout.leaves.length ? (
                 <div className="flex h-full items-center justify-center text-sm text-terminal-muted">No heatmap data available.</div>
               ) : isMobile ? (
-                <div className="space-y-2 overflow-auto p-3" data-testid="heatmap-mobile-list">
-                  {(activeGroup?.children ?? query.data?.data ?? []).map((item) => (
-                    <button
-                      key={item.symbol}
-                      type="button"
-                      className="w-full rounded border border-terminal-border bg-terminal-bg/40 p-3 text-left hover:border-terminal-accent/50"
-                      onClick={() => navigate(`/equity/security/${encodeURIComponent(item.symbol)}`)}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="font-semibold text-terminal-text">{item.symbol}</div>
-                          <div className="text-[11px] text-terminal-muted">{item.name}</div>
-                        </div>
-                        <div className={`text-sm font-semibold ${item.change_pct >= 0 ? "text-terminal-pos" : "text-terminal-neg"}`}>
-                          {item.change_pct >= 0 ? "+" : ""}
-                          {item.change_pct.toFixed(2)}%
-                        </div>
-                      </div>
-                      <div className="mt-2 h-2 overflow-hidden rounded bg-terminal-border/20">
-                        <div
-                          className="h-full rounded"
-                          style={{
-                            width: `${Math.min(100, Math.max(8, Math.abs(item.change_pct) * 12))}%`,
-                            backgroundColor: heatColor(item.change_pct),
-                          }}
-                        />
-                      </div>
-                    </button>
+                <div className="h-full space-y-3 overflow-auto p-3" data-testid="heatmap-mobile-list">
+                  {visibleGroups.map((groupNode) => (
+                    <div key={groupNode.name} className="space-y-2">
+                      {activeGroup ? null : (
+                        <button
+                          type="button"
+                          onClick={() => setActiveGroupName(groupNode.name)}
+                          className="flex w-full items-center justify-between rounded px-1 py-1 text-left text-[11px] font-semibold uppercase tracking-wide text-terminal-muted hover:text-terminal-accent"
+                          data-testid="heatmap-mobile-group"
+                        >
+                          <span>{groupNode.name}</span>
+                          <span aria-hidden="true">{">"}</span>
+                        </button>
+                      )}
+                      {groupNode.children.map((item) => (
+                        <button
+                          key={item.symbol}
+                          type="button"
+                          className="w-full rounded border border-terminal-border bg-terminal-bg/40 p-3 text-left hover:border-terminal-accent/50"
+                          onClick={() => navigate(`/equity/security/${encodeURIComponent(item.symbol)}`)}
+                          data-testid="heatmap-mobile-item"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="font-semibold text-terminal-text">{item.symbol}</div>
+                              <div className="text-[11px] text-terminal-muted">{item.name}</div>
+                            </div>
+                            <div className={`text-sm font-semibold ${item.change_pct >= 0 ? "text-terminal-pos" : "text-terminal-neg"}`}>
+                              {item.change_pct >= 0 ? "+" : ""}
+                              {item.change_pct.toFixed(2)}%
+                            </div>
+                          </div>
+                          <div className="mt-2 h-2 overflow-hidden rounded bg-terminal-border/20">
+                            <div
+                              className="h-full rounded"
+                              style={{
+                                width: `${Math.min(100, Math.max(8, Math.abs(item.change_pct) * 12))}%`,
+                                backgroundColor: heatColor(item.change_pct),
+                              }}
+                            />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   ))}
                 </div>
               ) : (

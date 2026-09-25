@@ -105,3 +105,11 @@ def test_equity_curve_to_returns_extraction() -> None:
     returns = equity_curve_to_returns([{"value": 100}, {"value": 110}, {"value": 99}])
 
     assert returns == pytest.approx([0.1, -0.1])
+
+
+def test_max_drawdown_total_wipeout_is_minus_one_not_nan():
+    import numpy as np
+
+    from backend.robustness.scorecard import _max_drawdown
+
+    assert _max_drawdown(np.array([-1.0, 0.1])) == -1.0

@@ -38,7 +38,8 @@ class CryptoDataAdapter(DataAdapter):
                     row = data.get(coin_id) if isinstance(data, dict) else {}
                     price = float(row.get("usd"))
                     chg = float(row.get("usd_24h_change") or 0.0)
-                    return QuoteResponse(symbol=pair, price=price, change=0.0, change_pct=chg, currency="USD", ts=datetime.now(timezone.utc).isoformat())
+                    change = price - price / (1.0 + chg / 100.0) if chg > -100.0 else 0.0
+                    return QuoteResponse(symbol=pair, price=price, change=change, change_pct=chg, currency="USD", ts=datetime.now(timezone.utc).isoformat())
             except Exception:
                 pass
         rows = await self.yahoo.get_quotes([pair])

@@ -58,7 +58,9 @@ function pointAt(index: number, radius: number): { x: number; y: number } {
 function arcPath(startIndex: number, endIndex: number, radius: number): string {
   const start = pointAt(startIndex, radius);
   const end = pointAt(endIndex, radius);
-  const largeArc = Math.abs(endIndex - startIndex) > 50 ? 1 : 0;
+  // The gauge spans at most 180deg, so this is never the SVG "large" (>180deg) arc.
+  // Flagging it large for index > 50 made the fill swing round the mirrored centre.
+  const largeArc = 0;
   return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y}`;
 }
 

@@ -9,7 +9,7 @@ function toCr(value: number): number {
 
 function fmtCr(value: number): string {
   if (!Number.isFinite(value)) return "-";
-  return `? ${value.toFixed(2)} Cr`;
+  return `₹ ${value.toFixed(2)} Cr`;
 }
 
 export function QuarterlyFinancialsChart({ symbol }: { symbol: string }) {

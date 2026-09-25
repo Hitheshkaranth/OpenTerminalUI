@@ -84,6 +84,16 @@ class TestProvenanceFromSnapshot:
         assert p["quality"] == "cached"
         assert p["as_of"] is None
 
+    def test_from_cache_adapter_without_kite_not_labelled_kite(self):
+        snap = {
+            "current_price": 500.0,
+            "details": {"price_source": "adapter", "yahoo": True, "nse": False, "fmp": False, "finnhub": False, "kite": False},
+        }
+        cached = provenance_from_snapshot(snap, from_cache=True)
+        live = provenance_from_snapshot(snap)
+        assert cached["source"] == live["source"] == "yahoo"
+        assert cached["quality"] == "cached"
+
     def test_all_keys_present(self):
         snap = {
             "current_price": 100.0,

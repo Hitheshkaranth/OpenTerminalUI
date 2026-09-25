@@ -72,7 +72,7 @@ function ResearchList({ data }: { data: unknown }) {
         >
           <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--ot-space-2)" }}>
             <a
-              href={r.url || "#"}
+              href={r.url && /^https?:\/\//i.test(r.url) ? r.url : "#"}
               target="_blank"
               rel="noreferrer"
               style={{ fontFamily: "var(--ot-font-ui)", fontSize: 12, fontWeight: 600, color: "var(--ot-color-text-primary)" }}

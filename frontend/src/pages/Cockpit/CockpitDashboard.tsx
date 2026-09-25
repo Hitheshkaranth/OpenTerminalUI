@@ -103,6 +103,8 @@ const EMPTY_PORTFOLIO: PortfolioResponse = {
 };
 
 function asNumber(value: unknown): number | null {
+  // Number(null) / Number("") are 0 — treat missing values as missing, not zero.
+  if (value === null || value === undefined || value === "") return null;
   const next = typeof value === "number" ? value : Number(value);
   return Number.isFinite(next) ? next : null;
 }
@@ -982,10 +984,12 @@ export function CockpitDashboard() {
             {showPanel("news") ? <TerminalPanel title="Headline Monitor" subtitle={`${headlines.length} focus headlines`} bodyClassName="space-y-2">
               {headlines.slice(0, 8).map((headline) => {
                 const external = /^https?:\/\//i.test(headline.url);
+                // Feed URLs are untrusted: only allow http(s) or app-relative links (blocks javascript:/data:).
+                const href = external || /^\/(?!\/)/.test(headline.url) ? headline.url : "/equity/news";
                 return (
                   <a
                     key={headline.id}
-                    href={headline.url}
+                    href={href}
                     target={external ? "_blank" : undefined}
                     rel={external ? "noreferrer" : undefined}
                     className="block rounded-sm border border-terminal-border bg-terminal-bg px-3 py-2 hover:border-terminal-accent"

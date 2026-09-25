@@ -46,3 +46,13 @@ async def test_tag_session_india():
     tagged = service._tag_session(bar, "IN")
     assert tagged["session"] == "rth"
     assert tagged["isExtended"] is False
+
+
+def test_normalize_fmp_intraday_is_us_eastern():
+    service = ExtendedHoursService()
+    bars = service._normalize_fmp(
+        [{"date": "2026-02-24 09:30:00", "open": 1, "high": 1, "low": 1, "close": 1, "volume": 10}]
+    )
+    expected = datetime(2026, 2, 24, 9, 30, tzinfo=ZoneInfo("America/New_York"))
+    assert bars[0]["time"] == int(expected.timestamp())
+    assert service._tag_session(bars[0], "US")["session"] == "rth"

@@ -357,7 +357,9 @@ class OHLCVCache:
             else:
                 merged = incoming
             merged = merged.drop_duplicates(subset=["t"], keep="last").sort_values("t")
-            merged.to_parquet(path, index=False)
+            tmp_path = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+            merged.to_parquet(tmp_path, index=False)
+            os.replace(tmp_path, path)
 
 
 _ohlcv_cache = OHLCVCache()

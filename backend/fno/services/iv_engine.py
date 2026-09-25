@@ -110,7 +110,8 @@ class IVEngine:
         chain = await self._fetcher.get_option_chain(symbol, expiry=expiry, strike_range=40)
         spot = self._to_float(chain.get("spot_price"), 0.0)
         atm_iv = self._atm_iv(chain)
-        await self._save_snapshot(str(chain.get("symbol") or symbol), atm_iv)
+        if atm_iv > 0:
+            await self._save_snapshot(str(chain.get("symbol") or symbol), atm_iv)
         iv_percentile, iv_rank = await self._iv_rank_percentile(str(chain.get("symbol") or symbol), atm_iv)
 
         skew = []

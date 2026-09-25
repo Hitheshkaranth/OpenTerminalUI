@@ -39,8 +39,10 @@ export function ExportButton({ source, data, filename, disabled }: ExportButtonP
     const headers = Object.keys(data[0]);
     const rows = data.map(row => headers.map(h => row[h]).join("\t"));
     const content = [headers.join("\t"), ...rows].join("\n");
-    void navigator.clipboard.writeText(content);
-    alert("Copied to clipboard (Tab-separated)");
+    navigator.clipboard.writeText(content).then(
+      () => alert("Copied to clipboard (Tab-separated)"),
+      () => alert("Copy to clipboard failed"),
+    );
     setShowModal(false);
   };
 

@@ -125,6 +125,7 @@ fi
 # --- 1. Ensure single .env exists -----------------------------------------
 if [ ! -f "$ENV_FILE" ]; then
   cp "$ROOT_DIR/.env.example" "$ENV_FILE"
+  chmod 600 "$ENV_FILE"
   green "    created .env from .env.example"
 else
   yellow "    .env already exists — keeping your values, filling blanks only"

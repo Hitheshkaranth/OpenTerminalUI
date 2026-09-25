@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 
@@ -28,7 +28,8 @@ class APIKeyCreate(BaseModel):
 class APIKeyResponse(BaseModel):
     id: int
     name: str
-    prefix: str
+    # ORM rows carry the column as key_prefix; create_api_key passes a dict keyed "prefix".
+    prefix: str = Field(validation_alias=AliasChoices("prefix", "key_prefix"))
     permissions: str
     is_active: int
     last_used_at: Optional[datetime]

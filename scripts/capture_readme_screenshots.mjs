@@ -15,8 +15,12 @@ const require = createRequire(`${process.cwd()}/`);
 const { chromium } = require("@playwright/test");
 
 const BASE = process.env.SHOT_BASE_URL || "http://localhost:8000";
-const EMAIL = process.env.SHOT_EMAIL || "karanth.hithesh@gmail.com";
-const PASSWORD = process.env.SHOT_PASSWORD || "Flyvi12#";
+const EMAIL = process.env.SHOT_EMAIL;
+const PASSWORD = process.env.SHOT_PASSWORD;
+if (!EMAIL || !PASSWORD) {
+  console.error("Set SHOT_EMAIL and SHOT_PASSWORD to an account on the target instance.");
+  process.exit(1);
+}
 const OUT_DIR = path.resolve(process.cwd(), "..", "assets", "screenshots");
 const TICKER = "ICICIBANK"; // an actual holding in the account
 const TICKER_US = "AAPL"; // a US holding (NASDAQ) for cross-market coverage

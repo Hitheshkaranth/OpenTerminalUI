@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchSectorRotation } from "../../api/client";
 import { useNavigate } from "react-router-dom";
@@ -49,12 +49,10 @@ export function SectorRotationMap({ defaultBenchmark = "SPY", width = "100%", he
     return Math.max(...data.sectors.map(s => s.trail.length)) - 1;
   }, [data]);
 
-  // Handle animation play
-  useMemo(() => {
+  // Handle animation play (effect, so the interval is cleaned up on pause/unmount)
+  useEffect(() => {
     if (isPlaying) {
-      if (historyIndex === null || historyIndex >= maxHistory) {
-         setHistoryIndex(0);
-      }
+      setHistoryIndex((prev) => (prev === null || prev >= maxHistory ? 0 : prev));
 
       const interval = setInterval(() => {
         setHistoryIndex(prev => {
@@ -69,7 +67,7 @@ export function SectorRotationMap({ defaultBenchmark = "SPY", width = "100%", he
 
       return () => clearInterval(interval);
     }
-  }, [isPlaying, maxHistory, historyIndex]);
+  }, [isPlaying, maxHistory]);
 
   const getQuadrantColor = (x: number, y: number) => {
     if (x >= 100 && y >= 100) return "#22c55e"; // Leading: Green

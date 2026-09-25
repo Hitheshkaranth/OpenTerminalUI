@@ -8,18 +8,18 @@ import type {
 } from "../types";
 
 export async function fetchBondScreener(rating?: string, issuerType?: string): Promise<BondScreenerItem[]> {
-  const { data } = await api.get<{ items: BondScreenerItem[] }>("/fixed-income/screener", { params: { rating, issuer_type: issuerType } });
-  return Array.isArray(data?.items) ? data.items : [];
+  const { data } = await api.get<BondScreenerItem[]>("/bonds/screener", { params: { rating, issuer_type: issuerType } });
+  return Array.isArray(data) ? data : [];
 }
 
 export async function fetchCreditSpreads(): Promise<{ history: CreditSpreadPoint[] }> {
-  const { data } = await api.get<{ history: CreditSpreadPoint[] }>("/fixed-income/credit-spreads");
+  const { data } = await api.get<{ history: CreditSpreadPoint[] }>("/bonds/credit-spreads");
   return data;
 }
 
 export async function fetchBondRatingsMigration(): Promise<RatingsMigrationItem[]> {
-  const { data } = await api.get<{ items: RatingsMigrationItem[] }>("/fixed-income/ratings-migration");
-  return Array.isArray(data?.items) ? data.items : [];
+  const { data } = await api.get<RatingsMigrationItem[]>("/bonds/ratings-migration");
+  return Array.isArray(data) ? data : [];
 }
 
 export async function fetchYieldCurve(country = "IN"): Promise<YieldCurveResponse> {

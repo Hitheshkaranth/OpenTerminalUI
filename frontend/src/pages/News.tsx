@@ -80,7 +80,8 @@ function normalizeSentiment(item: NewsLatestApiItem): UiNewsItem["sentiment"] {
 function normalizeNewsItem(item: NewsLatestApiItem): UiNewsItem | null {
   const title = String(item.title || "").trim();
   const url = String(item.url || "").trim();
-  if (!title || !url) return null;
+  // Only http(s) links — a `javascript:` URL from a feed would execute on click.
+  if (!title || !/^https?:\/\//i.test(url)) return null;
   return {
     id: String(item.id),
     title,
@@ -129,9 +130,13 @@ function toUpperWords(value: string): string[] {
     .filter((w) => w.length >= 3);
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function relevanceScore(item: UiNewsItem, ticker: string, aliases: string[]): number {
   const text = `${item.title} ${item.summary}`.toUpperCase();
-  const tickerToken = ticker.toUpperCase();
+  const tickerToken = escapeRegExp(ticker.toUpperCase());
   let score = 0;
   if (tickerToken && new RegExp(`\\b${tickerToken}\\b`).test(text)) score += 6;
   for (const alias of aliases) {
@@ -142,7 +147,7 @@ function relevanceScore(item: UiNewsItem, ticker: string, aliases: string[]): nu
 
 function relevanceReason(item: UiNewsItem, ticker: string, aliases: string[]): string {
   const text = `${item.title} ${item.summary}`.toUpperCase();
-  const tickerToken = ticker.toUpperCase();
+  const tickerToken = escapeRegExp(ticker.toUpperCase());
   if (tickerToken && new RegExp(`\\b${tickerToken}\\b`).test(text)) return "Ticker match";
   for (const alias of aliases) {
     if (alias && new RegExp(`\\b${alias}\\b`).test(text)) return "Company match";

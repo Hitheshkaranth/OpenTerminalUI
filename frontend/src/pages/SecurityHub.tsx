@@ -542,7 +542,7 @@ export function SecurityHubPage() {
                       return (
                     <a
                       key={`${item.id}-${item.published_at}`}
-                      href={item.url}
+                      href={/^https?:\/\//i.test(String(item.url || "")) ? item.url : undefined}
                       target="_blank"
                       rel="noreferrer"
                       className={`grid gap-1 rounded-sm border px-2 py-2 hover:border-terminal-accent ${idx === newsSelectedIndex ? "border-terminal-accent bg-terminal-accent/10" : "border-terminal-border bg-terminal-bg"}`}

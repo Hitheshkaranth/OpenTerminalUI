@@ -278,6 +278,9 @@ export function AboutPage({ terminalType = "market" }: AboutProps) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        // Escape inside a field (e.g. the command bar) or already handled by an overlay should not leave the page.
+        const target = event.target instanceof Element ? event.target : null;
+        if (event.defaultPrevented || target?.closest("input, textarea, select, [contenteditable='true']")) return;
         event.preventDefault();
         navigate(-1);
       }

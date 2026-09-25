@@ -49,3 +49,16 @@ def test_bond_analytics_aggregator():
         analytics(spec, ytm=0.05, price=100.0)
     with pytest.raises(ValueError):
         analytics(spec)
+
+def test_fractional_maturity_keeps_final_coupon():
+    # 0.75y semi-annual bond: coupons at 0.25y and 0.75y plus face at maturity
+    spec = BondSpec(coupon_rate=0.05, years_to_maturity=0.75, frequency=2)
+    expected = 2.5 / 1.025 ** 0.5 + 102.5 / 1.025 ** 1.5
+    assert bond_price(spec, 0.05) == pytest.approx(expected, abs=1e-9)
+    assert bond_ytm(spec, expected) == pytest.approx(0.05, abs=1e-6)
+
+def test_current_yield_uses_price_and_ytm_rejects_unsolvable_price():
+    spec = BondSpec(coupon_rate=0.05, years_to_maturity=10, frequency=2)
+    assert analytics(spec, price=80.0)["current_yield"] == pytest.approx(0.0625, abs=1e-6)
+    with pytest.raises(ValueError):
+        bond_ytm(spec, -5.0)

@@ -464,6 +464,55 @@ def test_reflections_benchmark_raises():
     db.close()
 
 
+def test_reflections_committed_and_llm_failure_not_stored():
+    """Notes survive the session (the route never commits); a failed LLM call stores nothing."""
+    from backend.agent.reflections import run_reflections
+    from backend.models.journal import JournalEntry
+
+    db = _session()
+    uid = "u83"
+    now = datetime.now(timezone.utc)
+    db.add(JournalEntry(
+        user_id=uid, symbol="INFY", direction="long",
+        entry_date=now, entry_price=1500, quantity=5,
+        exit_date=now, exit_price=1600,
+    ))
+    db.commit()
+
+    class DownProvider:
+        async def complete(self, messages, **kw):
+            raise RuntimeError("provider down")
+
+    class FakeProvider:
+        async def complete(self, messages, **kw):
+            return AssistantMessage(content="took profit on time")
+
+    with patch("backend.agent.reflections.market_classifier", side_effect=RuntimeError("no data")):
+        r1 = asyncio.run(run_reflections(db, uid, DownProvider()))
+        assert r1["created"] == 0
+        r2 = asyncio.run(run_reflections(db, uid, FakeProvider()))
+        assert r2["created"] == 1
+    db.close()
+
+    fresh = _session()
+    notes = memory_service.list_notes(fresh, uid)
+    assert len(notes) == 1
+    assert notes[0]["content"].endswith("took profit on time")
+    fresh.close()
+
+
+def test_memory_tool_handlers_scoped_and_persisted(monkeypatch):
+    import backend.shared.db as shared_db
+
+    monkeypatch.setattr(shared_db, "SessionLocal", SessionFactory)
+    specs_a = {s.name: s for s in memory_service.memory_tool_specs("u84a")}
+    specs_b = {s.name: s for s in memory_service.memory_tool_specs("u84b")}
+
+    specs_a["remember_note"].handler({"symbol": "tcs", "content": "a's thesis"})
+    assert [n["content"] for n in specs_a["recall_notes"].handler({"symbol": "TCS"})["items"]] == ["a's thesis"]
+    assert specs_b["recall_notes"].handler({"symbol": "TCS"})["items"] == []
+
+
 # ============================================================
 # Routes (mini FastAPI with overrides)
 # ============================================================

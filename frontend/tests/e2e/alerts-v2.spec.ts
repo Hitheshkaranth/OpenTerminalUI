@@ -74,7 +74,7 @@ test("alerts builder creates and tests a multi-condition alert", async ({ page }
   await page.getByLabel("Condition field 2").selectOption("rsi_14");
   await page.getByLabel("Condition operator 2").selectOption("above");
   await page.getByLabel("Condition value 2").fill("70");
-  await page.getByRole("button", { name: "AND" }).click();
+  await page.getByRole("button", { name: "AND", exact: true }).click();
   await page.getByRole("checkbox", { name: "Webhook" }).check();
   await page.getByLabel("Webhook URL").fill("https://example.com/hook");
   await page.getByRole("button", { name: "Save" }).click();

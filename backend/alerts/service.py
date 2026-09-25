@@ -256,9 +256,8 @@ def _eval_ast_node(node: ast.AST, globals_: dict[str, Any], locals_: dict[str, A
     if isinstance(node, ast.Compare):
         left = _eval_ast_node(node.left, globals_, locals_)
         results = []
-        for comparator in node.comparators:
+        for comp, comparator in zip(node.ops, node.comparators):
             right = _eval_ast_node(comparator, globals_, locals_)
-            comp = node.ops[0]
             if isinstance(comp, ast.Eq):
                 results.append(left == right)
             elif isinstance(comp, ast.NotEq):

@@ -2,6 +2,7 @@ import type { DashboardResults, LabLeaderboardEntry } from "../../api/intelligen
 import { GuidedEmptyState } from "./GuidedEmptyState";
 
 function asNumber(value: unknown): number | null {
+  if (value == null || value === "") return null;
   const next = typeof value === "number" ? value : Number(value);
   return Number.isFinite(next) ? next : null;
 }

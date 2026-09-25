@@ -41,7 +41,11 @@ export default defineConfig({
         reuseExistingServer: true,
         timeout: 120_000,
         env: {
+          AUTH_MIDDLEWARE_ENABLED: "0",
+          E2E_DEV_AUTH: "1",
           OPENTERMINALUI_SQLITE_URL: sqliteUrl,
+          // Let the e2e frontend origin make credentialed cross-origin calls to the e2e backend.
+          OPENTERMINALUI_CORS_ORIGINS: `http://127.0.0.1:${e2eFrontendPort},http://localhost:${e2eFrontendPort},http://localhost:5173,http://127.0.0.1:5173`,
           DATABASE_URL: databaseUrl,
         },
       },

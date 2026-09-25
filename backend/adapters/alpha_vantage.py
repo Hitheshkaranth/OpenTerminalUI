@@ -11,7 +11,6 @@ from backend.adapters.base import DataAdapter, FuturesContract, Instrument, OHLC
 
 
 ALPHA_VANTAGE_URL = "https://www.alphavantage.co/query"
-ALPHA_VANTAGE_URL_ALT = "https://alphavantage-paper.backpack.exchange/query"
 
 
 def _coerce_float(value: Any) -> float | None:
@@ -44,7 +43,7 @@ class AlphaVantageAdapter(DataAdapter):
     ) -> dict[str, Any]:
         if not self._enabled:
             return {}
-        for base_url in (ALPHA_VANTAGE_URL, ALPHA_VANTAGE_URL_ALT):
+        for base_url in (ALPHA_VANTAGE_URL,):
             attempt = 0
             while attempt < max_attempts:
                 attempt += 1
@@ -77,11 +76,12 @@ class AlphaVantageAdapter(DataAdapter):
         if not ticker:
             return None
         data = await self._request_json(
-            function="QUOTE",
+            function="GLOBAL_QUOTE",
             params={"symbol": ticker},
         )
         if "error" in data:
             return None
+        data = data.get("Global Quote") or {}
         fields = {
             "01. symbol": "symbol",
             "02. open": "open",
@@ -89,13 +89,14 @@ class AlphaVantageAdapter(DataAdapter):
             "04. low": "low",
             "05. price": "price",
             "06. volume": "volume",
-            "08. previousClose": "previous_close",
+            "08. previous close": "previous_close",
             "09. change": "change",
             "10. change percent": "change_pct",
         }
         values: dict[str, float | None] = {}
         for av_key, py_key in fields.items():
-            values[py_key] = _coerce_float(data.get(av_key))
+            raw = data.get(av_key)
+            values[py_key] = _coerce_float(raw.rstrip("%") if isinstance(raw, str) else raw)
         price = values.get("price")
         if price is None:
             return None
@@ -131,7 +132,8 @@ class AlphaVantageAdapter(DataAdapter):
         tf = (interval or "1d").lower()
         if tf in ("1m", "2m", "5m", "15m", "30m", "60m", "1h", "4h"):
             function = "TIME_SERIES_INTRADAY"
-            interval_param = f"{tf}" if tf in ("1m", "2m", "5m", "15m", "30m", "60m") else tf.replace("h", "min")
+            # Alpha Vantage intraday only accepts 1min/5min/15min/30min/60min.
+            interval_param = {"1m": "1min", "2m": "1min", "5m": "5min", "15m": "15min", "30m": "30min"}.get(tf, "60min")
         else:
             function = "TIME_SERIES_DAILY"
             interval_param = "1day"
@@ -173,6 +175,8 @@ class AlphaVantageAdapter(DataAdapter):
                 continue
             try:
                 ts_dt = datetime.fromisoformat(ts_str.replace(" ", "T"))
+                if (start and ts_dt.date() < start) or (end and ts_dt.date() > end):
+                    continue
                 ts_int = int(ts_dt.replace(tzinfo=timezone.utc).timestamp())
             except (ValueError, TypeError):
                 continue

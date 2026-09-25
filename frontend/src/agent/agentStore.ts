@@ -83,7 +83,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         });
       }
     }
-    set({ messages, threadId });
+    set({ messages, threadId, artifacts: [] });
   },
 
   appendUserAndPending: (prompt) =>

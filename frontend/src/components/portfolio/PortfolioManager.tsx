@@ -50,7 +50,9 @@ export function PortfolioManager() {
     try {
       const pfs = await fetchPortfolios();
       setPortfolios(pfs);
-      const activeId = nextId || selectedId || pfs[0]?.id || "";
+      // Fall back to the first portfolio when the preferred one no longer exists (e.g. just deleted).
+      const preferredId = nextId || selectedId;
+      const activeId = (preferredId && pfs.some((p) => p.id === preferredId) ? preferredId : pfs[0]?.id) || "";
       if (activeId) {
         setSelectedId(activeId);
         const [h, a] = await Promise.all([fetchPortfolioHoldings(activeId), fetchPortfolioAnalyticsV2(activeId)]);
@@ -62,6 +64,7 @@ export function PortfolioManager() {
           setEditBenchmark(selected.benchmark_symbol || BENCHMARKS[0]);
         }
       } else {
+        setSelectedId("");
         setHoldings([]);
         setAnalytics(null);
         setEditName("");
@@ -99,6 +102,7 @@ export function PortfolioManager() {
     try {
       const text = await file.text();
       const lines = text
+        .replace(/^\uFEFF/, "")
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean);

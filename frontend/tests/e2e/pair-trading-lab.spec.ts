@@ -1,12 +1,16 @@
 import { expect, test } from "@playwright/test";
 
+import { proxyToLiveBackend } from "./fixtures/liveBackend";
+
 function makeJwt(payload: Record<string, unknown>): string {
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `x.${encoded}.y`;
 }
 
-test("pair trading lab renders cointegration verdict from real data", async ({ page }) => {
+test("pair trading lab renders cointegration verdict from real data", async ({ page, request }) => {
   test.slow();
+  // Real /api/pairs/* endpoints + real market data, with a real backend session.
+  await proxyToLiveBackend(page, request, "pairs");
   const accessToken = makeJwt({
     sub: "e2e-user",
     email: "e2e@example.com",
@@ -45,8 +49,12 @@ test("pair trading lab renders cointegration verdict from real data", async ({ p
 
   await page.screenshot({ path: "test-results/pair-trading-backtest.png", fullPage: true });
 
+  // The app shell's background polls (market status, notifications, ...) go straight to the
+  // backend, which does not allow the e2e dev-server origin under the fake e2e session; those
+  // CORS rejections are harness noise. A CORS failure on /api/pairs/* would still count.
+  const shellCorsNoise = (e: string) => /blocked by CORS policy/i.test(e) && !/\/api\/pairs\//.test(e);
   const fatal = consoleErrors.filter(
-    (e) => !/favicon|ResizeObserver|Failed to load resource|WebGLRenderer|THREE\.|WebGL context/i.test(e),
+    (e) => !/favicon|ResizeObserver|Failed to load resource|WebGLRenderer|THREE\.|WebGL context/i.test(e) && !shellCorsNoise(e),
   );
   expect(fatal, `console errors: ${fatal.join("\n")}`).toHaveLength(0);
 });

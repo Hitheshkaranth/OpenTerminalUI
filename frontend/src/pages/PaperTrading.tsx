@@ -36,7 +36,7 @@ export function PaperTradingPage() {
     }
   }
 
-  async function loadDetails(portfolioId: string) {
+  async function loadDetails(portfolioId: string, isStale: () => boolean = () => false) {
     if (!portfolioId) return;
     const [p, o, t, k] = await Promise.all([
       fetchPaperPositions(portfolioId),
@@ -44,6 +44,7 @@ export function PaperTradingPage() {
       fetchPaperTrades(portfolioId),
       fetchPaperPerformance(portfolioId),
     ]);
+    if (isStale()) return;
     setPositions(p);
     setOrders(o);
     setTrades(t);
@@ -56,7 +57,11 @@ export function PaperTradingPage() {
 
   useEffect(() => {
     if (!selectedPortfolioId) return;
-    void loadDetails(selectedPortfolioId);
+    let cancelled = false;
+    void loadDetails(selectedPortfolioId, () => cancelled);
+    return () => {
+      cancelled = true;
+    };
   }, [selectedPortfolioId]);
 
   const selectedPortfolio = useMemo(

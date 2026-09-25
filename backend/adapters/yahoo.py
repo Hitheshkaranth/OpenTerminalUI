@@ -42,10 +42,10 @@ class YahooFinanceAdapter(DataAdapter):
         # Yahoo limits: 1m (7 days), 2m/5m/15m/30m/90m (60 days), 60m/1h (730 days).
         # We try to use the requested timeframe if it's within limits, else fallback gracefully.
 
+        is_intraday = timeframe not in ["1d", "1wk", "1mo"] and (timeframe.endswith("m") or timeframe.endswith("h"))
         if timeframe in ["1d", "1wk", "1mo"]:
             interval_str = timeframe
         else:
-            is_intraday = timeframe.endswith("m") or timeframe.endswith("h")
             if not is_intraday:
                 interval_str = "1d"
             else:

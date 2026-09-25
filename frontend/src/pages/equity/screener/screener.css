@@ -19,12 +19,12 @@
   border-radius: 8px;
 }
 
-.screener-row:hover {
-  background: var(--bg-tertiary);
-}
-
 .screener-row:nth-child(even) {
   background: rgba(26, 31, 46, 0.3);
+}
+
+.screener-row:hover {
+  background: var(--bg-tertiary);
 }
 
 .badge-high {

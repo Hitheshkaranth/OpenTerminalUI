@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
@@ -96,8 +97,8 @@ def _is_constant_string(value: Any) -> bool:
 
 
 def _reject_string_literal(value: str, node: ast.AST) -> None:
-    lowered = value.lower()
-    if any(token in lowered for token in _BANNED_STRING_TOKENS):
+    words = set(re.findall(r"[a-z0-9_]+", value.lower()))
+    if words & _BANNED_STRING_TOKENS:
         raise OpenScriptError(f"String literal contains blocked token: {value!r}", node)
 
 
@@ -222,6 +223,8 @@ def _binary_op(left: Any, right: Any, op: ast.operator) -> Any:
     if isinstance(op, ast.Sub):
         return left - right
     if isinstance(op, ast.Mult):
+        if isinstance(left, str) or isinstance(right, str):
+            raise OpenScriptError("String repetition is not supported")
         return left * right
     if isinstance(op, ast.Div):
         return left / right
@@ -262,26 +265,35 @@ def _vectorize_bool(value: Any, index: pd.Index) -> pd.Series:
     return pd.Series([bool(value)] * len(index), index=index, dtype=bool)
 
 
+def _period(value: Any) -> int:
+    period = int(_as_scalar(value, kind=(int, float)))
+    if period < 1:
+        raise OpenScriptError(f"Period must be >= 1, got {period}")
+    return period
+
+
 def _call_function(name: str, args: list[Any], index: pd.Index) -> Any:
+    if len(args) != 2:
+        raise OpenScriptError(f"{name}() expects 2 arguments, got {len(args)}")
     if name == "sma":
         series = args[0]
-        period = int(_as_scalar(args[1], kind=(int, float)))
+        period = _period(args[1])
         return technical_sma(pd.Series(series, index=index, dtype=float), period)
     if name == "ema":
         series = args[0]
-        period = int(_as_scalar(args[1], kind=(int, float)))
+        period = _period(args[1])
         return technical_ema(pd.Series(series, index=index, dtype=float), period)
     if name == "rsi":
         series = args[0]
-        period = int(_as_scalar(args[1], kind=(int, float)))
+        period = _period(args[1])
         return scanner_rsi(pd.Series(series, index=index, dtype=float), period)
     if name == "highest":
         series = pd.Series(args[0], index=index, dtype=float)
-        period = int(_as_scalar(args[1], kind=(int, float)))
+        period = _period(args[1])
         return series.rolling(period).max()
     if name == "lowest":
         series = pd.Series(args[0], index=index, dtype=float)
-        period = int(_as_scalar(args[1], kind=(int, float)))
+        period = _period(args[1])
         return series.rolling(period).min()
     if name == "crossover":
         left = pd.Series(args[0], index=index, dtype=float)

@@ -11,6 +11,7 @@ import { useStockHistory } from "../../hooks/useStocks";
 import type { ChartPoint, CorporateEvent, InsiderTrade } from "../../types";
 
 function formatCurrency(value: number | null | undefined): string {
+  if (value == null) return "-"; // Number(null) is 0 — don't show missing values as $0
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "-";
   return `$${numeric.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;

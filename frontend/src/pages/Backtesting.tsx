@@ -413,6 +413,8 @@ export function BacktestingPage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [robustness, setRobustness] = useState<RobustnessData | null>(null);
   const [robustnessLoading, setRobustnessLoading] = useState(false);
+  // Run id whose robustness fetch failed; stops the auto-fetch effect from retrying in a tight loop.
+  const [robustnessFailedRun, setRobustnessFailedRun] = useState<string | null>(null);
   const [chartType, setChartType] = useState<ChartKind>("candle");
   const [dataTimeframe, setDataTimeframe] = useState<"1m" | "5m" | "15m" | "1h" | "1d">("1d");
   const [timeframe, setTimeframe] = useState<BacktestTimeframe>("1D");
@@ -631,22 +633,24 @@ export function BacktestingPage() {
     setRobustnessLoading(true);
     try {
       const resp = await fetch(`/api/backtests/${runId}/robustness`);
-      if (resp.ok) {
-        const data = await resp.json();
+      const data = resp.ok ? await resp.json() : null;
+      if (data?.robustness) {
         setRobustness(data.robustness);
+      } else {
+        setRobustnessFailedRun(runId);
       }
     } catch {
-      // no-op
+      setRobustnessFailedRun(runId);
     } finally {
       setRobustnessLoading(false);
     }
   }, [runId, jobState]);
 
   useEffect(() => {
-    if (activeTab === "robustness" && !robustness && !robustnessLoading && runId && jobState === "done") {
+    if (activeTab === "robustness" && !robustness && !robustnessLoading && runId && jobState === "done" && robustnessFailedRun !== runId) {
       void fetchRobustness();
     }
-  }, [activeTab, robustness, robustnessLoading, runId, jobState, fetchRobustness]);
+  }, [activeTab, robustness, robustnessLoading, robustnessFailedRun, runId, jobState, fetchRobustness]);
 
   useEffect(() => {
     if (jobState === "done") void fetchAnalytics();

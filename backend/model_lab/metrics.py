@@ -50,7 +50,7 @@ def _align_for_beta_alpha(strategy: np.ndarray, benchmark: np.ndarray) -> tuple[
     b_var = float(np.var(b))
     if b_var == 0:
         return 0.0, 0.0
-    beta = float(np.cov(s, b)[0, 1] / b_var)
+    beta = float(np.cov(s, b, ddof=0)[0, 1] / b_var)
     alpha = float((np.mean(s) - beta * np.mean(b)) * 252.0)
     return alpha, beta
 
@@ -98,17 +98,23 @@ def compute_run_metrics(
     max_dd = _max_drawdown(equity)
     calmar = float(cagr / max_dd) if max_dd > 0 else 0.0
 
+    # Realized PnL per closing SELL against the average cost of the open long position.
     pnls: list[float] = []
     qty_total = 0.0
+    open_qty = 0.0
+    avg_cost = 0.0
     for trade in trades:
         action = str(trade.get("action", "")).upper()
         price = float(trade.get("price", 0.0) or 0.0)
         qty = abs(float(trade.get("quantity", 0.0) or 0.0))
         qty_total += qty
-        if action == "SELL":
-            pnls.append(price * qty)
-        elif action == "BUY":
-            pnls.append(-price * qty)
+        if action == "BUY":
+            avg_cost = (avg_cost * open_qty + price * qty) / (open_qty + qty) if open_qty + qty > 0 else 0.0
+            open_qty += qty
+        elif action == "SELL" and open_qty > 0:
+            closed_qty = min(qty, open_qty)
+            pnls.append((price - avg_cost) * closed_qty)
+            open_qty -= closed_qty
 
     wins = [x for x in pnls if x > 0]
     losses = [x for x in pnls if x < 0]

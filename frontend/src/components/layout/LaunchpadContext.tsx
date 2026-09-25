@@ -286,7 +286,7 @@ export function LaunchpadProvider({ children }: { children: ReactNode }) {
           const serverItems = payload.items.map((layout) => normalizeLayoutPreset(layout));
           startTransition(() => {
             setSavedLayouts(serverItems);
-            if (!serverItems.some((l) => l.id === activeLayoutId)) setActiveLayoutId(serverItems[0].id);
+            setActiveLayoutId((current) => (serverItems.some((l) => l.id === current) ? current : serverItems[0].id));
           });
         }
       } catch {
@@ -301,7 +301,10 @@ export function LaunchpadProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [activeLayoutId]);
+    // Hydrate from the server once on mount. Re-running on every layout switch
+    // re-fetched the (not yet synced) server list and clobbered newly created /
+    // deleted layouts before the debounced PUT landed.
+  }, []);
 
   useEffect(() => {
     if (!serverHydrated) return;

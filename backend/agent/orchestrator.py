@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any, AsyncGenerator
 
 from backend.agent import events
@@ -69,7 +70,12 @@ class Orchestrator:
             "pe", "p/e", "roe", "roce", "debt", "market cap", "growth",
             "margin", "dividend", "value", "quality", "momentum", "breakout",
         )
-        return any(term in text for term in screening_terms) and any(term in text for term in metric_terms)
+        # Short metric names need a whole-word match: as bare substrings "pe"/"roce"
+        # fire on "operations"/"process" and misroute ordinary questions to the screener.
+        return any(term in text for term in screening_terms) and any(
+            re.search(rf"\b{re.escape(term)}s?\b", text) if len(term) <= 4 else term in text
+            for term in metric_terms
+        )
 
     @staticmethod
     def _screening_directive(prompt: str, screen_context: dict[str, Any] | None) -> str:

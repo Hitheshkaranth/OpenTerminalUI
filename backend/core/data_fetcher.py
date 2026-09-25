@@ -118,6 +118,7 @@ class MarketDataFetcher:
                 auto_adjust=False,
                 progress=False,
                 timeout=self.request_timeout_seconds,
+                multi_level_index=False,
             )
             if isinstance(data, pd.DataFrame) and not data.empty:
                 self._mark_network_success()

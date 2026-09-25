@@ -97,8 +97,6 @@ def persona_weights(db: Session, user_id: str) -> dict[str, float]:
 
 
 def _is_too_recent(signal: AgentSignal, horizon_days: int) -> bool:
-    if signal.evaluated_at is None:
-        return False
     if signal.created_at is None:
         return False
     try:

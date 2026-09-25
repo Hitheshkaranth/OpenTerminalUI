@@ -90,7 +90,7 @@ export function SaveScreenDialog() {
                 query,
                 columns_config: activeScreen.columns_config || [],
                 viz_config: activeScreen.viz_config || {},
-                is_public: activeScreen.is_public,
+                is_public: publicMode,
               });
               if (publicMode && !updated.is_public) {
                 await publishScreenV3(updated.id);

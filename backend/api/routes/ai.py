@@ -20,8 +20,9 @@ async def ai_query(
     if not query_text:
         raise HTTPException(status_code=400, detail="Query text is required")
 
-    # In a real app, user_id would come from auth token
-    user_id = "default_user" # Mock for now
+    # Rate limits are per user; the auth middleware sets current_user on /api requests.
+    current_user = getattr(request.state, "current_user", None)
+    user_id = str(getattr(current_user, "id", None) or "default_user")
 
     data = await service.query(user_id, query_text, context)
     return data

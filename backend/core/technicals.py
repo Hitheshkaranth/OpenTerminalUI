@@ -22,8 +22,9 @@ def rsi(close: pd.Series, period: int = 14) -> pd.Series:
     delta = close.diff()
     gain = delta.clip(lower=0).rolling(period).mean()
     loss = -delta.clip(upper=0).rolling(period).mean()
-    rs = gain / loss.replace(0, pd.NA)
-    return 100 - (100 / (1 + rs))
+    rs = gain / loss.replace(0, np.nan)
+    # No losses in the window means RSI is 100 by definition, not undefined.
+    return (100 - (100 / (1 + rs))).mask((loss == 0) & (gain > 0), 100.0)
 
 
 def macd(close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> pd.DataFrame:
@@ -80,9 +81,9 @@ def compute_indicator(df: pd.DataFrame, indicator_type: str, params: dict[str, i
     elif itype == "stochastic":
         k_period = int(params.get("period", 14))
         d_smooth = int(params.get("signal", 3))
-        high_s = df["High"].fillna(method="ffill").fillna(method="bfill").values
-        low_s = df["Low"].fillna(method="ffill").fillna(method="bfill").values
-        close_s = df["Close"].fillna(method="ffill").fillna(method="bfill").values
+        high_s = df["High"].ffill().bfill().values
+        low_s = df["Low"].ffill().bfill().values
+        close_s = df["Close"].ffill().bfill().values
         low_min = pd.Series(low_s).rolling(k_period).min().values
         high_max = pd.Series(high_s).rolling(k_period).max().values
         denom = high_max - low_min
@@ -100,9 +101,10 @@ def compute_indicator(df: pd.DataFrame, indicator_type: str, params: dict[str, i
         dn = -np.diff(low_s, prepend=low_s[0])
         plus_dm = np.where((up > dn) & (up > 0), up, 0.0)
         minus_dm = np.where((dn > up) & (dn > 0), dn, 0.0)
+        prev_close = np.r_[close_s[:1], close_s[:-1]]  # first bar has no prior close
         tr = np.maximum(
             high_s - low_s,
-            np.maximum(np.abs(high_s - np.roll(close_s, 1)), np.abs(low_s - np.roll(close_s, 1))),
+            np.maximum(np.abs(high_s - prev_close), np.abs(low_s - prev_close)),
         )
         atr = pd.Series(tr).rolling(period).mean()
         plus_di = 100.0 * pd.Series(plus_dm).rolling(period).mean() / atr
@@ -113,22 +115,22 @@ def compute_indicator(df: pd.DataFrame, indicator_type: str, params: dict[str, i
         out["minus_di"] = minus_di.ffill().bfill()
     elif itype == "cci":
         period = int(params.get("period", 20))
-        high_s = df["High"].fillna(method="ffill").fillna(method="bfill").values
-        low_s = df["Low"].fillna(method="ffill").fillna(method="bfill").values
-        close_s = df["Close"].fillna(method="ffill").fillna(method="bfill").values
+        high_s = df["High"].ffill().bfill().values
+        low_s = df["Low"].ffill().bfill().values
+        close_s = df["Close"].ffill().bfill().values
         tp = (high_s + low_s + close_s) / 3.0
         tp_s = pd.Series(tp)
         sma_tp = tp_s.rolling(period).mean()
-        mad = tp_s.rolling(period).apply(lambda x: np.abs(x - sma_tp[x.name]).mean(), raw=True) if hasattr(tp_s.rolling(period), "apply") else tp_s.rolling(period).std() * np.sqrt(period / (period + 1))
+        mad = tp_s.rolling(period).apply(lambda x: np.abs(x - x.mean()).mean(), raw=True) if hasattr(tp_s.rolling(period), "apply") else tp_s.rolling(period).std() * np.sqrt(period / (period + 1))
         mad = mad.ffill().bfill()
         denom = 0.015 * mad
         denom = np.where(denom == 0, 1.0, denom.values)
         out["cci"] = ((tp - sma_tp.values) / denom).astype(float)
     elif itype == "williams_r":
         period = int(params.get("period", 14))
-        high_s = df["High"].fillna(method="ffill").fillna(method="bfill").values
-        low_s = df["Low"].fillna(method="ffill").fillna(method="bfill").values
-        close_s = df["Close"].fillna(method="ffill").fillna(method="bfill").values
+        high_s = df["High"].ffill().bfill().values
+        low_s = df["Low"].ffill().bfill().values
+        close_s = df["Close"].ffill().bfill().values
         hh = pd.Series(high_s).rolling(period).max()
         ll = pd.Series(low_s).rolling(period).min()
         denom = hh - ll

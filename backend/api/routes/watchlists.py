@@ -95,8 +95,8 @@ def create_watchlist(payload: WatchlistCreate, db: Session = Depends(get_db), cu
 
 
 @router.put("/{watchlist_id}", response_model=WatchlistResponse)
-def update_watchlist(watchlist_id: str, payload: WatchlistUpdate, db: Session = Depends(get_db)):
-    wl = db.query(WatchlistORM).filter(WatchlistORM.id == watchlist_id).first()
+def update_watchlist(watchlist_id: str, payload: WatchlistUpdate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    wl = db.query(WatchlistORM).filter(WatchlistORM.id == watchlist_id, WatchlistORM.user_id == current_user.id).first()
     if not wl:
         raise HTTPException(status_code=404, detail="Watchlist not found")
 
@@ -119,8 +119,8 @@ def update_watchlist(watchlist_id: str, payload: WatchlistUpdate, db: Session = 
 
 
 @router.delete("/{watchlist_id}")
-def delete_watchlist(watchlist_id: str, db: Session = Depends(get_db)):
-    wl = db.query(WatchlistORM).filter(WatchlistORM.id == watchlist_id).first()
+def delete_watchlist(watchlist_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    wl = db.query(WatchlistORM).filter(WatchlistORM.id == watchlist_id, WatchlistORM.user_id == current_user.id).first()
     if not wl:
         raise HTTPException(status_code=404, detail="Watchlist not found")
     db.delete(wl)
@@ -129,8 +129,8 @@ def delete_watchlist(watchlist_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{watchlist_id}/symbols", response_model=WatchlistResponse)
-def add_symbols(watchlist_id: str, symbols: List[str], db: Session = Depends(get_db)):
-    wl = db.query(WatchlistORM).filter(WatchlistORM.id == watchlist_id).first()
+def add_symbols(watchlist_id: str, symbols: List[str], db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    wl = db.query(WatchlistORM).filter(WatchlistORM.id == watchlist_id, WatchlistORM.user_id == current_user.id).first()
     if not wl:
         raise HTTPException(status_code=404, detail="Watchlist not found")
 
@@ -153,8 +153,8 @@ def add_symbols(watchlist_id: str, symbols: List[str], db: Session = Depends(get
 
 
 @router.delete("/{watchlist_id}/symbols/{symbol}", response_model=WatchlistResponse)
-def remove_symbol(watchlist_id: str, symbol: str, db: Session = Depends(get_db)):
-    wl = db.query(WatchlistORM).filter(WatchlistORM.id == watchlist_id).first()
+def remove_symbol(watchlist_id: str, symbol: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    wl = db.query(WatchlistORM).filter(WatchlistORM.id == watchlist_id, WatchlistORM.user_id == current_user.id).first()
     if not wl:
         raise HTTPException(status_code=404, detail="Watchlist not found")
 

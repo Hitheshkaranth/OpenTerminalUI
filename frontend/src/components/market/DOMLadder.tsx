@@ -144,7 +144,14 @@ export function DOMLadder({ symbol, market, className = "", refPrice, onSnapshot
 
   useEffect(() => {
     if (!autoCenter) return;
-    lastPriceRowRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    // Center within the ladder's own viewport only. scrollIntoView also scrolls every
+    // ancestor, so on phones each refresh yanked the whole page back to the ladder.
+    const region = scrollRef.current;
+    const row = lastPriceRowRef.current;
+    if (!region || !row) return;
+    const offset = row.getBoundingClientRect().top - region.getBoundingClientRect().top;
+    const top = region.scrollTop + offset - (region.clientHeight - row.offsetHeight) / 2;
+    region.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
   }, [autoCenter, depthQuery.data, levels]);
 
   const snapshot = depthQuery.data ?? null;
@@ -287,7 +294,7 @@ export function DOMLadder({ symbol, market, className = "", refPrice, onSnapshot
             <span className="text-center">Price</span>
             <span>Ask Size</span>
           </div>
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto lg:max-h-[calc(100dvh-18rem)]" data-testid="dom-scroll-region">
+          <div ref={scrollRef} className="min-h-0 max-h-[60dvh] flex-1 overflow-y-auto lg:max-h-[calc(100dvh-18rem)]" data-testid="dom-scroll-region">
             {depthQuery.isLoading && !rows.length ? (
               <div className="flex h-full items-center justify-center px-3 py-10 text-xs text-terminal-muted">Loading DOM ladder...</div>
             ) : null}

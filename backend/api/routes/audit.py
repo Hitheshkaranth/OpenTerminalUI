@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from backend.api.deps import get_db
 from backend.auth.deps import get_current_user
-from backend.models import AuditLogORM, User
+from backend.models import AuditLogORM, User, UserRole
 
 router = APIRouter()
 
@@ -16,9 +16,12 @@ def list_audit(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, object]:
     query = db.query(AuditLogORM)
+    # Non-admins see only their own events plus system (userless) ones, matching /oms/orders scoping.
+    if str(getattr(current_user.role, "value", current_user.role)) != UserRole.ADMIN.value:
+        query = query.filter((AuditLogORM.user_id == current_user.id) | (AuditLogORM.user_id.is_(None)))
     if event_type:
         query = query.filter(AuditLogORM.event_type == event_type)
     rows = query.order_by(AuditLogORM.created_at.desc()).offset(offset).limit(limit).all()

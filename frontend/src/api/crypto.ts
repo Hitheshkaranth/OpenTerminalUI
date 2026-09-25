@@ -18,8 +18,8 @@ export async function fetchCryptoSearch(q: string): Promise<Array<{ ticker: stri
 }
 
 export async function fetchCryptoCandles(symbol: string, interval = "1d", range = "1y"): Promise<ChartResponse> {
-  const { data } = await api.get<ChartResponse>(`/v1/crypto/candles/${encodeURIComponent(symbol)}`, {
-    params: { interval, range },
+  const { data } = await api.get<ChartResponse>("/v1/crypto/candles", {
+    params: { symbol, interval, range },
   });
   return data;
 }

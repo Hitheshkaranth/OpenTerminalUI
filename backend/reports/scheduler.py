@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import smtplib
+import ssl
 import uuid
 from dataclasses import dataclass
 from email.message import EmailMessage
@@ -74,6 +75,8 @@ class ScheduledReportsService:
             return CronTrigger(hour=18, minute=0)
         if low == "weekly":
             return CronTrigger(day_of_week="fri", hour=18, minute=0)
+        if low == "monthly":
+            return CronTrigger(day="last", hour=18, minute=0)
         return CronTrigger(hour="*/12")
 
     def _noop_delivery(self, config_id: str) -> None:
@@ -96,7 +99,7 @@ class ScheduledReportsService:
         msg.add_attachment(attachment_bytes, maintype="application", subtype="octet-stream", filename=attachment_name)
 
         with smtplib.SMTP(host, port) as smtp:
-            smtp.starttls()
+            smtp.starttls(context=ssl.create_default_context())
             smtp.login(user, password)
             smtp.send_message(msg)
 

@@ -48,11 +48,11 @@ export async function fetchStockBriefing(ticker: string, market?: string): Promi
 }
 
 export async function fetchAiRiskInsights(metrics: Record<string, any>, scope = "portfolio"): Promise<InsightData> {
-  const { data } = await api.post<InsightData>("/v1/ai/risk-insights", { metrics, scope });
+  const { data } = await api.post<InsightData>("/ai/risk-insights", { metrics, scope });
   return data;
 }
 
 export async function fetchCollectionBriefing(symbols: string[], scope = "collection"): Promise<InsightData> {
-  const { data } = await api.post<InsightData>("/v1/ai/collection-briefing", { symbols, scope });
+  const { data } = await api.post<InsightData>("/ai/collection-briefing", { symbols, scope });
   return data;
 }

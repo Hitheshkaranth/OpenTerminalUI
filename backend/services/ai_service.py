@@ -86,7 +86,7 @@ class AIQueryService:
                     quote = await fetcher.yahoo.get_quotes([t])
                     if quote:
                         results.append(quote[0])
-                except:
+                except Exception:
                     continue
             return {
                 "type": "data_table",

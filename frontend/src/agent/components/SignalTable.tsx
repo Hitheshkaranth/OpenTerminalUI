@@ -125,10 +125,9 @@ function SignalRow({
 
 function ScorecardStrip({ personas, loaded }: { personas: ScorecardPersona[]; loaded: boolean }) {
   const [evaluating, setEvaluating] = useState(false);
-  const [sc, setSc] = useState({ personas: [] as ScorecardPersona[], loaded: false as boolean });
+  const [sc, setSc] = useState({ personas, loaded });
 
-  if (loaded) {
-    if (!sc.personas.length) return null;
+  if (sc.loaded && sc.personas.length) {
     return (
       <div className="mt-2 flex items-center gap-3 rounded border border-terminal-border/60 bg-terminal-panel/60 px-2.5 py-1.5">
         <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-terminal-muted">Scorecard</span>
@@ -153,6 +152,8 @@ function ScorecardStrip({ personas, loaded }: { personas: ScorecardPersona[]; lo
           setEvaluating(true);
           try {
             await evaluateSignals(10);
+            const res = await getScorecard();
+            setSc({ personas: Array.isArray(res?.personas) ? res.personas : [], loaded: true });
           } catch { /* silent */ } finally {
             setEvaluating(false);
           }

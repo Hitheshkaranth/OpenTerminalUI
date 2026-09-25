@@ -424,7 +424,9 @@ class ChartDataProvider:
         try:
             bars = await fetch_coro
         except Exception as exc:
-            logger.warning("%s historical failed for %s: %s", provider_name, ticker, exc)
+            # str(HTTPStatusError) embeds the request URL, which carries apikey/token query params.
+            detail = f"HTTP {exc.response.status_code}" if isinstance(exc, httpx.HTTPStatusError) else exc
+            logger.warning("%s historical failed for %s: %s", provider_name, ticker, detail)
             return []
         if bars:
             logger.debug("%s historical resolved %s bars for %s", provider_name, len(bars), ticker)

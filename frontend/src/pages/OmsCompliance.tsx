@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { extractApiErrorMessage } from "../api/base";
 import { createOmsOrder, fetchAuditEvents, fetchOmsOrders, setRestrictedSymbol } from "../api/client";
 import type { AuditEvent, OmsOrder } from "../types";
 
@@ -37,9 +38,13 @@ export function OmsCompliancePage() {
           <button
             className="rounded border border-terminal-border px-2 py-1 text-xs"
             onClick={async () => {
-              const out = await createOmsOrder({ symbol, side, quantity, simulate_fill: true });
-              setMessage(`Order ${out.order.status}: ${out.order.id}`);
-              await load();
+              try {
+                const out = await createOmsOrder({ symbol, side, quantity, simulate_fill: true });
+                setMessage(`Order ${out.order.status}: ${out.order.id}`);
+                await load();
+              } catch (e) {
+                setMessage(`Order failed: ${extractApiErrorMessage(e, "request failed")}`);
+              }
             }}
           >
             Submit Order
@@ -47,9 +52,13 @@ export function OmsCompliancePage() {
           <button
             className="rounded border border-terminal-neg px-2 py-1 text-xs text-terminal-neg"
             onClick={async () => {
-              await setRestrictedSymbol({ symbol, active: true, reason: "Manual compliance restriction" });
-              setMessage(`Restricted ${symbol}`);
-              await load();
+              try {
+                await setRestrictedSymbol({ symbol, active: true, reason: "Manual compliance restriction" });
+                setMessage(`Restricted ${symbol}`);
+                await load();
+              } catch (e) {
+                setMessage(`Restrict failed: ${extractApiErrorMessage(e, "request failed")}`);
+              }
             }}
           >
             Restrict Symbol

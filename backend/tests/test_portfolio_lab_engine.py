@@ -48,3 +48,16 @@ def test_risk_parity_contributions_approximately_equal() -> None:
     rc = w * mrc / np.sqrt(port_var)
     rc = rc / np.sum(rc)
     assert float(np.max(rc) - np.min(rc)) < 0.55
+
+
+def test_monthly_rebalance_fires_when_month_ends_on_weekend() -> None:
+    import numpy as np
+    import pandas as pd
+
+    from backend.portfolio_lab.engine import run_portfolio_engine
+
+    idx = pd.bdate_range("2025-05-01", "2025-06-30")  # May 31 2025 is a Saturday
+    rets = pd.DataFrame(np.random.default_rng(3).normal(0, 0.01, (len(idx), 2)), index=idx, columns=["A", "B"])
+    out = run_portfolio_engine(rets, rebalance_frequency="MONTHLY", weighting_method="VOL_TARGET", max_weight=1.0)
+    rebalanced = {row["date"] for row in out.execution_series if row["fills"]}
+    assert "2025-05-30" in rebalanced

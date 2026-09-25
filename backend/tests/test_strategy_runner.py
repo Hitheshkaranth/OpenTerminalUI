@@ -81,6 +81,38 @@ def generate_signals(df, context):
         StrategyRunner(timeout_seconds=0.2).run(code, _frame(), {})
 
 
+@pytest.mark.parametrize("body", [
+    "pd.io.common.os.getcwd()",
+    "pd.read_csv('/etc/hosts')",
+    "df.to_csv('/tmp/x.csv')",
+    "np.load('x.npy', allow_pickle=True)",
+    "(lambda: (yield))().gi_frame",
+    "print('{0.__class__.__init__.__globals__[sys].modules[os].environ}'.format(df))",
+    "print('{x.__class__}'.format_map({'x': df}))",
+    "np.zeros(2).dump('/tmp/x')",
+    "pd.ExcelFile('/etc/hosts')",
+])
+def test_inline_strategy_blocks_module_and_file_escapes(body: str) -> None:
+    code = f"""
+def generate_signals(df, context):
+    {body}
+    return [0 for _ in range(len(df))]
+"""
+    with pytest.raises(ValueError, match="blocked"):
+        StrategyRunner(timeout_seconds=1.0).run(code, _frame(), {})
+
+
+def test_inline_strategy_allows_normal_attribute_use() -> None:
+    code = """
+def generate_signals(df, context):
+    fast = df["close"].rolling(2, min_periods=1).mean()
+    noise = np.random.default_rng(0).normal(size=len(df))
+    return [1 if f > 0 and n == n else 0 for f, n in zip(fast.to_list(), noise)]
+"""
+    out = StrategyRunner(timeout_seconds=1.0).run(code, _frame(), {})
+    assert len(out.signals) == len(_frame())
+
+
 @pytest.mark.parametrize("strategy_key", [
     "awesome_oscillator",
     "heikin_ashi",

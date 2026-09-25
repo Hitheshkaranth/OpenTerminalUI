@@ -113,14 +113,14 @@ def vectorized_sweep(
         
         if strategy == "sma_crossover":
             fast, slow = params.get("fast"), params.get("slow")
-            if fast is None or slow is None or slow <= fast:
+            if fast is None or slow is None or fast <= 0 or slow <= fast:
                 continue
             pos = (close.rolling(fast).mean() > close.rolling(slow).mean())
             position = pos.astype(float).shift(1).fillna(0.0)
             
         elif strategy == "ema_crossover":
             fast, slow = params.get("fast"), params.get("slow")
-            if fast is None or slow is None or slow <= fast:
+            if fast is None or slow is None or fast <= 0 or slow <= fast:
                 continue
             pos = (close.ewm(span=fast).mean() > close.ewm(span=slow).mean())
             position = pos.astype(float).shift(1).fillna(0.0)
@@ -129,7 +129,7 @@ def vectorized_sweep(
             period = params.get("period")
             oversold = params.get("oversold")
             overbought = params.get("overbought")
-            if period is None or oversold is None or overbought is None:
+            if period is None or period <= 0 or oversold is None or overbought is None:
                 continue
             rsi = _compute_rsi(close, period)
             raw = np.where(rsi < oversold, 1.0, np.where(rsi > overbought, 0.0, np.nan))

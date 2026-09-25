@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import contextlib
 import io
+import types
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from typing import Any
@@ -632,6 +633,49 @@ _SAFE_STRATEGY_BUILTINS: dict[str, Any] = {
 }
 
 
+# Attribute names inline code may never touch: pandas/numpy file I/O, string
+# evaluators/formatters, and frame/generator introspection (frame.f_globals escapes scope).
+_BLOCKED_STRATEGY_ATTRS: frozenset[str] = frozenset({
+    "to_csv", "to_pickle", "to_parquet", "to_excel", "to_hdf", "to_sql", "to_feather",
+    "to_stata", "to_json", "to_html", "to_latex", "to_markdown", "to_clipboard", "to_xml",
+    "to_orc", "to_string", "tofile", "save", "savez", "savez_compressed", "savetxt",
+    "load", "loadtxt", "genfromtxt", "fromfile", "fromregex", "memmap", "DataSource",
+    "ExcelWriter", "ExcelFile", "HDFStore", "eval", "query", "dump",
+    # str.format/format_map walk attributes and keys inside the format string
+    # ("{0.__init__.__globals__[sys].modules[os].environ}"), bypassing the AST checks.
+    "format", "format_map",
+    "gi_frame", "gi_code", "cr_frame", "cr_code", "ag_frame", "ag_code",
+    "f_back", "f_globals", "f_locals", "f_builtins", "f_code", "tb_frame", "tb_next",
+})
+# Submodules reachable by attribute access; any other module (e.g. pd.io.common.os)
+# is refused at runtime.
+_ALLOWED_STRATEGY_MODULES: frozenset[str] = frozenset({"numpy.random", "numpy.linalg", "numpy.fft"})
+
+
+def _sandbox_getattr(obj: Any, name: str) -> Any:
+    value = getattr(obj, name)
+    if isinstance(value, types.ModuleType) and value.__name__ not in _ALLOWED_STRATEGY_MODULES:
+        raise ValueError(f"Inline strategy blocked module access: {name}")
+    return value
+
+
+class _AttributeGuard(ast.NodeTransformer):
+    """Route every attribute read through _sandbox_getattr."""
+
+    def visit_Attribute(self, node: ast.Attribute) -> ast.AST:
+        self.generic_visit(node)
+        if not isinstance(node.ctx, ast.Load):
+            return node
+        return ast.copy_location(
+            ast.Call(
+                func=ast.Name(id="_sandbox_getattr", ctx=ast.Load()),
+                args=[node.value, ast.Constant(value=node.attr)],
+                keywords=[],
+            ),
+            node,
+        )
+
+
 def _run_inline_strategy(
     code: str,
     frame: pd.DataFrame,
@@ -655,7 +699,7 @@ def _run_inline_strategy(
             raise ValueError(f"Inline strategy blocked call: {node.func.id}")
         # Block dunder traversal (e.g. ().__class__.__base__.__subclasses__()),
         # which reaches arbitrary loaded classes and escapes the sandbox -> RCE.
-        if isinstance(node, ast.Attribute) and "__" in node.attr:
+        if isinstance(node, ast.Attribute) and ("__" in node.attr or node.attr.startswith("read_") or node.attr in _BLOCKED_STRATEGY_ATTRS):
             raise ValueError(f"Inline strategy blocked attribute access: {node.attr}")
         if isinstance(node, ast.Name) and "__" in node.id:
             raise ValueError(f"Inline strategy blocked name: {node.id}")
@@ -665,7 +709,13 @@ def _run_inline_strategy(
             if node.func.id not in _SAFE_STRATEGY_BUILTINS:
                 raise ValueError(f"Inline strategy blocked call: {node.func.id}")
     # Only expose pandas, numpy, and the safe builtins - nothing else.
-    scope: dict[str, Any] = {"pd": pd, "np": np, "__builtins__": dict(_SAFE_STRATEGY_BUILTINS)}
+    tree = ast.fix_missing_locations(_AttributeGuard().visit(tree))
+    scope: dict[str, Any] = {
+        "pd": pd,
+        "np": np,
+        "_sandbox_getattr": _sandbox_getattr,
+        "__builtins__": dict(_SAFE_STRATEGY_BUILTINS),
+    }
     out = io.StringIO()
     err = io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):

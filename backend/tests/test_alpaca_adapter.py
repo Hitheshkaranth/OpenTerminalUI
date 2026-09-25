@@ -82,3 +82,25 @@ async def test_alpaca_request_json_retries_on_429(monkeypatch: pytest.MonkeyPatc
     payload = await adapter._request_json(base_url=ALPACA_DATA_URL, path="/stocks/bars", params={})
     assert payload == {"ok": True}
     assert calls["count"] == 3
+
+
+@pytest.mark.asyncio
+async def test_alpaca_snapshot_change_uses_previous_close(monkeypatch: pytest.MonkeyPatch) -> None:
+    adapter = AlpacaAdapter(api_key="key", secret_key="secret")
+
+    async def _fake_request_json(**_: Any):
+        return {
+            "snapshots": {
+                "AAPL": {
+                    "latestTrade": {"p": 110.0, "t": "2026-01-02T15:00:00Z"},
+                    "dailyBar": {"o": 105.0, "c": 110.0},
+                    "prevDailyBar": {"c": 100.0},
+                }
+            }
+        }
+
+    monkeypatch.setattr(adapter, "_request_json", _fake_request_json)
+    quote = await adapter.get_quote("AAPL")
+    assert quote is not None
+    assert quote.change == pytest.approx(10.0)
+    assert quote.change_pct == pytest.approx(10.0)

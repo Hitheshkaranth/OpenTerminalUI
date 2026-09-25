@@ -225,7 +225,7 @@ export function BondAnalyticsCalculator() {
             <div className="mt-4 rounded border border-terminal-border bg-terminal-panel/20 p-4">
               <h3 className="mb-2 text-xs font-bold text-terminal-accent uppercase">Quick Summary</h3>
               <p className="text-xs leading-relaxed text-terminal-muted">
-                A bond with a <span className="text-terminal-text">{mutation.data.coupon_rate * 100}%</span> coupon 
+                A bond with a <span className="text-terminal-text">{Number((mutation.data.coupon_rate * 100).toFixed(4))}%</span> coupon 
                 maturing in <span className="text-terminal-text">{mutation.data.years_to_maturity}</span> years 
                 at a yield of <span className="text-terminal-text">{(mutation.data.ytm * 100).toFixed(2)}%</span> is priced at 
                 <span className="text-terminal-text"> {mutation.data.price.toFixed(2)}</span>. 

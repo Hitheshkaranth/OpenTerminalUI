@@ -29,6 +29,7 @@ export function TickerDropdown({
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchSeqRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,6 +38,7 @@ export function TickerDropdown({
 
   const search = (q: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    const seq = ++searchSeqRef.current;
     debounceRef.current = setTimeout(async () => {
       if (!q.trim()) {
         setResults([]);
@@ -48,23 +50,27 @@ export function TickerDropdown({
         setLoading(true);
         const apiMarket = market === "IN" ? "NSE" : "NASDAQ";
         const r = await searchSymbols(q, apiMarket);
+        // A newer keystroke (or a pick) superseded this request — drop the stale result.
+        if (seq !== searchSeqRef.current) return;
         setResults(r.slice(0, 8));
         setSelectedIdx(0);
         setOpen(true);
       } catch {
-        setResults([]);
+        if (seq === searchSeqRef.current) setResults([]);
       } finally {
-        setLoading(false);
+        if (seq === searchSeqRef.current) setLoading(false);
       }
     }, 250);
   };
 
   const pick = (item: SearchSymbolItem) => {
     const resolvedMarket: "IN" | "US" = item.country_code === "US" ? "US" : "IN";
+    searchSeqRef.current += 1;
     onChange(item.ticker, resolvedMarket, item.name ?? null);
     setQuery(item.ticker);
     setOpen(false);
     setResults([]);
+    setLoading(false);
   };
 
   const handleKey = (e: React.KeyboardEvent) => {

@@ -175,7 +175,9 @@ export function PanelHeader({
 
   return (
     <header {...rest} className={`shrink-0 border-b border-terminal-border ${className}`.trim()}>
-      <div className="flex items-center justify-between gap-2 px-2 py-1">
+      {/* flex-wrap: on narrow screens wide actions drop to their own line instead of
+          squeezing the (min-w-0) title block down to zero width. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-2 py-1">
         <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
@@ -192,7 +194,7 @@ export function PanelHeader({
             {subtitle ? <div className="ot-type-panel-subtitle truncate text-terminal-muted">{subtitle}</div> : null}
           </div>
         </div>
-        <div className="ml-2 flex shrink-0 items-center gap-1">
+        <div className="ml-auto flex min-w-0 max-w-full items-center gap-1">
           <button
             type="button"
             className="rounded p-1 text-terminal-muted hover:text-terminal-text"
@@ -202,7 +204,7 @@ export function PanelHeader({
           >
             <ExternalLink className="h-3.5 w-3.5" />
           </button>
-          {actions ? <div className="shrink-0">{actions}</div> : null}
+          {actions ? <div className="min-w-0 max-w-full">{actions}</div> : null}
         </div>
       </div>
       {toolbar ? <div className="border-t border-terminal-border/60 px-2 py-1">{toolbar}</div> : null}

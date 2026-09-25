@@ -13,7 +13,7 @@ export async function createPortfolioBacktestJob(payload: Record<string, unknown
 }
 
 export async function fetchPortfolioBacktestJobStatus(jobId: string) {
-  const { data } = await api.get(`/portfolio-backtests/jobs/${jobId}`);
+  const { data } = await api.get(`/portfolio-backtests/jobs/${jobId}/status`);
   return data;
 }
 

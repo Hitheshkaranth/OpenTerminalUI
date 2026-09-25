@@ -26,14 +26,18 @@ interface NotificationState {
   setFilter: (filter: NotificationFilter) => void;
 }
 
+let fetchSeq = 0;
+
 export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
   unreadCount: 0,
   isOpen: false,
   activeFilter: "all",
   fetchNotifications: async (type) => {
+    const seq = ++fetchSeq;
     const notifications = await fetchNotifications(type ? { type } : undefined);
-    set({ notifications });
+    // A slower response for a previous filter must not overwrite the newer list.
+    if (seq === fetchSeq) set({ notifications });
   },
   fetchUnreadCount: async () => {
     const unreadCount = await fetchNotificationUnreadCount();

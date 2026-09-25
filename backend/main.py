@@ -108,6 +108,16 @@ app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=li
 _ALLOWED_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
 _ALLOWED_HEADERS = ["Content-Type", "Authorization", "X-CSRF-Token", "Accept", "Origin"]
 
+app.add_middleware(AuthMiddleware)
+
+# CSRF protection for state-changing requests.
+app.add_middleware(CsrfProtectMiddleware)
+
+# CORS must be the OUTERMOST middleware (Starlette runs the last-added one
+# first). Otherwise AuthMiddleware answers the browser's unauthenticated
+# preflight OPTIONS with 401 (so every cross-origin call fails as a network
+# error), and 401/403s from auth/CSRF carry no CORS headers, so the client
+# can never see them to trigger a token refresh.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -115,10 +125,6 @@ app.add_middleware(
     allow_methods=_ALLOWED_METHODS,
     allow_headers=_ALLOWED_HEADERS,
 )
-app.add_middleware(AuthMiddleware)
-
-# CSRF protection for state-changing requests.
-app.add_middleware(CsrfProtectMiddleware)
 
 from backend.api.router import api_router
 
@@ -217,7 +223,9 @@ def spa_entry(full_path: str) -> FileResponse:
         raise HTTPException(status_code=404, detail="Not found")
     if not _frontend_dist.exists():
         raise HTTPException(status_code=404, detail="Frontend bundle not found")
-    requested = _frontend_dist / full_path
+    requested = (_frontend_dist / full_path).resolve()
+    if not requested.is_relative_to(_frontend_dist.resolve()):
+        raise HTTPException(status_code=404, detail="Not found")
     if full_path and requested.exists() and requested.is_file():
         return FileResponse(requested)
     if full_path and requested.exists() and requested.is_dir():

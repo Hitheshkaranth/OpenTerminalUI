@@ -576,7 +576,8 @@ class PortfolioLabService:
                     }
                 )
             reverse = bool(descending)
-            items.sort(key=lambda item: item.get(sort_key) or "", reverse=reverse)
+            # `or ""` would turn a legit 0.0 metric into "" and crash comparing str with float.
+            items.sort(key=lambda item: (item.get(sort_key) is not None, item.get(sort_key) if item.get(sort_key) is not None else 0), reverse=reverse)
             return {"items": items[:limit], "sort_by": sort_key, "descending": reverse}
         finally:
             db.close()

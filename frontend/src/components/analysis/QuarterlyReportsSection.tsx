@@ -54,7 +54,8 @@ export function QuarterlyReportsSection({ symbol, market, limit = 8 }: Props) {
     }
     if (event.key === "Enter") {
       event.preventDefault();
-      const link = primaryLink(rows[selected]);
+      const row = rows[selected];
+      const link = row ? primaryLink(row) : null;
       if (link) openLink(link);
       return;
     }

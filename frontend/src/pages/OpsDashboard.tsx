@@ -25,6 +25,8 @@ export function OpsDashboardPage() {
       setFeed(health);
       setSwitches(kill);
       setDataQuality(dq);
+    } catch (e) {
+      setMessage(`Failed to load ops state: ${e instanceof Error ? e.message : "request failed"}`);
     } finally {
       setLoading(false);
     }
@@ -242,12 +244,16 @@ export function OpsDashboardPage() {
                           : "bg-terminal-neg/10 border-terminal-neg text-terminal-neg hover:bg-terminal-neg/20"
                       }`}
                       onClick={async () => {
-                        await setKillSwitch({
-                          scope: sw.scope,
-                          enabled: !sw.enabled,
-                          reason: !sw.enabled ? "Manual emergency stop" : "Resumed"
-                        });
-                        setMessage(`${sw.scope} -> ${!sw.enabled ? "enabled" : "disabled"}`);
+                        try {
+                          await setKillSwitch({
+                            scope: sw.scope,
+                            enabled: !sw.enabled,
+                            reason: !sw.enabled ? "Manual emergency stop" : "Resumed"
+                          });
+                          setMessage(`${sw.scope} -> ${!sw.enabled ? "enabled" : "disabled"}`);
+                        } catch (e) {
+                          setMessage(`FAILED to change ${sw.scope}: ${e instanceof Error ? e.message : "request failed"}`);
+                        }
                         await load();
                       }}
                     >

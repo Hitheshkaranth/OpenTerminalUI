@@ -214,6 +214,8 @@
 :root[data-ot-theme="custom"] {
   --ot-color-accent-primary: var(--ot-custom-accent, #ff6b00);
   --ot-color-accent-primary-hover: color-mix(in srgb, var(--ot-color-accent-primary) 78%, white);
+  --ot-color-accent-primary-dim: color-mix(in srgb, var(--ot-color-accent-primary) 78%, black);
+  --ot-color-workstation-panel-active-glow: color-mix(in srgb, var(--ot-color-accent-primary) 18%, transparent);
   --ot-color-accent-glow: color-mix(in srgb, var(--ot-color-accent-primary) 20%, transparent);
   --ot-color-interaction-selected-border: var(--ot-color-accent-primary);
   --ot-color-workstation-panel-active-border: var(--ot-color-accent-primary);

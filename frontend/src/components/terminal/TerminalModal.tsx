@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { TerminalButton } from "./TerminalButton";
 
 type Props = {
@@ -31,11 +32,18 @@ export function TerminalModal({
   const titleId = useId();
   const subtitleId = useId();
   const dialogRef = useRef<HTMLDivElement | null>(null);
+  // Read latest onClose/busy via refs so the open-effect (which moves focus to the first
+  // focusable) runs only when the modal opens — not on every parent render that passes a
+  // fresh inline onClose, which would yank focus out of inputs while typing.
+  const onCloseRef = useRef(onClose);
+  const busyRef = useRef(busy);
+  onCloseRef.current = onClose;
+  busyRef.current = busy;
 
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) onClose();
+      if (event.key === "Escape" && !busyRef.current) onCloseRef.current();
       if (event.key !== "Tab") return;
       const root = dialogRef.current;
       if (!root) return;
@@ -70,13 +78,20 @@ export function TerminalModal({
       document.body.style.overflow = prev;
       window.cancelAnimationFrame(raf);
     };
-  }, [open, onClose, busy]);
+  }, [open]);
 
   if (!open) return null;
 
-  return (
+  // Portal to <body>: rendered in place, the overlay's z-50 is trapped inside the page
+  // content's stacking context (z-0), so fixed shell chrome such as the mobile bottom nav
+  // (z-40) paints over the dialog footer and swallows clicks on its buttons.
+  //
+  // The single grid column is minmax(0, 1fr): with the implicit `auto` column, a nowrap
+  // (truncated) subtitle sizes the track to its full text width, so on phones the dialog
+  // grows wider than the viewport and right-aligned actions end up off-screen.
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-3"
+      className="fixed inset-0 z-50 grid grid-cols-[minmax(0,1fr)] place-items-center bg-black/55 p-3"
       onMouseDown={(event) => {
         if (!closeOnOverlayClick || busy) return;
         if (event.target === event.currentTarget) onClose();
@@ -92,10 +107,10 @@ export function TerminalModal({
         tabIndex={-1}
         className={`w-full ${
           size === "sm" ? "max-w-md" : size === "lg" ? "max-w-3xl" : "max-w-xl"
-        } rounded-sm border border-terminal-border bg-terminal-panel shadow-2xl ${className}`.trim()}
+        } flex max-h-[calc(100dvh-1.5rem)] flex-col rounded-sm border border-terminal-border bg-terminal-panel shadow-2xl ${className}`.trim()}
       >
         {(title || subtitle) && (
-          <header className="flex items-start justify-between gap-2 border-b border-terminal-border px-3 py-2">
+          <header className="flex shrink-0 items-start justify-between gap-2 border-b border-terminal-border px-3 py-2">
             <div className="min-w-0">
               {title ? <div id={titleId} className="ot-type-panel-title text-terminal-accent">{title}</div> : null}
               {subtitle ? <div id={subtitleId} className="ot-type-panel-subtitle truncate text-terminal-muted">{subtitle}</div> : null}
@@ -112,9 +127,10 @@ export function TerminalModal({
             </TerminalButton>
           </header>
         )}
-        <div className={`p-3 ${busy ? "cursor-wait" : ""}`.trim()}>{children}</div>
-        {footer ? <footer className="border-t border-terminal-border px-3 py-2">{footer}</footer> : null}
+        <div className={`min-h-0 flex-1 overflow-y-auto p-3 ${busy ? "cursor-wait" : ""}`.trim()}>{children}</div>
+        {footer ? <footer className="shrink-0 border-t border-terminal-border px-3 py-2">{footer}</footer> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

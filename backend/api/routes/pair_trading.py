@@ -88,6 +88,13 @@ def _coerce(val: Any) -> float | None:
     except (ValueError, TypeError):
         return 0.0
 
+def _pvalue_sort_key(val: Any) -> float:
+    try:
+        f = float(val)
+    except (TypeError, ValueError):
+        return 1.0
+    return 1.0 if isnan(f) or np.isinf(f) else f
+
 async def _load_close_frame(symbols: list[str], period: str) -> pd.DataFrame:
     range_str = _period_to_range(period)
     fetcher = await get_unified_fetcher()
@@ -371,12 +378,15 @@ async def pair_scan(
                     "adf_pvalue": _coerce(st["adf_pvalue"]),
                     "half_life": _coerce(st["half_life"]),
                     "zscore_current": _coerce(st["zscore_current"]),
-                    "cointegrated": st["cointegrated"]
+                    "cointegrated": st["cointegrated"],
+                    "_sort_p": _pvalue_sort_key(st["coint_pvalue"]),
                 })
             except Exception:
                 continue
                 
-        results.sort(key=lambda x: x["coint_pvalue"] or 1.0)
+        # Sort on the raw p-value: _coerce rounds tiny p-values to 0.0 and maps NaN to 0.0,
+        # so `or 1.0` pushed the most strongly cointegrated pairs to the bottom.
+        results.sort(key=lambda x: x.pop("_sort_p"))
         data = {"period": payload.period, "results": results[:50]}
         await cache_instance.set(cache_key, data, ttl=1800)
         return data

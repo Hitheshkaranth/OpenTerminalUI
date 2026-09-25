@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from backend.auth.deps import require_role
 
 from backend.plugins.loader import plugin_loader
 
@@ -28,7 +30,7 @@ def list_plugins() -> dict[str, object]:
 
 
 @router.post("/plugins/{plugin_id}/enable")
-async def enable_plugin(plugin_id: str) -> dict[str, object]:
+async def enable_plugin(plugin_id: str, _auth=Depends(require_role("admin"))) -> dict[str, object]:  # noqa: ARG001
     key = plugin_id.replace("%40", "@")
     try:
         rec = await plugin_loader.enable(key)
@@ -40,7 +42,7 @@ async def enable_plugin(plugin_id: str) -> dict[str, object]:
 
 
 @router.post("/plugins/{plugin_id}/disable")
-async def disable_plugin(plugin_id: str) -> dict[str, object]:
+async def disable_plugin(plugin_id: str, _auth=Depends(require_role("admin"))) -> dict[str, object]:  # noqa: ARG001
     key = plugin_id.replace("%40", "@")
     try:
         rec = await plugin_loader.disable(key)
@@ -50,7 +52,7 @@ async def disable_plugin(plugin_id: str) -> dict[str, object]:
 
 
 @router.post("/plugins/{plugin_id}/reload")
-async def reload_plugin(plugin_id: str) -> dict[str, object]:
+async def reload_plugin(plugin_id: str, _auth=Depends(require_role("admin"))) -> dict[str, object]:  # noqa: ARG001
     key = plugin_id.replace("%40", "@")
     try:
         rec = await plugin_loader.reload(key)

@@ -27,6 +27,7 @@ export function OverlapAnalysis({ tickers }: Props) {
   useEffect(() => {
     if (tickers.length < 2) return;
 
+    let cancelled = false;
     const fetchOverlap = async () => {
       setLoading(true);
       setError(null);
@@ -36,15 +37,21 @@ export function OverlapAnalysis({ tickers }: Props) {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (!response.ok) throw new Error(`Failed to load overlap (${response.status})`);
-        setData(await response.json());
+        const payload = await response.json();
+        if (cancelled) return;
+        setData(payload);
       } catch (err) {
+        if (cancelled) return;
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchOverlap();
+    return () => {
+      cancelled = true;
+    };
   }, [tickers]);
 
   const columns: TerminalTableColumn<CommonHolding>[] = [

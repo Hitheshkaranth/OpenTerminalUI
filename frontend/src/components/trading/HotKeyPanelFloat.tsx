@@ -81,8 +81,9 @@ export function HotKeyPanelFloat() {
     const onMove = (event: MouseEvent) => {
       if (!dragRef.current) return;
       setPosition({
-        x: Math.max(8, dragRef.current.originX + (event.clientX - dragRef.current.startX)),
-        y: Math.max(56, dragRef.current.originY + (event.clientY - dragRef.current.startY)),
+        // Keep the drag handle on-screen so the (persisted) panel can't be lost off the right/bottom edge.
+        x: Math.max(8, Math.min(window.innerWidth - 80, dragRef.current.originX + (event.clientX - dragRef.current.startX))),
+        y: Math.max(56, Math.min(window.innerHeight - 40, dragRef.current.originY + (event.clientY - dragRef.current.startY))),
       });
     };
     const onUp = () => {

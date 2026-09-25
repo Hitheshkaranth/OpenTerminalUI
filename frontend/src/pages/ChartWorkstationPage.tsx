@@ -1480,12 +1480,13 @@ export function ChartWorkstationPage() {
         const compareSymbols = activeCompareSymbols.filter((symbol) => symbol !== slot.ticker?.toUpperCase());
         const rows = await Promise.all(
           compareSymbols.map(async (symbol, idx) => {
+            // One bad compare symbol must not wipe every overlay: treat its failure as empty data.
             const response = await fetchChartData(symbol, {
               market,
               interval,
               period: "1y",
               extended,
-            });
+            }).catch(() => ({ data: [] as Awaited<ReturnType<typeof fetchChartData>>["data"] }));
             return {
               symbol,
               color: COMPARE_PALETTE[idx % COMPARE_PALETTE.length],

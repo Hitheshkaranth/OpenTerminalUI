@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import desc, or_
 from sqlalchemy.exc import OperationalError
 
@@ -29,9 +29,12 @@ router = APIRouter()
 
 def _load_db_articles(symbol: str, market_code: str | None, days: int) -> list[dict[str, Any]]:
     cutoff_iso = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    aliases = _ticker_aliases(symbol, market_code)
+    if not aliases:
+        # An empty or_() drops the ticker filter and would match every article.
+        return []
     db = SessionLocal()
     try:
-        aliases = _ticker_aliases(symbol, market_code)
         ticker_filters = [NewsArticle.tickers.like(f'%"{alias}"%') for alias in aliases]
         rows = (
             db.query(NewsArticle)
@@ -67,6 +70,8 @@ async def get_stock_emotion(
     if not isinstance(market, str):
         market = None
     symbol = ticker.strip().upper()
+    if not symbol:
+        raise HTTPException(status_code=400, detail="ticker is required")
     market_code = (market or "").strip().upper() or None
 
     cache_key = cache_instance.build_key(

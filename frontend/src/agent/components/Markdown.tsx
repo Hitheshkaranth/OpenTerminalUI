@@ -34,6 +34,9 @@ function renderInline(text: string): ReactNode[] {
           {m[2]}
         </code>,
       );
+    } else if (m[3] !== undefined && !/^(https?:\/\/|\/(?!\/))/i.test(m[4].trim())) {
+      // Unsafe scheme (javascript:, data:, ...) — render the label as plain text.
+      nodes.push(m[3]);
     } else if (m[3] !== undefined) {
       nodes.push(
         <a

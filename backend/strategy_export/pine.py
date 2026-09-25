@@ -30,14 +30,15 @@ def to_pine(spec: StrategySpec) -> tuple[str, list[str]]:
     long_exit = _rules_expr(spec.exit_long, rendered, unsupported, warnings)
     short_exit = _rules_expr(spec.exit_short, rendered, unsupported, warnings)
 
+    # Pine v6 removed the `when=` argument from strategy.* calls; gate with `if`.
     if long_entry:
-        lines.append(f'strategy.entry("Long", strategy.long, when={long_entry})')
+        lines.append(f'if {long_entry}\n    strategy.entry("Long", strategy.long)')
     if short_entry:
-        lines.append(f'strategy.entry("Short", strategy.short, when={short_entry})')
+        lines.append(f'if {short_entry}\n    strategy.entry("Short", strategy.short)')
     if long_exit:
-        lines.append(f'strategy.close("Long", when={long_exit})')
+        lines.append(f'if {long_exit}\n    strategy.close("Long")')
     if short_exit:
-        lines.append(f'strategy.close("Short", when={short_exit})')
+        lines.append(f'if {short_exit}\n    strategy.close("Short")')
 
     stop_pct = spec.risk.stop_pct
     take_pct = spec.risk.take_pct

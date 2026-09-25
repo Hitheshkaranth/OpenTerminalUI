@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import re
 from dataclasses import dataclass
 
@@ -121,6 +122,36 @@ def _map_fields(expr: str) -> str:
     return comparator_pattern.sub(_fuzzy, updated)
 
 
+_UNSAFE_NODES = (ast.Attribute, ast.Subscript, ast.Lambda, ast.Starred, ast.NamedExpr)
+
+
+def _validate_expr(expr: str) -> None:
+    """
+    Rejects filter expressions that could escape pandas.query's evaluator.
+
+    The filter is later run through ``DataFrame.query(engine="python")`` which
+    resolves ``@name`` against the caller's scope and allows attribute access, so
+    user input like ``@pd.io.common.os.system(...)`` would execute arbitrary code.
+    Only plain column names, literals, comparisons, arithmetic and bare function
+    calls (pandas restricts these to its math functions) are allowed.
+    """
+    if not expr.strip():
+        return
+    if "@" in expr or "`" in expr:
+        raise ValueError("Invalid screener expression: '@' and backtick references are not allowed")
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except SyntaxError as exc:
+        raise ValueError(f"Invalid screener expression: {exc.msg}") from exc
+    for node in ast.walk(tree):
+        if isinstance(node, _UNSAFE_NODES):
+            raise ValueError(f"Invalid screener expression: {type(node).__name__} is not allowed")
+        if isinstance(node, ast.Call) and not isinstance(node.func, ast.Name):
+            raise ValueError("Invalid screener expression: only plain function calls are allowed")
+        if isinstance(node, ast.Name) and node.id.startswith("__"):
+            raise ValueError(f"Invalid screener expression: {node.id} is not allowed")
+
+
 def parse_query(query: str) -> ParsedQuery:
     """
     Parses a scanner query string containing filter expressions, sorting, and limits.
@@ -156,6 +187,7 @@ def parse_query(query: str) -> ParsedQuery:
     mapped = _map_fields(clean)
     mapped = _replace_between(mapped)
     mapped = _normalize_ops(mapped)
+    _validate_expr(mapped)
 
     return ParsedQuery(
         raw=query,

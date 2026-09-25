@@ -22,7 +22,7 @@ function TickerRow() {
         <span key={item.symbol} className="ot-market-ticker-item">
           <span className="ot-market-ticker-symbol">{item.symbol}</span>{" "}
           <span>{item.value}</span>{" "}
-          <span className={item.up ? "ot-value-up" : "ot-value-down"}>{item.up ? "?" : "?"}{item.delta}</span>
+          <span className={item.up ? "ot-value-up" : "ot-value-down"}>{item.up ? "▲" : "▼"}{item.delta}</span>
           <span className="ot-market-ticker-separator">|</span>
         </span>
       ))}

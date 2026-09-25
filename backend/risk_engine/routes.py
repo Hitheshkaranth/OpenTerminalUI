@@ -78,7 +78,14 @@ async def get_risk_summary(
     port_returns = df.mean(axis=1).values
 
     # Use first symbol or benchmark for beta (simplification)
-    bm_symbol = "^NSEI" if not ticker else ticker
+    # Beta must be against a market index; using `ticker` compared the basket to one of its own members.
+    bm_symbol = "^NSEI"
+    if ticker:
+        try:
+            if (await market_classifier.classify(ticker)).country_code == "US":
+                bm_symbol = "^GSPC"
+        except Exception:
+            pass
     bm_df = await _load_symbols_returns([bm_symbol])
     bm_returns = bm_df.iloc[:, 0].values if not bm_df.empty else port_returns
 

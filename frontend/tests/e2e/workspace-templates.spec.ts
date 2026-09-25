@@ -39,13 +39,13 @@ test("launchpad workspace templates can be applied, saved, and deleted", async (
   await expect(page.getByTestId("launchpad-panel-frame")).toHaveCount(4);
 
   await page.getByRole("button", { name: "Templates" }).click();
-  await page.getByTestId("workspace-template-save-current").evaluate((button) => (button as HTMLButtonElement).click());
+  await page.getByTestId("workspace-template-save-current").click();
   await page.getByTestId("workspace-template-name-input").fill("My Layout");
-  await page.getByTestId("workspace-template-save-submit").evaluate((button) => (button as HTMLButtonElement).click());
+  await page.getByTestId("workspace-template-save-submit").click();
 
   const myLayoutCard = page.getByTestId(/workspace-template-card-custom-.+/).filter({ hasText: "My Layout" });
   await expect(myLayoutCard).toBeVisible();
 
-  await myLayoutCard.getByRole("button", { name: "Delete" }).click({ force: true });
+  await myLayoutCard.getByRole("button", { name: "Delete" }).click();
   await expect(myLayoutCard).toHaveCount(0);
 });

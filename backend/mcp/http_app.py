@@ -71,8 +71,13 @@ def build_mcp_router() -> APIRouter:
             raise HTTPException(status_code=404, detail=f"unknown tool: {name}")
 
         raw_body = await request.body()
-        body = json.loads(raw_body) if raw_body else {}
+        try:
+            body = json.loads(raw_body) if raw_body else {}
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Request body must be valid JSON") from exc
         arguments = body.get("arguments", {}) if isinstance(body, dict) else {}
+        if not isinstance(arguments, dict):
+            raise HTTPException(status_code=400, detail="'arguments' must be a JSON object")
 
         # Tool failures are data the agent reasons over, not transport errors,
         # so a raising handler becomes an ok:false envelope, not a 500.

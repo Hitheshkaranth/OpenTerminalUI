@@ -115,7 +115,11 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
 
   const handleOpen = async (notification: Notification) => {
     if (!notification.read) {
-      await markAsRead(notification.id);
+      try {
+        await markAsRead(notification.id);
+      } catch {
+        // A failed read-receipt must not block opening the notification.
+      }
     }
     onClose();
     if (notification.action_url) {

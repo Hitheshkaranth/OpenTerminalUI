@@ -98,7 +98,7 @@ export function RiskDashboardPage() {
 
   const activeTicker = useMemo(() => (mode === "ticker" ? storeTicker : undefined), [mode, storeTicker]);
 
-  async function loadOverview() {
+  async function loadOverview(isStale: () => boolean = () => false) {
     setLoading(true);
     setError(null);
     try {
@@ -108,18 +108,19 @@ export function RiskDashboardPage() {
         fetchRiskCorrelation(activeTicker),
         fetchSectorConcentration(activeTicker),
       ]);
+      if (isStale()) return;
       setSummary(sumData);
       setExposures(expData);
       setCorrelation(corrData);
       setConcentration(concData);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load risk data");
+      if (!isStale()) setError(e instanceof Error ? e.message : "Failed to load risk data");
     } finally {
-      setLoading(false);
+      if (!isStale()) setLoading(false);
     }
   }
 
-  async function loadFactors(period: (typeof PERIODS)[number]) {
+  async function loadFactors(period: (typeof PERIODS)[number], isStale: () => boolean = () => false) {
     setFactorLoading(true);
     setError(null);
     try {
@@ -129,27 +130,34 @@ export function RiskDashboardPage() {
         fetchFactorHistory("current", period, 60),
         fetchFactorReturns(period),
       ]);
+      if (isStale()) return;
       setFactorExposures(expData);
       setFactorAttribution(attrData);
       setFactorHistory(histData);
       setFactorReturns(retData);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load factor analytics");
+      if (!isStale()) setError(e instanceof Error ? e.message : "Failed to load factor analytics");
     } finally {
-      setFactorLoading(false);
+      if (!isStale()) setFactorLoading(false);
     }
   }
 
   useEffect(() => {
-    if (tab === "overview") {
-      void loadOverview();
-    }
+    if (tab !== "overview") return;
+    let cancelled = false;
+    void loadOverview(() => cancelled);
+    return () => {
+      cancelled = true;
+    };
   }, [activeTicker, tab]);
 
   useEffect(() => {
-    if (tab === "factors") {
-      void loadFactors(factorPeriod);
-    }
+    if (tab !== "factors") return;
+    let cancelled = false;
+    void loadFactors(factorPeriod, () => cancelled);
+    return () => {
+      cancelled = true;
+    };
   }, [tab, factorPeriod]);
 
   const pcaData =
@@ -390,7 +398,7 @@ export function RiskDashboardPage() {
                         <span className="font-bold text-[10px]">{asset}</span>
                         <div className="flex items-center gap-2">
                           <div className="h-1 w-20 overflow-hidden rounded-full bg-terminal-border">
-                            <div className="h-full bg-terminal-accent" style={{ width: `${Math.min(100, Number(val) * 1000)}%` }} />
+                            <div className="h-full bg-terminal-accent" style={{ width: `${Math.max(0, Math.min(100, Number(val) * 1000))}%` }} />
                           </div>
                           <span className="w-10 text-right tabular-nums">{Number(val).toFixed(4)}</span>
                         </div>

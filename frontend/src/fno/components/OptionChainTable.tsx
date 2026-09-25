@@ -91,7 +91,7 @@ export function OptionChainTable({ rows, atmStrike }: Props) {
                 </>
               )}
               <th className="px-2 py-2 text-right">OI</th>
-              <th className="px-2 py-2 text-right cursor-pointer" onClick={() => onSort("ce_oi_change")}>?OI</th>
+              <th className="px-2 py-2 text-right cursor-pointer" onClick={() => onSort("ce_oi_change")}>ΔOI</th>
               <th className="px-2 py-2 text-right">Vol</th>
               <th className="px-2 py-2 text-right">IV</th>
               <th className="px-2 py-2 text-right">LTP</th>
@@ -99,7 +99,7 @@ export function OptionChainTable({ rows, atmStrike }: Props) {
               <th className="px-2 py-2 text-left">LTP</th>
               <th className="px-2 py-2 text-left">IV</th>
               <th className="px-2 py-2 text-left">Vol</th>
-              <th className="px-2 py-2 text-left cursor-pointer" onClick={() => onSort("pe_oi_change")}>?OI</th>
+              <th className="px-2 py-2 text-left cursor-pointer" onClick={() => onSort("pe_oi_change")}>ΔOI</th>
               <th className="px-2 py-2 text-left">OI</th>
               {showGreeks && (
                 <>
@@ -138,7 +138,7 @@ export function OptionChainTable({ rows, atmStrike }: Props) {
                       {formatDisplayMoney(Number(row.ce?.ltp || 0))}
                     </button>
                   </td>
-                  <td className="px-2 py-1 text-center font-semibold tabular-nums">{Number(row.strike_price).toFixed(0)}{isAtm ? " ?" : ""}</td>
+                  <td className="px-2 py-1 text-center font-semibold tabular-nums">{Number(row.strike_price).toFixed(0)}{isAtm ? " ●" : ""}</td>
                   <td className="px-2 py-1 text-left tabular-nums">
                     <button
                       className="text-terminal-accent hover:underline"
@@ -166,7 +166,7 @@ export function OptionChainTable({ rows, atmStrike }: Props) {
             })}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-2 py-3 text-center text-terminal-muted">No strikes found</td>
+                <td colSpan={showGreeks ? 15 : 11} className="px-2 py-3 text-center text-terminal-muted">No strikes found</td>
               </tr>
             )}
           </tbody>
@@ -178,7 +178,10 @@ export function OptionChainTable({ rows, atmStrike }: Props) {
           Add to Strategy: <span className="text-terminal-accent">{selectedLeg.side} {selectedLeg.strike}</span> @ {formatDisplayMoney(selectedLeg.ltp)}
           <button
             className="ml-3 rounded border border-terminal-accent px-2 py-0.5 text-[11px] text-terminal-accent"
-            onClick={() => persistLeg(selectedLeg)}
+            onClick={() => {
+              persistLeg(selectedLeg);
+              setSelectedLeg(null);
+            }}
           >
             Add
           </button>

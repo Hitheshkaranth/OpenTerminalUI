@@ -64,3 +64,16 @@ async def test_strategy_loop_never_raises_when_provider_fails_mid_loop():
     ).run("AAPL")]
 
     assert len([event for event in events if event["type"] == "final"]) == 1
+
+
+def test_string_tickers_fall_back_instead_of_splitting_characters():
+    orch = StrategyLoopOrchestrator(provider=None, registry=None)
+    out = orch._normalise({"strategy": "momentum_rotation", "tickers": "AAPL,GOOGL,MSFT"}, "SPY")
+    assert out["strategy"] == "sma_crossover" and out["ticker"] == "SPY"
+
+
+def test_non_dict_summary_does_not_crash_metric_or_report():
+    params = {"strategy": "momentum_rotation", "tickers": ["A", "B"]}
+    result = {"summary": "text"}
+    assert StrategyLoopOrchestrator._metric(params, result) is None
+    assert "Strategy Lab result" in StrategyLoopOrchestrator._report((params, result, None), None)

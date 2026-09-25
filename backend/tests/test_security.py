@@ -356,3 +356,16 @@ def test_dev_auth_disabled_in_production_v2(monkeypatch) -> None:
 
     monkeypatch.delenv("OPENTERMINALUI_ENV", raising=False)
     monkeypatch.delenv("E2E_DEV_AUTH", raising=False)
+
+def test_production_auth_toggle_off_still_enforces_but_keeps_exempt_paths(monkeypatch) -> None:
+    monkeypatch.setenv("OPENTERMINALUI_ENV", "production")
+    monkeypatch.setenv("AUTH_MIDDLEWARE_ENABLED", "0")
+    app, _ = _build_test_app()
+
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        return {"ok": "true"}
+
+    with TestClient(app) as client:
+        assert client.get("/api/private").status_code == 401
+        assert client.get("/health").status_code == 200

@@ -51,6 +51,15 @@ function conditionLabel(condition: AlertCondition): string {
   return `${field?.label || condition.field} ${op} ${condition.value ?? ""}`.trim();
 }
 
+// The API returns UTC ISO timestamps (often without an offset); datetime-local inputs are local wall-clock.
+// Slicing the raw string showed UTC as local time and every save shifted expiry by the TZ offset.
+function toLocalDateTimeInput(value: unknown): string {
+  const raw = String(value);
+  const date = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(raw) ? raw : `${raw}Z`);
+  if (Number.isNaN(date.getTime())) return raw.slice(0, 16);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
 function normalizeAlert(alert?: AlertRule | null, defaults?: Record<string, string>) {
   const conditions =
     alert?.conditions && alert.conditions.length
@@ -70,7 +79,7 @@ function normalizeAlert(alert?: AlertRule | null, defaults?: Record<string, stri
       discord_webhook_url: String(alert?.delivery_config?.discord_webhook_url || defaults?.discord_webhook_url || ""),
     },
     cooldown_minutes: Number(alert?.cooldown_minutes || 0),
-    expiry_date: alert?.expiry_date ? String(alert.expiry_date).slice(0, 16) : "",
+    expiry_date: alert?.expiry_date ? toLocalDateTimeInput(alert.expiry_date) : "",
     max_triggers: Number(alert?.max_triggers || 0),
   };
 }

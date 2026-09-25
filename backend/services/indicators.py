@@ -78,8 +78,9 @@ def adx(
     plus_dm = np.where((up > dn) & (up > 0), up, 0.0)
     minus_dm = np.where((dn > up) & (dn > 0), dn, 0.0)
 
-    plus_di = 100.0 * pd.Series(plus_dm).rolling(period).mean() / atr_calc
-    minus_di = 100.0 * pd.Series(minus_dm).rolling(period).mean() / atr_calc
+    atr_safe = atr_calc.where(atr_calc != 0, 1.0)
+    plus_di = 100.0 * pd.Series(plus_dm).rolling(period).mean() / atr_safe
+    minus_di = 100.0 * pd.Series(minus_dm).rolling(period).mean() / atr_safe
 
     di_diff = np.abs(plus_di - minus_di)
     di_sum = plus_di + minus_di
@@ -121,8 +122,9 @@ def aroon(
         high_idx = np.argmax(window)
         window_l = l[max(0, i - period + 1): i + 1]
         low_idx = np.argmin(window_l)
-        aroon_up.append(100.0 * (period - high_idx) / period)
-        aroon_down.append(100.0 * (period - low_idx) / period)
+        # Bars since the extreme: 0 when it is the current (last) bar.
+        aroon_up.append(100.0 * (period - (len(window) - 1 - high_idx)) / period)
+        aroon_down.append(100.0 * (period - (len(window_l) - 1 - low_idx)) / period)
 
     return {
         "aroon_up": aroon_up,
@@ -235,33 +237,26 @@ def parabolic_sar(
     if n < 2:
         return {"parabolic_sar": sar_vals}
 
-    hp = float("-inf")
-    lp = float("inf")
-    sar = l[0]
+    # Wilder's Parabolic SAR: track trend direction and its extreme point (ep).
+    up = True
     af = step
+    ep = h[0]
+    sar = l[0]
 
     for i in range(1, n):
-        if af <= max_af:
-            if h[i] > hp:
-                hp = h[i]
-                af = min(af + step, max_af)
-            if l[i] < lp:
-                lp = l[i]
-            sar_new = sar + af * (hp - sar)
-            if l[i] < sar_new:
-                sar = hp
-                af = step
-                hp = l[0]
-                lp = float("inf")
-            else:
-                sar = sar_new
-        else:
-            sar = sar + af * (hp - sar)
+        sar = sar + af * (ep - sar)
+        if up:
+            sar = min(sar, l[i - 1], l[i - 2] if i >= 2 else l[i - 1])
             if l[i] < sar:
-                sar = hp
-                af = step
-                hp = l[0]
-                lp = float("inf")
+                up, sar, ep, af = False, ep, l[i], step
+            elif h[i] > ep:
+                ep, af = h[i], min(af + step, max_af)
+        else:
+            sar = max(sar, h[i - 1], h[i - 2] if i >= 2 else h[i - 1])
+            if h[i] > sar:
+                up, sar, ep, af = True, ep, h[i], step
+            elif l[i] < ep:
+                ep, af = l[i], min(af + step, max_af)
         sar_vals[i] = round(sar, 6)
 
     return {"parabolic_sar": sar_vals}
@@ -342,11 +337,7 @@ def ultimate_oscillator(
     avg2 = bp_series.rolling(period2).mean() / tr_series.rolling(period2).mean()
     avg3 = bp_series.rolling(period3).mean() / tr_series.rolling(period3).mean()
 
-    denom = avg1 + avg2 * 2.0 + avg3
-    denom = _fillna_local(denom)
-    denom = np.where(denom == 0, 1.0, denom.values)
-
-    uo = 100.0 * (avg1 + avg2 * 2.0 + avg3) / denom
+    uo = 100.0 * (4.0 * avg1 + 2.0 * avg2 + avg3) / 7.0
     return {"ultimate_oscillator": _fillna_local(uo).tolist()}
 
 

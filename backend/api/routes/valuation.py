@@ -170,8 +170,8 @@ def _extract_peer_symbols(raw: Any, ticker: str) -> list[str]:
                 sym = item.split(".")[0].strip().upper()
                 if sym: out.append(sym)
             elif isinstance(item, dict):
-                 # Handle FMP variants
-                 pass # Simplified loop
+                sym = str(item.get("symbol") or item.get("ticker") or "").split(".")[0].strip().upper()
+                if sym: out.append(sym)
 
     # Dedupe
     uniq = []

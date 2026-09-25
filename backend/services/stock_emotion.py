@@ -22,7 +22,7 @@ from typing import Any
 from backend.config.settings import get_settings
 from backend.services.llm.base import LLMError, LLMMessage
 from backend.services.llm.factory import get_llm_provider
-from backend.services.lm_studio_client import parse_json_response
+from backend.services.lm_studio_client import LMStudioError, parse_json_response
 from backend.services.sentiment_engine import score_article_sentiment
 
 # Emotion taxonomy mapped onto a 0-100 fear<->greed axis.
@@ -366,7 +366,7 @@ async def analyze_stock_emotion(
         try:
             raw_analyses = await _analyze_batch(provider, symbol, selected)
             engine = provider_name
-        except (LLMError, asyncio.TimeoutError):
+        except (LLMError, LMStudioError, asyncio.TimeoutError):
             raw_analyses = []
             engine = "fallback"
 

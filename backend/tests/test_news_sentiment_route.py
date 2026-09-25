@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from fastapi import HTTPException
+import pytest
+
 import asyncio
 
 from backend.api.routes import news
@@ -141,3 +144,39 @@ def test_news_sentiment_market_summary_payload(monkeypatch) -> None:
     assert result["total_articles"] == 2
     assert "distribution" in result
     assert "top_sources" in result
+
+
+def test_news_by_ticker_blank_ticker_does_not_match_every_article(monkeypatch) -> None:
+    """A blank ticker yields no aliases; or_() with no args used to drop the filter
+    and return every article in the table."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    from backend.db.models import NewsArticle
+    from backend.shared.db import Base
+
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(bind=engine, tables=[NewsArticle.__table__])
+    TestSession = sessionmaker(bind=engine)
+    with TestSession() as db:
+        db.add(NewsArticle(source="Src", title="Reliance news", url="https://example.com/r", published_at="2026-02-10T09:00:00+00:00", tickers='["RELIANCE"]'))
+        db.commit()
+
+    async def _no_cache(*_args, **_kwargs):
+        return None
+
+    async def _no_fallback(*_args, **_kwargs):
+        return []
+
+    monkeypatch.setattr(news.cache_instance, "get", _no_cache)
+    monkeypatch.setattr(news.cache_instance, "set", _no_cache)
+    monkeypatch.setattr(news, "_fetch_news_fallback", _no_fallback)
+    monkeypatch.setattr(news, "SessionLocal", TestSession)
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(news.get_news_by_ticker(" ", limit=50, market=None))
+    assert exc.value.status_code == 400
+
+    hit = asyncio.run(news.get_news_by_ticker("RELIANCE", limit=50, market=None))
+    assert [item["title"] for item in hit["items"]] == ["Reliance news"]

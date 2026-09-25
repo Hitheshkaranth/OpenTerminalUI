@@ -98,10 +98,10 @@ export function DataQualityPanel({ report, loading = false }: Props) {
             </thead>
             <tbody>
               {loading && rows.length === 0 && (
-                <tr><td className="px-2 py-2 text-terminal-muted" colSpan={9}>Loading data quality metrics...</td></tr>
+                <tr><td className="px-2 py-2 text-terminal-muted" colSpan={8}>Loading data quality metrics...</td></tr>
               )}
               {!loading && rows.length === 0 && (
-                <tr><td className="px-2 py-2 text-terminal-dim" colSpan={9}>No monitored symbols yet. Subscribe to US quotes to populate.</td></tr>
+                <tr><td className="px-2 py-2 text-terminal-dim" colSpan={8}>No monitored symbols yet. Subscribe to US quotes to populate.</td></tr>
               )}
               {rows.map((row) => {
                 const typed = row as OpsDataQualitySymbolRow;

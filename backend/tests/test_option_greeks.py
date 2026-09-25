@@ -52,3 +52,9 @@ def test_invalid_option_type():
     spec = OptionSpec(spot=100, strike=100, time_to_expiry=1, rate=0.05, volatility=0.2, option_type="bogus")
     with pytest.raises(ValueError):
         bs_price(spec)
+
+def test_iv_rejects_price_outside_bs_range():
+    # A call can never be worth more than spot; bisection used to silently return vol=5.0
+    spec = OptionSpec(spot=100, strike=100, time_to_expiry=1, rate=0.05, volatility=0.2, option_type="call")
+    with pytest.raises(ValueError):
+        implied_volatility(spec, 150.0)

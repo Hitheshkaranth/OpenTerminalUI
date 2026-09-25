@@ -51,7 +51,9 @@ export function CentralBankMonitor({ banks, loading = false }: Props) {
               </td>
               <td className="px-3 py-2">
                 <div className={toneForDays(bank.days_until_next_decision)}>{bank.next_decision_date}</div>
-                <div className="text-[11px] text-terminal-muted">{bank.days_until_next_decision}d remaining</div>
+                <div className="text-[11px] text-terminal-muted">{bank.days_until_next_decision < 0
+                    ? `${-bank.days_until_next_decision}d ago`
+                    : `${bank.days_until_next_decision}d remaining`}</div>
               </td>
               <td className="px-3 py-2 text-right text-terminal-muted">{bank.decision_cycle}</td>
             </tr>

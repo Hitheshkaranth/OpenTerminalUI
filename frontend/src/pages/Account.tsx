@@ -389,9 +389,15 @@ export function AccountPage() {
 
   const onSave = (event: FormEvent) => {
     event.preventDefault();
-    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
-    localStorage.setItem(CONNECTED_STORAGE_KEY, JSON.stringify(connected));
-    localStorage.setItem(AGGREGATORS_STORAGE_KEY, JSON.stringify(aggregators));
+    try {
+      localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+      localStorage.setItem(CONNECTED_STORAGE_KEY, JSON.stringify(connected));
+      localStorage.setItem(AGGREGATORS_STORAGE_KEY, JSON.stringify(aggregators));
+    } catch {
+      // Typically QuotaExceededError from a large avatar data URL.
+      setFlashMessage("Could not save: browser storage is full (try a smaller avatar image).", "warn");
+      return;
+    }
 
     setSelectedCountry(connected.preferredCountry);
     setSelectedMarket(connected.preferredExchange);

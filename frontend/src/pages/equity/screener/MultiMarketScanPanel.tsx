@@ -94,11 +94,16 @@ function parseFormulaToFilters(formula: string): ScreenerScanFilter[] {
 }
 
 function highlightFormula(formula: string): string {
-  return formula
-    .replace(/(AND|OR|NOT|\(|\))/gi, "<span class='text-terminal-accent'>$1</span>")
-    .replace(/\b(PE|ROE|ROIC|DIVIDENDYIELD|MARKETCAP|DEBTTOEQUITY)\b/gi, "<span class='text-blue-300'>$1</span>")
-    .replace(/([<>]=?|!=|=)/g, "<span class='text-amber-300'>$1</span>")
-    .replace(/(\d+(\.\d+)?)/g, "<span class='text-emerald-300'>$1</span>");
+  // Escape first, then tokenize in a single pass so later rules never re-match
+  // markup (or user-typed HTML) produced by earlier ones.
+  const escaped = formula.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return escaped.replace(
+    /\b(AND|OR|NOT)\b|([()])|\b(PE|ROE|ROIC|DIVIDENDYIELD|MARKETCAP|DEBTTOEQUITY)\b|(&lt;=?|&gt;=?|!=|=)|(\d+(?:\.\d+)?)/gi,
+    (match, keyword, paren, field, cmp) => {
+      const cls = keyword || paren ? "text-terminal-accent" : field ? "text-blue-300" : cmp ? "text-amber-300" : "text-emerald-300";
+      return `<span class='${cls}'>${match}</span>`;
+    },
+  );
 }
 
 function getRowSymbol(row: Record<string, unknown>): string {

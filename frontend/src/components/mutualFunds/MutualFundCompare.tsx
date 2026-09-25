@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { compareMutualFunds } from "../../api/client";
@@ -16,15 +16,20 @@ export function MutualFundCompare({ selected }: Props) {
   const [funds, setFunds] = useState<MutualFundPerformance[]>([]);
   const [normalized, setNormalized] = useState<Record<string, Array<{ date: string; value: number }>>>({});
 
+  const requestSeqRef = useRef(0);
+
   const loadCompare = async () => {
     if (!selected.length) return;
+    const seq = ++requestSeqRef.current;
     setLoading(true);
     try {
       const out = await compareMutualFunds(selected.map((x) => x.scheme_code), period);
+      // A later Compare click superseded this one — don't let a slow response overwrite it.
+      if (seq !== requestSeqRef.current) return;
       setFunds(out.funds || []);
       setNormalized(out.normalized || {});
     } finally {
-      setLoading(false);
+      if (seq === requestSeqRef.current) setLoading(false);
     }
   };
 

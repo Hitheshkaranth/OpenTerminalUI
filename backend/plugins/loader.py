@@ -53,7 +53,7 @@ class PluginLoader:
                 payload = yaml.safe_load(manifest.read_text(encoding="utf-8")) or {}
             except Exception:
                 continue
-            if not self._validate_manifest(payload):
+            if not isinstance(payload, dict) or not self._validate_manifest(payload):
                 continue
             plugin_id = f"{payload['name']}@{payload['version']}"
             self.records[plugin_id] = PluginRecord(

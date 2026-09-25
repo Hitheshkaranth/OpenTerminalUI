@@ -20,7 +20,7 @@ interface QuarterlyResultsProps {
 
 export const QuarterlyResults: React.FC<QuarterlyResultsProps> = ({ ticker }) => {
   const { data, isLoading, error } = useFinancials(ticker, "quarterly");
-  const { financialUnit, formatFinancialCompact, scaleFinancialAmount } = useDisplayCurrency();
+  const { financialUnit, scaleFinancialAmount } = useDisplayCurrency();
 
   const chartData = useMemo(() => {
     if (!data?.income_statement?.length) return [];
@@ -65,9 +65,13 @@ export const QuarterlyResults: React.FC<QuarterlyResultsProps> = ({ ticker }) =>
                 if (key.includes("OPM")) {
                   return [`${Number(value ?? 0).toFixed(2)}%`, key];
                 }
+                // Values are already currency-converted and scaled; re-running formatFinancialCompact
+                // would convert the currency a second time (e.g. NSE stock shown in USD).
                 const scaled = Number(value ?? 0);
-                const base = scaled * (financialUnit === "Cr" ? 1e7 : 1e6);
-                return [formatFinancialCompact(base), key];
+                if (!Number.isFinite(scaled)) return ["-", key];
+                const usd = financialUnit === "M";
+                const amount = scaled.toLocaleString(usd ? "en-US" : "en-IN", { maximumFractionDigits: 2 });
+                return [`${usd ? "$" : "\u20b9"} ${amount} ${financialUnit}`, key];
               }}
               contentStyle={{ borderRadius: "4px", border: "1px solid #2a2f3a", background: "#0c0f14", color: "#d8dde7" }}
             />

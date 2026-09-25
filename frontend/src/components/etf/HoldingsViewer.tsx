@@ -21,6 +21,7 @@ export function HoldingsViewer({ ticker }: Props) {
   useEffect(() => {
     if (!ticker) return;
 
+    let cancelled = false;
     const fetchHoldings = async () => {
       setLoading(true);
       setError(null);
@@ -31,15 +32,20 @@ export function HoldingsViewer({ ticker }: Props) {
         });
         if (!response.ok) throw new Error(`Failed to load holdings (${response.status})`);
         const data = await response.json();
-        setHoldings(data.holdings);
+        if (cancelled) return;
+        setHoldings(Array.isArray(data?.holdings) ? data.holdings : []);
       } catch (err) {
+        if (cancelled) return;
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchHoldings();
+    return () => {
+      cancelled = true;
+    };
   }, [ticker]);
 
   const columns: TerminalTableColumn<Holding>[] = [

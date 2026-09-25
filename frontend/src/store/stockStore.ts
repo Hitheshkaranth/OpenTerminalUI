@@ -7,6 +7,8 @@ import type { ChartResponse, StockSnapshot } from "../types";
 import { normalizeTicker } from "../utils/ticker";
 import { parseInstrument, isExchange, type Exchange, type Instrument } from "../lib/instrument";
 
+let loadSeq = 0;
+
 type StockState = {
   ticker: string;
   exchange: Exchange | null;
@@ -54,6 +56,7 @@ export const useStockStore = create<StockState>()(
       setInterval: (interval) => set({ interval }),
       setRange: (range) => set({ range }),
       load: async () => {
+        const seq = ++loadSeq;
         const { ticker, interval, range } = get();
         const normalizedTicker = normalizeTicker(ticker);
         const market = useSettingsStore.getState().selectedMarket;
@@ -63,6 +66,8 @@ export const useStockStore = create<StockState>()(
             fetchStock(normalizedTicker, market),
             fetchChart(normalizedTicker, interval, range, market),
           ]);
+          // A newer load() superseded this one; drop the stale result so it can't overwrite fresher data.
+          if (seq !== loadSeq) return;
           const nextStock = stockResult.status === "fulfilled" ? stockResult.value : get().stock;
           const nextChart = chartResult.status === "fulfilled" ? chartResult.value : get().chart;
           const errors: string[] = [];
@@ -77,6 +82,7 @@ export const useStockStore = create<StockState>()(
             loading: false,
           });
         } catch (error) {
+          if (seq !== loadSeq) return;
           const message = error instanceof Error ? error.message : "Failed to load stock data";
           set({ error: message, loading: false });
         }

@@ -66,15 +66,31 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// Single-pass tokenizer: each regex pass used to run over previously inserted <span> markup,
+// so comment lines (and "//" inside strings) produced broken HTML in the overlay.
+const HIGHLIGHT_TOKEN =
+  /(\/\/.*$)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|\b(\d+(?:\.\d+)?)\b|\b(and|or|not|true|false)\b|\b(plot|hline|bgcolor|alertcondition)\b|\b(sma|ema|rsi|crossover|crossunder|highest|lowest)\b|\b(open|high|low|close|volume)\b/gi;
+const HIGHLIGHT_STYLES = [
+  "color:#6b7280",
+  "color:#f59e0b",
+  "color:#fb923c",
+  "color:#60a5fa;font-weight:600",
+  "color:#d946ef;font-weight:600",
+  "color:#22d3ee;font-weight:600",
+  "color:#4ade80",
+];
+
 function highlightLine(line: string): string {
-  let out = escapeHtml(line);
-  out = out.replace(/(\/\/.*$)/, '<span style="color:#6b7280">$1</span>');
-  out = out.replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, '<span style="color:#f59e0b">$1</span>');
-  out = out.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span style="color:#fb923c">$1</span>');
-  out = out.replace(/\b(and|or|not|true|false)\b/gi, '<span style="color:#60a5fa;font-weight:600">$1</span>');
-  out = out.replace(/\b(plot|hline|bgcolor|alertcondition)\b/gi, '<span style="color:#d946ef;font-weight:600">$1</span>');
-  out = out.replace(/\b(sma|ema|rsi|crossover|crossunder|highest|lowest)\b/gi, '<span style="color:#22d3ee;font-weight:600">$1</span>');
-  out = out.replace(/\b(open|high|low|close|volume)\b/gi, '<span style="color:#4ade80">$1</span>');
+  let out = "";
+  let last = 0;
+  for (const match of line.matchAll(HIGHLIGHT_TOKEN)) {
+    const index = match.index ?? 0;
+    const group = match.slice(1).findIndex((value) => value !== undefined);
+    out += escapeHtml(line.slice(last, index));
+    out += `<span style="${HIGHLIGHT_STYLES[group]}">${escapeHtml(match[0])}</span>`;
+    last = index + match[0].length;
+  }
+  out += escapeHtml(line.slice(last));
   return out || "&nbsp;";
 }
 
@@ -215,12 +231,12 @@ export function ScriptEditor({
       insertText("  ");
       return;
     }
-    if (event.key === "ArrowDown" && showCompletions) {
+    if (event.key === "ArrowDown" && showCompletions && completionItems.length) {
       event.preventDefault();
       setCompletionIndex((value) => (value + 1) % completionItems.length);
       return;
     }
-    if (event.key === "ArrowUp" && showCompletions) {
+    if (event.key === "ArrowUp" && showCompletions && completionItems.length) {
       event.preventDefault();
       setCompletionIndex((value) => (value - 1 + completionItems.length) % completionItems.length);
       return;

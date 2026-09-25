@@ -455,7 +455,7 @@ export function LaunchpadWorkspace({ toolbarActions }: { toolbarActions?: ReactN
                 ) : (
                   <Suspense fallback={<PanelBody>Loading panel...</PanelBody>}>
                     <VisibilityMount panelId={panel.id} focused={focusedPanelId === panel.id}>
-                      <PanelView panel={panel} />
+                      {PanelView ? <PanelView panel={panel} /> : <PanelBody>Unsupported panel type: {panel.type}</PanelBody>}
                     </VisibilityMount>
                   </Suspense>
                 )}

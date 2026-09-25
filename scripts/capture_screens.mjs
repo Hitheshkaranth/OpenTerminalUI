@@ -100,7 +100,7 @@ async function settle(extra = 1500) {
   await page.waitForLoadState("networkidle", { timeout: 25000 }).catch(() => {});
   const t0 = Date.now();
   while (Date.now() - t0 < 20000) {
-    const loading = await page.evaluate(() => /(^|\s)(loading|fetching|running)(…|\.\.\.)?(\s|$)/i.test(document.body.innerText.slice(0, 20000)) && !/no data|unavailable/i.test(""));
+    const loading = await page.evaluate(() => /(^|\s)(loading|fetching|running)(…|\.\.\.)?(\s|$)/i.test(document.body.innerText.slice(0, 20000)));
     if (!loading) break;
     await page.waitForTimeout(700);
   }

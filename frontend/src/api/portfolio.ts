@@ -141,7 +141,7 @@ export async function realizeTaxLots(payload: {
 }
 
 export async function fetchPortfolioMutualFunds(): Promise<PortfolioMutualFundsResponse> {
-  const { data } = await api.get<PortfolioMutualFundsResponse>("/portfolio/mutual-funds");
+  const { data } = await api.get<PortfolioMutualFundsResponse>("/mutual-funds/portfolio");
   return data;
 }
 

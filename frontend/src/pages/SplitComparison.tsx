@@ -70,7 +70,10 @@ export function SplitComparisonPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [leftTicker, setLeftTicker] = useState((searchParams.get("left") || "AAPL").toUpperCase());
   const [rightTicker, setRightTicker] = useState((searchParams.get("right") || "MSFT").toUpperCase());
-  const [timeframe, setTimeframe] = useState<Timeframe>((searchParams.get("tf") as Timeframe) || "3M");
+  const [timeframe, setTimeframe] = useState<Timeframe>(() => {
+    const tf = searchParams.get("tf");
+    return tf && tf in RANGE_BY_TIMEFRAME ? (tf as Timeframe) : "3M";
+  });
   const [overlayInChart, setOverlayInChart] = useState(true);
 
   const range = RANGE_BY_TIMEFRAME[timeframe];

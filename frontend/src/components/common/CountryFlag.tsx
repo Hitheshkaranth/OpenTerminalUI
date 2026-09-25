@@ -13,7 +13,7 @@ const SIZE_CLASS: Record<NonNullable<CountryFlagProps["size"]>, string> = {
 };
 
 export function CountryFlag({ countryCode, flagEmoji, size = "md" }: CountryFlagProps) {
-  const [imgFailed, setImgFailed] = useState(false);
+  const [failedCode, setFailedCode] = useState<string | null>(null);
   const emoji = (flagEmoji || "").trim();
   if (emoji) {
     return <span className={`inline-flex items-center ${SIZE_CLASS[size]}`}>{emoji}</span>;
@@ -21,7 +21,7 @@ export function CountryFlag({ countryCode, flagEmoji, size = "md" }: CountryFlag
 
   const code = (countryCode || "").trim().toLowerCase();
   if (!code) return null;
-  if (imgFailed) {
+  if (failedCode === code) {
     return <span className={`inline-flex items-center rounded border border-terminal-border px-1 text-[10px] text-terminal-muted`}>{code.toUpperCase()}</span>;
   }
   return (
@@ -30,7 +30,7 @@ export function CountryFlag({ countryCode, flagEmoji, size = "md" }: CountryFlag
       alt={countryCode || code.toUpperCase()}
       className="inline-block h-3.5 w-5 rounded-sm border border-terminal-border object-cover"
       loading="lazy"
-      onError={() => setImgFailed(true)}
+      onError={() => setFailedCode(code)}
     />
   );
 }

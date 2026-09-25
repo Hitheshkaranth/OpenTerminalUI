@@ -287,12 +287,21 @@ def _remember_note_handler(args: dict[str, Any]) -> dict[str, Any]:
         kind = str(args.get("kind", "note"))
         content = str(args.get("content", ""))
         item = add_note(db, user_id, symbol or "", kind, content, "user")
+        db.commit()
         return item
     finally:
         db.close()
 
 
 def memory_tool_specs(user_id: str) -> list[ToolSpec]:
+    # Nothing upstream injects "_user_id" into tool args; bind the caller's id here
+    # so notes are scoped to this user rather than a shared "" bucket.
+    def _recall(args: dict[str, Any]) -> dict[str, Any]:
+        return _recall_notes_handler({**args, "_user_id": user_id})
+
+    def _remember(args: dict[str, Any]) -> dict[str, Any]:
+        return _remember_note_handler({**args, "_user_id": user_id})
+
     return [
         ToolSpec(
             name="recall_notes",
@@ -304,7 +313,7 @@ def memory_tool_specs(user_id: str) -> list[ToolSpec]:
                     "limit": {"type": "integer", "minimum": 1, "maximum": 50, "default": 20},
                 },
             },
-            handler=_recall_notes_handler,
+            handler=_recall,
             read_only=True,
         ),
         ToolSpec(
@@ -319,7 +328,7 @@ def memory_tool_specs(user_id: str) -> list[ToolSpec]:
                 },
                 "required": ["content"],
             },
-            handler=_remember_note_handler,
+            handler=_remember,
             read_only=False,
             write_class="soft",
         ),

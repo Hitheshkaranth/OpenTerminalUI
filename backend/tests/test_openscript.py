@@ -220,3 +220,27 @@ def test_run_script() -> None:
     assert out.row_count == len(_frame())
     assert len(out.outputs) == 1
     assert len(out.outputs[0].series) == len(_frame())
+
+
+def test_string_repetition_memory_bomb_rejected() -> None:
+    from backend.services.openscript_compiler import OpenScriptError
+
+    res = _compile('x = "a" * 1000000000\ny = x * 1000000000\nplot(close, "c")')
+    assert res.success is True
+    with pytest.raises(OpenScriptError, match="String repetition"):
+        OpenScriptCompiler().evaluate(res.ast or {}, _frame())
+
+
+@pytest.mark.parametrize("source", ['plot(sma(close), "t")', 'plot(ema(close, 0), "t")', 'plot(highest(close, -1), "t")'])
+def test_bad_call_arguments_raise_openscript_error(source: str) -> None:
+    from backend.services.openscript_compiler import OpenScriptError
+
+    res = _compile(source)
+    assert res.success is True
+    with pytest.raises(OpenScriptError):
+        OpenScriptCompiler().evaluate(res.ast or {}, _frame())
+
+
+def test_blocked_tokens_match_whole_words_only() -> None:
+    assert _compile('plot(close, "Direction", "blue", 1)').success is True
+    assert _compile('plot(close, "run exec now", "blue", 1)').success is False

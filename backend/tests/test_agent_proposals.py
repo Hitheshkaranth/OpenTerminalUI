@@ -289,6 +289,32 @@ async def test_confirm_alert(test_db, test_user_id):
     assert result["result"]["status"] == "created"
 
 
+@pytest.mark.asyncio
+async def test_confirm_twice_from_stale_session_executes_once(test_user_id):
+    """A second confirm holding a stale 'pending' copy must not run the action again."""
+    from sqlalchemy.pool import StaticPool
+
+    from backend.agent.proposals import confirm_proposal, create_proposal
+    from backend.models import AlertORM
+
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(bind=engine)
+    factory = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+    a, b = factory(), factory()
+    p = create_proposal(a, test_user_id, "run-1", "alert",
+                        {"symbol": "NSE:TCS", "condition_type": "price_above", "threshold": 3000},
+                        "Alert TCS above 3000", "Watch this level")
+    from backend.models.agent_proposals import AgentProposal
+    assert b.get(AgentProposal, p["proposal_id"]).status == "pending"  # b now holds a stale copy
+
+    assert (await confirm_proposal(a, test_user_id, p["proposal_id"]))["status"] == "confirmed"
+    with pytest.raises(ValueError, match="not_pending"):
+        await confirm_proposal(b, test_user_id, p["proposal_id"])
+    assert a.query(AlertORM).count() == 1
+    a.close()
+    b.close()
+
+
 # ---------------------------------------------------------------------------
 # Confirm watchlist_add tests
 # ---------------------------------------------------------------------------

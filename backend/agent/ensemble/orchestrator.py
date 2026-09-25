@@ -297,7 +297,9 @@ class EnsembleOrchestrator:
                     symbols.append(t.strip().upper())
         elif subject_stripped.startswith("watchlist:"):
             wl_id = subject_stripped[len("watchlist:"):]
-            if not self.registry.get("get_watchlists"):
+            try:
+                self.registry.get("get_watchlists")
+            except KeyError:
                 yield final("No symbols to analyse.")
                 return
             result = await _call_tool(self.registry, "get_watchlists", {})

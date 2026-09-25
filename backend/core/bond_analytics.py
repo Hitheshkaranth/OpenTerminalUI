@@ -1,4 +1,5 @@
 from __future__ import annotations
+import math
 from dataclasses import dataclass
 
 @dataclass(frozen=True)
@@ -8,8 +9,15 @@ class BondSpec:
     frequency: int = 2          # coupon payments per year (1,2,4,12)
     face_value: float = 100.0
 
+def _coupon_periods(n: float) -> list[float]:
+    """Coupon times in periods, counted back from maturity (n, n-1, ... > 0), so a
+    fractional n keeps the final coupon paid at maturity. Equals 1..n for integer n."""
+    return [n - k for k in range(math.ceil(n - 1e-9))]
+
 def bond_price(spec: BondSpec, ytm: float) -> float:
-    """Clean price from yield to maturity (ytm as decimal, annualised).
+    """Price from yield to maturity (ytm as decimal, annualised). Clean when the
+    maturity is a whole number of coupon periods; otherwise the full (dirty) price,
+    since the first coupon is discounted over a fractional period.
     Discount each coupon and the final face value at ytm/frequency over
     spec.years_to_maturity*spec.frequency periods."""
     n = spec.years_to_maturity * spec.frequency
@@ -17,11 +25,9 @@ def bond_price(spec: BondSpec, ytm: float) -> float:
     y = ytm / spec.frequency
     
     price = 0.0
-    # Use integer part for the main loop
-    for i in range(1, int(n) + 1):
+    for i in _coupon_periods(n):
         price += coupon / ((1 + y) ** i)
     
-    # Simple model assumes integer number of periods for clean price.
     price += spec.face_value / ((1 + y) ** n)
     return price
 
@@ -30,6 +36,8 @@ def bond_ytm(spec: BondSpec, price: float) -> float:
     bond_price. Search range [-0.5, 2.0], ~100 iterations, tol 1e-8."""
     low = -0.5
     high = 2.0
+    if not bond_price(spec, high) <= price <= bond_price(spec, low):
+        raise ValueError("Price is outside the range solvable for yield (-50% to 200%).")
     for _ in range(100):
         mid = (low + high) / 2
         if bond_price(spec, mid) > price:
@@ -48,7 +56,7 @@ def macaulay_duration(spec: BondSpec, ytm: float) -> float:
     
     weighted_pv = 0.0
     total_pv = 0.0
-    for i in range(1, int(n) + 1):
+    for i in _coupon_periods(n):
         t = i / spec.frequency
         pv = coupon / ((1 + y) ** i)
         weighted_pv += t * pv
@@ -73,7 +81,7 @@ def convexity(spec: BondSpec, ytm: float) -> float:
     price = bond_price(spec, ytm)
     
     conv = 0.0
-    for i in range(1, int(n) + 1):
+    for i in _coupon_periods(n):
         t = i / spec.frequency
         pv = coupon / ((1 + y) ** i)
         conv += pv * t * (t + 1/spec.frequency)
@@ -91,14 +99,12 @@ def dv01(spec: BondSpec, ytm: float) -> float:
     p2 = bond_price(spec, ytm + 0.0001)
     return abs(p1 - p2)
 
-def current_yield(spec: BondSpec) -> float:
-    """annual coupon income / face_value (since price defaults to par-based;
-    actually compute coupon_amount*frequency... -> use annual coupon / price?).
-    Define as: (coupon_rate*face_value) / bond_price_at_par_is_face.
-    Simplest correct def: coupon_rate (annual) relative to price -- accept a
-    price arg is NOT in signature, so return coupon_rate*face_value/face_value =
-    coupon_rate. Keep it: return spec.coupon_rate."""
-    return spec.coupon_rate
+def current_yield(spec: BondSpec, price: float | None = None) -> float:
+    """Annual coupon income / price. Without a price, the bond is assumed at par
+    (face_value), which reduces to coupon_rate."""
+    if not price or price <= 0:
+        return spec.coupon_rate
+    return (spec.coupon_rate * spec.face_value) / price
 
 def analytics(spec: BondSpec, *, ytm: float | None = None, price: float | None = None) -> dict:
     """Convenience aggregator. Exactly one of ytm/price must be provided.
@@ -109,6 +115,8 @@ def analytics(spec: BondSpec, *, ytm: float | None = None, price: float | None =
     if (ytm is None and price is None) or (ytm is not None and price is not None):
         raise ValueError("Exactly one of ytm or price must be provided.")
     
+    if ytm is not None and ytm <= -spec.frequency:
+        raise ValueError("ytm must be greater than -frequency.")
     if ytm is None:
         ytm = bond_ytm(spec, price)
     else:
@@ -125,6 +133,6 @@ def analytics(spec: BondSpec, *, ytm: float | None = None, price: float | None =
         "modified_duration": round(modified_duration(spec, ytm), 6),
         "convexity": round(convexity(spec, ytm), 6),
         "dv01": round(dv01(spec, ytm), 6),
-        "current_yield": round(current_yield(spec), 6),
+        "current_yield": round(current_yield(spec, price), 6),
     }
     return res

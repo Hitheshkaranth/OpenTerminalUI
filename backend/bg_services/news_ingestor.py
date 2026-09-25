@@ -306,6 +306,7 @@ class NewsIngestor:
                 db.commit()
             return inserted
         except Exception:
+            logger.exception("News store failed for %d items", len(items))
             db.rollback()
             return 0
         finally:

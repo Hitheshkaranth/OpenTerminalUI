@@ -23,7 +23,8 @@ def compute(financials: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
     letters = {
         "C": _grade(_num(financials, "eps_growth_qoq") > 25),
         "A": _grade(_num(financials, "annual_eps_growth") > 25),
-        "N": _grade(_num(financials, "near_52w_high") <= 15),
+        # Missing data must not read as "0% below the 52w high".
+        "N": _grade(financials.get("near_52w_high") is not None and _num(financials, "near_52w_high") <= 15),
         "S": _grade(_num(financials, "volume_surge") > 50),
         "L": _grade(_num(financials, "rs_rating") > 80),
         "I": _grade(_num(financials, "institutional_holding_change") > 0),

@@ -65,38 +65,34 @@ def provenance_from_snapshot(
     if not has_data:
         return make_provenance("none", "unavailable", note="No provider returned data", latency_ms=latency_ms)
 
-    # Derive source from details first
+    # Derive source from price_source (applies to cached snapshots too)
     raw_source = details.get("price_source", "unavailable") or "unavailable"
     source = _PRICE_SOURCE_MAP.get(raw_source, raw_source)
+
+    # If price_source was adapter/kite but kite flag is false, fall back to first truthy detail
+    if source == "kite" and raw_source == "adapter":
+        if not details.get("kite"):
+            source = "none"
+            for k in _DETAIL_ORDER:
+                if details.get(k):
+                    source = k
+                    break
+
+    # Fallback: first truthy detail
+    if source == "none" or source == "unavailable":
+        for k in _DETAIL_ORDER:
+            if details.get(k):
+                source = k
+                break
+
+    if source == "unavailable":
+        source = "none"
 
     # from_cache override for quality
     if from_cache:
         quality = "cached"
         as_of = None
     else:
-        # Derive source from price_source
-        raw_source = details.get("price_source", "unavailable") or "unavailable"
-        source = _PRICE_SOURCE_MAP.get(raw_source, raw_source)
-
-        # If price_source was adapter/kite but kite flag is false, fall back to first truthy detail
-        if source == "kite" and raw_source == "adapter":
-            if not details.get("kite"):
-                source = "none"
-                for k in _DETAIL_ORDER:
-                    if details.get(k):
-                        source = k
-                        break
-
-        # Fallback: first truthy detail
-        if source == "none" or source == "unavailable":
-            for k in _DETAIL_ORDER:
-                if details.get(k):
-                    source = k
-                    break
-
-        if source == "unavailable":
-            source = "none"
-
         # Map quality from source
         if source == "mock":
             quality = "synthetic"

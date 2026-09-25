@@ -94,7 +94,7 @@ def _to_float(value: Any) -> Optional[float]:
         return None
     try:
         out = float(value)
-        if out != out:
+        if out != out or out in (float("inf"), float("-inf")):
             return None
         return out
     except Exception:
@@ -426,7 +426,8 @@ class EarningsService:
             )
 
         result = result[-max(1, quarters) :]
-        await cache.set(cache_key, [x.model_dump() for x in result], ttl=self.FINANCIALS_TTL_SECONDS)
+        if result:
+            await cache.set(cache_key, [x.model_dump() for x in result], ttl=self.FINANCIALS_TTL_SECONDS)
         return result
 
     async def get_earnings_analysis(self, symbol: str) -> EarningsAnalysis:

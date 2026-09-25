@@ -26,21 +26,26 @@ def _holdings_snapshot(user_id: str) -> dict[str, Any]:
         total_cost = 0.0
         total_value = 0.0
         items = []
+        values = []
         for h in holdings:
             cost = float(h.quantity) * float(h.avg_buy_price)
             total_cost += cost
             cp = h.avg_buy_price  # no live price available in agent context
             value = float(h.quantity) * cp
             total_value += value
+            values.append(value)
             pnl = value - cost
             items.append({
                 "ticker": h.ticker,
                 "quantity": h.quantity,
                 "avg_buy_price": h.avg_buy_price,
                 "current_price": cp,
-                "pnl": round(pnl, 2) if pnl else None,
-                "weight_pct": round(pnl / total_cost * 100, 2) if total_cost else None,
+                "pnl": round(pnl, 2),
+                "weight_pct": None,
             })
+        # Weight = share of total portfolio value, known only once every row is summed.
+        for item, value in zip(items, values):
+            item["weight_pct"] = round(value / total_value * 100, 2) if total_value else None
         total_cost = round(total_cost, 2)
         total_value = round(total_value, 2)
         return {
@@ -64,9 +69,19 @@ def _paper_positions(user_id: str) -> dict[str, Any]:
             .filter(VirtualPortfolio.user_id == user_id)
             .all()
         )
+        pos_rows = (
+            db.query(VirtualPosition)
+            .filter(VirtualPosition.portfolio_id.in_([p.id for p in portfolios]))
+            .all()
+        )
+        # Equity = cash + positions at mark (avg entry here), not cash alone.
+        position_value: dict[Any, float] = {}
+        for pos in pos_rows:
+            mark = mark_map.get(pos.symbol, pos.avg_entry_price)
+            position_value[pos.portfolio_id] = position_value.get(pos.portfolio_id, 0.0) + mark * pos.quantity
         portfolio_items = []
         for p in portfolios:
-            equity = p.current_cash  # simplified: equity ≈ cash
+            equity = p.current_cash + position_value.get(p.id, 0.0)
             portfolio_items.append({
                 "id": p.id,
                 "name": p.name,
@@ -74,11 +89,6 @@ def _paper_positions(user_id: str) -> dict[str, Any]:
                 "equity": round(equity, 2),
             })
 
-        pos_rows = (
-            db.query(VirtualPosition)
-            .filter(VirtualPosition.portfolio_id.in_([p.id for p in portfolios]))
-            .all()
-        )
         position_items = []
         for pos in pos_rows:
             mark = mark_map.get(pos.symbol, pos.avg_entry_price)

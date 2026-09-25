@@ -57,6 +57,16 @@ def test_depth_snapshot_centres_on_ref_price():
     assert abs(default["mid_price"] - 1246.5) > 100  # seeded base is unrelated without ref_price
 
 
+def test_depth_snapshot_sub_dollar_ref_price_stays_positive():
+    from backend.services.orderbook_service import service
+
+    for ref in (0.15, 0.0000123):
+        wire = service.get_snapshot("SUBDOLLAR-USD", market_hint="CRYPTO", levels=40, ref_price=ref).to_wire()
+        assert abs(wire["mid_price"] - ref) < ref * 0.01
+        assert all(level["price"] > 0 for level in wire["bids"])
+        assert wire["bids"][0]["price"] < ref < wire["asks"][0]["price"]
+
+
 def test_create_watchlist_keeps_symbols(monkeypatch):
     """POST /api/watchlists used to discard the symbols in the payload."""
     from types import SimpleNamespace
@@ -117,3 +127,33 @@ def test_every_top_level_spa_route_is_served_as_the_app():
     top_level = {m for m in re.findall(r'path="/([a-z-]+)"', app_tsx)}
     missing = sorted(top_level - _frontend_app_entry_paths)
     assert not missing, f"routes not served as SPA: {missing}"
+
+
+def test_monthly_frequency_gets_monthly_trigger_not_12h():
+    from backend.reports.scheduler import ScheduledReportsService
+
+    trig = str(ScheduledReportsService()._trigger_for_frequency("monthly"))
+    assert "day='last'" in trig and "*/12" not in trig
+
+
+def test_send_email_starttls_verifies_certificates(monkeypatch):
+    import ssl
+
+    from backend.reports import scheduler as sched
+
+    seen = {}
+
+    class _FakeSMTP:
+        def __init__(self, *a, **k): ...
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def starttls(self, context=None): seen["ctx"] = context
+        def login(self, *a): ...
+        def send_message(self, *a): ...
+
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SMTP_USER", "u@example.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "pw")
+    monkeypatch.setattr(sched.smtplib, "SMTP", _FakeSMTP)
+    sched.ScheduledReportsService().send_email("a@b.co", "s", "b", "r.csv", b"x")
+    assert seen["ctx"] is not None and seen["ctx"].verify_mode == ssl.CERT_REQUIRED

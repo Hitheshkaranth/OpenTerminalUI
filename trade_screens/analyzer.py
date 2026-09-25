@@ -749,7 +749,7 @@ class QuantModels:
         cash = info.get('total_cash', 0) or 0
         shares = info.get('shares_outstanding', 0) or 1
         price = info.get('current_price', 0) or 0
-        rev_growth = info.get('revenue_growth', 0) or 0.10
+        rev_growth = info.get('revenue_growth'); rev_growth = 0.10 if rev_growth is None else rev_growth
         ebitda_margin = (ebitda / revenue) if revenue > 0 else 0.15
 
         # Convert to Crores
@@ -805,7 +805,7 @@ class QuantModels:
         net_debt = ((info.get('total_debt', 0) or 0) - (info.get('total_cash', 0) or 0)) / 1e7
         shares = (info.get('shares_outstanding', 0) or 1) / 1e7
         price = info.get('current_price', 0) or 0
-        rev_growth = info.get('revenue_growth', 0) or 0.10
+        rev_growth = info.get('revenue_growth'); rev_growth = 0.10 if rev_growth is None else rev_growth
 
         values = []
         np.random.seed(42)

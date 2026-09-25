@@ -72,4 +72,5 @@ async def deliver_alert(alert: Any, message: str, db: Session | None = None) -> 
             elif channel == "discord" and config.get("discord_webhook_url"):
                 await deliver_discord(str(config["discord_webhook_url"]), message)
         except Exception as exc:  # pragma: no cover
-            print(f"Delivery failed for {channel}: {exc}")
+            # Exception text can embed the target URL (Telegram bot token, Discord webhook secret) — log the type only.
+            print(f"Delivery failed for {channel}: {type(exc).__name__}")

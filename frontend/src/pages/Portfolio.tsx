@@ -502,17 +502,23 @@ export function PortfolioPage() {
       setMfSuggestionsOpen(false);
       return;
     }
+    let cancelled = false;
     const handle = setTimeout(async () => {
       try {
         const items = await searchMutualFunds(q);
+        if (cancelled) return;
         setMfSuggestions(items.slice(0, 12));
         setMfSuggestionsOpen(items.length > 0);
       } catch {
+        if (cancelled) return;
         setMfSuggestions([]);
         setMfSuggestionsOpen(false);
       }
     }, 250);
-    return () => clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [mfSchemeCode, portfolioMode]);
 
   const pickMfSuggestion = (item: MutualFund) => {

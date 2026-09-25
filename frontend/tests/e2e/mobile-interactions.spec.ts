@@ -84,8 +84,8 @@ test.describe("mobile interactions", () => {
   test("portfolio swipe changes timeframe", async ({ page }) => {
     await loginAndOpen(page, "/equity/portfolio");
 
-    const allBtn = page.getByRole("button", { name: "ALL" });
-    const fiveYBtn = page.getByRole("button", { name: "5Y" });
+    const allBtn = page.getByRole("button", { name: "ALL", exact: true });
+    const fiveYBtn = page.getByRole("button", { name: "5Y", exact: true });
 
     await expect(allBtn).toBeVisible();
 

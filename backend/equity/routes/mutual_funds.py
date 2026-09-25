@@ -67,7 +67,7 @@ async def compare_funds(codes: str, period: str = "1y") -> dict[str, Any]:
     scheme_codes: list[int] = []
     for raw in (codes or "").split(","):
         value = raw.strip()
-        if value.isdigit():
+        if value.isdecimal():
             scheme_codes.append(int(value))
     if not scheme_codes:
         raise HTTPException(status_code=400, detail="Provide at least one valid scheme code in 'codes'")
@@ -128,7 +128,7 @@ def calculate_sip(
 
 @router.get("/overlap")
 async def get_fund_overlap(codes: str = Query(...)) -> dict[str, Any]:
-    scheme_codes = [int(c) for c in codes.split(",") if c.strip().isdigit()]
+    scheme_codes = [int(c) for c in codes.split(",") if c.strip().isdecimal()]
     if not scheme_codes:
         raise HTTPException(status_code=400, detail="Provide valid 'codes' as comma separated integers.")
     return await mutual_fund_service.get_fund_overlap(scheme_codes)
@@ -182,8 +182,11 @@ async def add_fund_to_portfolio(fund: PortfolioMutualFundCreate, db: Session = D
     db.add(row)
     db.commit()
     db.refresh(row)
-    perf = await mutual_fund_service.get_fund_performance(row.scheme_code)
-    return {"status": "created", "holding": _to_portfolio_payload(row, perf.current_nav).model_dump()}
+    try:
+        current_nav = (await mutual_fund_service.get_fund_performance(row.scheme_code)).current_nav
+    except Exception:
+        current_nav = float(row.avg_nav)
+    return {"status": "created", "holding": _to_portfolio_payload(row, current_nav).model_dump()}
 
 
 @router.get("/portfolio")

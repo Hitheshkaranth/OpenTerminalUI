@@ -68,6 +68,10 @@ export function ProviderKeyForm({ providerId, envKeys, rows, onSaved }: Props) {
         msg += ` Restart the backend to apply: ${needsRestart.join(", ")}`;
       }
       setSuccess(msg);
+      // Saved: drop the typed secrets so the form is clean and Save disables again.
+      setValues({});
+      setDirty({});
+      setShow({});
       onSaved(res);
     } catch (e: unknown) {
       let handled = false;

@@ -19,6 +19,7 @@ dim() { printf "\033[2m%s\033[0m\n" "$1"; }
 
 if [ ! -f "$ENV_FILE" ]; then
   cp "$ROOT_DIR/.env.example" "$ENV_FILE"
+  chmod 600 "$ENV_FILE"
   green "Created .env from .env.example"
 fi
 
@@ -27,8 +28,9 @@ env_get() { sed -n "s/^${1}=//p" "$ENV_FILE" | head -n1; }
 env_set() {
   local key="$1" value="$2"
   if grep -q "^${key}=" "$ENV_FILE"; then
-    awk -v k="$key" -v v="$value" 'BEGIN{FS=OFS="="} $1==k{print k"="v; next} {print}' "$ENV_FILE" > "$ENV_FILE.tmp"
+    OTUI_V="$value" awk -v k="$key" 'BEGIN{FS=OFS="="; v=ENVIRON["OTUI_V"]} $1==k{print k"="v; next} {print}' "$ENV_FILE" > "$ENV_FILE.tmp"
     mv "$ENV_FILE.tmp" "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
   else
     printf "%s=%s\n" "$key" "$value" >> "$ENV_FILE"
   fi

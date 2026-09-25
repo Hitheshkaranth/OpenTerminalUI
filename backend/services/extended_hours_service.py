@@ -202,7 +202,8 @@ class ExtendedHoursService:
                 if len(dt_str) == 10:
                     dt = datetime.strptime(dt_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
                 else:
-                    dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                    # Intraday FMP timestamps are exchange-local (US Eastern), not UTC.
+                    dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=ZoneInfo("America/New_York"))
 
                 bars.append({
                     "time": int(dt.timestamp()),

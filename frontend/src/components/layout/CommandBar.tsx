@@ -885,15 +885,20 @@ export function CommandBar({ onExecute }: Props) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-terminal-border/50">
-{(aiResult.data as unknown as { symbol: string; last?: number; changePct?: number }[]).map((row, i: number) => (
+{/* Backend returns raw Yahoo quotes (regularMarketPrice / regularMarketChangePercent). */}
+{(Array.isArray(aiResult.data) ? (aiResult.data as unknown as { symbol: string; last?: number; changePct?: number; regularMarketPrice?: number; regularMarketChangePercent?: number }[]) : []).map((row, i: number) => {
+                          const last = row.last ?? row.regularMarketPrice ?? 0;
+                          const changePct = row.changePct ?? row.regularMarketChangePercent ?? 0;
+                          return (
                            <tr key={i} className="hover:bg-terminal-accent/5">
                              <td className="px-2 py-1 font-bold text-terminal-accent">{row.symbol}</td>
-                             <td className="px-2 py-1 text-right">{(row.last ?? 0).toFixed(2)}</td>
-                             <td className={`px-2 py-1 text-right ${((row.changePct ?? 0) >= 0 ? 'text-terminal-pos' : 'text-terminal-neg')}`}>
-                               {(row.changePct ?? 0).toFixed(2)}%
+                             <td className="px-2 py-1 text-right">{last.toFixed(2)}</td>
+                             <td className={`px-2 py-1 text-right ${(changePct >= 0 ? 'text-terminal-pos' : 'text-terminal-neg')}`}>
+                               {changePct.toFixed(2)}%
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

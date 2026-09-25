@@ -17,21 +17,28 @@ export function MutualFundSearch({ onSelect }: Props) {
   const canSearch = query.trim().length >= 2;
 
   useEffect(() => {
+    // Ignore responses for a superseded query/category so a slow request can't overwrite newer results.
+    let cancelled = false;
     const handle = setTimeout(async () => {
       if (!canSearch) {
         setRows([]);
+        setLoading(false);
         return;
       }
       setLoading(true);
       try {
-        setRows(await searchMutualFunds(query.trim(), category || undefined));
+        const next = await searchMutualFunds(query.trim(), category || undefined);
+        if (!cancelled) setRows(next);
       } catch {
-        setRows([]);
+        if (!cancelled) setRows([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }, 280);
-    return () => clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [canSearch, category, query]);
 
   const shown = useMemo(() => rows.slice(0, 50), [rows]);

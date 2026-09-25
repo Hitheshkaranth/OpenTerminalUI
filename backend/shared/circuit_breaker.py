@@ -105,15 +105,7 @@ class CircuitBreaker:
                 with cb():
                     return func(*args, **kwargs)
 
-            @functools.wraps(func)
-            def choose_wrapper(*args: Any, **kwargs: Any) -> Any:
-                try:
-                    asyncio.get_running_loop()
-                    return async_wrapper(*args, **kwargs)
-                except RuntimeError:
-                    return sync_wrapper(*args, **kwargs)
-
-            return choose_wrapper
+            return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
 
         return decorator
 

@@ -31,6 +31,7 @@ function formatTime(value: string): string {
 }
 
 function openNewsUrl(url: string) {
+  if (!/^https?:\/\//i.test(url)) return;
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
@@ -83,12 +84,14 @@ export function NewsPanel({ symbol, market, limit = 14 }: Props) {
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "/") {
+    // Let "/" and "r" be typed into the search box instead of acting as hotkeys.
+    const typingInSearch = event.target === searchInputRef.current;
+    if (event.key === "/" && !typingInSearch) {
       event.preventDefault();
       searchInputRef.current?.focus();
       return;
     }
-    if (event.key === "r" || event.key === "R") {
+    if ((event.key === "r" || event.key === "R") && !typingInSearch) {
       event.preventDefault();
       void query.refetch();
       return;

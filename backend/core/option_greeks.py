@@ -134,22 +134,25 @@ def implied_volatility(spec: OptionSpec, market_price: float) -> float:
     
     low = 1e-4
     high = 5.0
-    
-    # Check if market_price is within bounds [bs_price(low), bs_price(high)]
-    # but for simplicity in bisection we just run it.
-    
-    for _ in range(100):
-        mid = (low + high) / 2
-        test_spec = OptionSpec(
+
+    def _price_at(vol: float) -> float:
+        return bs_price(OptionSpec(
             spot=spec.spot,
             strike=spec.strike,
             time_to_expiry=spec.time_to_expiry,
             rate=spec.rate,
-            volatility=mid,
+            volatility=vol,
             dividend_yield=spec.dividend_yield,
             option_type=spec.option_type
-        )
-        if bs_price(test_spec) < market_price:
+        ))
+
+    # Outside [price(low), price(high)] the bisection would just pin to a bound.
+    if not _price_at(low) <= market_price <= _price_at(high):
+        raise ValueError("market_price is outside the Black-Scholes range for vol in [0.0001, 5.0]")
+
+    for _ in range(100):
+        mid = (low + high) / 2
+        if _price_at(mid) < market_price:
             low = mid
         else:
             high = mid

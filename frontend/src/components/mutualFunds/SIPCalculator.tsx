@@ -11,7 +11,7 @@ export function SIPCalculator() {
   const calculateSIP = () => {
     const i = expectedReturn / 100 / 12;
     const n = years * 12;
-    const futureValue = monthlyAmount * ((Math.pow(1 + i, n) - 1) / i) * (1 + i);
+    const futureValue = i === 0 ? monthlyAmount * n : monthlyAmount * ((Math.pow(1 + i, n) - 1) / i) * (1 + i);
     setTotalValue(Math.round(futureValue));
   };
 

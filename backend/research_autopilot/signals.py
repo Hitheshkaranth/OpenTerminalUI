@@ -14,7 +14,7 @@ def build_signal_panel(spec: SignalSpec, panels: dict) -> pd.DataFrame:
         return pd.DataFrame()
 
     if spec.kind == "momentum":
-        return (close / close.shift(int(spec.lookback_days)) - 1.0).replace([float("inf"), float("-inf")], pd.NA)
+        return (close / close.shift(int(spec.lookback_days)) - 1.0).replace([float("inf"), float("-inf")], float("nan"))
 
     factor_id = spec.factor_id or "momentum_12_1"
     factor = next((item for item in FACTOR_REGISTRY if item.id == factor_id), None)

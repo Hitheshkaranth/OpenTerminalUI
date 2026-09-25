@@ -63,7 +63,10 @@ class StrategyLoopOrchestrator:
             return {"strategy": strategy, "ticker": str(proposal.get("ticker") or fallback_ticker).strip().upper(),
                     "short_window": short, "long_window": long, "range": str(proposal.get("range") or "3y")}
         if strategy == "momentum_rotation":
-            tickers = [str(t).strip().upper() for t in proposal.get("tickers", []) if str(t).strip()]
+            raw_tickers = proposal.get("tickers")
+            if not isinstance(raw_tickers, list):
+                return self._normalise(None, fallback_ticker)
+            tickers = [str(t).strip().upper() for t in raw_tickers if str(t).strip()]
             tickers = list(dict.fromkeys(tickers))[:30]
             try:
                 top_n, lookback, years = int(proposal.get("top_n", 5)), int(proposal.get("lookback_days", 63)), int(proposal.get("years", 3))
@@ -78,8 +81,8 @@ class StrategyLoopOrchestrator:
     def _metric(params: dict[str, Any], result: Any) -> float | None:
         if not isinstance(result, dict):
             return None
-        source = result.get("metrics", {}) if params.get("strategy") == "sma_crossover" else result.get("summary", {}).get("strategy", {})
         try:
+            source = result.get("metrics", {}) if params.get("strategy") == "sma_crossover" else result.get("summary", {}).get("strategy", {})
             value = float(source.get("sharpe"))
             return value if value == value else None
         except (AttributeError, TypeError, ValueError):
@@ -109,7 +112,8 @@ class StrategyLoopOrchestrator:
         if not best:
             return "## Strategy Lab result\n\nNo usable backtest result was produced. No edge is claimed."
         params, result, sharpe = best
-        metrics = result.get("metrics", {}) if params["strategy"] == "sma_crossover" else result.get("summary", {}).get("strategy", {})
+        summary = result.get("summary")
+        metrics = result.get("metrics", {}) if params["strategy"] == "sma_crossover" else (summary.get("strategy", {}) if isinstance(summary, dict) else {})
         validation = validation or {}
         permutation = validation.get("permutation", {}) if isinstance(validation, dict) else {}
         robustness = validation.get("robustness", {}) if isinstance(validation, dict) else {}

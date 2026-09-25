@@ -61,7 +61,7 @@ export function TaxLotManager({ data, onRefresh }: { data: TaxLotSummary | null;
           className="rounded border border-terminal-border px-3 py-2 text-xs text-terminal-text"
           onClick={async () => {
             try {
-              const specific_lot_ids = method === "SPECIFIC" ? lotsByTicker.slice(0, Math.ceil(sellQty)).map((x) => x.id) : undefined;
+              const specific_lot_ids = method === "SPECIFIC" ? lotsByTicker.filter((x) => x.remaining_quantity > 0).slice(0, Math.ceil(sellQty)).map((x) => x.id) : undefined;
               const out = await realizeTaxLots({ ticker, quantity: sellQty, sell_price: sellPrice, sell_date: sellDate, method, specific_lot_ids });
               await onRefresh();
               setMessage(`Realized gain: ${formatInr(out.realized_gain_total)} | STCG ${formatInr(out.short_term_gain)} | LTCG ${formatInr(out.long_term_gain)}`);

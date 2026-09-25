@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+import { proxyToLiveBackend } from "./fixtures/liveBackend";
+
 const NEW_TABS = ["Factor / CAPM", "Autocorrelation", "Causality", "Regimes"] as const;
 
 test("Statistical Lab shows the 4 new statsmodels tabs", async ({ page }) => {
@@ -19,7 +21,9 @@ test("Statistical Lab shows the 4 new statsmodels tabs", async ({ page }) => {
   }
 });
 
-test("Factor / CAPM tab runs against live data and renders results", async ({ page }) => {
+test("Factor / CAPM tab runs against live data and renders results", async ({ page, request }) => {
+  // Real /api/statlab/* endpoints + real market data, with a real backend session.
+  await proxyToLiveBackend(page, request, "statlab");
   await page.goto("/equity/stat-lab", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "Statistical Lab" })).toBeVisible({ timeout: 30_000 });
 

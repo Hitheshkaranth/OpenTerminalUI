@@ -17,7 +17,9 @@ function getInitialLayout(): PanelId[] {
   if (saved) {
     try {
       const parsed = JSON.parse(saved) as PanelId[];
-      if (Array.isArray(parsed) && parsed.length) return parsed;
+      // Drop stale/unknown panel ids persisted by older builds; rendering them would throw.
+      const known = Array.isArray(parsed) ? parsed.filter((id) => Object.prototype.hasOwnProperty.call(PANEL_LABELS, id)) : [];
+      if (known.length) return known;
     } catch {
       // fallback to default
     }

@@ -114,6 +114,7 @@ async def run_screener_v1(
         persistence.save_results(db, run.id, all_rows)
         persistence.finalize_run(db, run.id, "completed", bundle.summary)
     except Exception as exc:
+        db.rollback()  # a failed save_results leaves the session unusable for finalize_run
         persistence.finalize_run(db, run.id, "failed", {"error": str(exc)})
         raise HTTPException(status_code=500, detail=f"Scan failed: {exc}") from exc
 

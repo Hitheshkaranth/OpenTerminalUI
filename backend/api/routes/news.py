@@ -12,7 +12,7 @@ from xml.etree import ElementTree as ET
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import desc, or_
+from sqlalchemy import desc, false, or_
 from sqlalchemy.exc import OperationalError
 import httpx
 
@@ -408,6 +408,8 @@ async def get_news_by_ticker(
     market: str | None = Query(default=None, description="Optional market context e.g. NSE/BSE/NASDAQ"),
 ) -> dict[str, Any]:
     symbol = ticker.strip().upper()
+    if not symbol:
+        raise HTTPException(status_code=400, detail="ticker is required")
     if not isinstance(market, str):
         market = None
     market_code = (market or "").strip().upper() or None
@@ -422,7 +424,7 @@ async def get_news_by_ticker(
         ticker_filters = [NewsArticle.tickers.like(f'%"{alias}"%') for alias in aliases]
         rows = (
             db.query(NewsArticle)
-            .filter(or_(*ticker_filters))
+            .filter(or_(false(), *ticker_filters))
             .order_by(desc(NewsArticle.published_at))
             .limit(limit)
             .all()
@@ -578,6 +580,8 @@ async def get_news_sentiment(
     if not isinstance(market, str):
         market = None
     symbol = ticker.strip().upper()
+    if not symbol:
+        raise HTTPException(status_code=400, detail="ticker is required")
     market_code = (market or "").strip().upper() or None
     cache_key = cache_instance.build_key("news_latest", f"sentiment:{symbol}", {"days": days, "market": market_code or ""})
     cached = await cache_instance.get(cache_key)
@@ -593,7 +597,7 @@ async def get_news_sentiment(
         ticker_filters = [NewsArticle.tickers.like(f'%"{alias}"%') for alias in aliases]
         rows = (
             db.query(NewsArticle)
-            .filter(or_(*ticker_filters), NewsArticle.published_at >= cutoff_iso)
+            .filter(or_(false(), *ticker_filters), NewsArticle.published_at >= cutoff_iso)
             .order_by(desc(NewsArticle.published_at))
             .all()
         )

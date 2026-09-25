@@ -47,6 +47,12 @@ test.describe("Multi-timeframe dashboard", () => {
       const parts = url.pathname.split("/");
       const symbol = decodeURIComponent(parts[parts.length - 1] || "RELIANCE").toUpperCase();
       const interval = (url.searchParams.get("interval") || "1d").toLowerCase();
+      if (url.searchParams.get("normalized") === "true") {
+        // Unified OHLCV contract (backend/api/routes/chart.py): `t` is epoch milliseconds.
+        const data = makeSeries(interval, symbol).map((bar) => ({ ...bar, t: bar.t * 1000 }));
+        await route.fulfill({ json: { symbol, interval, count: data.length, market_hint: "NSE", data } });
+        return;
+      }
       await route.fulfill({
         json: {
           ticker: symbol,

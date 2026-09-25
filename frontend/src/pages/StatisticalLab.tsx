@@ -477,6 +477,58 @@ export function StatisticalLab() {
           </div>
         )}
 
+        {activeTab === "decomposition" && (
+          <div className="space-y-4">
+            <TerminalPanel title="Decomposition Configuration">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3 items-end">
+                <div>
+                  <label className="block text-[10px] uppercase text-terminal-muted mb-1">Ticker</label>
+                  <input
+                    type="text"
+                    value={decompTicker}
+                    onChange={(e) => setDecompTicker(e.target.value.toUpperCase())}
+                    className="w-full bg-terminal-bg border border-terminal-border px-3 py-2 text-xs text-terminal-text focus:border-terminal-accent focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase text-terminal-muted mb-1">Period (e.g. 21)</label>
+                  <input
+                    type="number"
+                    value={decompPeriod}
+                    onChange={(e) => setDecompPeriod(parseInt(e.target.value))}
+                    className="w-full bg-terminal-bg border border-terminal-border px-3 py-2 text-xs text-terminal-text focus:border-terminal-accent focus:outline-none"
+                  />
+                </div>
+                <button
+                  onClick={() => decompMutation.mutate({ ticker: decompTicker, period: decompPeriod })}
+                  disabled={decompMutation.isPending}
+                  className="flex items-center justify-center bg-terminal-accent px-4 py-2 text-xs font-bold uppercase text-black hover:bg-terminal-accent/80 disabled:opacity-50"
+                >
+                  {decompMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+                  Decompose Series
+                </button>
+              </div>
+            </TerminalPanel>
+
+            {renderError(decompMutation)}
+
+            {decompMutation.data ? (
+              <div className="space-y-4">
+                <DecompChart title="Observed" data={decompMutation.data.series} dataKey="observed" color="#10B981" />
+                <DecompChart title="Trend" data={decompMutation.data.series} dataKey="trend" color="#3B82F6" />
+                <DecompChart title="Seasonal" data={decompMutation.data.series} dataKey="seasonal" color="#F59E0B" />
+                <DecompChart title="Residual" data={decompMutation.data.series} dataKey="resid" color="#9CA3AF" />
+              </div>
+            ) : (
+              !decompMutation.isPending && (
+                <div className="flex h-64 items-center justify-center border-2 border-dashed border-terminal-border rounded">
+                  <p className="text-terminal-muted uppercase tracking-widest text-xs">Run analysis to see results</p>
+                </div>
+              )
+            )}
+          </div>
+        )}
+
         {activeTab === "regression" && (
           <div className="space-y-4">
             <TerminalPanel title="Factor / CAPM Configuration">

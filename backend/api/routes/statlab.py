@@ -93,6 +93,17 @@ async def _get_series(ticker: str, lookback_days: int) -> "pd.Series":
     return series
 
 
+def _pick_column(df_clean, symbol: str, fallback_pos: int):
+    # yfinance returns columns in alphabetical order, NOT the requested order, so
+    # select by name to keep ticker_a/ticker_b (asset/benchmark) correctly assigned.
+    # The download helper strips ".NS" and names columns by the base symbol.
+    base = symbol.replace(".NS", "").upper()
+    for col in df_clean.columns:
+        if str(col).replace(".NS", "").upper() == base:
+            return df_clean[col]
+    return df_clean.iloc[:, fallback_pos]
+
+
 async def _get_pair(ticker_a: str, ticker_b: str, lookback_days: int):
     end = datetime.now()
     start = end - timedelta(days=lookback_days)
@@ -105,17 +116,7 @@ async def _get_pair(ticker_a: str, ticker_b: str, lookback_days: int):
     if len(df_clean) < 60:
         raise HTTPException(400, "Insufficient overlapping price data (need at least 60 rows)")
 
-    # yfinance returns columns in alphabetical order, NOT the requested order, so
-    # select by name to keep ticker_a/ticker_b (asset/benchmark) correctly assigned.
-    # The download helper strips ".NS" and names columns by the base symbol.
-    def _pick(symbol: str, fallback_pos: int):
-        base = symbol.replace(".NS", "").upper()
-        for col in df_clean.columns:
-            if str(col).replace(".NS", "").upper() == base:
-                return df_clean[col]
-        return df_clean.iloc[:, fallback_pos]
-
-    return _pick(ticker_a, 0), _pick(ticker_b, 1)
+    return _pick_column(df_clean, ticker_a, 0), _pick_column(df_clean, ticker_b, 1)
 
 
 @router.get("/methods")
@@ -156,8 +157,8 @@ async def post_cointegration(req: CointegrationRequest):
     if len(df_clean) < 30:
         raise HTTPException(status_code=400, detail="Insufficient overlapping price data (need at least 30 rows)")
     
-    sa = df_clean.iloc[:, 0]
-    sb = df_clean.iloc[:, 1]
+    sa = _pick_column(df_clean, req.ticker_a, 0)
+    sb = _pick_column(df_clean, req.ticker_b, 1)
     
     try:
         result = await asyncio.to_thread(

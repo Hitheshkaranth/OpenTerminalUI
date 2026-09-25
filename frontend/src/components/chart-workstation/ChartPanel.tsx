@@ -366,8 +366,12 @@ export function ChartPanel({
     return () => window.clearTimeout(timer);
   }, [alertNotice]);
 
+  // Track the last handled command so a ticker change doesn't re-apply (re-toggle) the same command.
+  const handledPanelCommandRef = useRef<number | null>(null);
   useEffect(() => {
     if (!panelCommand?.revision || !slot.ticker) return;
+    if (handledPanelCommandRef.current === panelCommand.revision) return;
+    handledPanelCommandRef.current = panelCommand.revision;
     if (panelCommand.id === "toggleIndicators") {
       setShowIndicators((value) => !value);
       return;

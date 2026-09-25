@@ -45,10 +45,10 @@ def parse_execution_config(raw: dict[str, Any] | None, *, default_slippage_bps: 
         fixed_bps=max(0.0, fixed),
         participation_cap=cap,
         adv=adv if adv and adv > 0 else None,
-        volume_weighted_bps=max(0.0, float(node.get("volume_weighted_bps", 25.0) or 25.0)),
-        impact_coefficient_bps=max(0.0, float(node.get("impact_coefficient_bps", 35.0) or 35.0)),
+        volume_weighted_bps=max(0.0, float(node.get("volume_weighted_bps") if node.get("volume_weighted_bps") not in (None, "") else 25.0)),
+        impact_coefficient_bps=max(0.0, float(node.get("impact_coefficient_bps") if node.get("impact_coefficient_bps") not in (None, "") else 35.0)),
         min_bps=max(0.0, float(node.get("min_bps", 0.0) or 0.0)),
-        max_bps=max(0.0, float(node.get("max_bps", 500.0) or 500.0)),
+        max_bps=max(0.0, float(node.get("max_bps") if node.get("max_bps") not in (None, "") else 500.0)),
     )
 
 

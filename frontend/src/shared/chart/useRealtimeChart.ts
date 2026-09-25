@@ -228,7 +228,8 @@ export function useRealtimeChart(
   useEffect(() => {
     if (!enabled || supportsUSStreamingBars || !liveCandle || !candleInterval) return;
 
-    generationRef.current++;
+    // Only a seed reset invalidates queued updates; live updates must not
+    // cancel a seed update batched in the same commit.
     const currentGeneration = generationRef.current;
 
     const t = Math.floor(Number(liveCandle.t) / 1000);
@@ -269,7 +270,6 @@ export function useRealtimeChart(
     if (!enabled || supportsUSStreamingBars || !tick || !Number.isFinite(Number(tick.ltp))) return;
     if (candleInterval) return;
 
-    generationRef.current++;
     const currentGeneration = generationRef.current;
 
     const ts = Math.floor(new Date(tick.ts).getTime() / 1000);
