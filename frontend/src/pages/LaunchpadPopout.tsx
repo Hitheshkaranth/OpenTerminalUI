@@ -42,6 +42,7 @@ const PANEL_RENDERERS: Record<LaunchpadPanelType, ComponentType<{ panel: Launchp
   "watchlist-heatmap": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadWatchlistHeatmapPanel }))),
   "sector-rotation": lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadSectorRotationPanel }))),
   hotkeys: lazy(() => import("../components/layout/LaunchpadPanels").then((m) => ({ default: m.LaunchpadHotKeyTradingPanel }))),
+  "research-notes": lazy(() => import("../components/layout/ResearchNotesPanel").then((m) => ({ default: m.LaunchpadResearchNotesPanel }))),
 };
 
 function toPanelType(value: string | null): LaunchpadPanelType {

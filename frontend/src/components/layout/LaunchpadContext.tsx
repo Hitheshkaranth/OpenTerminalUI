@@ -41,7 +41,8 @@ export type LaunchpadPanelType =
   | "option-chain"
   | "watchlist-heatmap"
   | "sector-rotation"
-  | "hotkeys";
+  | "hotkeys"
+  | "research-notes";
 
 export type LaunchpadPanelConfig = {
   id: string;
@@ -119,6 +120,7 @@ export const SUPPORTED_LAUNCHPAD_PANEL_TYPES: LaunchpadPanelType[] = [
   "watchlist-heatmap",
   "sector-rotation",
   "hotkeys",
+  "research-notes",
 ];
 
 export function isLaunchpadPanelType(value: string): value is LaunchpadPanelType {
@@ -180,8 +182,9 @@ function defaultPresets(): LaunchpadLayoutPreset[] {
       id: "research",
       name: "Research",
       panels: [
-        makePanel("r-chart", "chart", "Chart", 0, 0, 7, 10, "AAPL"),
-        makePanel("r-fund", "fundamentals", "Fundamentals", 7, 0, 5, 10, "AAPL"),
+        makePanel("r-chart", "chart", "Chart", 0, 0, 7, 5, "AAPL"),
+        makePanel("r-fund", "fundamentals", "Fundamentals", 7, 0, 5, 5, "AAPL"),
+        makePanel("r-notes", "research-notes", "Research Notes", 0, 5, 12, 5, "AAPL"),
       ],
     },
     {
@@ -199,13 +202,31 @@ function defaultPresets(): LaunchpadLayoutPreset[] {
   ];
 }
 
+export function migrateLegacyBuiltInLayouts(layouts: LaunchpadLayoutPreset[]): LaunchpadLayoutPreset[] {
+  const currentResearch = defaultPresets().find((layout) => layout.id === "research");
+  if (!currentResearch) return layouts;
+
+  return layouts.map((layout) => {
+    const panelIds = new Set(layout.panels.map((panel) => panel.id));
+    const isUntouchedLegacyResearch =
+      layout.id === "research" &&
+      layout.panels.length === 2 &&
+      panelIds.has("r-chart") &&
+      panelIds.has("r-fund");
+
+    return isUntouchedLegacyResearch ? currentResearch : layout;
+  });
+}
+
 function readLocalLayouts(): LaunchpadLayoutPreset[] {
   if (typeof window === "undefined") return defaultPresets();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultPresets();
     const parsed = JSON.parse(raw) as LaunchpadLayoutPreset[];
-    return Array.isArray(parsed) && parsed.length ? parsed.map((layout) => normalizeLayoutPreset(layout)) : defaultPresets();
+    return Array.isArray(parsed) && parsed.length
+      ? migrateLegacyBuiltInLayouts(parsed.map((layout) => normalizeLayoutPreset(layout)))
+      : defaultPresets();
   } catch {
     return defaultPresets();
   }
@@ -248,6 +269,7 @@ const PANEL_REGISTRY: Record<LaunchpadPanelType, ComponentType<{ panel: Launchpa
   "watchlist-heatmap": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadWatchlistHeatmapPanel }))),
   "sector-rotation": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadSectorRotationPanel }))),
   hotkeys: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadHotKeyTradingPanel }))),
+  "research-notes": lazy(() => import("./ResearchNotesPanel").then((m) => ({ default: m.LaunchpadResearchNotesPanel }))),
 };
 
 export function LaunchpadProvider({ children }: { children: ReactNode }) {
@@ -283,7 +305,7 @@ export function LaunchpadProvider({ children }: { children: ReactNode }) {
         const payload = (await res.json()) as { items?: LaunchpadLayoutPreset[] };
         if (cancelled) return;
         if (Array.isArray(payload?.items) && payload.items.length) {
-          const serverItems = payload.items.map((layout) => normalizeLayoutPreset(layout));
+          const serverItems = migrateLegacyBuiltInLayouts(payload.items.map((layout) => normalizeLayoutPreset(layout)));
           startTransition(() => {
             setSavedLayouts(serverItems);
             setActiveLayoutId((current) => (serverItems.some((l) => l.id === current) ? current : serverItems[0].id));

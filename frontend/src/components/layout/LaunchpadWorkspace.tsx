@@ -37,6 +37,7 @@ const PANEL_TYPES: LaunchpadPanelType[] = [
   "watchlist-heatmap",
   "sector-rotation",
   "hotkeys",
+  "research-notes",
 ];
 
 function typeIconLabel(type: LaunchpadPanelType) {
@@ -86,6 +87,8 @@ function typeIconLabel(type: LaunchpadPanelType) {
       return "RRG";
     case "hotkeys":
       return "HK";
+    case "research-notes":
+      return "NT";
     default:
       return "PN";
   }

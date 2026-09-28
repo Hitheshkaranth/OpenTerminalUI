@@ -66,7 +66,7 @@ export const BUILTIN_TEMPLATES: WorkspaceTemplate[] = [
   {
     id: "research",
     name: "Research",
-    description: "Security analysis with financials, news, and peers",
+    description: "Security analysis with financials, news, peers, and linked research notes",
     icon: "magnifying-glass",
     category: "research",
     gridCols: 2,
@@ -75,6 +75,7 @@ export const BUILTIN_TEMPLATES: WorkspaceTemplate[] = [
       { id: "p2", type: "financials", title: "Financials", props: {}, grid: { x: 6, y: 0, w: 6, h: 5 } },
       { id: "p3", type: "news", title: "News & Sentiment", props: {}, grid: { x: 0, y: 5, w: 6, h: 5 } },
       { id: "p4", type: "peers", title: "Peer Comparison", props: {}, grid: { x: 6, y: 5, w: 6, h: 5 } },
+      { id: "p5", type: "research-notes", title: "Research Notes", props: {}, grid: { x: 0, y: 10, w: 12, h: 4 } },
     ],
   },
   {

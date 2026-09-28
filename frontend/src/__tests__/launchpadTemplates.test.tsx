@@ -29,7 +29,15 @@ vi.mock("../components/layout/LaunchpadPanels", () => {
   };
 });
 
+vi.mock("../components/layout/ResearchNotesPanel", () => ({
+  LaunchpadResearchNotesPanel: ({ panel }: { panel: { id: string; title: string } }) => (
+    <div data-testid={`mock-panel-${panel.id}`}>{panel.title}</div>
+  ),
+}));
+
 import { LaunchpadPage } from "../pages/Launchpad";
+import { migrateLegacyBuiltInLayouts, type LaunchpadLayoutPreset } from "../components/layout/LaunchpadContext";
+import { BUILTIN_TEMPLATES } from "../data/workspaceTemplates";
 import { useWorkspaceTemplateStore } from "../store/workspaceTemplateStore";
 
 describe("Launchpad workspace templates", () => {
@@ -108,5 +116,40 @@ describe("Launchpad workspace templates", () => {
     await waitFor(() => {
       expect(screen.queryByText("My Layout")).not.toBeInTheDocument();
     });
+  });
+
+  it("adds linked research notes to the research template", async () => {
+    const user = userEvent.setup();
+
+    render(<LaunchpadPage />);
+    await user.click(await screen.findByRole("button", { name: "Templates" }));
+    await user.click(screen.getByTestId("workspace-template-apply-research"));
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId("launchpad-panel-frame")).toHaveLength(5);
+    });
+    const researchTemplate = BUILTIN_TEMPLATES.find((template) => template.id === "research");
+    expect(researchTemplate?.panels).toContainEqual(
+      expect.objectContaining({ type: "research-notes", grid: { x: 0, y: 10, w: 12, h: 4 } }),
+    );
+  });
+
+  it("upgrades the untouched legacy research preset without changing custom layouts", async () => {
+    const legacyResearch: LaunchpadLayoutPreset = {
+      id: "research",
+      name: "Research",
+      panels: [
+        { id: "r-chart", type: "chart", title: "Chart", x: 0, y: 0, w: 7, h: 10, symbol: "AAPL" },
+        { id: "r-fund", type: "fundamentals", title: "Fundamentals", x: 7, y: 0, w: 5, h: 10, symbol: "AAPL" },
+      ],
+    };
+    const custom: LaunchpadLayoutPreset = { id: "custom", name: "My Custom Layout", panels: [] };
+
+    const migrated = migrateLegacyBuiltInLayouts([legacyResearch, custom]);
+
+    expect(migrated[0].panels).toContainEqual(
+      expect.objectContaining({ id: "r-notes", type: "research-notes", x: 0, y: 5, w: 12, h: 5 }),
+    );
+    expect(migrated[1]).toBe(custom);
   });
 });
