@@ -1,0 +1,48 @@
+name: Release banner
+
+# Generates a banner image for every published release, uploads it as a
+# release asset and puts it at the top of the release notes.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to (re)generate the banner for, e.g. v0.8.0
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  banner:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq fonts-jetbrains-mono
+          pip install --quiet pillow
+      - name: Render banner
+        run: |
+          gh release view "$TAG" --json body -q .body > notes.md
+          date=$(gh release view "$TAG" --json publishedAt -q .publishedAt | cut -c1-10)
+          python scripts/release_banner.py --version "$TAG" --notes notes.md \
+            --date "$(date -d "$date" '+%d %b %Y')" --out release-banner.png
+      - name: Attach to release
+        run: |
+          gh release upload "$TAG" release-banner.png --clobber
+          marker='<!-- release-banner -->'
+          if ! grep -qF "$marker" notes.md; then
+            url="https://github.com/${{ github.repository }}/releases/download/$TAG/release-banner.png"
+            { printf '%s\n<p align="center"><img src="%s" alt="OpenTerminalUI %s" width="900" /></p>\n\n' "$marker" "$url" "$TAG"
+              cat notes.md; } > body.md
+            gh release edit "$TAG" --notes-file body.md
+          fi
