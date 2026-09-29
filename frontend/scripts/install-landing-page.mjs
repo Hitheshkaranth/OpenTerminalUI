@@ -23,7 +23,6 @@ if (!isE2EBuild) {
 copyLandingFile("Docs.dc.html");
 copyLandingFile("Features.dc.html");
 copyLandingFile("Roadmap.dc.html");
-copyLandingFile("support.js");
 
 cpSync(join(landingRoot, "assets"), join(distRoot, "assets"), { recursive: true });
 

@@ -1,165 +1,127 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<script src="./support.js"></script>
+<title>Features — OpenTerminalUI</title>
+<meta name="description" content="Every module in OpenTerminalUI: terminal shell, data provenance, charting, research, screener, AI agent and MCP, F&amp;O, portfolio and risk, backtesting, macro, alerts.">
+<link rel="icon" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
-<x-dc>
-<helmet>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<style>
-  :root{ --accent:#ff6b00; }
-  *{ box-sizing:border-box; }
-  ::selection{ background:rgba(255,107,0,.22); }
-  html{ scroll-behavior:smooth; }
-  body{ margin:0; background:#07090d; }
-  @keyframes otReveal{ from{opacity:0; transform:translateY(26px)} to{opacity:1; transform:translateY(0)} }
-  @media (prefers-reduced-motion: reduce){ *{ animation:none !important; } }
-</style>
-</helmet>
 
-<div style="background:#07090d; color:#e8ecf2; font-family:'Space Grotesk',system-ui,sans-serif; -webkit-font-smoothing:antialiased; overflow-x:hidden; position:relative; min-height:100vh;">
-  <div style="position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;"><canvas id="ot-market-canvas" style="position:absolute; inset:0; width:100%; height:100%;"></canvas></div>
-  <div style="position:relative; z-index:1;">
+<div class="announce">
+  <span class="pill">NEW</span>
+  <span><b>v0.8.0</b> — provenance on every number, in-app provider keys, Kite &amp; CSV import, and a Docker image on GHCR.</span>
+  <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/releases/latest">Release notes →</a>
+</div>
 
-  <div style="position:absolute; top:0; left:50%; transform:translateX(-50%); width:1100px; max-width:140%; height:420px; background:radial-gradient(ellipse at center, rgba(255,107,0,.07), transparent 64%); pointer-events:none;"></div>
-
-  <!-- NAV -->
-  <nav style="position:sticky; top:0; z-index:50; display:flex; align-items:center; justify-content:space-between; padding:18px 32px; background:rgba(7,9,13,.72); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid rgba(255,255,255,.06);">
-    <a href="index.html" style="display:flex; align-items:center; text-decoration:none;"><img src="assets/logo.png" alt="OpenTerminalUI" style="height:22px; width:auto; display:block; filter:brightness(0) invert(1);" /></a>
-    <div style="display:flex; align-items:center; gap:26px; font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#8b94a3;">
-      <a href="index.html" style="color:inherit; text-decoration:none;">Home</a>
-      <a href="Features.dc.html" style="color:#e8ecf2; text-decoration:none;">Features</a>
-      <a href="Docs.dc.html" style="color:inherit; text-decoration:none;">Docs</a>
-      <a href="Roadmap.dc.html" style="color:inherit; text-decoration:none;">Roadmap</a>
-      <a href="https://github.com/Hitheshkaranth/OpenTerminalUI" style="display:inline-flex; align-items:center; gap:7px; padding:7px 15px; border-radius:999px; background:#e8ecf2; color:#07090d; text-decoration:none; font-weight:600;">GitHub ↗</a>
+<nav class="top" id="nav">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="OpenTerminalUI home"><img src="assets/logo-ink.png" alt="OpenTerminalUI" width="92" height="28"></a>
+    <div class="links">
+      <a href="Features.dc.html" aria-current="page">Features</a>
+      <a href="index.html#workflows">Workflows</a>
+      <a href="index.html#agent">AI &amp; MCP</a>
+      <a href="index.html#deploy">Deploy</a>
+      <a href="Docs.dc.html">Docs</a>
+      <a href="Roadmap.dc.html">Roadmap</a>
     </div>
-  </nav>
-
-  <!-- HEADER -->
-  <header style="position:relative; max-width:1180px; margin:0 auto; padding:84px 32px 36px;">
-    <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.26em; text-transform:uppercase; color:#6a7488; margin-bottom:26px;">Instrument index</div>
-    <h1 style="margin:0; font-weight:700; font-size:clamp(46px,7vw,104px); line-height:0.9; letter-spacing:-.04em; color:#f3f6fa;">Every function<br/><span style="color:var(--accent,#ff6b00);">on the desk.</span></h1>
-    <p style="margin:30px 0 0; font-size:18px; line-height:1.6; color:#8b94a3; max-width:560px;">From a keyboard-driven shell to a quant research stack — the complete catalog of what ships inside OpenTerminalUI, all open source and self-hosted.</p>
-  </header>
-
-  <!-- SHOWCASE -->
-  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:32px 32px 16px;">
-    <div style="display:grid; grid-template-columns:1.45fr 1fr; gap:14px;">
-      <div style="border:1px solid rgba(255,255,255,.09); border-radius:16px; overflow:hidden; background:#0d1117;"><div style="display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.06);"><span style="width:8px; height:8px; border-radius:50%; background:#ff5f56;"></span><span style="width:8px; height:8px; border-radius:50%; background:#ffbd2e;"></span><span style="width:8px; height:8px; border-radius:50%; background:#27c93f;"></span><span style="margin-left:8px; font-family:'Fira Code',monospace; font-size:11px; color:#6a7488;">otui ▸ market · AAPL NASDAQ</span></div><img src="assets/screenshots/market-view.png" alt="Market view" loading="lazy" style="display:block; width:100%;" /></div>
-      <div style="border:1px solid rgba(255,255,255,.09); border-radius:16px; overflow:hidden; background:#0d1117;"><div style="display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.06);"><span style="width:8px; height:8px; border-radius:50%; background:#ff5f56;"></span><span style="width:8px; height:8px; border-radius:50%; background:#ffbd2e;"></span><span style="width:8px; height:8px; border-radius:50%; background:#27c93f;"></span><span style="margin-left:8px; font-family:'Fira Code',monospace; font-size:11px; color:#6a7488;">otui ▸ F&amp;O · option chain</span></div><img src="assets/screenshots/fno-option-chain.png" alt="Option chain" loading="lazy" style="display:block; width:100%;" /></div>
+    <div class="nav-r">
+      <a class="btn sm" href="https://github.com/Hitheshkaranth/OpenTerminalUI" aria-label="GitHub repository">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span class="star" id="stars">★ GitHub</span>
+      </a>
+      <a class="btn sm primary" data-launch href="index.html#deploy">Get started</a>
     </div>
-  </section>
+  </div>
+</nav>
 
-  <!-- CATALOG -->
-  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:48px 32px 90px;">
-    <div style="display:flex; align-items:baseline; gap:16px; border-bottom:1px solid rgba(255,255,255,.1); padding-bottom:18px; margin-bottom:8px;">
-      <span style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent,#ff6b00);">∑</span>
-      <span style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:#6a7488;">Twelve modules</span>
+<header class="page-hero">
+  <div class="wrap">
+    <div class="label"><b>//</b> Feature index · v0.8.0</div>
+    <h1>Every function<br><em class="s">on the desk.</em></h1>
+    <p class="lede">Thirteen modules, one keyboard-driven shell — the complete catalogue of what ships inside OpenTerminalUI. Open source and self-hosted.</p>
+    <div class="jump"><a href="#mod-01">Terminal shell</a><a href="#mod-02">Data trust &amp; providers</a><a href="#mod-03">Charting</a><a href="#mod-04">Equity research</a><a href="#mod-05">Screener &amp; stock picking</a><a href="#mod-06">AI research agent</a><a href="#mod-07">MCP for external agents</a><a href="#mod-08">Futures &amp; options</a><a href="#mod-09">Portfolio &amp; risk</a><a href="#mod-10">Backtesting &amp; labs</a><a href="#mod-11">Cross-asset &amp; macro</a><a href="#mod-12">Alerts &amp; automation</a><a href="#mod-13">News, plugins &amp; data</a></div>
+  </div>
+</header>
+
+<section style="padding-top:64px">
+  <div class="wrap">
+    <div class="sec-head">
+      <div><div class="label"><b>01</b> Modules · 13</div><h2>What's <em class="s">in the box.</em></h2></div>
+      <div class="aside-note">// highlighted: updated in 0.8.0</div>
     </div>
-
-    <sc-for list="{{ modules }}" as="m" hint-placeholder-count="12">
-      <div style="display:grid; grid-template-columns:0.4fr 1fr; gap:30px; padding:32px 0; border-bottom:1px solid rgba(255,255,255,.07);">
-        <div>
-          <div style="font-family:'Fira Code',monospace; font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:#5b6472; margin-bottom:10px;">{{ m.id }}</div>
-          <h3 style="margin:0; font-weight:600; font-size:25px; line-height:1.06; letter-spacing:-.02em; color:#f3f6fa;">{{ m.title }}</h3>
-        </div>
-        <ul style="margin:0; padding:0; list-style:none; display:grid; grid-template-columns:1fr 1fr; gap:9px 28px; align-self:center;">
-          <sc-for list="{{ m.items }}" as="it" hint-placeholder-count="6">
-            <li style="display:flex; gap:10px; font-size:14.5px; color:#9aa3b2; line-height:1.45;"><span style="color:var(--accent,#ff6b00);">—</span>{{ it }}</li>
-          </sc-for>
-        </ul>
-      </div>
-    </sc-for>
-  </section>
-
-  <!-- CTA -->
-  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:20px 32px 110px;">
-    <div style="position:relative; border:1px solid rgba(255,107,0,.2); border-radius:22px; overflow:hidden; background:radial-gradient(120% 150% at 50% 0%, rgba(255,107,0,.16), transparent 58%), #0b0e14; padding:72px 40px; text-align:center;">
-      <h2 style="margin:0; font-weight:700; font-size:clamp(32px,4.6vw,60px); line-height:1.0; letter-spacing:-.03em; color:#f3f6fa;">See it running.</h2>
-      <div style="display:flex; gap:13px; justify-content:center; margin-top:30px; flex-wrap:wrap;">
-        <a href="Docs.dc.html" style-hover="transform:translateY(-2px);" style="display:inline-flex; align-items:center; gap:9px; padding:14px 28px; border-radius:999px; background:var(--accent,#ff6b00); color:#0a0d12; font-weight:600; font-size:14px; text-decoration:none; transition:transform .25s;">Install guide →</a>
-        <a href="index.html" style-hover="border-color:rgba(255,255,255,.4);" style="display:inline-flex; align-items:center; gap:9px; padding:14px 28px; border-radius:999px; border:1px solid rgba(255,255,255,.16); color:#e8ecf2; font-weight:500; font-size:14px; text-decoration:none; transition:border-color .25s;">Back to home</a>
-      </div>
+    <div class="mods">
+      <div class="mod rv new" id="mod-01"><div class="id">MOD-01 · <span class="badge">UPDATED IN 0.8</span></div><h3>Terminal shell</h3><ul><li>GO bar symbol &amp; route lookup (Ctrl+G)</li><li>Command palette, 25+ functions (Ctrl+K)</li><li>Function keys F1–F9</li><li>Grouped nav rail with pins &amp; recents</li><li>Symbol Context Rail on every symbol page</li><li>Terminal Noir, classic and light themes</li></ul></div>
+      <div class="mod rv new" id="mod-02"><div class="id">MOD-02 · <span class="badge">UPDATED IN 0.8</span></div><h3>Data trust &amp; providers</h3><ul><li>Provenance on every snapshot: live · delayed · cached · synthetic</li><li>Blank metrics say which provider would fill them</li><li>Per-provider health row in the status bar</li><li>Settings → Data Providers: set, mask, test, clear keys</li><li>Synthetic data labelled, never a price basis</li><li>Market follows the symbol you open</li></ul></div>
+      <div class="mod rv" id="mod-03"><div class="id">MOD-03</div><h3>Charting</h3><ul><li>Up to 9 synced panels, linked crosshairs</li><li>70+ technical indicators</li><li>1m → 1M with extended hours</li><li>Drawing tools, volume profile, replay</li><li>Renko, Kagi, Point &amp; Figure, Line Break</li><li>OpenScript; PNG / SVG / CSV export</li></ul></div>
+      <div class="mod rv" id="mod-04"><div class="id">MOD-04</div><h3>Equity research</h3><ul><li>8-tab Security Hub, US and India</li><li>Fundamentals, estimates, peers, ESG</li><li>Earnings calendar &amp; surprises</li><li>Shareholding history, corporate actions</li><li>Insider monitor &amp; cluster-buy detection</li><li>AI catalysts &amp; conviction</li></ul></div>
+      <div class="mod rv" id="mod-05"><div class="id">MOD-05</div><h3>Screener &amp; stock picking</h3><ul><li>Query builder + custom formula engine</li><li>15+ visualisation modes</li><li>Value / Momentum / Quality / Low-vol composite</li><li>Point-in-time fundamentals</li><li>“Why ranked” explanations</li><li>Presets, sharing, multi-market scans</li></ul></div>
+      <div class="mod rv" id="mod-06"><div class="id">MOD-06</div><h3>AI research agent</h3><ul><li>Console on any screen (Ctrl/Cmd+J)</li><li>Tool-using loop, screen-aware</li><li>Bull vs bear debate → PM decision</li><li>Strategy Lab with out-of-sample checks</li><li>Memory, threads, reflections</li><li>OpenRouter, Gemini, OpenAI or LM Studio</li></ul></div>
+      <div class="mod rv new" id="mod-07"><div class="id">MOD-07 · <span class="badge">UPDATED IN 0.8</span></div><h3>MCP for external agents</h3><ul><li>45 tools over stdio or HTTP</li><li>API key → user: your portfolio, not a demo</li><li>Read keys see 38 read-only tools</li><li>7 propose_* tools, human-confirmed</li><li>otui:// resources + 5 workflow prompts</li><li>{ok, data, provenance} on every result</li></ul></div>
+      <div class="mod rv" id="mod-08"><div class="id">MOD-08</div><h3>Futures &amp; options</h3><ul><li>Full chain with live Greeks</li><li>IV analysis, rank &amp; term structure</li><li>Multi-leg strategy builder</li><li>OI build-up &amp; PCR signals</li><li>Options-flow scanner &amp; heatmaps</li><li>Futures basis &amp; expiry calendar</li></ul></div>
+      <div class="mod rv new" id="mod-09"><div class="id">MOD-09 · <span class="badge">UPDATED IN 0.8</span></div><h3>Portfolio &amp; risk</h3><ul><li>Holdings-first multi-portfolio</li><li>Kite sync; Zerodha / Groww / generic CSV</li><li>VaR, CVaR, EWMA, PCA exposures</li><li>6 stress scenarios + Monte Carlo</li><li>Correlation deep dive, tax lots, dividends</li><li>Paper trading with TCA</li></ul></div>
+      <div class="mod rv" id="mod-10"><div class="id">MOD-10</div><h3>Backtesting &amp; labs</h3><ul><li>16+ strategy templates</li><li>Realistic slippage, impact, partial fills</li><li>Walk-forward, sweeps, Monte Carlo</li><li>Model Lab &amp; governance, leaderboards</li><li>Pair Trading Lab (cointegration)</li><li>Portfolio Lab: 200 assets, blends</li></ul></div>
+      <div class="mod rv" id="mod-11"><div class="id">MOD-11</div><h3>Cross-asset &amp; macro</h3><ul><li>Commodities with term structure</li><li>Forex + central-bank monitor</li><li>Crypto, ETFs, mutual funds, bonds</li><li>Yield curve &amp; 2s10s inversion</li><li>Economic calendar (FRED, FXMacroData)</li><li>Events hub: earnings to F&amp;O expiry</li></ul></div>
+      <div class="mod rv new" id="mod-12"><div class="id">MOD-12 · <span class="badge">UPDATED IN 0.8</span></div><h3>Alerts &amp; automation</h3><ul><li>AND/OR multi-condition builder</li><li>In-app, email, webhook, Slack, Telegram</li><li>Actions: paper order, watchlist, webhook</li><li>Dry-run before you save</li><li>Cooldowns, expiry, trigger limits</li><li>Breakout scanner with confidence</li></ul></div>
+      <div class="mod rv" id="mod-13"><div class="id">MOD-13</div><h3>News, plugins &amp; data</h3><ul><li>Ticker &amp; market news with sentiment</li><li>AI Emotion Indicator (local Gemma)</li><li>Plugin API + sandboxed Python</li><li>Kite &amp; Finnhub WebSocket ticks</li><li>Provider waterfall with failover</li><li>L1 SQLite + L2 Redis cache</li></ul></div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- FOOTER -->
-  <footer style="border-top:1px solid rgba(255,255,255,.07);">
-    <div style="max-width:1180px; margin:0 auto; padding:30px 32px; display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap; font-family:'Fira Code',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5b6472;">
-      <span>OpenTerminalUI</span>
-      <div style="display:flex; gap:22px;">
-        <a href="index.html" style="color:inherit; text-decoration:none;">Home</a>
-        <a href="Features.dc.html" style="color:inherit; text-decoration:none;">Features</a>
-        <a href="Docs.dc.html" style="color:inherit; text-decoration:none;">Docs</a>
-        <a href="Roadmap.dc.html" style="color:inherit; text-decoration:none;">Roadmap</a>
-      </div>
-      <span>MIT · © 2026</span>
+<section class="dark" style="padding:88px 0">
+  <div class="wrap">
+    <div class="label"><b>02</b> More screens</div>
+    <h2 style="margin-bottom:12px">Beyond <em class="s">the tour.</em></h2>
+    <p class="lede" style="margin-bottom:44px">Screens not shown on the home page — captured from the real app with seeded data.</p>
+    <div class="gallery">
+      <figure class="shot rv"><div class="bar"><i></i><i></i><i></i><span>otui ▸ launchpad</span></div><img src="assets/shots/launchpad.webp" alt="Launchpad screenshot" loading="lazy" width="1680" height="1050"><figcaption><b>Launchpad</b> — saved workspaces with linked research notes.</figcaption></figure>
+      <figure class="shot rv"><div class="bar"><i></i><i></i><i></i><span>otui ▸ security · AAPL</span></div><img src="assets/shots/stock-detail.webp" alt="Security Hub (US) screenshot" loading="lazy" width="1680" height="1050"><figcaption><b>Security Hub (US)</b> — provenance chip, fundamentals and the symbol Context Rail.</figcaption></figure>
+      <figure class="shot rv"><div class="bar"><i></i><i></i><i></i><span>otui ▸ factors</span></div><img src="assets/shots/factor-dashboard.webp" alt="Factor dashboard screenshot" loading="lazy" width="1680" height="1050"><figcaption><b>Factor dashboard</b> — ranked multi-factor idea lists for US and India.</figcaption></figure>
+      <figure class="shot rv"><div class="bar"><i></i><i></i><i></i><span>otui ▸ risk</span></div><img src="assets/shots/risk-dashboard.webp" alt="Risk dashboard screenshot" loading="lazy" width="1680" height="1050"><figcaption><b>Risk dashboard</b> — VaR, exposures and factor heatmaps.</figcaption></figure>
+      <figure class="shot rv"><div class="bar"><i></i><i></i><i></i><span>otui ▸ model lab</span></div><img src="assets/shots/model-lab.webp" alt="Model Lab screenshot" loading="lazy" width="1680" height="1050"><figcaption><b>Model Lab</b> — sweeps, walk-forward and run leaderboards.</figcaption></figure>
+      <figure class="shot rv"><div class="bar"><i></i><i></i><i></i><span>otui ▸ alerts</span></div><img src="assets/shots/alerts.webp" alt="Alerts screenshot" loading="lazy" width="1680" height="1050"><figcaption><b>Alerts</b> — rules with actions that run on trigger.</figcaption></figure>
+      <figure class="shot rv"><div class="bar"><i></i><i></i><i></i><span>otui ▸ commodities</span></div><img src="assets/shots/commodities.webp" alt="Commodities screenshot" loading="lazy" width="1680" height="1050"><figcaption><b>Commodities</b> — energy, metals and agriculture with term structure.</figcaption></figure>
+      <figure class="shot rv"><div class="bar"><i></i><i></i><i></i><span>otui ▸ news · AAPL</span></div><img src="assets/shots/news-sentiment.webp" alt="News & sentiment screenshot" loading="lazy" width="1680" height="1050"><figcaption><b>News & sentiment</b> — the AI Emotion Indicator on a local model.</figcaption></figure>
     </div>
-  </footer>
+  </div>
+</section>
 
+<div class="wrap" style="margin-top:112px">
+  <div class="final rv">
+    <div class="label"><b>03</b> Next step</div>
+    <h2>See it <em class="s">running.</em></h2>
+    <p>One command on your own machine, or a Docker image from GHCR.</p>
+    <div class="cta-row"><a class="btn accent" href="Docs.dc.html#quickstart">Install guide →</a><a class="btn ghost-dark" href="index.html">Back to home</a></div>
   </div>
 </div>
-</x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:900},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#ff6b00&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#ff6b00&quot;,&quot;#3fbaff&quot;,&quot;#2ec27e&quot;,&quot;#a78bfa&quot;],&quot;section&quot;:&quot;Theme&quot;}}">
-class Component extends DCLogic {
-  componentDidMount(){
-    if (this.props.accent) document.documentElement.style.setProperty('--accent', this.props.accent);
-    this.initMarket();
-    if (!('IntersectionObserver' in window)) return;
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting){ e.target.style.animation = 'otReveal .8s cubic-bezier(.16,1,.3,1) both'; io.unobserve(e.target); }
-      });
-    }, { threshold: 0.06, rootMargin: '0px 0px -4% 0px' });
-    document.querySelectorAll('[data-reveal]').forEach((el) => io.observe(el));
-  }
-  componentDidUpdate(prev){
-    if (this.props.accent && this.props.accent !== prev.accent){
-      document.documentElement.style.setProperty('--accent', this.props.accent);
-    }
-  }
-  initMarket(){
-    const c = document.getElementById('ot-market-canvas');
-    if (!c) return;
-    const ctx = c.getContext('2d');
-    const DPR = Math.min(window.devicePixelRatio || 1, 2);
-    let W = 0, H = 0, series = []; const STEP = 9;
-    const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    const setup = () => { W = c.clientWidth; H = c.clientHeight; c.width = Math.max(1, W * DPR); c.height = Math.max(1, H * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); };
-    const build = () => { const COUNT = W < 700 ? 5 : 9; const N = Math.ceil(W / STEP) + 4; series = []; for (let s = 0; s < COUNT; s++){ const baseY = ((s + 0.5) / COUNT) * H; const amp = (H / COUNT) * 0.46; const accent = s % 3 === 1; const pts = []; let v = 0; for (let i = 0; i < N; i++){ v += (Math.random() - 0.5) * 0.9; v = Math.max(-1, Math.min(1, v * 0.96)); pts.push(v); } series.push({ baseY, amp, pts, accent, drift: 0, speed: 0.16 + Math.random() * 0.14 }); } };
-    setup(); build();
-    this._mktResize = () => { setup(); build(); };
-    window.addEventListener('resize', this._mktResize, { passive: true });
-    const plot = (sr, shift) => { ctx.beginPath(); for (let i = 0; i < sr.pts.length; i++){ const x = i * STEP - shift; const y = sr.baseY - sr.pts[i] * sr.amp; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.strokeStyle = sr.accent ? 'rgba(255,130,40,0.34)' : 'rgba(150,185,235,0.14)'; ctx.lineWidth = sr.accent ? 1.7 : 1.1; ctx.stroke(); };
-    if (reduce){ ctx.clearRect(0, 0, W, H); for (const sr of series) plot(sr, 0); return; }
-    const frame = () => { ctx.clearRect(0, 0, W, H); for (const sr of series){ sr.drift += sr.speed; if (sr.drift >= STEP){ sr.drift -= STEP; sr.pts.shift(); let last = sr.pts[sr.pts.length - 1]; last += (Math.random() - 0.5) * 0.9; last = Math.max(-1, Math.min(1, last * 0.96)); sr.pts.push(last); } plot(sr, sr.drift); } this._mktRaf = requestAnimationFrame(frame); };
-    frame();
-  }
 
-  renderVals(){
-    return {
-      modules: [
-        { id: 'MOD-01', title: 'Terminal shell', items: ['GO bar symbol lookup (Ctrl+G)', 'Command palette, 25+ functions', 'Function keys F1–F9', 'Ticker tape & status bar', 'Terminal Noir / classic / light', 'Desktop & mobile layouts'] },
-        { id: 'MOD-02', title: 'Charting', items: ['9 synced panels, crosshair link', '70+ technical indicators', 'Multi-timeframe 1m → 1M', 'Drawing tools, volume profile', 'Renko, Kagi, P&F, Line Break', 'OpenScript, PNG/SVG/CSV export'] },
-        { id: 'MOD-03', title: 'Equity research', items: ['8-tab Security Hub', 'P/E, P/B, ROE, ROA, growth', 'Earnings calendar & surprises', 'Shareholding, analyst estimates', 'Insider & cluster-buy monitor', 'Trade journal with equity curve'] },
-        { id: 'MOD-04', title: 'Screener & picking', items: ['Query builder + formula engine', '15+ visualization modes', 'Multi-factor composite scoring', 'Ranked ideas, factor dashboard', 'Catalyst & conviction engine', '“Why ranked” explanations'] },
-        { id: 'MOD-05', title: 'AI research agent', items: ['Conversational console (Ctrl+J)', 'Tool-using agentic loop', 'Screen-aware context', 'Multi-agent debate mode', 'Strategy Lab, out-of-sample', 'MCP server, read-only'] },
-        { id: 'MOD-06', title: 'Futures & options', items: ['Full chain with live Greeks', 'IV analysis & term structure', 'Multi-leg strategy builder', 'OI analysis & PCR tracking', 'Options-flow scanner, heatmaps', 'Futures analytics & expiry'] },
-        { id: 'MOD-07', title: 'Portfolio & risk', items: ['Multi-portfolio & attribution', 'VaR, CVaR, EWMA, PCA', '6 stress scenarios + Monte Carlo', 'Correlation deep dive', 'Tax-lot & dividend tracker', 'Paper trading with TCA'] },
-        { id: 'MOD-08', title: 'Backtesting & labs', items: ['16+ strategy templates', 'Pair Trading Lab (cointegration)', 'Vectorized realistic execution', 'Walk-forward & sweeps', 'Monte Carlo, tear-sheets', 'Portfolio Lab: 200 assets'] },
-        { id: 'MOD-09', title: 'Cross-asset & macro', items: ['Commodities, term structure', 'Forex + central-bank monitor', 'Crypto workspace, ETF analytics', 'Mutual funds, SIP, bonds', 'Yield curve & inversion', 'Economics calendar, RRG'] },
-        { id: 'MOD-10', title: 'Alerts & scanner', items: ['Multi-condition AND/OR builder', 'Email, webhook, Slack, Telegram', 'Cooldowns, expiry, limits', 'WebSocket push notifications', 'Breakout confidence scoring', 'Full history with dedup'] },
-        { id: 'MOD-11', title: 'News & sentiment', items: ['Ticker & market-wide feeds', 'Bullish / bearish / neutral', 'AI Emotion Indicator (Gemma)', '0–100 fear/greed index', 'Runs on your machine', 'FinBERT fallback offline'] },
-        { id: 'MOD-12', title: 'Plugins & data', items: ['Extensible plugin API', 'Sandboxed Python, OpenScript', 'Multi-provider WebSocket', 'Provider waterfall failover', 'L1 SQLite + L2 Redis cache', 'Candle aggregation, pub/sub'] }
-      ]
-    };
-  }
-}
-</script>
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <img src="assets/logo-ink.png" alt="OpenTerminalUI" style="height:28px;width:auto">
+        <p>A self-hosted, open-source financial terminal for markets, research, risk and AI-assisted analysis.</p>
+        <div class="tags"><span>MIT</span><span>Self-hosted</span><span>v0.8.0</span></div>
+      </div>
+      <div><h4>Product</h4><ul>
+        <li><a href="index.html#products">Security Hub</a></li><li><a href="index.html#products">Charts</a></li><li><a href="index.html#products">Screener</a></li><li><a href="index.html#products">F&amp;O</a></li><li><a href="index.html#products">Portfolio &amp; Risk</a></li><li><a href="index.html#products">Backtesting</a></li></ul></div>
+      <div><h4>Platform</h4><ul>
+        <li><a href="index.html#agent">AI agent &amp; MCP</a></li><li><a href="index.html#agent">Provenance</a></li><li><a href="index.html#workflows">Alerts &amp; actions</a></li><li><a href="Features.dc.html">All features</a></li></ul></div>
+      <div><h4>Developers</h4><ul>
+        <li><a href="Docs.dc.html">Documentation</a></li><li><a href="index.html#deploy">Deploy</a></li><li><a href="https://github.com/Hitheshkaranth/OpenTerminalUI/pkgs/container/openterminalui">Docker image</a></li><li><a href="https://github.com/Hitheshkaranth/OpenTerminalUI/releases">Changelog</a></li></ul></div>
+      <div><h4>Project</h4><ul>
+        <li><a href="https://github.com/Hitheshkaranth/OpenTerminalUI">GitHub</a></li><li><a href="Roadmap.dc.html">Roadmap</a></li><li><a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/CONTRIBUTING.md">Contributing</a></li><li><a href="https://github.com/Hitheshkaranth/OpenTerminalUI/issues">Issues</a></li><li><a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/LICENSE">License</a></li></ul></div>
+    </div>
+    <div class="foot-bot"><span>© 2026 OpenTerminalUI contributors · MIT</span><span>not investment advice · paper trading only</span></div>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+
 </body>
 </html>

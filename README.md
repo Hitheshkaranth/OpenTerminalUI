@@ -203,13 +203,9 @@ Captured from the built app with `scripts/capture_screens.mjs` (headless Chromiu
 |---|---|
 | <img src="assets/screenshots/news-sentiment.png" alt="News and sentiment for AAPL" width="420" /> | <img src="assets/screenshots/intelligence-timeline.png" alt="Intelligence timeline" width="420" /> |
 
-| AI Research Agent | Multi-Agent Debate |
-|---|---|
-| <img src="assets/screenshots/ai-agent.png" alt="AI research agent panel" width="420" /> | <img src="assets/screenshots/agent-debate.png" alt="Multi-agent debate panel" width="420" /> |
-
-| Strategy Lab Agent | Research Library |
-|---|---|
-| <img src="assets/screenshots/strategy-lab.png" alt="Strategy Lab agent result" width="420" /> | <img src="assets/screenshots/research.png" alt="Research library" width="420" /> |
+| Research Library |
+|---|
+| <img src="assets/screenshots/research.png" alt="Research library" width="420" /> |
 
 | OMS Compliance | Ops Dashboard |
 |---|---|
@@ -733,9 +729,9 @@ frontend/                React + Vite + TypeScript SPA
 plugins/                 Extensible plugin system with examples
 docs/                    Wiki, architecture specs, and contributor docs
   screenshots/           Per-screen capture manifest (SCREENSHOTS.md)
-  site/                  GitHub Pages website
   wiki/                  Getting started, contributing guides
 data/                    Local SQLite databases and test fixtures
+frontend/public/landing/ Project website (GitHub Pages + in-app landing)
 docker-compose.yml       Container orchestration (backend + Redis + Postgres)
 Dockerfile               Multi-stage build (Node builder + Python runtime)
 Makefile                 Development commands (setup, test, gate)
