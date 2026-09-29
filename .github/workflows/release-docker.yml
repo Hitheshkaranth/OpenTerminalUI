@@ -1,0 +1,115 @@
+name: Release Docker image
+
+# On every published release, build the Dockerfile at the release tag for
+# amd64 + arm64 (native runners), push it to GHCR as :X.Y.Z, :X.Y and :latest,
+# and add a "Docker image" section with the pull command to the release notes.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build and publish, e.g. v0.8.0
+        required: true
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  IMAGE: ghcr.io/${{ github.repository_owner }}/openterminalui
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - name: Lowercase image name
+        run: echo "IMAGE=${IMAGE,,}" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ env.TAG }}
+            org.opencontainers.image.title=OpenTerminalUI
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          d="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${d#sha256:}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.runner }}
+          path: /tmp/digests/*
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Push multi-arch tags
+        run: |
+          IMAGE="${IMAGE,,}"
+          v="${TAG#v}"
+          tags="-t $IMAGE:$v -t $IMAGE:${v%.*}"
+          # :latest only for the newest release
+          latest=$(gh release view -R "${{ github.repository }}" --json tagName -q .tagName)
+          [ "$latest" = "$TAG" ] && tags="$tags -t $IMAGE:latest"
+          cd /tmp/digests
+          docker buildx imagetools create $tags $(printf "$IMAGE@sha256:%s " *)
+          docker buildx imagetools inspect "$IMAGE:$v"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+      - name: Add Docker section to release notes
+        run: |
+          marker='<!-- docker-image -->'
+          gh release view "$TAG" -R "${{ github.repository }}" --json body -q .body > notes.md
+          grep -qF "$marker" notes.md && exit 0
+          v="${TAG#v}"
+          cat >> notes.md <<EOF
+
+          $marker
+          ### Docker image
+
+          \`\`\`bash
+          docker pull $IMAGE:$v
+          docker run -p 8000:8000 $IMAGE:$v
+          \`\`\`
+
+          Multi-arch (linux/amd64, linux/arm64). Also tagged \`${v%.*}\`. Package: https://github.com/${{ github.repository }}/pkgs/container/openterminalui
+          EOF
+          gh release edit "$TAG" -R "${{ github.repository }}" --notes-file notes.md
