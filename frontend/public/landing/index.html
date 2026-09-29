@@ -1,467 +1,964 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<script src="./support.js"></script>
+<title>OpenTerminalUI — One terminal. Every market. Self-hosted.</title>
+<meta name="description" content="OpenTerminalUI is a self-hosted, open-source financial terminal: live market data with provenance, charting, F&O, portfolio and risk, backtesting, and an AI research agent with 45 MCP tools.">
+<meta property="og:title" content="OpenTerminalUI — One terminal. Every market. Self-hosted.">
+<meta property="og:description" content="Open-source financial terminal you run yourself. Equities, F&O, crypto, macro, backtests and an AI agent — every number labelled with where it came from.">
+<meta property="og:image" content="assets/shots/home.webp">
+<link rel="icon" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#fafaf7; --bg-2:#f2f1ec; --ink:#0b0e14; --ink-2:#3b414d; --muted:#6b7280; --line:#e4e3dc; --line-2:#d6d5cd;
+  --card:#ffffff; --dark:#0b0e14; --dark-2:#121722; --dark-line:#222938; --dark-ink:#f5f5f0; --dark-muted:#8b94a3;
+  --accent:#f08a00; --accent-ink:#b85f00; --accent-soft:#fff3e0; --accent-glow:rgba(255,159,26,.22);
+  --live:#16a34a; --delayed:#ca8a04; --cached:#2563eb; --synthetic:#9333ea;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace; --serif:"Instrument Serif",Georgia,serif;
+  --r:14px; --wrap:1200px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+img{max-width:100%;display:block}
+a{color:inherit}
+::selection{background:var(--accent-glow)}
+.wrap{max-width:var(--wrap);margin:0 auto;padding:0 32px}
+.mono{font-family:var(--mono)}
+em.s,.s{font-family:var(--serif);font-style:italic;font-weight:400;letter-spacing:-.01em;color:var(--accent)}
+.dark em.s,.dark .s{color:#ffb347}
+
+/* ---------- announcement + nav ---------- */
+.announce{display:flex;justify-content:center;align-items:center;gap:12px;padding:9px 16px;border-bottom:1px solid var(--line);background:var(--bg-2);font-size:13px;text-align:center}
+.pill{font:500 11px/1 var(--mono);padding:4px 8px;border-radius:6px;background:var(--ink);color:var(--bg);letter-spacing:.02em}
+.announce a{font-weight:500;text-decoration:none;white-space:nowrap}
+.announce a:hover{text-decoration:underline}
+nav.top{position:sticky;top:0;z-index:40;background:rgba(250,250,247,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid transparent;transition:border-color .2s}
+nav.top.scrolled{border-bottom-color:var(--line)}
+nav.top .wrap{display:flex;align-items:center;justify-content:space-between;height:62px;gap:20px}
+.brand img{height:32px;width:auto}
+.links{display:flex;gap:26px;font-size:14px;color:var(--ink-2)}
+.links a{text-decoration:none}.links a:hover{color:var(--ink)}
+.nav-r{display:flex;align-items:center;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:9px;border:1px solid var(--line-2);background:var(--card);color:var(--ink);font:500 14px/1 var(--sans);text-decoration:none;cursor:pointer;transition:transform .15s,border-color .15s,background .15s;white-space:nowrap}
+.btn:hover{border-color:var(--ink-2)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.primary:hover{background:#222836}
+.btn.accent{background:var(--accent);border-color:var(--accent);color:#1a1000}
+.btn.accent:hover{background:#ff9f1a}
+.btn.sm{height:34px;padding:0 12px;font-size:13px}
+.btn.ghost-dark{background:transparent;color:var(--dark-ink);border-color:#343c4d}
+.btn.ghost-dark:hover{border-color:#6b7385}
+.star{font:500 12px var(--mono);color:var(--ink-2)}
+.menu-btn{display:none}
+
+/* ---------- section scaffolding ---------- */
+section{padding:112px 0}
+.label{display:flex;align-items:center;gap:10px;font:500 11.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:22px}
+.label b{color:var(--accent);font-weight:500}
+.label::after{content:"";width:64px;height:1px;background:currentColor;opacity:.5}
+h1,h2,h3{margin:0;font-weight:500;letter-spacing:-.035em;line-height:1.02}
+h2{font-size:clamp(38px,5vw,58px)}
+h3{font-size:22px;letter-spacing:-.02em;line-height:1.2}
+.lede{font-size:18px;color:var(--ink-2);max-width:560px;margin:22px 0 0}
+.sec-head{display:flex;justify-content:space-between;align-items:flex-end;gap:32px;margin-bottom:48px;flex-wrap:wrap}
+.aside-note{font:13px/1.7 var(--mono);color:var(--muted);text-align:right}
+.dark{background:var(--dark);color:var(--dark-ink)}
+.dark .label{color:var(--dark-muted)}
+.dark .lede{color:var(--dark-muted)}
+
+/* ---------- hero ---------- */
+.hero{position:relative;padding:72px 0 56px;overflow:hidden}
+.hero canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:.55}
+.hero .wrap{position:relative}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:56px;align-items:center}
+.hero-grid > *,.man-grid > *,.band > *,.faq > *{min-width:0}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:13px;color:var(--ink-2);margin-bottom:30px}
+.eyebrow .tag{font:500 11px var(--mono);padding:4px 8px;border:1px solid var(--line-2);border-radius:6px;background:var(--card)}
+.hero h1{font-size:clamp(44px,6.3vw,90px);letter-spacing:-.05em;line-height:.94}
+.hero h1 .l2{color:#434a57}
+.hero h1 .s{font-size:1.04em;letter-spacing:-.02em}
+.hero .lede{max-width:520px}
+.hero .fine{font-size:14px;color:var(--muted);max-width:540px;margin:14px 0 0}
+.cta-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:32px}
+.micro{font:12px var(--mono);color:var(--muted);margin-top:16px}
+
+.console{background:var(--dark);border-radius:16px;box-shadow:0 30px 80px -30px rgba(11,14,20,.55),0 0 0 1px rgba(11,14,20,.9);color:#cfd6e4;overflow:hidden;font:13px/1.65 var(--mono)}
+.console-top{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--dark-line)}
+.verb{font-size:11px;padding:3px 7px;border-radius:5px;background:#1d4ed8;color:#fff}
+.console-top .path{color:#e6ebf5;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ok{color:#4ade80}
+.console-body{padding:16px 18px;min-height:292px;white-space:pre;overflow:hidden}
+.k{color:#93c5fd}.v{color:#fbbf24}.n{color:#f5a3c7}.c{color:#6b7385}
+.cursor{display:inline-block;width:8px;height:15px;background:var(--accent);vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.console-tabs{display:flex;gap:6px;padding:12px 14px;border-top:1px solid var(--dark-line);flex-wrap:wrap}
+.console-tabs button{font:12px var(--mono);color:var(--dark-muted);background:transparent;border:1px solid var(--dark-line);border-radius:999px;padding:5px 11px;cursor:pointer}
+.console-tabs button[aria-selected=true]{color:#fff;border-color:var(--accent);background:rgba(255,159,26,.14)}
+.float-card{position:absolute;right:-18px;bottom:-54px;width:300px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:0 18px 50px -20px rgba(11,14,20,.35);font-size:13px}
+.float-card strong{display:block;font-size:14.5px;margin-bottom:4px}
+.float-card p{margin:0 0 12px;color:var(--ink-2)}
+.float-card code{display:block;font:12px var(--mono);background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.console-wrap{position:relative}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line-2);border-bottom:1px solid var(--line-2);margin-top:84px}
+.stat{padding:24px 24px 22px;border-left:1px solid var(--line-2)}
+.stat:first-child{border-left:0;padding-left:0}
+.stat b{display:block;font:500 44px/1 var(--mono);letter-spacing:-.04em}
+.stat span{display:block;margin-top:10px;font:11.5px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+
+/* ---------- live demo ---------- */
+.demo{border:1px solid var(--line-2);border-radius:18px;background:var(--card);overflow:hidden;box-shadow:0 1px 0 rgba(11,14,20,.03)}
+.demo-bar{display:flex;align-items:center;gap:4px;padding:10px 12px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.demo-bar::-webkit-scrollbar{display:none}
+.dots{display:flex;gap:6px;margin-right:12px}.dots i{width:10px;height:10px;border-radius:50%;background:var(--line-2)}
+.demo-bar button{font:500 13px var(--sans);color:var(--ink-2);background:transparent;border:0;border-radius:8px;padding:8px 12px;cursor:pointer;white-space:nowrap}
+.demo-bar button:hover{background:var(--bg-2)}
+.demo-bar button[aria-selected=true]{background:var(--ink);color:var(--bg)}
+.live-dot{margin-left:auto;display:flex;align-items:center;gap:7px;font:12px var(--mono);color:var(--muted);padding-left:12px;white-space:nowrap}
+.live-dot::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--live);box-shadow:0 0 0 3px rgba(22,163,74,.18)}
+.demo-grid{display:grid;grid-template-columns:260px 1fr;min-height:540px}
+.demo-side{border-right:1px solid var(--line);padding:20px}
+.demo-side .kick{font:11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.demo-side h3{margin:8px 0 8px;font-size:20px}
+.demo-side p{margin:0 0 18px;font-size:14px;color:var(--ink-2)}
+.demo-side ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.demo-side li{display:flex;gap:10px;font-size:13.5px}
+.demo-side li::before{content:"";flex:none;width:6px;height:6px;margin-top:8px;background:var(--accent);border-radius:1px}
+.demo-side .route{margin-top:20px;font:12px var(--mono);color:var(--muted);border-top:1px dashed var(--line-2);padding-top:14px}
+.demo-shot{background:#0b0e14;display:flex;align-items:flex-start;justify-content:center;overflow:hidden;position:relative}
+.demo-shot img{width:100%;height:100%;object-fit:cover;object-position:top left;transition:opacity .35s}
+.demo-shot img.fade{opacity:0}
+.demo-foot{display:flex;justify-content:space-between;padding:10px 16px;border-top:1px solid var(--line);font:12px var(--mono);color:var(--muted)}
+
+/* ---------- shipped marquee + providers ---------- */
+.ticker{background:var(--dark);color:var(--dark-ink);border-block:1px solid var(--dark-line);overflow:hidden;white-space:nowrap;font:12.5px var(--mono);display:flex}
+.ticker .fixed{flex:none;padding:12px 18px;background:var(--dark);position:relative;z-index:1;color:#4ade80;box-shadow:12px 0 16px var(--dark)}
+.ticker .track{display:inline-flex;gap:44px;padding:12px 0;animation:marquee 60s linear infinite}
+.ticker .item b{font-weight:500;font-size:10.5px;padding:2px 6px;border-radius:4px;background:rgba(255,159,26,.16);color:#ffb347;margin:0 8px}
+.ticker .item i{font-style:normal;color:var(--dark-muted)}
+@keyframes marquee{to{transform:translateX(-50%)}}
+.providers{padding:42px 0 50px;text-align:center}
+.providers .cap{font:11.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:20px}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:8px 13px;border:1px solid var(--line-2);border-radius:999px;background:var(--card);font-size:13.5px}
+.chip small{font:11px var(--mono);color:var(--muted)}
+.chip .d{width:7px;height:7px;border-radius:50%}
+
+/* ---------- manifesto ---------- */
+.manifesto{position:relative;overflow:hidden}
+.manifesto h2{font-family:var(--serif);font-style:italic;font-weight:400;font-size:clamp(44px,6.6vw,92px);letter-spacing:-.02em;line-height:1.02}
+.manifesto h2 del{color:#5b6475;text-decoration-thickness:3px;text-decoration-color:#8b94a3}
+.manifesto h2 .hl{color:#ffb347}
+.man-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;margin-top:72px}
+.beliefs .kick{font:11.5px var(--mono);color:#ffb347;letter-spacing:.06em;text-transform:uppercase;margin-bottom:18px}
+.beliefs p{margin:0 0 18px;color:var(--dark-muted);font-size:15px}
+.beliefs strong{color:var(--dark-ink);font-weight:600}
+.log{font:12.5px/1.95 var(--mono);color:#9aa3b5;height:292px;overflow:hidden;mask-image:linear-gradient(transparent,#000 18%,#000 82%,transparent)}
+.log .t{color:#566077}.log .i{color:#60a5fa}.log .w{color:#fbbf24}.log .g{color:#4ade80}.log .p{color:#c084fc}
+
+/* ---------- product cards ---------- */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.card{background:var(--card);border:1px solid var(--line-2);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;text-decoration:none;transition:border-color .2s,transform .2s,box-shadow .2s}
+.card:hover{border-color:var(--ink-2);transform:translateY(-2px);box-shadow:0 14px 30px -18px rgba(11,14,20,.3)}
+.card.feat{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.card .thumb{height:132px;background:#0b0e14 center top/cover no-repeat;border-bottom:1px solid var(--line)}
+.card .body{padding:18px 18px 20px;display:flex;flex-direction:column;gap:10px;flex:1}
+.card .ttl{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.card h3{font-size:17px}
+.card .path{font:11.5px var(--mono);color:var(--muted)}
+.card p{margin:0;font-size:13.5px;color:var(--ink-2)}
+.card ul{margin:0;padding-left:16px;font-size:13px;color:var(--ink-2)}
+.card li{margin:2px 0}
+.badge{font:500 10.5px var(--mono);padding:3px 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent-ink);border:1px solid #ffd9a3;white-space:nowrap}
+
+/* ---------- zero-config band ---------- */
+.band{background:var(--dark);color:var(--dark-ink);border-radius:22px;padding:64px 56px;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;position:relative;overflow:hidden}
+.band::before{content:"";position:absolute;right:-120px;top:-160px;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,rgba(255,159,26,.22),transparent 65%)}
+.band > *{position:relative}
+.band h2{font-size:clamp(36px,4.6vw,54px)}
+.band .lede{color:var(--dark-muted)}
+.band .lede .mono{color:var(--dark-ink)}
+.band .kick{display:inline-flex;align-items:center;gap:8px;font:12px var(--mono);color:#ffb347;margin-bottom:20px}
+.band ul{list-style:none;padding:0;margin:26px 0 0;display:grid;gap:10px;color:var(--dark-muted);font-size:14.5px}
+.band li{display:flex;gap:10px}
+.band li::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-top:9px}
+.band li b{color:var(--dark-ink);font-weight:600}
+.term{background:#0f141d;border:1px solid var(--dark-line);border-radius:12px;overflow:hidden;font:13px/1.8 var(--mono)}
+.term-top{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--dark-line);color:var(--dark-muted);font-size:11.5px}
+.term-top .dots i{background:#2a3242}
+.term pre{margin:0;padding:16px 18px;color:#cfd6e4;overflow-x:auto}
+.copy{font:11.5px var(--mono);color:#ffb347;background:transparent;border:1px solid #3a3223;border-radius:6px;padding:4px 9px;cursor:pointer}
+.copy:hover{border-color:#ffb347}
+
+/* ---------- workflows ---------- */
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line-2);border-radius:var(--r);overflow:hidden;background:var(--card)}
+.cell{padding:28px 26px 30px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.cell:nth-child(3n){border-right:0}.cell:nth-last-child(-n+3){border-bottom:0}
+.cell .ico{width:34px;height:34px;border:1px solid var(--line-2);border-radius:9px;display:grid;place-items:center;margin-bottom:18px;color:var(--ink-2)}
+.cell .kick{font:11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.cell h3{font-size:18px;margin:6px 0 8px}
+.cell p{margin:0;font-size:14px;color:var(--ink-2)}
+.cell .steps{margin-top:14px;font:12px var(--mono);color:var(--accent-ink)}
+
+/* ---------- keyboard grid (dark) ---------- */
+.keys{display:grid;grid-template-columns:repeat(6,1fr);border:1px solid var(--dark-line);border-radius:var(--r);overflow:hidden}
+.key{padding:22px 20px;border-right:1px solid var(--dark-line);border-bottom:1px solid var(--dark-line)}
+.key:nth-child(6n){border-right:0}.key:nth-last-child(-n+6){border-bottom:0}
+.key kbd{display:inline-block;font:500 12px var(--mono);color:#ffb347;padding:3px 7px;border:1px solid #3a3223;border-bottom-width:2px;border-radius:6px;background:#15130f}
+.key b{display:block;margin:14px 0 4px;font-weight:500;font-size:15px}
+.key span{font:12px var(--mono);color:var(--dark-muted)}
+
+/* ---------- bento ---------- */
+.bento{display:grid;grid-template-columns:repeat(6,1fr);gap:14px}
+.tile{background:var(--card);border:1px solid var(--line-2);border-radius:18px;padding:26px 26px 28px;overflow:hidden}
+.tile .kick{font:11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+.tile h3{font-size:26px;letter-spacing:-.03em;margin-bottom:10px}
+.tile p{margin:0;font-size:14px;color:var(--ink-2);max-width:460px}
+.t-a{grid-column:span 3}.t-b{grid-column:span 3}.t-c{grid-column:span 2}.t-d{grid-column:span 2}.t-e{grid-column:span 2}
+.prov{margin-top:22px;border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:14px 16px;font:12.5px var(--mono)}
+.prov-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px dashed var(--line-2)}
+.prov-row:last-child{border-bottom:0}
+.q{font-size:10.5px;padding:3px 7px;border-radius:5px;font-weight:500;letter-spacing:.04em}
+.q.live{background:#dcfce7;color:#166534}.q.delayed{background:#fef9c3;color:#854d0e}.q.cached{background:#dbeafe;color:#1e40af}.q.synthetic{background:#f3e8ff;color:#6b21a8}.q.na{background:#f1f1ee;color:#6b7280}
+.health{margin-top:22px;display:grid;gap:9px;font:12.5px var(--mono)}
+.health div{display:grid;grid-template-columns:90px 1fr 46px;gap:12px;align-items:center}
+.bar{height:6px;border-radius:3px;background:var(--bg-2);overflow:hidden}.bar i{display:block;height:100%;background:var(--live);border-radius:3px}
+.bar i.warn{background:var(--delayed)}.bar i.bad{background:#dc2626}
+.flow{margin-top:20px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font:12px var(--mono)}
+.flow span{padding:6px 9px;border:1px solid var(--line-2);border-radius:8px;background:var(--bg)}
+.flow em{font-style:normal;color:var(--muted)}
+.meter{margin-top:22px}
+.meter .row{display:flex;justify-content:space-between;font:12px var(--mono);color:var(--muted);margin-bottom:8px}
+.meter .row b{color:var(--live);font-weight:500}
+.meter .bar{height:8px}
+
+/* ---------- deploy options (pricing form factor) ---------- */
+.plans{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.plan{background:var(--card);border:1px solid var(--line-2);border-radius:var(--r);padding:24px 22px;display:flex;flex-direction:column}
+.plan.pop{background:var(--accent-soft);border-color:var(--accent);box-shadow:0 0 0 3px rgba(240,138,0,.12)}
+.plan .nm{font-weight:600;font-size:15px}
+.plan .sub{font:12px var(--mono);color:var(--muted);margin-top:2px}
+.plan .big{font:500 34px/1 var(--mono);letter-spacing:-.04em;margin:26px 0 20px}
+.plan ul{list-style:none;padding:0;margin:0 0 22px;display:grid;gap:9px;font-size:13.5px;color:var(--ink-2)}
+.plan li::before{content:"✓";color:var(--accent-ink);margin-right:9px;font-size:12px}
+.plan pre{margin:auto 0 16px;font:11.5px/1.6 var(--mono);background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre}
+.plan.pop pre{background:#fff}
+.plans-note{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:18px;font:12px var(--mono);color:var(--muted)}
+
+/* ---------- faq ---------- */
+.faq{display:grid;grid-template-columns:.8fr 1.2fr;gap:64px}
+.faq-l p{color:var(--ink-2);margin-top:22px}
+details{border-bottom:1px solid var(--line-2)}
+summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;gap:20px;padding:20px 0;font-weight:500;font-size:16.5px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font:400 20px/1 var(--mono);color:var(--muted);transition:transform .2s}
+details[open] summary::after{transform:rotate(45deg)}
+details p{margin:-6px 0 20px;color:var(--ink-2);font-size:15px;max-width:640px}
+details code{font:13px var(--mono);background:var(--bg-2);padding:1px 5px;border-radius:4px}
+
+/* ---------- final cta ---------- */
+.final{background:var(--dark);color:var(--dark-ink);border-radius:22px;padding:72px 64px;position:relative;overflow:hidden}
+.final::after{content:"";position:absolute;right:-8%;top:30%;width:70%;height:2px;transform:rotate(-24deg);background:linear-gradient(90deg,transparent,#ff9f1a,transparent);box-shadow:0 0 30px 6px rgba(255,159,26,.35)}
+.final h2{font-size:clamp(44px,6vw,76px);position:relative;z-index:1}
+.final p{color:var(--dark-muted);margin:18px 0 32px;position:relative;z-index:1}
+.final .cta-row{position:relative;z-index:1}
+
+/* ---------- footer ---------- */
+footer{background:var(--bg-2);border-top:1px solid var(--line);margin-top:112px;padding:64px 0 28px}
+.foot{display:grid;grid-template-columns:1.6fr repeat(4,1fr);gap:32px}
+.foot p{color:var(--ink-2);font-size:14px;max-width:300px}
+.foot h4{margin:0 0 16px;font:500 11.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.foot ul{list-style:none;margin:0;padding:0;display:grid;gap:9px;font-size:14px}
+.foot a{text-decoration:none;color:var(--ink-2)}.foot a:hover{color:var(--ink)}
+.foot .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:18px}
+.foot .tags span{font:11px var(--mono);padding:4px 8px;border:1px solid var(--line-2);border-radius:999px}
+.foot-bot{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:56px;padding-top:22px;border-top:1px solid var(--line-2);font:12px var(--mono);color:var(--muted)}
+
+/* ---------- reveal ---------- */
+.rv{opacity:0;transform:translateY(18px);transition:opacity .7s ease,transform .7s ease}
+.rv.in{opacity:1;transform:none}
+
+/* ---------- responsive ---------- */
+@media (max-width:1080px){
+  .cards{grid-template-columns:repeat(2,1fr)}
+  .plans{grid-template-columns:repeat(2,1fr)}
+  .keys{grid-template-columns:repeat(3,1fr)}
+  .key:nth-child(6n){border-right:1px solid var(--dark-line)}.key:nth-child(3n){border-right:0}
+  .key:nth-last-child(-n+6){border-bottom:1px solid var(--dark-line)}.key:nth-last-child(-n+3){border-bottom:0}
+  .float-card{display:none}
+}
+@media (max-width:900px){
+  .wrap{padding:0 20px}
+  section{padding:80px 0}
+  .links,.star{display:none}
+  .hero-grid,.man-grid,.band,.faq{grid-template-columns:1fr}
+  .hero{padding-top:48px}
+  .stats{grid-template-columns:repeat(2,1fr);margin-top:56px}
+  .stat:nth-child(3){border-left:0;padding-left:0}
+  .stat{border-top:1px solid var(--line-2)}.stat:nth-child(-n+2){border-top:0}
+  .demo-grid{grid-template-columns:1fr}
+  .demo-side{border-right:0;border-bottom:1px solid var(--line)}
+  .demo-shot{min-height:240px}
+  .grid3{grid-template-columns:1fr}
+  .cell{border-right:0!important;border-bottom:1px solid var(--line)!important}.cell:last-child{border-bottom:0!important}
+  .bento{grid-template-columns:1fr}.tile{grid-column:auto!important}
+  .band,.final{padding:44px 26px}
+  .foot{grid-template-columns:1fr 1fr}
+  .foot > div:first-child{grid-column:1/-1}
+  .aside-note{text-align:left}
+}
+@media (max-width:560px){
+  .cards,.plans{grid-template-columns:1fr}
+  .keys{grid-template-columns:1fr 1fr}
+  .key{border-right:1px solid var(--dark-line)!important;border-bottom:1px solid var(--dark-line)!important}
+  .key:nth-child(2n){border-right:0!important}
+  .nav-r .btn:not(.primary){display:none}
+  .stat b{font-size:34px}
+  .announce{font-size:12px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+  .rv{opacity:1;transform:none}
+}
+</style>
 </head>
 <body>
-<x-dc>
-<helmet>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<style>
-  :root{ --accent:#ff6b00; }
-  *{ box-sizing:border-box; }
-  ::selection{ background:rgba(255,107,0,.22); }
-  html{ scroll-behavior:smooth; }
-  body{ margin:0; background:#07090d; }
-  @keyframes otBlink{ 0%,49%{opacity:1} 50%,100%{opacity:0} }
-  @keyframes otHead{ 0%{transform:translateX(0)} 50%{transform:translateX(14px)} 100%{transform:translateX(0)} }
-  @keyframes otPlay{ 0%{left:0%} 46%{left:100%} 50%{left:100%} 96%{left:0%} 100%{left:0%} }
-  @keyframes otPulse{ 0%,100%{opacity:.4; transform:scale(.85)} 50%{opacity:1; transform:scale(1.2)} }
-  @keyframes otReveal{ from{opacity:0; transform:translateY(28px)} to{opacity:1; transform:translateY(0)} }
-  .ot-comfort *{ animation:none !important; }
-  @media (prefers-reduced-motion: reduce){ *{ animation:none !important; } }
-</style>
-</helmet>
 
-<div id="ot-root" style="background:#07090d; color:#e8ecf2; font-family:'Space Grotesk',system-ui,sans-serif; -webkit-font-smoothing:antialiased; overflow-x:hidden; position:relative; min-height:100vh;">
-  <div style="position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;"><canvas id="ot-market-canvas" style="position:absolute; inset:0; width:100%; height:100%;"></canvas></div>
-  <div style="position:relative; z-index:1;">
+<div class="announce">
+  <span class="pill">NEW</span>
+  <span><b>v0.8.0</b> — provenance on every number, in-app provider keys, Kite &amp; CSV import, and a Docker image on GHCR.</span>
+  <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/releases/latest">Release notes →</a>
+</div>
 
-  <!-- NAV -->
-  <nav style="position:sticky; top:0; z-index:50; display:flex; align-items:center; justify-content:space-between; padding:18px 32px; background:rgba(7,9,13,.72); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid rgba(255,255,255,.06);">
-    <a href="#top" style="display:flex; align-items:center; text-decoration:none;"><img src="assets/logo.png" alt="OpenTerminalUI" style="height:22px; width:auto; display:block; filter:brightness(0) invert(1);" /></a>
-    <div style="display:flex; align-items:center; gap:26px; font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#8b94a3;">
-      <a href="Features.dc.html" style="color:inherit; text-decoration:none;">Features</a>
-      <a href="Docs.dc.html" style="color:inherit; text-decoration:none;">Docs</a>
-      <a href="Roadmap.dc.html" style="color:inherit; text-decoration:none;">Roadmap</a>
-      <button onClick="{{ toggleMotion }}" style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#8b94a3; background:transparent; border:1px solid rgba(255,255,255,.12); border-radius:999px; padding:5px 12px; cursor:pointer;">Motion · {{ motionLabel }}</button>
-      <a href="https://github.com/Hitheshkaranth/OpenTerminalUI" style="display:inline-flex; align-items:center; gap:7px; padding:7px 15px; border-radius:999px; border:1px solid rgba(255,255,255,.16); color:#e8ecf2; text-decoration:none; font-weight:500;">GitHub ↗</a>
-      <a href="/login" style="display:inline-flex; align-items:center; gap:7px; padding:7px 15px; border-radius:999px; background:var(--accent,#ff6b00); color:#07090d; text-decoration:none; font-weight:600;">Launch Terminal →</a>
+<nav class="top" id="nav">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="OpenTerminalUI home"><img src="assets/logo-ink.png" alt="OpenTerminalUI" width="92" height="28"></a>
+    <div class="links">
+      <a href="#products">Product</a>
+      <a href="#workflows">Workflows</a>
+      <a href="#agent">AI &amp; MCP</a>
+      <a href="#deploy">Deploy</a>
+      <a href="Docs.dc.html">Docs</a>
+      <a href="Roadmap.dc.html">Roadmap</a>
     </div>
-  </nav>
-
-  <!-- HERO -->
-  <header id="top" style="position:relative; min-height:92vh; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:80px 32px 60px; overflow:hidden;">
-    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:1100px; max-width:140%; height:560px; background:radial-gradient(ellipse at center, rgba(255,107,0,.08), transparent 62%); pointer-events:none;"></div>
-    <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.28em; text-transform:uppercase; color:#6a7488; margin-bottom:30px; position:relative;">Build now · Rewind history · Watch it live</div>
-    <h1 style="position:relative; margin:0; font-weight:700; font-size:clamp(52px,11vw,160px); line-height:0.86; letter-spacing:-.04em; color:#f3f6fa;">
-      <span style="position:absolute; inset:0; color:rgba(255,107,0,.14); animation:otHead 9s ease-in-out infinite; pointer-events:none;">Strategy<br/>through time</span>
-      Strategy<br/>through time
-    </h1>
-    <p style="position:relative; margin:38px 0 0; font-size:18px; line-height:1.6; color:#8b94a3; max-width:520px;">Write the logic, replay it against years of market history, then watch it run live — backtests, signals, risk and analytics on one self-hosted desk.</p>
-    <div style="position:relative; display:flex; gap:13px; margin-top:38px; flex-wrap:wrap; justify-content:center;">
-      <a href="/login" style-hover="transform:translateY(-2px);" style="display:inline-flex; align-items:center; gap:9px; padding:14px 26px; border-radius:999px; background:var(--accent,#ff6b00); color:#0a0d12; font-weight:600; font-size:14px; text-decoration:none; transition:transform .25s;">Launch the terminal →</a>
-      <a href="https://github.com/Hitheshkaranth/OpenTerminalUI" style-hover="border-color:rgba(255,255,255,.4);" style="display:inline-flex; align-items:center; gap:9px; padding:14px 26px; border-radius:999px; border:1px solid rgba(255,255,255,.16); color:#e8ecf2; font-weight:500; font-size:14px; text-decoration:none; transition:border-color .25s;">★ Star on GitHub</a>
+    <div class="nav-r">
+      <a class="btn sm" href="https://github.com/Hitheshkaranth/OpenTerminalUI" aria-label="GitHub repository">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span class="star" id="stars">★ GitHub</span>
+      </a>
+      <a class="btn sm primary" data-launch href="#deploy">Get started</a>
     </div>
+  </div>
+</nav>
 
-    <!-- PAST <<< REWIND >>> NOW scrubber -->
-    <div style="position:relative; width:min(680px,90%); margin-top:64px;">
-      <div style="display:flex; align-items:center; justify-content:space-between; font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:#6a7488; margin-bottom:14px;">
-        <span>Past</span>
-        <span style="color:#8b94a3;">&laquo; Rewind &nbsp;·&nbsp; Replay &raquo;</span>
-        <span style="display:inline-flex; align-items:center; gap:7px; color:var(--accent,#ff6b00);"><span style="width:7px; height:7px; border-radius:50%; background:var(--accent,#ff6b00); box-shadow:0 0 8px var(--accent,#ff6b00); animation:otPulse 1.8s ease-in-out infinite;"></span>Now · Live</span>
+<!-- ============ HERO ============ -->
+<header class="hero" id="top">
+  <canvas id="mesh" aria-hidden="true"></canvas>
+  <div class="wrap hero-grid">
+    <div>
+      <div class="eyebrow"><span class="tag">MIT</span> Open source · self-hosted · <span class="mono">v0.8.0</span></div>
+      <h1>One terminal.<br><span class="l2">Every market,</span><br><span class="s">self-hosted.</span></h1>
+      <p class="lede">A Bloomberg-style financial terminal you run on your own machine — equities, F&amp;O, crypto, macro, portfolio risk, backtests and an AI research agent, with every number labelled with where it came from.</p>
+      <p class="fine">NSE, BSE, NYSE and NASDAQ plus crypto, forex, commodities, bonds, ETFs and mutual funds. Starts on free data with no API keys; add Kite, Finnhub or FMP when you want live feeds.</p>
+      <div class="cta-row">
+        <a class="btn primary" data-launch href="#deploy">Get started →</a>
+        <a class="btn" href="#demo">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 22h8M12 18v4"/></svg>
+          Tour the screens</a>
+        <a class="btn" href="https://github.com/Hitheshkaranth/OpenTerminalUI">★ Star on GitHub</a>
       </div>
-      <div style="position:relative; height:2px; background:linear-gradient(90deg, rgba(255,255,255,.04), rgba(255,255,255,.18), rgba(255,107,0,.6)); border-radius:2px;">
-        <div data-motion style="position:absolute; top:50%; left:0; transform:translate(-50%,-50%); animation:otPlay 7s cubic-bezier(.5,0,.5,1) infinite;">
-          <div style="width:13px; height:13px; border-radius:50%; background:#f3f6fa; box-shadow:0 0 0 4px rgba(243,246,250,.12), 0 0 14px rgba(255,107,0,.5);"></div>
+      <div class="micro">// one command · no key to start · SQLite by default · amd64 + arm64</div>
+    </div>
+
+    <div class="console-wrap">
+      <div class="console" role="region" aria-label="API example">
+        <div class="console-top"><span class="verb" id="c-verb">GET</span><span class="path" id="c-path"></span><span class="ok" id="c-status">200 OK</span></div>
+        <div class="console-body" id="c-body" aria-live="polite"></div>
+        <div class="console-tabs" role="tablist" id="c-tabs"></div>
+      </div>
+      <div class="float-card">
+        <strong>Your terminal, inside Claude</strong>
+        <p>45 MCP tools over stdio or HTTP — your portfolio, watchlists and alerts, with provenance on every result.</p>
+        <code>/api/mcp · X-API-Key: otui_…</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="stats">
+      <div class="stat"><b data-count="77">77</b><span>Screens, one shell</span></div>
+      <div class="stat"><b data-count="70" data-suffix="+">70+</b><span>Technical indicators</span></div>
+      <div class="stat"><b data-count="45">45</b><span>MCP tools for agents</span></div>
+      <div class="stat"><b data-count="1762" data-sep="1">1,762</b><span>Automated tests</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ 01 LIVE TOUR ============ -->
+<section id="demo" style="padding-top:64px">
+  <div class="wrap">
+    <div class="label"><b>01</b> Screen tour</div>
+    <div class="demo rv">
+      <div class="demo-bar" role="tablist" id="d-tabs"><span class="dots"><i></i><i></i><i></i></span></div>
+      <div class="demo-grid">
+        <div class="demo-side">
+          <div class="kick" id="d-kick"></div>
+          <h3 id="d-title"></h3>
+          <p id="d-desc"></p>
+          <ul id="d-list"></ul>
+          <div class="route" id="d-route"></div>
         </div>
+        <div class="demo-shot"><img id="d-img" alt="" width="1680" height="1050"></div>
       </div>
-      <div style="display:flex; justify-content:space-between; margin-top:12px; font-family:'Fira Code',monospace; font-size:10px; letter-spacing:.1em; color:#4f5868;">
-        <span>2019</span><span>2021</span><span>2023</span><span>2025</span><span style="color:#7a8497;">TODAY</span>
-      </div>
+      <div class="demo-foot"><span id="d-count"></span><span>captured from the real app · seeded data</span></div>
     </div>
-  </header>
+  </div>
+</section>
 
-  <!-- HOOK -->
-  <section data-reveal style="position:relative; max-width:980px; margin:0 auto; padding:120px 32px; text-align:center;">
-    <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:#6a7488; margin-bottom:26px;">Before live, every strategy faces one question</div>
-    <h2 style="margin:0; font-weight:600; font-size:clamp(34px,5.4vw,72px); line-height:1.02; letter-spacing:-.03em; color:#f3f6fa;">What would your strategy<br/>have <span style="color:var(--accent,#ff6b00);">actually done?</span></h2>
-    <p style="margin:30px auto 0; max-width:520px; font-size:18px; line-height:1.6; color:#8b94a3;">Not a hunch. A vectorized answer — with slippage, fills and fees — across every bar of history you can replay.</p>
-  </section>
+<div class="ticker" aria-label="Recently shipped">
+  <span class="fixed">● RECENTLY SHIPPED</span>
+  <div class="track" id="ship"></div>
+</div>
 
-  <!-- BUILD THE LOGIC -->
-  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:40px 32px 100px;">
-    <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent,#ff6b00); margin-bottom:18px;">Logic before proof</div>
-    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:30px; flex-wrap:wrap; margin-bottom:42px;">
-      <h2 style="margin:0; font-weight:600; font-size:clamp(30px,4vw,52px); line-height:1.0; letter-spacing:-.03em; color:#f3f6fa;">Build the logic.</h2>
-      <p style="margin:0; max-width:360px; font-size:16px; line-height:1.55; color:#8b94a3;">Set context, conditions, capital, risk and exits — then let history answer.</p>
-    </div>
-    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px;">
-      <sc-for list="{{ buildCards }}" as="c" hint-placeholder-count="8">
-        <div style="border:1px solid rgba(255,255,255,.07); border-radius:14px; background:linear-gradient(165deg,#0e121a,#0a0d13); padding:22px; min-height:128px; display:flex; flex-direction:column; justify-content:space-between;">
-          <div style="font-family:'Fira Code',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5b6472;">{{ c.tag }}</div>
-          <div>
-            <div style="font-size:17px; font-weight:600; color:#eef1f5; margin-bottom:5px;">{{ c.title }}</div>
-            <div style="font-size:13px; color:#7e8798; line-height:1.45;">{{ c.sub }}</div>
-          </div>
-        </div>
-      </sc-for>
-    </div>
-  </section>
-
-  <!-- RUN IT THROUGH HISTORY / LIVE -->
-  <section id="history" data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:40px 32px 100px;">
-    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap; margin-bottom:30px;">
-      <h2 style="margin:0; font-weight:600; font-size:clamp(28px,3.8vw,50px); line-height:1.0; letter-spacing:-.03em; color:#f3f6fa; max-width:18ch;">Run it through history.<br/>Or watch it live.</h2>
-      <div style="display:inline-flex; padding:4px; border:1px solid rgba(255,255,255,.1); border-radius:999px; background:#0c1016; gap:4px;">
-        <button onClick="{{ setHistory }}" style="font-family:'Fira Code',monospace; font-size:12px; letter-spacing:.04em; padding:8px 18px; border:0; border-radius:999px; cursor:pointer; background:{{ histBg }}; color:{{ histFg }};">Replay</button>
-        <button onClick="{{ setLive }}" style="font-family:'Fira Code',monospace; font-size:12px; letter-spacing:.04em; padding:8px 18px; border:0; border-radius:999px; cursor:pointer; background:{{ liveBg }}; color:{{ liveFg }};">Live</button>
-      </div>
-    </div>
-
-    <div style="border:1px solid rgba(255,255,255,.08); border-radius:18px; background:linear-gradient(180deg,#0d1118,#0a0d13); overflow:hidden;">
-      <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 22px; border-bottom:1px solid rgba(255,255,255,.06); flex-wrap:wrap; gap:12px;">
-        <div style="display:flex; align-items:center; gap:12px;">
-          <span style="font-family:'Fira Code',monospace; font-size:12px; color:#eef1f5;">sma_cross · NIFTY 50</span>
-          <span style="font-family:'Fira Code',monospace; font-size:11px; color:#5b6472;">{{ chartRange }}</span>
-        </div>
-        <span style="display:inline-flex; align-items:center; gap:7px; font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:{{ modeColor }};"><span style="width:7px; height:7px; border-radius:50%; background:{{ modeColor }}; box-shadow:0 0 8px {{ modeColor }};"></span>{{ modeLabel }}</span>
-      </div>
-      <div style="display:grid; grid-template-columns:1fr 280px;">
-        <div style="position:relative; padding:18px 8px 18px 18px; min-height:300px;">
-          <canvas id="ot-equity" style="display:block; width:100%; height:300px;"></canvas>
-        </div>
-        <div style="border-left:1px solid rgba(255,255,255,.06); display:grid; grid-template-rows:repeat(4,1fr);">
-          <sc-for list="{{ chartStats }}" as="s" hint-placeholder-count="4">
-            <div style="padding:20px 24px; border-bottom:1px solid rgba(255,255,255,.06); display:flex; flex-direction:column; justify-content:center;">
-              <div style="font-family:'Fira Code',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5b6472; margin-bottom:7px;">{{ s.label }}</div>
-              <div data-count-to="{{ s.value }}" data-count-prefix="{{ s.prefix }}" data-count-suffix="{{ s.suffix }}" data-count-dec="{{ s.dec }}" style="font-family:'Fira Code',monospace; font-size:26px; font-weight:500; color:{{ s.color }};">{{ s.display }}</div>
-            </div>
-          </sc-for>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CONTROL -->
-  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:40px 32px 100px;">
-    <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent,#ff6b00); margin-bottom:18px;">Risk above action</div>
-    <div style="display:grid; grid-template-columns:0.85fr 1.15fr; gap:56px; align-items:center;">
-      <div>
-        <h2 style="margin:0 0 18px; font-weight:600; font-size:clamp(30px,4vw,52px); line-height:1.0; letter-spacing:-.03em; color:#f3f6fa;">Control above action.</h2>
-        <p style="margin:0; font-size:17px; line-height:1.6; color:#8b94a3;">Protect long and short setups, pause new entries on a volatility spike, and resume every live strategy together — desk-wide, in one move.</p>
-      </div>
-      <div style="display:flex; flex-direction:column; gap:10px;">
-        <sc-for list="{{ controls }}" as="ct" hint-placeholder-count="5">
-          <div style="display:flex; align-items:center; gap:16px; border:1px solid rgba(255,255,255,.07); border-radius:12px; background:#0c1016; padding:16px 20px;">
-            <span style="width:9px; height:9px; border-radius:50%; background:{{ ct.color }}; box-shadow:0 0 9px {{ ct.color }}; flex-shrink:0;"></span>
-            <div style="font-size:15px; font-weight:600; color:#eef1f5; min-width:200px;">{{ ct.title }}</div>
-            <div style="font-size:14px; color:#7e8798;">{{ ct.sub }}</div>
-          </div>
-        </sc-for>
-      </div>
-    </div>
-  </section>
-
-  <!-- ANALYTICS -->
-  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:40px 32px 100px;">
-    <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent,#ff6b00); margin-bottom:18px;">Performance rollup</div>
-    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap; margin-bottom:30px;">
-      <h2 style="margin:0; font-weight:600; font-size:clamp(28px,3.8vw,50px); line-height:1.0; letter-spacing:-.03em; color:#f3f6fa;">Analytics across every level.</h2>
-      <div style="display:inline-flex; padding:4px; border:1px solid rgba(255,255,255,.1); border-radius:999px; background:#0c1016; gap:4px;">
-        <button onClick="{{ tabStrat }}" style="font-family:'Fira Code',monospace; font-size:12px; padding:8px 16px; border:0; border-radius:999px; cursor:pointer; background:{{ tA.bg }}; color:{{ tA.fg }};">Strategy</button>
-        <button onClick="{{ tabPort }}" style="font-family:'Fira Code',monospace; font-size:12px; padding:8px 16px; border:0; border-radius:999px; cursor:pointer; background:{{ tB.bg }}; color:{{ tB.fg }};">Portfolio</button>
-        <button onClick="{{ tabDesk }}" style="font-family:'Fira Code',monospace; font-size:12px; padding:8px 16px; border:0; border-radius:999px; cursor:pointer; background:{{ tC.bg }}; color:{{ tC.fg }};">Desk</button>
-      </div>
-    </div>
-    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px;">
-      <sc-for list="{{ rollup }}" as="r" hint-placeholder-count="8">
-        <div style="border:1px solid rgba(255,255,255,.07); border-radius:14px; background:linear-gradient(165deg,#0e121a,#0a0d13); padding:22px;">
-          <div style="font-family:'Fira Code',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5b6472; margin-bottom:10px;">{{ r.label }}</div>
-          <div style="font-family:'Fira Code',monospace; font-size:24px; font-weight:500; color:{{ r.color }};">{{ r.value }}</div>
-        </div>
-      </sc-for>
-    </div>
-  </section>
-
-  <!-- PRODUCT PROOF -->
-  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:40px 32px 100px;">
-    <div style="text-align:center; max-width:680px; margin:0 auto 40px;">
-      <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent,#ff6b00); margin-bottom:18px;">Product proof</div>
-      <h2 style="margin:0; font-weight:600; font-size:clamp(28px,3.8vw,50px); line-height:1.0; letter-spacing:-.03em; color:#f3f6fa;">The workspace behind the motion.</h2>
-      <p style="margin:22px 0 0; font-size:17px; line-height:1.6; color:#8b94a3;">Strategy rules, history replay, live activity, analytics and risk control — tied into one working surface, open source and self-hosted.</p>
-    </div>
-    <div style="border:1px solid rgba(255,255,255,.1); border-radius:16px; overflow:hidden; background:#0d1117; box-shadow:0 50px 110px -50px rgba(0,0,0,.9);">
-      <div style="display:flex; align-items:center; gap:8px; padding:11px 16px; background:rgba(255,255,255,.03); border-bottom:1px solid rgba(255,255,255,.06);"><span style="width:9px; height:9px; border-radius:50%; background:#ff5f56;"></span><span style="width:9px; height:9px; border-radius:50%; background:#ffbd2e;"></span><span style="width:9px; height:9px; border-radius:50%; background:#27c93f;"></span><span style="margin-left:10px; font-family:'Fira Code',monospace; font-size:11px; color:#6a7488;">otui ▸ home · mission control</span></div>
-      <img src="assets/screenshots/home.png" alt="OpenTerminalUI workspace overview" loading="lazy" style="display:block; width:100%;" />
-    </div>
-    <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:26px;">
-      <span style="font-family:'Fira Code',monospace; font-size:12px; color:#8b94a3;"><span style="color:var(--accent,#ff6b00);">1</span> Build strategy</span>
-      <span style="color:#3a414e;">·</span>
-      <span style="font-family:'Fira Code',monospace; font-size:12px; color:#8b94a3;"><span style="color:var(--accent,#ff6b00);">2</span> Run history</span>
-      <span style="color:#3a414e;">·</span>
-      <span style="font-family:'Fira Code',monospace; font-size:12px; color:#8b94a3;"><span style="color:var(--accent,#ff6b00);">3</span> Watch live</span>
-      <span style="color:#3a414e;">·</span>
-      <span style="font-family:'Fira Code',monospace; font-size:12px; color:#8b94a3;"><span style="color:var(--accent,#ff6b00);">4</span> Read analytics</span>
-      <span style="color:#3a414e;">·</span>
-      <span style="font-family:'Fira Code',monospace; font-size:12px; color:#8b94a3;"><span style="color:var(--accent,#ff6b00);">5</span> Control risk</span>
-    </div>
-  </section>
-
-  <!-- CTA -->
-  <section data-reveal style="position:relative; max-width:1180px; margin:0 auto; padding:20px 32px 120px;">
-    <div style="position:relative; border:1px solid rgba(255,107,0,.2); border-radius:22px; overflow:hidden; background:radial-gradient(120% 150% at 50% 0%, rgba(255,107,0,.16), transparent 58%), #0b0e14; padding:84px 40px; text-align:center;">
-      <div style="font-family:'Fira Code',monospace; font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:#6a7488; margin-bottom:22px;">Ready to start</div>
-      <h2 style="margin:0; font-weight:700; font-size:clamp(34px,5vw,68px); line-height:1.0; letter-spacing:-.03em; color:#f3f6fa;">Start with a strategy<br/>you can <span style="color:var(--accent,#ff6b00);">inspect.</span></h2>
-      <p style="margin:22px auto 0; max-width:480px; font-size:17px; line-height:1.6; color:#8b94a3;">Replay market history on virtual capital and keep every live decision traceable — before real money is involved.</p>
-      <div style="display:flex; gap:13px; justify-content:center; margin-top:34px; flex-wrap:wrap;">
-        <a href="https://github.com/Hitheshkaranth/OpenTerminalUI" style-hover="transform:translateY(-2px);" style="display:inline-flex; align-items:center; gap:9px; padding:15px 30px; border-radius:999px; background:var(--accent,#ff6b00); color:#0a0d12; font-weight:600; font-size:14px; text-decoration:none; transition:transform .25s;">Get OpenTerminalUI →</a>
-        <a href="Docs.dc.html" style-hover="border-color:rgba(255,255,255,.4);" style="display:inline-flex; align-items:center; gap:9px; padding:15px 30px; border-radius:999px; border:1px solid rgba(255,255,255,.16); color:#e8ecf2; font-weight:500; font-size:14px; text-decoration:none; transition:border-color .25s;">Read the docs</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- FOOTER -->
-  <footer style="border-top:1px solid rgba(255,255,255,.07);">
-    <div style="max-width:1180px; margin:0 auto; padding:30px 32px; display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap; font-family:'Fira Code',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5b6472;">
-      <span>OpenTerminalUI</span>
-      <div style="display:flex; gap:22px;">
-        <a href="Features.dc.html" style="color:inherit; text-decoration:none;">Features</a>
-        <a href="Docs.dc.html" style="color:inherit; text-decoration:none;">Docs</a>
-        <a href="Roadmap.dc.html" style="color:inherit; text-decoration:none;">Roadmap</a>
-        <a href="https://github.com/Hitheshkaranth/OpenTerminalUI" style="color:inherit; text-decoration:none;">GitHub</a>
-      </div>
-      <span>MIT · © 2026</span>
-    </div>
-  </footer>
-
+<div class="providers wrap">
+  <div class="cap">Works with the data you already have · provider waterfall with automatic failover</div>
+  <div class="chips">
+    <span class="chip"><i class="d" style="background:var(--live)"></i>Zerodha Kite <small>NSE/BSE live</small></span>
+    <span class="chip"><i class="d" style="background:var(--live)"></i>Finnhub <small>US ticks</small></span>
+    <span class="chip"><i class="d" style="background:var(--live)"></i>Alpaca</span>
+    <span class="chip"><i class="d" style="background:var(--cached)"></i>FMP <small>fundamentals</small></span>
+    <span class="chip"><i class="d" style="background:var(--delayed)"></i>Yahoo Finance <small>no key</small></span>
+    <span class="chip"><i class="d" style="background:var(--delayed)"></i>NSE <small>F&amp;O, actions</small></span>
+    <span class="chip"><i class="d" style="background:var(--cached)"></i>FRED</span>
+    <span class="chip"><i class="d" style="background:var(--cached)"></i>FXMacroData <small>no key</small></span>
+    <span class="chip"><i class="d" style="background:var(--synthetic)"></i>OpenRouter · LM Studio</span>
+    <span class="chip"><i class="d" style="background:var(--ink)"></i>Claude via MCP</span>
   </div>
 </div>
-</x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:900},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#ff6b00&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#ff6b00&quot;,&quot;#3fbaff&quot;,&quot;#2ec27e&quot;,&quot;#a78bfa&quot;],&quot;section&quot;:&quot;Theme&quot;}}">
-class Component extends DCLogic {
-  state = { mode: 'history', tab: 'strat', comfort: false };
 
-  constructor(props){
-    super(props);
-    this.reduce = false; this.eqRaf = null;
+<!-- ============ 02 MANIFESTO ============ -->
+<section class="dark manifesto">
+  <div class="wrap">
+    <div class="label"><b>02</b> Manifesto</div>
+    <h2 class="rv">Terminals were built for institutions.<br><del>So everyone else trades on screenshots.</del><br><span class="hl">So we built one you can own.</span></h2>
+    <div class="man-grid">
+      <div class="beliefs rv">
+        <div class="kick">// what we believe</div>
+        <p><strong>A number without a source is a rumour.</strong> Every snapshot says live, delayed, cached or synthetic — and which provider served it.</p>
+        <p><strong>Blank beats invented.</strong> If a provider can't fill a metric, the cell says why instead of showing a plausible-looking guess.</p>
+        <p><strong>Your data stays on your machine.</strong> Self-hosted, MIT, local LLMs welcome. No telemetry, no seat licence.</p>
+        <p><strong>Analysis should end in action.</strong> Alert → paper order, screen → backtest, idea → out-of-sample verdict — in one shell.</p>
+      </div>
+      <div class="log rv" id="log" aria-hidden="true"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 03 PRODUCTS ============ -->
+<section id="products">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="label"><b>03</b> Product · 8 desks</div>
+        <h2>Every desk<br><em class="s">a trader needs.</em></h2>
+      </div>
+      <div class="aside-note">// one shell, one symbol context<br>// Ctrl+G to jump anywhere</div>
+    </div>
+    <div class="cards">
+      <a class="card feat rv" href="#demo" data-tab="hub">
+        <div class="thumb" style="background-image:url(assets/shots/security-hub-india.webp)"></div>
+        <div class="body"><div class="ttl"><h3>Security Hub</h3><span class="badge">0.8 · PROVENANCE</span></div><span class="path">/equity/security/RELIANCE</span>
+        <p>One page per symbol, across US and Indian markets.</p>
+        <ul><li>8 tabs: financials to ESG</li><li>Provenance chip on every quote</li><li>AI catalysts &amp; conviction</li></ul></div>
+      </a>
+      <a class="card rv" href="#demo" data-tab="charts">
+        <div class="thumb" style="background-image:url(assets/shots/chart-workstation.webp)"></div>
+        <div class="body"><div class="ttl"><h3>Chart Workstation</h3></div><span class="path">/equity/chart-workstation</span>
+        <p>Up to nine linked panels with synced crosshairs.</p>
+        <ul><li>70+ indicators, replay mode</li><li>Renko, Kagi, P&amp;F</li><li>Volume profile, drawings</li></ul></div>
+      </a>
+      <a class="card rv" href="#demo" data-tab="screener">
+        <div class="thumb" style="background-image:url(assets/shots/screener.webp)"></div>
+        <div class="body"><div class="ttl"><h3>Screener &amp; Factors</h3></div><span class="path">/equity/screener</span>
+        <p>Query builder, formula engine and factor ranks.</p>
+        <ul><li>Value · Momentum · Quality</li><li>"Why ranked" explanations</li><li>15+ visualisations</li></ul></div>
+      </a>
+      <a class="card rv" href="#demo" data-tab="fno">
+        <div class="thumb" style="background-image:url(assets/shots/fno-option-chain.webp)"></div>
+        <div class="body"><div class="ttl"><h3>Futures &amp; Options</h3></div><span class="path">/fno</span>
+        <p>Chains, Greeks, OI and flow for NSE and US.</p>
+        <ul><li>Live Greeks &amp; IV rank</li><li>Multi-leg strategy builder</li><li>PCR, OI build-up, expiry</li></ul></div>
+      </a>
+      <a class="card rv" href="#demo" data-tab="portfolio">
+        <div class="thumb" style="background-image:url(assets/shots/portfolio.webp)"></div>
+        <div class="body"><div class="ttl"><h3>Portfolio &amp; Risk</h3><span class="badge">0.8 · IMPORT</span></div><span class="path">/equity/portfolio</span>
+        <p>Holdings-first, with broker and CSV import.</p>
+        <ul><li>Kite, Zerodha, Groww CSV</li><li>VaR, CVaR, stress tests</li><li>Paper trading &amp; journal</li></ul></div>
+      </a>
+      <a class="card rv" href="#demo" data-tab="backtest">
+        <div class="thumb" style="background-image:url(assets/shots/backtesting.webp)"></div>
+        <div class="body"><div class="ttl"><h3>Backtest &amp; Model Lab</h3></div><span class="path">/backtesting</span>
+        <p>From template to walk-forward in one flow.</p>
+        <ul><li>16+ strategy templates</li><li>Monte Carlo robustness</li><li>Pair trading, Portfolio Lab</li></ul></div>
+      </a>
+      <a class="card rv" href="#agent" data-tab="agent">
+        <div class="thumb" style="background-image:url(assets/shots/ai-agent.webp);background-position:center 12%"></div>
+        <div class="body"><div class="ttl"><h3>AI Research Agent</h3><span class="badge">45 MCP TOOLS</span></div><span class="path">Ctrl/Cmd + J</span>
+        <p>Tool-using, screen-aware and debate-capable.</p>
+        <ul><li>Bull vs bear → PM decision</li><li>Strategy Lab with OOS tests</li><li>Memory, threads, approvals</li></ul></div>
+      </a>
+      <a class="card rv" href="#demo" data-tab="macro">
+        <div class="thumb" style="background-image:url(assets/shots/economic-terminal.webp)"></div>
+        <div class="body"><div class="ttl"><h3>Cross-Asset &amp; Macro</h3></div><span class="path">/equity/economics</span>
+        <p>Everything that isn't a single stock.</p>
+        <ul><li>Crypto, FX, commodities</li><li>Bonds, yield curve, ETFs</li><li>Events hub &amp; macro calendar</li></ul></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 04 ZERO CONFIG BAND ============ -->
+<div class="wrap">
+  <div class="band rv">
+    <div>
+      <div class="kick">✦ ZERO CONFIG <span class="pill" style="background:#ffb347;color:#1a1000">NEW IN 0.8</span></div>
+      <h2>No keys. No signup.<br><em class="s">One command.</em></h2>
+      <p class="lede" style="font-size:16px">The installer detects your OS, writes a single <span class="mono">.env</span>, generates secrets and an admin login, and starts the terminal on <span class="mono">localhost:8000</span>.</p>
+      <ul>
+        <li><span><b>Free data out of the box</b> — Yahoo, NSE, FXMacroData and FRED fallbacks</span></li>
+        <li><span><b>Add keys in the browser</b> — Settings → Data Providers sets, masks and tests them live</span></li>
+        <li><span><b>Or skip the clone</b> — pull the multi-arch image from GHCR</span></li>
+      </ul>
+      <div class="cta-row">
+        <a class="btn accent" href="#deploy">See deploy options →</a>
+        <a class="btn ghost-dark" href="https://github.com/Hitheshkaranth/OpenTerminalUI#quick-start">Read the quick start</a>
+      </div>
+    </div>
+    <div class="term">
+      <div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span>bash</span><button class="copy" data-copy="git clone https://github.com/Hitheshkaranth/OpenTerminalUI.git && cd OpenTerminalUI && ./install.sh">copy</button></div>
+<pre><span class="c"># clone and install — Docker if you have it, else Python + Node</span>
+<span class="v">$</span> git clone https://github.com/Hitheshkaranth/OpenTerminalUI.git
+<span class="v">$</span> cd OpenTerminalUI && ./install.sh
+<span class="ok">✓</span> OpenTerminalUI is ready  → http://localhost:8000
+    email:    admin@openterminal.local
+    password: <span class="c">&lt;generated&gt;</span>
+
+<span class="c"># …or just run the image</span>
+<span class="v">$</span> docker run -p 8000:8000 \
+    ghcr.io/hitheshkaranth/openterminalui:latest</pre>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 05 WORKFLOWS ============ -->
+<section id="workflows">
+  <div class="wrap">
+    <div class="label"><b>05</b> In practice</div>
+    <h2 style="margin-bottom:48px">What people <em class="s">actually run</em> on it.</h2>
+    <div class="grid3 rv">
+      <div class="cell"><div class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></div>
+        <div class="kick">Pre-market</div><h3>Morning brief</h3><p>Cockpit ranks portfolio risk, alerts, catalysts and movers into one stack before the open.</p><div class="steps">cockpit → events hub → watchlist</div></div>
+      <div class="cell"><div class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></div>
+        <div class="kick">Quant research</div><h3>Idea → verdict</h3><p>Screen, backtest, sweep parameters, then an out-of-sample test that refuses to call a curve fit an edge.</p><div class="steps">screener → backtest → model lab</div></div>
+      <div class="cell"><div class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19h16M6 15l3-8 3 5 3-3 3 6"/></svg></div>
+        <div class="kick">Derivatives</div><h3>Options desk</h3><p>Chain with live Greeks, OI build-up and PCR, then build and price a multi-leg strategy.</p><div class="steps">option chain → greeks → strategy</div></div>
+      <div class="cell"><div class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
+        <div class="kick">Portfolio</div><h3>Import &amp; stress-test</h3><p>Sync Kite or drop a Groww/Zerodha CSV, then run VaR, factor exposure and six macro stress scenarios.</p><div class="steps">import → risk → stress test</div></div>
+      <div class="cell"><div class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
+        <div class="kick">Automation</div><h3>Alerts that act</h3><p>Compound rules trigger a paper order, a watchlist add or a webhook — with a dry run before you save.</p><div class="steps">alert → action → journal</div></div>
+      <div class="cell"><div class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.9 5.8H20l-5 3.6 1.9 5.8-4.9-3.6-4.9 3.6 1.9-5.8-5-3.6h6.1z"/></svg></div>
+        <div class="kick">Agents</div><h3>Claude on your book</h3><p>Point Claude Code or Desktop at the MCP server; it reads your positions and proposes, a human confirms.</p><div class="steps">mcp → propose_* → you approve</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 06 KEYBOARD (dark) ============ -->
+<section class="dark">
+  <div class="wrap">
+    <div class="label"><b>06</b> Keyboard first</div>
+    <h2 style="margin-bottom:48px">Fast hands, <em class="s">not more clicks.</em></h2>
+    <div class="keys rv">
+      <div class="key"><kbd>Ctrl G</kbd><b>GO bar</b><span>symbol or route</span></div>
+      <div class="key"><kbd>Ctrl K</kbd><b>Command palette</b><span>25+ functions</span></div>
+      <div class="key"><kbd>Ctrl J</kbd><b>AI agent</b><span>screen-aware</span></div>
+      <div class="key"><kbd>F1–F9</kbd><b>Workspaces</b><span>Bloomberg hotkeys</span></div>
+      <div class="key"><kbd>1–7</kbd><b>Timeframes</b><span>in any chart</span></div>
+      <div class="key"><kbd>Esc</kbd><b>Close</b><span>panel or dialog</span></div>
+      <div class="key"><kbd>RELIANCE</kbd><b>Market follows</b><span>re-points to NSE</span></div>
+      <div class="key"><kbd>Right-click</kbd><b>Paper buy/sell</b><span>from any symbol</span></div>
+      <div class="key"><kbd>Pin</kbd><b>Nav rail</b><span>pinned + recent</span></div>
+      <div class="key"><kbd>Save view</kbd><b>Saved views</b><span>filters, tabs, layout</span></div>
+      <div class="key"><kbd>Preset</kbd><b>Workspaces</b><span>Trader · Quant · PM</span></div>
+      <div class="key"><kbd>Theme</kbd><b>Terminal Noir</b><span>classic · light</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 07 TRUST BENTO ============ -->
+<section id="agent">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="label"><b>07</b> Trust layer</div>
+        <h2>Trust <em class="s">the numbers.</em></h2>
+      </div>
+      <div class="aside-note" style="max-width:360px;text-align:left">// new in 0.8.0<br>The unglamorous work — provenance, provider health and screen-by-screen checks — so the terminal never passes off a guess as a price.</div>
+    </div>
+    <div class="bento">
+      <div class="tile t-a rv">
+        <div class="kick">// provenance · every snapshot</div>
+        <h3>Know where <em class="s">every number</em> came from</h3>
+        <p>Each quote carries source, quality, as-of and latency. Synthetic data is labelled and never used as a price basis.</p>
+        <div class="prov">
+          <div class="prov-row"><span>RELIANCE · last</span><span class="q live">LIVE · KITE</span></div>
+          <div class="prov-row"><span>AAPL · last</span><span class="q delayed">DELAYED · YAHOO</span></div>
+          <div class="prov-row"><span>AAPL · P/E</span><span class="q cached">CACHED · FMP 4m</span></div>
+          <div class="prov-row"><span>NIFTY · order book</span><span class="q synthetic">SYNTHETIC</span></div>
+          <div class="prov-row"><span>INFY · ESG score</span><span class="q na">NO DATA · needs FMP</span></div>
+        </div>
+      </div>
+      <div class="tile t-b rv">
+        <div class="kick">// providers · live status</div>
+        <h3>Provider health, <em class="s">probed for real</em></h3>
+        <p>An expired Kite token reads <b>down</b>, not ok. Admins set, mask, test and clear keys from Settings.</p>
+        <div class="health">
+          <div><span>kite</span><span class="bar"><i style="width:100%"></i></span><span>ok</span></div>
+          <div><span>finnhub</span><span class="bar"><i style="width:100%"></i></span><span>ok</span></div>
+          <div><span>yahoo</span><span class="bar"><i class="warn" style="width:72%"></i></span><span>slow</span></div>
+          <div><span>fmp</span><span class="bar"><i style="width:100%"></i></span><span>ok</span></div>
+          <div><span>nse</span><span class="bar"><i class="bad" style="width:28%"></i></span><span>down</span></div>
+        </div>
+      </div>
+      <div class="tile t-c rv">
+        <div class="kick">// analysis → action</div>
+        <h3>Alerts that <em class="s">do things</em></h3>
+        <p>Up to five actions per rule, dry-run in the builder.</p>
+        <div class="flow"><span>RSI &lt; 30 AND vol &gt; 2×</span><em>→</em><span>paper BUY 10</span><em>→</em><span>webhook</span></div>
+      </div>
+      <div class="tile t-d rv">
+        <div class="kick">// agents · mcp</div>
+        <h3><em class="s">45</em> tools, permission-gated</h3>
+        <p>38 read-only tools; 7 <span class="mono">propose_*</span> writes that a human confirms. Every result comes back as <span class="mono">{ok, data, provenance}</span>.</p>
+      </div>
+      <div class="tile t-e rv">
+        <div class="kick">// verified · 0.8.0</div>
+        <h3>Checked <em class="s">screen by screen</em></h3>
+        <p>Every route captured and checked for failed calls and page errors.</p>
+        <div class="meter"><div class="row"><span>screens clean</span><b>72 / 72</b></div><div class="bar"><i style="width:100%"></i></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 08 DEPLOY ============ -->
+<section id="deploy" style="padding-top:24px">
+  <div class="wrap">
+    <div class="label"><b>08</b> Deploy · free forever</div>
+    <h2 style="margin-bottom:48px">Run it <em class="s">your way.</em></h2>
+    <div class="plans">
+      <div class="plan pop rv">
+        <div class="nm">Installer</div><div class="sub">recommended · macOS · Linux · WSL · Windows</div>
+        <div class="big">1 cmd</div>
+        <ul><li>Detects Docker or local</li><li>Generates secrets &amp; admin</li><li>Prints your login</li><li>Guided keys: <span class="mono">make keys</span></li></ul>
+        <pre>./install.sh</pre>
+        <a class="btn primary" href="https://github.com/Hitheshkaranth/OpenTerminalUI#one-command-recommended">Install guide →</a>
+      </div>
+      <div class="plan rv">
+        <div class="nm">Docker image</div><div class="sub">GHCR · every release</div>
+        <div class="big">:latest</div>
+        <ul><li>linux/amd64 + arm64</li><li>Tagged X.Y.Z and X.Y</li><li>Health-checked</li><li>No clone needed</li></ul>
+        <pre>docker run -p 8000:8000 \
+  ghcr.io/hitheshkaranth/\
+openterminalui:latest</pre>
+        <a class="btn" href="https://github.com/Hitheshkaranth/OpenTerminalUI/pkgs/container/openterminalui">View package →</a>
+      </div>
+      <div class="plan rv">
+        <div class="nm">Compose</div><div class="sub">backend + Redis + Postgres</div>
+        <div class="big">3 svc</div>
+        <ul><li>Redis cache &amp; pub/sub</li><li>Optional PostgreSQL 16</li><li>Persistent data volume</li><li>LM Studio on the host</li></ul>
+        <pre>docker compose \
+  --profile postgres up</pre>
+        <a class="btn" href="https://github.com/Hitheshkaranth/OpenTerminalUI#manual-alternatives">Compose docs →</a>
+      </div>
+      <div class="plan rv">
+        <div class="nm">Develop</div><div class="sub">hot reload · Python 3.11 · Node 22</div>
+        <div class="big">MIT</div>
+        <ul><li>FastAPI + React 18</li><li>Plugin API &amp; scripting</li><li><span class="mono">make gate</span> runs every check</li><li>PRs welcome</li></ul>
+        <pre>uvicorn backend.main:app --reload
+cd frontend && npm run dev</pre>
+        <a class="btn" href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/CONTRIBUTING.md">Contribute →</a>
+      </div>
+    </div>
+    <div class="plans-note"><span>Minimum: 2 cores · 4 GB RAM · 2 GB disk. All API keys optional.</span><a href="https://github.com/Hitheshkaranth/OpenTerminalUI/releases">All releases →</a></div>
+  </div>
+</section>
+
+<!-- ============ 09 FAQ ============ -->
+<section style="padding-top:24px">
+  <div class="wrap faq">
+    <div class="faq-l">
+      <div class="label"><b>09</b> Questions</div>
+      <h2>Frequently <em class="s">asked.</em></h2>
+      <p>Something missing? Read the <a href="Docs.dc.html">docs</a> or <a href="https://github.com/Hitheshkaranth/OpenTerminalUI/issues">open an issue</a>.</p>
+    </div>
+    <div>
+      <details><summary>Is it really free?</summary><p>Yes. OpenTerminalUI is MIT-licensed and runs on your own hardware. The only costs are any paid data providers you choose to plug in.</p></details>
+      <details><summary>Do I need API keys to start?</summary><p>No. It runs on free sources (Yahoo, NSE, FXMacroData, FRED) out of the box. Keys for Kite, Finnhub, FMP or Alpaca unlock live ticks and deeper fundamentals, and can be added later from Settings → Data Providers.</p></details>
+      <details><summary>Which markets are covered?</summary><p>NSE, BSE, NYSE and NASDAQ equities, NSE and US options, plus crypto, forex, commodities, bonds, ETFs and mutual funds. Opening a symbol re-points the whole terminal to its market.</p></details>
+      <details><summary>How do I know whether a number is live?</summary><p>Every snapshot carries a provenance chip — <code>LIVE</code>, <code>DELAYED</code>, <code>CACHED</code>, <code>SYNTHETIC</code> or <code>NO DATA</code> — with the serving provider and as-of time. The status bar shows per-provider health.</p></details>
+      <details><summary>Can Claude or another agent use it?</summary><p>Yes. The built-in MCP server exposes 45 tools over stdio or HTTP. An API key maps to a user, read keys only reach read tools, and write tools only create proposals that you confirm.</p></details>
+      <details><summary>Does it place real trades?</summary><p>No. Orders go to the built-in paper-trading engine. The agent never executes anything — it proposes, you approve.</p></details>
+      <details><summary>Can I run the AI features locally?</summary><p>Yes. Point it at LM Studio (e.g. a Gemma model) for news sentiment and the agent, or use OpenRouter's free models. Nothing leaves your machine when you run locally.</p></details>
+      <details><summary>What does it need to run?</summary><p>Docker, or Python 3.11 and Node. 2 cores and 4 GB RAM is enough; SQLite by default, PostgreSQL and Redis optional.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 10 FINAL CTA ============ -->
+<div class="wrap">
+  <div class="final rv">
+    <div class="label"><b>10</b> Start today</div>
+    <h2>Own your terminal.<br><em class="s">Not</em> a subscription.</h2>
+    <p>Free and open source. Running in about two minutes.</p>
+    <div class="cta-row">
+      <a class="btn accent" data-launch href="#deploy">Get started →</a>
+      <a class="btn ghost-dark" href="https://github.com/Hitheshkaranth/OpenTerminalUI">★ Star on GitHub</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <img src="assets/logo-ink.png" alt="OpenTerminalUI" style="height:28px;width:auto">
+        <p>A self-hosted, open-source financial terminal for markets, research, risk and AI-assisted analysis.</p>
+        <div class="tags"><span>MIT</span><span>Self-hosted</span><span>v0.8.0</span></div>
+      </div>
+      <div><h4>Product</h4><ul>
+        <li><a href="#products">Security Hub</a></li><li><a href="#products">Charts</a></li><li><a href="#products">Screener</a></li><li><a href="#products">F&amp;O</a></li><li><a href="#products">Portfolio &amp; Risk</a></li><li><a href="#products">Backtesting</a></li></ul></div>
+      <div><h4>Platform</h4><ul>
+        <li><a href="#agent">AI agent &amp; MCP</a></li><li><a href="#agent">Provenance</a></li><li><a href="#workflows">Alerts &amp; actions</a></li><li><a href="Features.dc.html">All features</a></li></ul></div>
+      <div><h4>Developers</h4><ul>
+        <li><a href="Docs.dc.html">Documentation</a></li><li><a href="#deploy">Deploy</a></li><li><a href="https://github.com/Hitheshkaranth/OpenTerminalUI/pkgs/container/openterminalui">Docker image</a></li><li><a href="https://github.com/Hitheshkaranth/OpenTerminalUI/releases">Changelog</a></li></ul></div>
+      <div><h4>Project</h4><ul>
+        <li><a href="https://github.com/Hitheshkaranth/OpenTerminalUI">GitHub</a></li><li><a href="Roadmap.dc.html">Roadmap</a></li><li><a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/CONTRIBUTING.md">Contributing</a></li><li><a href="https://github.com/Hitheshkaranth/OpenTerminalUI/issues">Issues</a></li><li><a href="https://github.com/Hitheshkaranth/OpenTerminalUI/blob/main/LICENSE">License</a></li></ul></div>
+    </div>
+    <div class="foot-bot"><span>© 2026 OpenTerminalUI contributors · MIT</span><span>not investment advice · paper trading only</span></div>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const esc = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+  // Inside the app (served by the backend) "Get started" opens the terminal; on the public site it scrolls to Deploy.
+  if (!/github\.io$/.test(location.hostname) && location.protocol !== "file:") {
+    document.querySelectorAll("[data-launch]").forEach(a => { a.href = "/login"; a.textContent = "Launch terminal →"; });
   }
 
-  componentDidMount(){
-    this.reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    if (this.props.accent) document.documentElement.style.setProperty('--accent', this.props.accent);
-    this.initReveal();
-    this.initMarket();
-    this.drawEquity(true);
-    this.onResize = () => this.drawEquity(false);
-    window.addEventListener('resize', this.onResize, { passive: true });
+  const nav = $("#nav");
+  addEventListener("scroll", () => nav.classList.toggle("scrolled", scrollY > 8), { passive: true });
+
+  // GitHub stars (unauthenticated, best effort)
+  fetch("https://api.github.com/repos/Hitheshkaranth/OpenTerminalUI").then(r => r.ok ? r.json() : null)
+    .then(j => { if (j && j.stargazers_count != null) $("#stars").textContent = "★ " + j.stargazers_count.toLocaleString(); })
+    .catch(() => {});
+
+  // ---------- hero console ----------
+  const J = (o, d = 0) => {
+    const pad = "  ".repeat(d);
+    if (Array.isArray(o)) return "[" + o.map(x => J(x, d)).join(", ") + "]";
+    if (o && typeof o === "object") return "{\n" + Object.entries(o).map(([k, v]) => `${pad}  <span class="k">"${k}"</span>: ${J(v, d + 1)}`).join(",\n") + `\n${pad}}`;
+    if (typeof o === "string") return `<span class="v">"${esc(o)}"</span>`;
+    return `<span class="n">${o}</span>`;
+  };
+  const calls = [
+    { id: "snapshot", verb: "GET", path: "/api/stocks/RELIANCE/snapshot-v2", ms: "182ms",
+      body: { symbol: "RELIANCE", exchange: "NSE", last: 1247.4, change_pct: 0.62,
+        provenance: { source: "kite", quality: "live", as_of: "09:41:07 IST", latency_ms: 38 } } },
+    { id: "providers", verb: "GET", path: "/api/providers/status", ms: "94ms",
+      body: { kite: { status: "ok", unlocks: "NSE/BSE live ticks" }, finnhub: { status: "ok" }, nse: { status: "down", last_error: "403 from container" } } },
+    { id: "events", verb: "GET", path: "/api/events-hub/upcoming?symbol=AAPL", ms: "240ms",
+      body: { events: [{ type: "earnings", date: "2026-10-29", impact: "high" }], failed_sources: [] } },
+    { id: "mcp", verb: "POST", path: "/api/mcp/tools/get_portfolio_risk", ms: "311ms",
+      body: { ok: true, data: { var_95: -0.021, cvar_95: -0.034 }, provenance: { quality: "cached", source: "yahoo" } } },
+  ];
+  const tabs = $("#c-tabs"), body = $("#c-body");
+  let ci = 0, typer;
+  calls.forEach((c, i) => {
+    const b = document.createElement("button");
+    b.textContent = c.id; b.setAttribute("role", "tab");
+    b.onclick = () => { showCall(i); clearInterval(rot); };
+    tabs.appendChild(b);
+  });
+  function showCall(i) {
+    ci = i; const c = calls[i];
+    [...tabs.children].forEach((b, j) => b.setAttribute("aria-selected", j === i));
+    $("#c-verb").textContent = c.verb;
+    $("#c-verb").style.background = c.verb === "POST" ? "#b45309" : "#1d4ed8";
+    $("#c-path").textContent = c.path;
+    $("#c-status").textContent = "200 OK · " + c.ms;
+    const html = `<span class="c">// ${c.verb === "POST" ? "agent tool call over MCP HTTP" : "every response says where it came from"}</span>\n` + J(c.body);
+    clearInterval(typer);
+    if (reduce) { body.innerHTML = html + ' <span class="cursor"></span>'; return; }
+    // reveal line by line
+    const lines = html.split("\n"); let n = 0;
+    body.innerHTML = "";
+    typer = setInterval(() => {
+      n++; body.innerHTML = lines.slice(0, n).join("\n") + ' <span class="cursor"></span>';
+      if (n >= lines.length) clearInterval(typer);
+    }, 70);
   }
-  componentDidUpdate(prev){
-    if (this.props.accent && this.props.accent !== prev.accent){
-      document.documentElement.style.setProperty('--accent', this.props.accent);
+  showCall(0);
+  const rot = reduce ? 0 : setInterval(() => showCall((ci + 1) % calls.length), 6500);
+
+  // ---------- screen tour ----------
+  const shots = [
+    { id: "home", tab: "Mission Control", kick: "Home · daily desk", img: "home", route: "/home",
+      desc: "Market context, AI outlook, portfolio hub and system health on one screen.", pts: ["Ticker tape with stale values dimmed", "Provider health in the status bar", "Launch grid for every workspace"] },
+    { id: "hub", tab: "Security Hub", kick: "Equity research", img: "security-hub-india", route: "/equity/security/RELIANCE",
+      desc: "The same eight-tab workflow for RELIANCE on NSE or AAPL on NASDAQ.", pts: ["Provenance chip on the quote", "Symbol Context Rail: position, alerts, events", "Paper Buy/Sell in one click"] },
+    { id: "charts", tab: "Charts", kick: "Technical analysis", img: "chart-workstation", route: "/equity/chart-workstation",
+      desc: "A six-pane workstation with synced crosshairs and 70+ indicators.", pts: ["Up to 9 linked panels", "Replay bar by bar", "Export PNG, SVG, CSV"] },
+    { id: "screener", tab: "Screener", kick: "Stock picking", img: "screener", route: "/equity/screener",
+      desc: "Query builder and formula engine with explainable factor ranks.", pts: ["Composite Value / Momentum / Quality", "Why-ranked rationale per row", "One click to chart or backtest"] },
+    { id: "fno", tab: "Options", kick: "Futures & options", img: "fno-option-chain", route: "/fno",
+      desc: "Option chain with live Greeks, OI build-up and PCR signals.", pts: ["Delta, gamma, theta, vega, rho", "Multi-leg strategy builder", "Expiry calendar with rolls"] },
+    { id: "portfolio", tab: "Portfolio", kick: "Holdings & risk", img: "portfolio", route: "/equity/portfolio",
+      desc: "Holdings-first portfolio with Kite sync and CSV import.", pts: ["Zerodha, Groww, generic CSV", "VaR, CVaR and factor exposure", "Benchmark overlay"] },
+    { id: "backtest", tab: "Backtesting", kick: "Quant research", img: "backtesting", route: "/backtesting",
+      desc: "Strategy templates, realistic execution and honest trade pairing.", pts: ["Slippage, commission, market impact", "Walk-forward and Monte Carlo", "Tear-sheets and leaderboards"] },
+    { id: "macro", tab: "Macro", kick: "Cross-asset", img: "economic-terminal", route: "/equity/economics",
+      desc: "Release calendar and macro dashboard from FRED and FXMacroData.", pts: ["Policy rates, CPI, GDP", "Yield curve with 2s10s", "Commodities, FX, crypto desks"] },
+    { id: "settings", tab: "Providers", kick: "New in 0.8 · settings", img: "settings", route: "/settings",
+      desc: "See what each provider unlocks and manage keys without touching .env.", pts: ["Real probes — expired tokens read down", "Set, mask, test and clear keys", "Restart-required list"] },
+  ];
+  const dt = $("#d-tabs"), img = $("#d-img");
+  shots.forEach((s, i) => {
+    const b = document.createElement("button");
+    b.textContent = s.tab; b.setAttribute("role", "tab"); b.dataset.id = s.id;
+    b.onclick = () => { showShot(i); stopTour(); };
+    dt.appendChild(b);
+  });
+  const live = document.createElement("span"); live.className = "live-dot"; live.textContent = "auto-play"; dt.appendChild(live);
+  let si = 0, tour;
+  function showShot(i) {
+    si = i; const s = shots[i];
+    [...dt.querySelectorAll("button")].forEach((b, j) => b.setAttribute("aria-selected", j === i));
+    $("#d-kick").textContent = s.kick; $("#d-title").textContent = s.tab; $("#d-desc").textContent = s.desc;
+    $("#d-list").innerHTML = s.pts.map(p => `<li>${esc(p)}</li>`).join("");
+    $("#d-route").textContent = "route  " + s.route;
+    $("#d-count").textContent = `( ${i + 1} / ${shots.length} ) · screens`;
+    img.classList.add("fade");
+    const src = `assets/shots/${s.img}.webp`;
+    const pre = new Image(); pre.src = src;
+    pre.onload = pre.onerror = () => { img.src = src; img.alt = s.tab + " screenshot"; img.classList.remove("fade"); };
+  }
+  function stopTour() { clearInterval(tour); live.textContent = "paused"; }
+  showShot(0);
+  const demoEl = $("#demo");
+  if (!reduce) {
+    const startTour = () => { clearInterval(tour); tour = setInterval(() => showShot((si + 1) % shots.length), 5000); };
+    new IntersectionObserver(([e]) => e.isIntersecting && live.textContent !== "paused" ? startTour() : clearInterval(tour), { threshold: .3 }).observe(demoEl);
+  }
+  document.querySelectorAll(".card[data-tab]").forEach(c => c.addEventListener("click", () => {
+    const i = shots.findIndex(s => s.id === c.dataset.tab); if (i >= 0) { showShot(i); stopTour(); }
+  }));
+
+  // ---------- shipped ticker ----------
+  const shipped = [
+    ["SEP 29", "OPS", "Multi-arch Docker image on GHCR for every release"],
+    ["SEP 28", "FEAT", "Linked research notes on the Launchpad"],
+    ["SEP 25", "FIX", "Screen-by-screen QA sweep — 72 screens, ~45 data defects"],
+    ["SEP 25", "SEC", "Whole-repo review — sandbox, IDOR and path-traversal fixes"],
+    ["SEP 23", "FEAT", "MCP surface: 16 → 45 tools, HTTP transport, resources, prompts"],
+    ["SEP 22", "FEAT", "Agent memory, threads and approval-gated actions"],
+    ["SEP 21", "FEAT", "Provider keys from Settings · alert actions editor"],
+    ["SEP 21", "FEAT", "Events hub, grouped nav rail, symbol context rail"],
+    ["SEP 21", "FEAT", "Data provenance chips · Kite and CSV portfolio import"],
+  ];
+  const row = shipped.map(([d, t, s]) => `<span class="item"><i>${d}</i><b>${t}</b>${esc(s)}</span>`).join("");
+  $("#ship").innerHTML = row + row;
+
+  // ---------- manifesto log ----------
+  const logEl = $("#log");
+  const L = [
+    ["i", "INFO", "quote   RELIANCE  kite      <span class='g'>live</span>   38ms"],
+    ["i", "INFO", "quote   AAPL      finnhub   <span class='g'>live</span>   52ms"],
+    ["w", "WARN", "nse     403 from upstream → fallback yahoo"],
+    ["i", "INFO", "quote   NIFTY     yahoo     <span class='w'>delayed</span> 15m"],
+    ["i", "INFO", "cache   L1 hit    ohlcv:TCS:1D  0.4ms"],
+    ["p", "SYN ", "orderbook NIFTY   labelled synthetic"],
+    ["i", "INFO", "alert   rsi<30 AND vol>2x  → paper BUY 10 INFY"],
+    ["i", "INFO", "mcp     get_portfolio_risk  user=42  <span class='g'>ok</span>"],
+    ["i", "INFO", "events  AAPL earnings 2026-10-29  impact=high"],
+    ["w", "WARN", "fmp     429 rate-limited → cached 4m"],
+    ["i", "INFO", "backtest SMA 20/50 RELIANCE  17 trips  win 37.5%"],
+    ["i", "INFO", "agent   debate AAPL → HOLD  conviction 0.61"],
+  ];
+  let li = 0;
+  const pushLog = () => {
+    const t = new Date(); const ts = t.toTimeString().slice(0, 8) + "." + String(t.getMilliseconds()).padStart(3, "0");
+    const [cls, lvl, msg] = L[li++ % L.length];
+    const d = document.createElement("div");
+    d.innerHTML = `<span class="t">[${ts}]</span> <span class="${cls}">${lvl}</span> ${msg}`;
+    logEl.appendChild(d); while (logEl.children.length > 16) logEl.firstChild.remove();
+  };
+  for (let i = 0; i < 12; i++) pushLog();
+  if (!reduce) setInterval(pushLog, 1400);
+
+  // ---------- copy buttons ----------
+  document.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "copied"; }
+    catch { b.textContent = "select + copy"; }
+    setTimeout(() => (b.textContent = "copy"), 1600);
+  }));
+
+  // ---------- reveal on scroll ----------
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { rootMargin: "0px 0px -8% 0px" });
+  document.querySelectorAll(".rv").forEach((el, i) => { el.style.transitionDelay = (i % 4) * 60 + "ms"; io.observe(el); });
+
+  // ---------- hero mesh (anakin-style network lines, orange nodes) ----------
+  const cv = $("#mesh"), cx = cv.getContext("2d");
+  let W, H, pts = [];
+  const size = () => {
+    const r = cv.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
+    W = r.width; H = r.height; cv.width = W * dpr; cv.height = H * dpr; cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    pts = Array.from({ length: Math.round(W * H / 26000) }, () => ({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .18, vy: (Math.random() - .5) * .18 }));
+  };
+  const draw = () => {
+    cx.clearRect(0, 0, W, H);
+    for (const p of pts) { p.x += p.vx; p.y += p.vy; if (p.x < 0 || p.x > W) p.vx *= -1; if (p.y < 0 || p.y > H) p.vy *= -1; }
+    for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
+      const a = pts[i], b = pts[j], d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (d < 150) { cx.strokeStyle = `rgba(11,14,20,${(1 - d / 150) * .09})`; cx.beginPath(); cx.moveTo(a.x, a.y); cx.lineTo(b.x, b.y); cx.stroke(); }
     }
-  }
-  componentWillUnmount(){
-    if (this.eqRaf) cancelAnimationFrame(this.eqRaf);
-    if (this.onResize) window.removeEventListener('resize', this.onResize);
-  }
+    pts.forEach((p, i) => { cx.fillStyle = i % 7 ? "rgba(11,14,20,.18)" : "rgba(240,138,0,.7)"; cx.beginPath(); cx.arc(p.x, p.y, i % 7 ? 1.3 : 2.2, 0, 7); cx.fill(); });
+    if (!reduce) requestAnimationFrame(draw);
+  };
+  size(); addEventListener("resize", size); draw();
 
-  initReveal(){
-    if (!('IntersectionObserver' in window)) return;
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting){
-          e.target.style.animation = 'otReveal .9s cubic-bezier(.16,1,.3,1) both';
-          this.runCounters(e.target);
-          io.unobserve(e.target);
-        }
-      });
-    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
-    document.querySelectorAll('[data-reveal]').forEach((el) => io.observe(el));
+  // ---------- count-up stats ----------
+  if (!reduce) {
+    const sio = new IntersectionObserver(es => es.forEach(e => {
+      if (!e.isIntersecting) return; sio.unobserve(e.target);
+      const el = e.target, to = +el.dataset.count, suf = el.dataset.suffix || "", t0 = performance.now();
+      const step = t => { const k = Math.min(1, (t - t0) / 1100), v = Math.round(to * (1 - Math.pow(1 - k, 3)));
+        el.textContent = (el.dataset.sep ? v.toLocaleString() : v) + suf; if (k < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    }), { threshold: .6 });
+    document.querySelectorAll("[data-count]").forEach(el => sio.observe(el));
   }
-
-  runCounters(scope){
-    const els = scope.querySelectorAll('[data-count-to]');
-    els.forEach((el) => this.animateCount(el));
-  }
-  animateCount(el){
-    const to = parseFloat(el.getAttribute('data-count-to')) || 0;
-    const pre = el.getAttribute('data-count-prefix') || '';
-    const suf = el.getAttribute('data-count-suffix') || '';
-    const dec = parseInt(el.getAttribute('data-count-dec') || '0', 10);
-    const fmt = (n) => pre + n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }) + suf;
-    if (this.reduce || this.state.comfort){ el.textContent = fmt(to); return; }
-    const dur = 1100; const t0 = performance.now();
-    const step = (t) => {
-      const p = Math.min(1, (t - t0) / dur);
-      const e = 1 - Math.pow(1 - p, 3);
-      el.textContent = fmt(to * e);
-      if (p < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  }
-
-  initMarket(){
-    const c = document.getElementById('ot-market-canvas');
-    if (!c) return;
-    const ctx = c.getContext('2d');
-    const DPR = Math.min(window.devicePixelRatio || 1, 2);
-    let W = 0, H = 0, series = []; const STEP = 9;
-    const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || this.state.comfort;
-    const setup = () => { W = c.clientWidth; H = c.clientHeight; c.width = Math.max(1, W * DPR); c.height = Math.max(1, H * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); };
-    const build = () => { const COUNT = W < 700 ? 5 : 9; const N = Math.ceil(W / STEP) + 4; series = []; for (let s = 0; s < COUNT; s++){ const baseY = ((s + 0.5) / COUNT) * H; const amp = (H / COUNT) * 0.46; const accent = s % 3 === 1; const pts = []; let v = 0; for (let i = 0; i < N; i++){ v += (Math.random() - 0.5) * 0.9; v = Math.max(-1, Math.min(1, v * 0.96)); pts.push(v); } series.push({ baseY, amp, pts, accent, drift: 0, speed: 0.16 + Math.random() * 0.14 }); } };
-    setup(); build();
-    this._mktResize = () => { setup(); build(); };
-    window.addEventListener('resize', this._mktResize, { passive: true });
-    const plot = (sr, shift) => { ctx.beginPath(); for (let i = 0; i < sr.pts.length; i++){ const x = i * STEP - shift; const y = sr.baseY - sr.pts[i] * sr.amp; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.strokeStyle = sr.accent ? 'rgba(255,130,40,0.34)' : 'rgba(150,185,235,0.14)'; ctx.lineWidth = sr.accent ? 1.7 : 1.1; ctx.stroke(); };
-    if (reduce){ ctx.clearRect(0, 0, W, H); for (const sr of series) plot(sr, 0); return; }
-    const frame = () => { ctx.clearRect(0, 0, W, H); for (const sr of series){ sr.drift += sr.speed; if (sr.drift >= STEP){ sr.drift -= STEP; sr.pts.shift(); let last = sr.pts[sr.pts.length - 1]; last += (Math.random() - 0.5) * 0.9; last = Math.max(-1, Math.min(1, last * 0.96)); sr.pts.push(last); } plot(sr, sr.drift); } this._mktRaf = requestAnimationFrame(frame); };
-    frame();
-  }
-
-  drawEquity(animate){
-    const c = document.getElementById('ot-equity');
-    if (!c) return;
-    const ctx = c.getContext('2d');
-    const DPR = Math.min(window.devicePixelRatio || 1, 2);
-    const W = c.clientWidth, H = c.clientHeight;
-    c.width = Math.max(1, W * DPR); c.height = Math.max(1, H * DPR);
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-
-    const live = this.state.mode === 'live';
-    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#ff6b00';
-    const seed = live ? 7 : 3;
-    let rnd = seed;
-    const rand = () => { rnd = (rnd * 9301 + 49297) % 233280; return rnd / 233280; };
-    const N = 90;
-    const pts = [];
-    let v = 0; const drift = live ? 0.16 : 0.12;
-    for (let i = 0; i < N; i++){
-      v += drift + (rand() - 0.45) * 1.4;
-      if (live && i > N * 0.6) v += (rand() - 0.5) * 0.6;
-      pts.push(v);
-    }
-    let mn = Math.min.apply(null, pts), mx = Math.max.apply(null, pts);
-    const padX = 14, padY = 18;
-    const x = (i) => padX + (i / (N - 1)) * (W - padX * 2);
-    const y = (val) => padY + (1 - (val - mn) / (mx - mn || 1)) * (H - padY * 2);
-
-    // gridlines
-    const drawGrid = () => {
-      ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1;
-      for (let g = 0; g <= 4; g++){
-        const gy = padY + (g / 4) * (H - padY * 2);
-        ctx.beginPath(); ctx.moveTo(padX, gy); ctx.lineTo(W - padX, gy); ctx.stroke();
-      }
-    };
-    const render = (prog) => {
-      ctx.clearRect(0, 0, W, H);
-      drawGrid();
-      const last = Math.max(1, Math.floor(prog * (N - 1)));
-      // area
-      ctx.beginPath(); ctx.moveTo(x(0), y(pts[0]));
-      for (let i = 1; i <= last; i++) ctx.lineTo(x(i), y(pts[i]));
-      ctx.lineTo(x(last), H - padY); ctx.lineTo(x(0), H - padY); ctx.closePath();
-      const grad = ctx.createLinearGradient(0, padY, 0, H);
-      grad.addColorStop(0, 'rgba(255,107,0,0.18)'); grad.addColorStop(1, 'rgba(255,107,0,0)');
-      ctx.fillStyle = grad; ctx.fill();
-      // line
-      ctx.beginPath(); ctx.moveTo(x(0), y(pts[0]));
-      for (let i = 1; i <= last; i++) ctx.lineTo(x(i), y(pts[i]));
-      ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
-      // head dot
-      ctx.beginPath(); ctx.arc(x(last), y(pts[last]), 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = '#f3f6fa'; ctx.fill();
-      ctx.beginPath(); ctx.arc(x(last), y(pts[last]), 7, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255,107,0,0.4)'; ctx.lineWidth = 1.5; ctx.stroke();
-    };
-    if (this.eqRaf) cancelAnimationFrame(this.eqRaf);
-    if (!animate || this.reduce || this.state.comfort){ render(1); return; }
-    const t0 = performance.now(); const dur = 1200;
-    const step = (t) => {
-      const p = Math.min(1, (t - t0) / dur);
-      render(1 - Math.pow(1 - p, 3));
-      if (p < 1) this.eqRaf = requestAnimationFrame(step);
-    };
-    this.eqRaf = requestAnimationFrame(step);
-  }
-
-  setMode(m){ this.setState({ mode: m }, () => this.drawEquity(true)); }
-  toggleMotion(){
-    const next = !this.state.comfort;
-    this.setState({ comfort: next });
-    const root = document.getElementById('ot-root');
-    if (root) root.classList.toggle('ot-comfort', next);
-  }
-
-  histStats(){
-    if (this.state.mode === 'live'){
-      return [
-        { label: 'Open PnL', value: 612, prefix: '+$', suffix: '', dec: 0, color: '#2ec27e', display: '+$612' },
-        { label: 'ROI', value: 6.12, prefix: '+', suffix: '%', dec: 2, color: '#2ec27e', display: '+6.12%' },
-        { label: 'Win rate', value: 60.0, prefix: '', suffix: '%', dec: 1, color: '#eef1f5', display: '60.0%' },
-        { label: 'Open trades', value: 9, prefix: '', suffix: '', dec: 0, color: '#eef1f5', display: '9' }
-      ];
-    }
-    return [
-      { label: 'Net PnL', value: 2418, prefix: '+$', suffix: '', dec: 0, color: '#2ec27e', display: '+$2,418' },
-      { label: 'ROI', value: 24.18, prefix: '+', suffix: '%', dec: 2, color: '#2ec27e', display: '+24.18%' },
-      { label: 'Win rate', value: 56.4, prefix: '', suffix: '%', dec: 1, color: '#eef1f5', display: '56.4%' },
-      { label: 'Trades', value: 41, prefix: '', suffix: '', dec: 0, color: '#eef1f5', display: '41' }
-    ];
-  }
-
-  rollupStats(){
-    const sets = {
-      strat: ['$10,000','+$1,940','+19.40%','55%','44','1.74','$44.00','$21.30'],
-      port:  ['$50,000','+$9,260','+18.52%','57%','188','1.81','$49.00','$96.40'],
-      desk:  ['$250,000','+$41,800','+16.72%','56%','742','1.69','$56.00','$402.10']
-    };
-    const labels = ['Capital base','Net PnL','ROI','Win rate','Trades closed','Profit factor','Expectancy','Fees total'];
-    const vals = sets[this.state.tab];
-    return labels.map((l, i) => ({
-      label: l, value: vals[i],
-      color: (i === 1 || i === 2) ? '#2ec27e' : '#eef1f5'
-    }));
-  }
-
-  tabStyle(name){
-    const on = this.state.tab === name;
-    return { bg: on ? '#e8ecf2' : 'transparent', fg: on ? '#07090d' : '#8b94a3' };
-  }
-
-  renderVals(){
-    const histOn = this.state.mode === 'history';
-    return {
-      motionLabel: this.state.comfort ? 'Comfort' : 'Full',
-      toggleMotion: () => this.toggleMotion(),
-      setHistory: () => this.setMode('history'),
-      setLive: () => this.setMode('live'),
-      histBg: histOn ? '#e8ecf2' : 'transparent', histFg: histOn ? '#07090d' : '#8b94a3',
-      liveBg: !histOn ? 'var(--accent)' : 'transparent', liveFg: !histOn ? '#0a0d12' : '#8b94a3',
-      modeLabel: histOn ? 'Replay · 2024' : 'Live · streaming',
-      modeColor: histOn ? '#7a8497' : '#ff6b00',
-      chartRange: histOn ? 'Jan – Dec 2024 · 1D' : 'Today · 15m',
-      chartStats: this.histStats(),
-      tabStrat: () => this.setState({ tab: 'strat' }),
-      tabPort: () => this.setState({ tab: 'port' }),
-      tabDesk: () => this.setState({ tab: 'desk' }),
-      tA: this.tabStyle('strat'), tB: this.tabStyle('port'), tC: this.tabStyle('desk'),
-      rollup: this.rollupStats(),
-      buildCards: [
-        { tag: 'Market context', title: 'Universe & symbol', sub: 'Pick the index, basket or ticker' },
-        { tag: 'Timing', title: 'Interval & trigger', sub: '1m to 1D, bar-close or tick' },
-        { tag: 'Capital', title: 'Budget & stake', sub: 'Per-trade sizing & allocation' },
-        { tag: 'Exit targets', title: 'Take-profit & stop', sub: 'Fixed, ATR or trailing' },
-        { tag: 'Engine mode', title: 'Rules or score', sub: 'Boolean gate or weighted score' },
-        { tag: 'Direction', title: 'Long or short', sub: 'One side or both' },
-        { tag: 'Entry conditions', title: 'Indicators & thresholds', sub: '70+ signals to combine' },
-        { tag: 'Decision logic', title: 'AND · OR · score', sub: 'Compose how signals resolve' }
-      ],
-      controls: [
-        { color: '#2ec27e', title: 'All strategies live', sub: 'Desk running normally' },
-        { color: '#ff6b00', title: 'Fast drawdown detected', sub: 'Pause new long entries' },
-        { color: '#ffbd2e', title: 'Volatility spike', sub: 'Widen stops, pause shorts' },
-        { color: '#ff5d5d', title: 'Manual risk halt', sub: 'Stop new entries desk-wide' },
-        { color: '#7a8497', title: 'Cooldown ended', sub: 'Entries resume on schedule' }
-      ]
-    };
-  }
-}
+})();
 </script>
 </body>
 </html>

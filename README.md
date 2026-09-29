@@ -223,124 +223,6 @@ Captured from the built app with `scripts/capture_screens.mjs` (headless Chromiu
 |---|---|
 | <img src="assets/screenshots/saved-views.png" alt="Saved views manager" width="420" /> | <img src="assets/screenshots/reports.png" alt="Scheduled reports" width="420" /> |
 
-### Workspace & Markets
-
-<p align="center">
-  <img src="assets/screenshots/home.png" alt="Home Dashboard" width="900" />
-</p>
-<p align="center"><em>Home / Mission Control — market context, AI Market Outlook, portfolio hub, system health, and the full feature launch grid.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/chart-workstation.png" alt="Chart Workstation" width="900" />
-</p>
-<p align="center"><em>Multi-panel chart workstation — a 6-chart grid with synchronized crosshairs, 70+ technical indicators, and drawing tools.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/market-view.png" alt="Market View" width="900" />
-</p>
-<p align="center"><em>Full-screen market view (AAPL, NASDAQ) — candlestick price action with volume, multi-timeframe, and indicator overlays.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/stock-detail.png" alt="Security Hub (US)" width="900" />
-</p>
-<p align="center"><em>Security Hub for a US name (AAPL) — quotes with a provenance chip, fundamentals, price chart, analysis tabs, the AI Catalyst &amp; Conviction panel, and the symbol Context Rail.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/security-hub-india.png" alt="Security Hub (India)" width="900" />
-</p>
-<p align="center"><em>Security Hub for an Indian name (RELIANCE, NSE) — the same workflow across markets, with India fundamentals and sector context.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/financial-analysis.png" alt="Financial Analysis" width="900" />
-</p>
-<p align="center"><em>Financial analysis — income statement, balance sheet, and cash-flow statements with multi-period trends.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/fno-option-chain.png" alt="F&O Option Chain" width="900" />
-</p>
-<p align="center"><em>Futures &amp; Options (AAPL, US) — option chain with Greeks, OI build-up, and PCR signals; the same workflow covers NSE F&amp;O when NSE data is reachable.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/commodities.png" alt="Commodities" width="900" />
-</p>
-<p align="center"><em>Cross-asset coverage — commodities, forex, crypto, bonds, ETFs, and mutual funds.</em></p>
-
-### Research & Stock Picking
-
-<p align="center">
-  <img src="assets/screenshots/screener.png" alt="Advanced Screener" width="900" />
-</p>
-<p align="center"><em>Advanced screener with query builder, custom formula engine, composite factor scores, and "why ranked" insights.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/factor-dashboard.png" alt="Factor Dashboard" width="900" />
-</p>
-<p align="center"><em>Factor Dashboard — multi-factor (Value / Momentum / Quality / Low-Vol) idea lists and ranked picks for US &amp; Indian markets.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/news-sentiment.png" alt="News & Sentiment" width="900" />
-</p>
-<p align="center"><em>News &amp; Sentiment with the AI Emotion Indicator powered by a local Gemma model via LM Studio.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/intelligence-timeline.png" alt="Intelligence Timeline" width="900" />
-</p>
-<p align="center"><em>Unified Intelligence Timeline — news, alerts, events, insider activity, earnings, and model signals in one feed.</em></p>
-
-### Portfolio, Risk & Backtesting
-
-<p align="center">
-  <img src="assets/screenshots/portfolio.png" alt="Portfolio" width="900" />
-</p>
-<p align="center"><em>Portfolio monitoring — holdings, movement &amp; historical return, risk metrics, and AI Risk Assessment.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/cockpit.png" alt="Cockpit" width="900" />
-</p>
-<p align="center"><em>Cockpit Priority Stack — a ranked daily brief across portfolio risk, alerts, catalysts, movers, and model signals.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/risk-dashboard.png" alt="Risk Dashboard" width="900" />
-</p>
-<p align="center"><em>Risk dashboard with statistical risk metrics, factor/exposure heatmaps, and AI Risk Insights powered by Gemma.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/backtesting.png" alt="Backtesting Lab" width="900" />
-</p>
-<p align="center"><em>Backtesting workspace with strategy presets, execution-profile modeling, performance summary, and AI analysis.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/model-lab.png" alt="Model Lab" width="900" />
-</p>
-<p align="center"><em>Model Lab — parameter sweeps, walk-forward validation, Monte Carlo robustness, and run leaderboards.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/portfolio-lab.png" alt="Portfolio Lab" width="900" />
-</p>
-<p align="center"><em>Portfolio Lab — multi-asset portfolio backtests, strategy blends, and correlation analysis.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/watchlist.png" alt="Watchlist" width="900" />
-</p>
-<p align="center"><em>Watchlists with live quotes, heatmap view, and one-click routing to charts, screener, and backtests.</em></p>
-
-### AI Research Agent
-
-<p align="center">
-  <img src="assets/screenshots/ai-agent.png" alt="AI Research Agent" width="420" />
-</p>
-<p align="center"><em>The tool-using research agent (<code>Ctrl/Cmd&nbsp;+&nbsp;J</code>) — a screen-aware verdict on AAPL backed by a live snapshot card it fetched itself.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/agent-debate.png" alt="Multi-agent debate" width="420" />
-</p>
-<p align="center"><em>Multi-agent debate — an analyst team (fundamental / sentiment / technical) each returns an evidence-backed verdict, which feeds a bull-vs-bear debate and a portfolio-manager decision.</em></p>
-
-<p align="center">
-  <img src="assets/screenshots/strategy-lab.png" alt="Strategy Lab agent" width="420" />
-</p>
-<p align="center"><em>Strategy Lab — the agent proposes a strategy, backtests it, changes one variable to iterate, then runs out-of-sample validation and reports an honest verdict (here, "not a validated edge" at p&nbsp;=&nbsp;0.25).</em></p>
-
 ## Features
 
 ### Terminal Shell
@@ -457,7 +339,7 @@ Captured from the built app with `scripts/capture_screens.mjs` (headless Chromiu
 - **Walk-Forward Analysis** &mdash; out-of-sample validation with sliding windows
 - **Parameter Sweep** &mdash; sensitivity analysis across hyperparameter ranges
 - **Experiment Tracking** &mdash; create, run, compare, and promote models through the Model Lab
-- **Model Governance** &mdash; version tracking with code/data hashing, promotion to paper trading
+- **Model Governance** &mdash; model registry with code/data hashing, approval workflows, risk-limit monitoring, and promotion to paper trading
 - **Monte Carlo Robustness** &mdash; trade/return resampling with confidence cones, terminal-wealth distribution, and probability-of-profit
 - **Liquidity-Aware Execution** &mdash; fixed-bps, volume-weighted, and square-root market-impact slippage models with percent-of-volume caps
 - **Strategy Tear-Sheets** &mdash; standardized HTML reports with equity, drawdown, rolling Sharpe, monthly returns, and benchmark overlay
@@ -508,8 +390,6 @@ Captured from the built app with `scripts/capture_screens.mjs` (headless Chromiu
 
 - **OMS** &mdash; order management with restricted list enforcement and audit trail
 - **Ops Dashboard** &mdash; feed health monitoring, kill switches, data quality panels
-- **Model Governance** &mdash; model registry, approval workflows, risk limit monitoring
-- **Cockpit** &mdash; executive dashboard aggregating portfolio, signals, risk, and events
 
 ### News & Sentiment
 
@@ -524,7 +404,6 @@ Captured from the built app with `scripts/capture_screens.mjs` (headless Chromiu
 - **Plugin API** &mdash; extensible architecture for custom analysis modules
 - **Included Plugins** &mdash; RSI Divergence Scanner, Sector Rotation Monitor, Unusual Volume Detector
 - **Python Scripting** &mdash; sandboxed execution with security-hardened imports
-- **OpenScript** &mdash; chart-based indicator scripting with library and sharing
 
 ### Real-Time Data
 
@@ -715,9 +594,7 @@ The platform runs without API keys using fallback providers. Add keys to unlock 
 | `REDIS_URL` | Redis connection for caching and pub/sub |
 | `OPENTERMINALUI_CORS_ORIGINS` | Allowed CORS origins |
 | `OPENTERMINALUI_PREFETCH_ENABLED` | Enable background data prefetch |
-| `LM_STUDIO_BASE_URL` | LM Studio OpenAI-compatible endpoint (default `http://localhost:1234/v1`; use `http://host.docker.internal:1234/v1` from Docker) |
-| `LM_STUDIO_MODEL` | Gemma model id loaded in LM Studio (default `google/gemma-4-26b-a4b`) |
-| `LM_STUDIO_ENABLED` | Toggle the LLM emotion analysis (default `true`; falls back to lexical sentiment when off) |
+| `LM_STUDIO_*` | Local Gemma model for news sentiment &mdash; see [AI News Sentiment](#ai-news-sentiment-with-gemma-4-lm-studio) |
 | `OPENROUTER_API_KEY` | OpenRouter key powering the AI research agent (free `:free` models work) |
 | `AGENT_PROVIDER` | Agent LLM provider: `openrouter` \| `openai` \| `lmstudio` (default `openrouter`) |
 | `AGENT_MODEL` | Primary agent model id (default `openai/gpt-oss-20b:free`) |
