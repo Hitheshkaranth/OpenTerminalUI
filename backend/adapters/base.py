@@ -14,6 +14,7 @@ class QuoteResponse:
     change_pct: float = 0.0
     currency: str | None = None
     ts: str | None = None
+    company_name: str | None = None
 
 
 @dataclass

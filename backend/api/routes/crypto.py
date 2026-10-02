@@ -685,15 +685,21 @@ async def crypto_correlation_matrix(
 ) -> CryptoCorrelationResponse:
     rows = await _load_rows(limit=120)
     rows.sort(key=lambda x: x.market_cap, reverse=True)
-    selected = rows[:limit]
-    symbols = [r.symbol for r in selected]
     returns_by_symbol: dict[str, list[float]] = {}
 
-    for row in selected:
-        returns = await _returns_from_charts(row.symbol, window)
-        if len(returns) < 2:
-            returns = _synthetic_returns(row.symbol, row.change_24h, window)
-        returns_by_symbol[row.symbol] = returns[-window:]
+    # Walk down the market-cap list until `limit` coins have real history. A coin whose
+    # chart is missing (e.g. Yahoo delisted the symbol) is skipped rather than failing the
+    # whole matrix or being filled with synthetic returns that would read as real correlation.
+    for row in rows:
+        if len(returns_by_symbol) >= limit:
+            break
+        try:
+            returns = await _returns_from_charts(row.symbol, window)
+        except Exception:
+            continue
+        if len(returns) >= 2:
+            returns_by_symbol[row.symbol] = returns[-window:]
+    symbols = list(returns_by_symbol)
 
     matrix: list[list[float]] = []
     for left in symbols:

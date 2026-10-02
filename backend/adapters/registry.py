@@ -12,7 +12,7 @@ from backend.adapters.alpha_vantage import AlphaVantageAdapter
 from backend.adapters.crypto import CryptoDataAdapter
 from backend.adapters.kite import KiteAdapter
 from backend.adapters.mock import MockDataAdapter
-from backend.adapters.yahoo import YahooFinanceAdapter
+from backend.adapters.yahoo import YahooFinanceAdapter, active_exchange as yahoo_active_exchange
 from backend.adapters.us_options_adapter import USOptionsAdapter
 from backend.core.failover import FailoverSlot, call_with_failover
 
@@ -111,6 +111,7 @@ class AdapterRegistry:
         return slots
 
     async def invoke(self, exchange: str, method: str, *args: Any, **kwargs: Any) -> Any:
+        token = yahoo_active_exchange.set(str(exchange or ""))
         try:
             return await call_with_failover(
                 self._slots_for_exchange(exchange),
@@ -122,6 +123,8 @@ class AdapterRegistry:
             )
         except RuntimeError as exc:
             raise RuntimeError(f"All adapters failed for {exchange}:{method}: {exc}") from exc
+        finally:
+            yahoo_active_exchange.reset(token)
 
     def health_snapshot(self) -> dict[str, dict[str, Any]]:
         snapshot: dict[str, dict[str, Any]] = {}

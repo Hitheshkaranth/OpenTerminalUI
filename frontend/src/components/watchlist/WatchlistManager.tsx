@@ -37,6 +37,7 @@ export function WatchlistManager() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isTickerSearchOpen, setIsTickerSearchOpen] = useState(false);
   const [tickerResults, setTickerResults] = useState<any[]>([]);
+  const [resultsQuery, setResultsQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ symbol: string; x: number; y: number } | null>(null);
 
@@ -98,9 +99,9 @@ export function WatchlistManager() {
     staleTime: 15_000,
   });
   const restBySymbol = useMemo(() => {
-    const map: Record<string, { ltp: number; change_pct: number; market: string }> = {};
+    const map: Record<string, { ltp: number; change_pct: number; market: string; volume?: number | null }> = {};
     for (const q of restQuotesQuery.data?.quotes || []) {
-      map[String(q.symbol).toUpperCase()] = { ltp: q.last, change_pct: q.changePct, market: q.market };
+      map[String(q.symbol).toUpperCase()] = { ltp: q.last, change_pct: q.changePct, market: q.market, volume: q.volume ?? null };
     }
     return map;
   }, [restQuotesQuery.data]);
@@ -116,7 +117,7 @@ export function WatchlistManager() {
     return {
       ltp: live?.ltp ?? rest?.ltp,
       change_pct: live?.change_pct ?? rest?.change_pct,
-      volume: live?.volume ?? null,
+      volume: live?.volume ?? rest?.volume ?? null,
     };
   };
 
@@ -148,6 +149,20 @@ export function WatchlistManager() {
 
   const closeContextMenu = () => setContextMenu(null);
 
+  // Add the typed ticker: an exact search match wins, else the top result. Only symbols
+  // the search endpoint returned are added, so typos never land in the watchlist.
+  const addFromSearch = () => {
+    if (!activeWl) return;
+    const typed = searchQuery.trim().toUpperCase();
+    // Results still belong to an earlier query while the debounced search is in flight.
+    if (resultsQuery.trim().toUpperCase() !== typed) return;
+    const pick = tickerResults.find((r) => String(r.ticker).toUpperCase() === typed) ?? tickerResults[0];
+    if (!pick) return;
+    addSymbolMut.mutate({ id: activeWl.id, symbols: [pick.ticker] });
+    setSearchQuery("");
+    setIsTickerSearchOpen(false);
+  };
+
   // Search logic
   useEffect(() => {
     if (!searchQuery) return;
@@ -157,7 +172,10 @@ export function WatchlistManager() {
       try {
         const results = await searchSymbols(searchQuery, selectedMarket === "NASDAQ" ? "NASDAQ" : "NSE");
         // Drop responses for a query the user has already typed past.
-        if (!cancelled) setTickerResults(results.slice(0, 10));
+        if (!cancelled) {
+          setTickerResults(results.slice(0, 10));
+          setResultsQuery(searchQuery);
+        }
       } catch {
         if (!cancelled) setTickerResults([]);
       } finally {
@@ -318,9 +336,17 @@ export function WatchlistManager() {
                   })}
                   filename={`${activeWl.name}_watchlist.csv`}
                 />
-                <div className="w-52">
+                <div className="relative w-52">
                   <TerminalCombobox
                   placeholder="Search ticker..."
+                  listClassName="absolute right-0 z-50 mt-1 max-h-64 w-72 overflow-auto rounded-sm border border-terminal-border bg-terminal-panel p-1 shadow-lg"
+                  itemClassName="cursor-pointer rounded-sm hover:bg-terminal-accent/15"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addFromSearch();
+                    }
+                  }}
                   value={searchQuery}
                   items={tickerResults}
                   loading={isSearching}
@@ -347,7 +373,11 @@ export function WatchlistManager() {
             <TerminalButton
               size="sm"
               variant="accent"
-              onClick={() => activeWl ? setIsTickerSearchOpen(true) : setIsCreating(true)}
+              onClick={() => {
+                if (!activeWl) setIsCreating(true);
+                else if (searchQuery.trim()) addFromSearch();
+                else setIsTickerSearchOpen(true);
+              }}
             >
               Add to Watchlist
             </TerminalButton>

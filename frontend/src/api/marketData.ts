@@ -156,11 +156,11 @@ export async function fetchDepth(symbol: string, market = "NSE", levels = 20, re
 export async function fetchQuotesBatch(
   symbols: string[],
   market: string,
-): Promise<{ market: string; status?: string; quotes: Array<{ symbol: string; last: number; change: number; changePct: number; ts: string }> }> {
+): Promise<{ market: string; status?: string; quotes: Array<{ symbol: string; last: number; change: number; changePct: number; volume?: number | null; ts: string }> }> {
   if (!symbols.length) return { market, quotes: [] };
   const tickers = symbols.map((s) => s.trim().toUpperCase()).filter(Boolean).join(",");
   if (!tickers) return { market, quotes: [] };
-  const { data } = await api.get<{ market: string; status?: string; quotes: Array<{ symbol: string; last: number; change: number; changePct: number; ts: string }> }>("/quotes", {
+  const { data } = await api.get<{ market: string; status?: string; quotes: Array<{ symbol: string; last: number; change: number; changePct: number; volume?: number | null; ts: string }> }>("/quotes", {
     params: { symbols: tickers, market },
   });
   return data;

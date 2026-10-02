@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextvars import ContextVar
 from datetime import date
 from typing import Any
 
@@ -15,6 +16,22 @@ def _f(value: Any) -> float | None:
         return None
 
 
+# Exchange of the registry chain currently being invoked. One Yahoo adapter instance
+# serves every chain, and failover passes the same bare symbol (e.g. "INFY") to all
+# adapters, so without this an NSE lookup resolves to the US ADR of the same ticker.
+active_exchange: ContextVar[str] = ContextVar("yahoo_active_exchange", default="")
+
+_EXCHANGE_SUFFIX = {"NSE": ".NS", "BSE": ".BO"}
+
+
+def _yahoo_symbol(symbol: str) -> str:
+    sym = symbol.strip().upper()
+    suffix = _EXCHANGE_SUFFIX.get(active_exchange.get().upper())
+    if not suffix or "." in sym or sym.startswith("^") or "=" in sym:
+        return sym
+    return sym + suffix
+
+
 class YahooFinanceAdapter(DataAdapter):
     def __init__(self, yahoo: YahooClient | None = None, exchange: str = "NASDAQ") -> None:
         self.yahoo = yahoo or YahooClient()
@@ -22,7 +39,7 @@ class YahooFinanceAdapter(DataAdapter):
 
     async def get_quote(self, symbol: str) -> QuoteResponse | None:
         sym = symbol.strip().upper()
-        rows = await self.yahoo.get_quotes([sym])
+        rows = await self.yahoo.get_quotes([_yahoo_symbol(sym)])
         row = rows[0] if rows else {}
         price = _f(row.get("regularMarketPrice"))
         if price is None:
@@ -64,7 +81,7 @@ class YahooFinanceAdapter(DataAdapter):
         range_str = "1y" if rng_days > 220 else "6mo" if rng_days > 120 else "3mo" if rng_days > 45 else "1mo"
         if interval_str == "1m": range_str = "7d"
         elif is_intraday and rng_days <= 60: range_str = "60d"
-        row = await self.yahoo.get_chart(symbol.strip().upper(), range_str=range_str, interval=interval_str)
+        row = await self.yahoo.get_chart(_yahoo_symbol(symbol), range_str=range_str, interval=interval_str)
         chart = ((row or {}).get("chart") or {}).get("result") or []
         if not chart:
             return []
@@ -108,7 +125,7 @@ class YahooFinanceAdapter(DataAdapter):
         return out
 
     async def get_fundamentals(self, symbol: str) -> dict[str, Any]:
-        return await self.yahoo.get_quote_summary(symbol.strip().upper(), ["financialData", "summaryDetail", "defaultKeyStatistics", "assetProfile"])
+        return await self.yahoo.get_quote_summary(_yahoo_symbol(symbol), ["financialData", "summaryDetail", "defaultKeyStatistics", "assetProfile"])
 
     async def supports_streaming(self) -> bool:
         return False

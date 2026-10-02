@@ -46,13 +46,26 @@ export function DashboardPage() {
     const gainers = useMovers("gainers");
     const losers = useMovers("losers");
     const moversUnavailable = !gainers.isLoading && !losers.isLoading && !(gainers.data?.length || losers.data?.length);
-    const hasMarketData = Array.isArray((marketStatus as { marketState?: unknown[] } | undefined)?.marketState);
+    const status = (marketStatus ?? {}) as {
+        error?: string;
+        nseStatus?: string;
+        nyseStatus?: string;
+        nifty50?: number | null;
+        nifty50Pct?: number | null;
+        source?: { nseIndices?: boolean };
+    };
+    const statusError = Boolean(status.error);
+    const nseStatus = status.nseStatus;
+    const nyseStatus = status.nyseStatus;
+    const nifty = typeof status.nifty50 === "number" ? status.nifty50 : null;
+    const niftyPct = typeof status.nifty50Pct === "number" ? status.nifty50Pct : null;
+    const nseLive = status.source?.nseIndices === true;
 
     return (
         <div className="space-y-4 px-3 py-2">
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-terminal-accent">Market Overview</h1>
-                <p className="text-terminal-muted">Live market insights and upcoming events.</p>
+                <p className="text-terminal-muted">Market snapshot, movers and upcoming events.</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -60,22 +73,26 @@ export function DashboardPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="rounded border border-terminal-border bg-terminal-panel p-4">
                             <div className="text-xs uppercase text-terminal-muted">NIFTY 50</div>
-                            <div className="text-xl font-bold text-terminal-text">{hasMarketData ? "LIVE" : "NA"}</div>
-                            <div className="text-sm text-terminal-pos">{hasMarketData ? "Feed Connected" : "Fallback Mode"}</div>
+                            <div className="text-xl font-bold text-terminal-text">
+                                {nifty != null ? nifty.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : "NA"}
+                            </div>
+                            <div className={`text-sm ${niftyPct == null ? "text-terminal-muted" : niftyPct >= 0 ? "text-terminal-pos" : "text-terminal-neg"}`}>
+                                {niftyPct != null ? `${niftyPct >= 0 ? "+" : ""}${niftyPct.toFixed(2)}%` : "No quote"}
+                            </div>
                         </div>
                         <div className="rounded border border-terminal-border bg-terminal-panel p-4">
                             <div className="text-xs uppercase text-terminal-muted">Market Status</div>
                             <div className="text-xl font-bold text-terminal-text">
-                                {(marketStatus as { error?: string } | undefined)?.error ? "Unavailable" : "Available"}
+                                {statusError ? "Unavailable" : `NSE ${nseStatus ?? "NA"}`}
                             </div>
-                            <div className={`text-sm ${(marketStatus as { error?: string } | undefined)?.error ? "text-terminal-neg" : "text-terminal-pos"}`}>
-                                {(marketStatus as { error?: string } | undefined)?.error ? "NSE endpoint failed" : "Realtime endpoint active"}
+                            <div className={`text-sm ${statusError ? "text-terminal-neg" : "text-terminal-muted"}`}>
+                                {statusError ? "Market status endpoint failed" : `NYSE ${nyseStatus ?? "NA"}`}
                             </div>
                         </div>
                         <div className="rounded border border-terminal-border bg-terminal-panel p-4">
                             <div className="text-xs uppercase text-terminal-muted">Data Vendor</div>
-                            <div className="text-xl font-bold text-terminal-text">NSE/Yahoo</div>
-                            <div className="text-sm text-terminal-muted">Auto-fallback enabled</div>
+                            <div className="text-xl font-bold text-terminal-text">{nseLive ? "NSE" : "Yahoo"}</div>
+                            <div className="text-sm text-terminal-muted">{nseLive ? "Direct NSE indices" : "NSE unavailable · Yahoo fallback (delayed)"}</div>
                         </div>
                     </div>
 

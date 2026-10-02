@@ -11,6 +11,18 @@ import pytest
 # once per test. Must be set before any module that builds the limiter is imported.
 os.environ.setdefault("RATE_LIMIT_ENABLED", "0")
 
+# Never let the suite touch the developer's real database. `.env` is loaded with
+# setdefault, so forcing these before any `backend` import wins over it. Tests that
+# drop tables or delete users would otherwise wipe data/openterminalui.db.
+# Set OT_TEST_DATABASE_URL to run against a specific (e.g. Postgres) test DB instead.
+import tempfile as _tempfile
+
+_test_db_url = os.environ.get("OT_TEST_DATABASE_URL") or (
+    f"sqlite:///{Path(_tempfile.mkdtemp(prefix='ot-pytest-')).as_posix()}/test.db"
+)
+os.environ["DATABASE_URL"] = _test_db_url
+os.environ["OPENTERMINALUI_SQLITE_URL"] = _test_db_url
+
 
 # Ensure `import backend...` works even when pytest is launched from `backend/`.
 REPO_ROOT = Path(__file__).resolve().parents[2]

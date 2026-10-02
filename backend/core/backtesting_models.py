@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class BacktestConfig(BaseModel):
@@ -15,6 +17,32 @@ class BacktestConfig(BaseModel):
     timeframe: str = Field("1d")
     fill_delay_bars: int = Field(0, ge=0)
     intraday_slippage_model: bool = Field(False)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _apply_execution_profile(cls, data: Any) -> Any:
+        """Map the UI's `execution_profile` onto fee/slippage bps.
+
+        Without this, `extra="ignore"` silently dropped the profile and every backtest ran
+        cost-free regardless of the commission/slippage the user entered. Mirrors
+        backend.execution_sim: slippage = slippage + spread + market impact.
+        """
+        if not isinstance(data, dict) or not isinstance(data.get("execution_profile"), dict):
+            return data
+        profile = data["execution_profile"]
+
+        def bps(key: str) -> float:
+            try:
+                return max(float(profile.get(key) or 0.0), 0.0)
+            except (TypeError, ValueError):
+                return 0.0
+
+        out = dict(data)
+        if "fee_bps" not in out:
+            out["fee_bps"] = bps("commission_bps")
+        if "slippage_bps" not in out:
+            out["slippage_bps"] = bps("slippage_bps") + bps("spread_bps") + bps("market_impact_bps")
+        return out
 
 
 class TradeRecord(BaseModel):

@@ -90,6 +90,7 @@ async def _fetch_yahoo_quotes(fetcher: Any, symbols: list[str], now_iso: str) ->
                     "last": last,
                     "change": change if change is not None else 0.0,
                     "changePct": change_pct if change_pct is not None else 0.0,
+                    "volume": _to_float(row.get("regularMarketVolume")),
                     "ts": ts_iso,
                 }
             )
@@ -180,6 +181,7 @@ async def get_quotes(
                         "last": last,
                         "change": change if change is not None else 0.0,
                         "changePct": change_pct if change_pct is not None else 0.0,
+                        "volume": _to_float(row.get("regularMarketVolume")),
                         "ts": ts_iso,
                     }
                 )
@@ -251,6 +253,7 @@ async def get_quotes(
                         "last": last,
                         "change": change if change is not None else 0.0,
                         "changePct": change_pct if change_pct is not None else 0.0,
+                        "volume": _to_float(row.get("regularMarketVolume")),
                         "ts": ts_iso,
                     }
                 )

@@ -102,6 +102,16 @@ class StockSnapshot(BaseModel):
     eps_growth_pct: float | None = None
     div_yield_pct: float | None = None
     beta: float | None = None
+    # Session + 52-week stats derived from daily history (latest bar = current session).
+    previous_close: float | None = None
+    open: float | None = None
+    day_high: float | None = None
+    day_low: float | None = None
+    volume: float | None = None
+    avg_volume: float | None = None
+    high_52w: float | None = None
+    low_52w: float | None = None
+    currency: str | None = None
     country_code: str | None = None
     exchange: str | None = None
     classification: dict[str, Any] | None = None

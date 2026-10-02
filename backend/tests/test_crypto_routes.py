@@ -259,3 +259,19 @@ def test_crypto_markets_uses_stale_cache_when_rate_limited(monkeypatch) -> None:
     result = asyncio.run(crypto.crypto_markets(limit=12))
     assert len(result["items"]) == 1
     assert result["items"][0]["symbol"] == "BTC-USD"
+
+
+def test_crypto_correlation_skips_coin_with_missing_chart(monkeypatch) -> None:
+    yahoo = _patch_fetcher(monkeypatch)
+    real_get_chart = type(yahoo).get_chart
+
+    async def _get_chart(self, symbol: str, range_str: str = "6mo", interval: str = "1d"):
+        if symbol == "UNI-USD":  # Yahoo 404s a delisted symbol
+            raise RuntimeError("404 Not Found")
+        return await real_get_chart(self, symbol, range_str, interval)
+
+    monkeypatch.setattr(type(yahoo), "get_chart", _get_chart)
+    result = asyncio.run(crypto.crypto_correlation_matrix(window=12, limit=4))
+    assert "UNI-USD" not in result["symbols"]
+    assert len(result["symbols"]) == 4  # next coin by market cap backfills the slot
+    assert len(result["matrix"]) == 4

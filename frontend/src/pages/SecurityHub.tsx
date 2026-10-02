@@ -96,14 +96,19 @@ function MetricCell({ label, value, accent = false, hint }: { label: string; val
   );
 }
 
+// Number(null) and Number("") are 0, which would render missing data as a real zero.
+function toNum(v: unknown) {
+  return v == null || v === "" ? NaN : Number(v);
+}
+
 function fmtNum(v: unknown) {
-  const n = Number(v);
+  const n = toNum(v);
   if (!Number.isFinite(n)) return "-";
   return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 
 function fmtPct(v: unknown) {
-  const n = Number(v);
+  const n = toNum(v);
   if (!Number.isFinite(n)) return "-";
   return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
 }
@@ -298,12 +303,12 @@ export function SecurityHubPage() {
     setNewsSelectedIndex((v) => Math.max(0, Math.min(v, maxIndex)));
   }, [tab, tickerNewsQuery.data?.length]);
 
-  const currentPrice = Number(stock.current_price);
-  const week52Low = Number(stock["52w_low"] ?? stock.low_52_week);
-  const week52High = Number(stock["52w_high"] ?? stock.high_52_week);
+  const currentPrice = toNum(stock.current_price);
+  const week52Low = toNum(stock.low_52w ?? stock["52w_low"] ?? stock.low_52_week);
+  const week52High = toNum(stock.high_52w ?? stock["52w_high"] ?? stock.high_52_week);
   const marketCap = stock.market_cap ?? stock.mcap;
   const peRatio = stock.pe ?? stock.pe_ratio;
-  const dividendYield = stock.dividend_yield;
+  const dividendYield = toNum(stock.div_yield_pct ?? stock.dividend_yield);
   const logoUrl = String(stock.logo || stock.image || stock.logo_url || stock.company_logo || "").trim();
 
   const financialRows = useMemo(() => normalizeStatementRows(annual).slice(0, 12), [annual]);
@@ -344,7 +349,7 @@ export function SecurityHubPage() {
             <div className="grid min-w-[280px] grid-cols-3 gap-2">
               <MetricCell label="Last" value={fmtNum(currentPrice)} accent />
               <MetricCell label="Change %" value={fmtPct(stock.change_pct)} />
-              <MetricCell label="Volume" value={fmtNum(stock.volume)} hint="Requires a real-time provider (Kite / Finnhub)" />
+              <MetricCell label="Volume" value={fmtNum(stock.volume)} />
             </div>
           </div>
           <div className="mt-2 flex items-center justify-between">
@@ -387,7 +392,7 @@ export function SecurityHubPage() {
               <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
                 <MetricCell label="Market Cap" value={fmtNum(marketCap)} hint="Requires FMP or Yahoo summary data" />
                 <MetricCell label="P/E" value={fmtNum(peRatio)} hint="Requires FMP or Yahoo summary data" />
-                <MetricCell label="Div Yield" value={fmtPct(dividendYield)} hint="Requires FMP or Yahoo summary data" />
+                <MetricCell label="Div Yield" value={Number.isFinite(dividendYield) ? `${dividendYield.toFixed(2)}%` : "-"} hint="Requires FMP or Yahoo summary data" />
                 <MetricCell label="52W Range" value={`${fmtNum(week52Low)} - ${fmtNum(week52High)}`} />
               </div>
               <div className="grid grid-cols-1 gap-2 lg:grid-cols-[1fr_auto_auto_auto]">
@@ -395,9 +400,9 @@ export function SecurityHubPage() {
                   <div className="mb-1 ot-type-label text-terminal-muted">52-Week Position</div>
                   <MiniRangeBar low={Number.isFinite(week52Low) ? week52Low : null} high={Number.isFinite(week52High) ? week52High : null} current={Number.isFinite(currentPrice) ? currentPrice : null} />
                 </div>
-                <MetricCell label="Open" value={fmtNum(stock.open)} hint="Requires a real-time provider (Kite / Finnhub)" />
-                <MetricCell label="High" value={fmtNum(stock.day_high ?? stock.high)} hint="Requires a real-time provider (Kite / Finnhub)" />
-                <MetricCell label="Low" value={fmtNum(stock.day_low ?? stock.low)} hint="Requires a real-time provider (Kite / Finnhub)" />
+                <MetricCell label="Open" value={fmtNum(stock.open)} />
+                <MetricCell label="High" value={fmtNum(stock.day_high ?? stock.high)} />
+                <MetricCell label="Low" value={fmtNum(stock.day_low ?? stock.low)} />
               </div>
               <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
                 <div className="rounded-sm border border-terminal-border bg-terminal-bg p-2">
@@ -417,7 +422,7 @@ export function SecurityHubPage() {
                     <div><span className="text-terminal-muted">Sector:</span> <span>{String(stock.sector || "-")}</span></div>
                     <div><span className="text-terminal-muted">Industry:</span> <span>{String(stock.industry || "-")}</span></div>
                     <div><span className="text-terminal-muted">Country:</span> <span>{String(stock.country || stock.country_code || "-")}</span></div>
-                    <div><span className="text-terminal-muted">Currency:</span> <span>{String(stock.currency || "-")}</span></div>
+                    <div><span className="text-terminal-muted">Currency:</span> <span>{String(stock.currency || (stock.classification as Record<string, unknown> | undefined)?.currency || "-")}</span></div>
                   </div>
                 </div>
               </div>
@@ -426,8 +431,8 @@ export function SecurityHubPage() {
             <TerminalPanel title="6M Price Chart" subtitle="Compact overview chart" bodyClassName="space-y-2">
               <TinyPriceChart points={histData} />
               <div className="grid grid-cols-3 gap-2 text-xs">
-                <MetricCell label="Prev Close" value={fmtNum(stock.previous_close)} hint="Requires a real-time provider (Kite / Finnhub)" />
-                <MetricCell label="Avg Volume" value={fmtNum(stock.avg_volume)} hint="Requires a real-time provider (Kite / Finnhub)" />
+                <MetricCell label="Prev Close" value={fmtNum(stock.previous_close)} />
+                <MetricCell label="Avg Volume" value={fmtNum(stock.avg_volume)} />
                 <MetricCell label="Beta" value={fmtNum(stock.beta)} />
               </div>
             </TerminalPanel>

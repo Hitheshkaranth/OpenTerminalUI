@@ -126,6 +126,33 @@ def _parse_yahoo_ohlc(data: Dict[str, Any]) -> pd.DataFrame:
     return pd.DataFrame(rows, index=pd.DatetimeIndex(dates)).sort_index()
 
 
+def _session_stats_from_history(data: Dict[str, Any]) -> Dict[str, float | None]:
+    """Prev close / OHLC / volume / 30-session avg volume / 52-week range from a 1y daily chart payload.
+
+    The last bar is treated as the current (or most recent) session.
+    """
+    chart = (data.get("chart") or {}).get("result") or []
+    if not chart:
+        return {}
+    quote = ((chart[0].get("indicators") or {}).get("quote") or [{}])[0]
+    cols = [quote.get(k) or [] for k in ("open", "high", "low", "close", "volume")]
+    bars = [b for b in zip(*cols) if None not in b[:4]]
+    if not bars:
+        return {}
+    last = bars[-1]
+    vols = [float(b[4]) for b in bars[-31:-1] if b[4]]
+    return {
+        "previous_close": float(bars[-2][3]) if len(bars) > 1 else None,
+        "open": float(last[0]),
+        "day_high": float(last[1]),
+        "day_low": float(last[2]),
+        "volume": float(last[4]) if last[4] else None,
+        "avg_volume": sum(vols) / len(vols) if vols else None,
+        "high_52w": max(float(b[1]) for b in bars),
+        "low_52w": min(float(b[2]) for b in bars),
+    }
+
+
 def _pct_change_from_cutoff(close: pd.Series, days: int) -> float | None:
     if close.empty:
         return None
@@ -140,11 +167,19 @@ def _pct_change_from_cutoff(close: pd.Series, days: int) -> float | None:
         return None
     return ((latest_close - base) / base) * 100.0
 
+async def _fetch_history_for_stats(ticker: str) -> Dict[str, Any]:
+    return await (await get_unified_fetcher()).fetch_history(ticker, range_str="1y", interval="1d")
+
+
 @router.get("/stocks/{ticker}", response_model=StockSnapshot)
 async def get_stock(ticker: str) -> StockSnapshot:
     classification = await market_classifier.classify(ticker)
     yf_symbol = await market_classifier.yfinance_symbol(ticker)
     started = time.perf_counter()
+    # Daily history for session/52w stats runs alongside the snapshot so it adds no latency.
+    history_task = asyncio.create_task(
+        _fetch_history_for_stats(ticker)
+    )
     q = None
     try:
         snap = await fetch_stock_snapshot_coalesced(ticker)
@@ -195,8 +230,17 @@ async def get_stock(ticker: str) -> StockSnapshot:
         except Exception:
             pass
 
+    session: Dict[str, float | None] = {}
+    try:
+        history = await asyncio.wait_for(history_task, timeout=4)
+        session = _session_stats_from_history(history if isinstance(history, dict) else {})
+    except Exception:
+        history_task.cancel()
+
     # Map UnifiedFetcher snapshot dict to StockSnapshot model
     return StockSnapshot(
+        **session,
+        currency=snap.get("currency") or classification.currency,
         ticker=ticker.upper(),
         symbol=yf_symbol,
         company_name=snap.get("company_name"),

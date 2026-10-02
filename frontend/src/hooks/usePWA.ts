@@ -29,9 +29,11 @@ function useSWRegistration() {
           setIsReady(true);
           return;
         }
-        if (registration.installing) {
-          registration.installing.addEventListener("statechange", () => {
-            if ((registration.installing as any).state === "activated") {
+        // Capture the worker: registration.installing is null once it leaves the installing state.
+        const worker = registration.installing ?? registration.waiting;
+        if (worker) {
+          worker.addEventListener("statechange", () => {
+            if (worker.state === "activated") {
               setIsReady(true);
             }
           });
