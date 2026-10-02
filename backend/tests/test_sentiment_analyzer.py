@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from nlp.sentiment import FinancialSentimentAnalyzer
+from backend.nlp.sentiment import FinancialSentimentAnalyzer
 
 
 def test_sentiment_analyzer_bullish_text() -> None:

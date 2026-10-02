@@ -24,6 +24,19 @@ export function PromoterHoldingsCard({ ticker }: Props) {
     return <div className="h-40 animate-pulse rounded border border-terminal-border bg-terminal-panel" />;
   }
 
+  // The backend fills a placeholder split when NSE is unreachable; showing it as numbers presented made-up data as fact.
+  const isPlaceholder = /fallback distribution/i.test(String(data?.warning ?? ""));
+  if (isPlaceholder || !latest) {
+    return (
+      <div className="rounded border border-terminal-border bg-terminal-panel p-4">
+        <div className="text-xs uppercase tracking-wide text-terminal-accent">Promoter Holdings</div>
+        <div className="mt-3 text-xs text-terminal-muted">
+          Shareholding pattern is unavailable right now (the exchange feed did not respond). It will appear once NSE data loads.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded border border-terminal-border bg-terminal-panel p-4">
       <div className="text-xs uppercase tracking-wide text-terminal-accent">Promoter Holdings</div>

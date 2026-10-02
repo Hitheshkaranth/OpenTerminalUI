@@ -98,6 +98,12 @@ function fmtCompact(v: unknown) {
   return n.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 2 });
 }
 
+/** Snapshot ratios already arrive in percent (47.7 = 47.7%). */
+function fmtPctValue(v: unknown) {
+  const n = toNum(v);
+  return Number.isFinite(n) ? `${n.toFixed(1)}%` : "-";
+}
+
 function fmtNum(v: unknown) {
   const n = toNum(v);
   if (!Number.isFinite(n)) return "-";
@@ -401,6 +407,15 @@ export function SecurityHubPage() {
                 <MetricCell label="Open" value={fmtNum(stock.open)} />
                 <MetricCell label="High" value={fmtNum(stock.day_high ?? stock.high)} />
                 <MetricCell label="Low" value={fmtNum(stock.day_low ?? stock.low)} />
+              </div>
+              {/* Key ratios: the panel stretches to the price chart's height, which left a block of dead space here. */}
+              <div className="grid grid-cols-3 gap-2 lg:grid-cols-6">
+                <MetricCell label="P/B" value={fmtNum(stock.pb_calc ?? stock.pb_ratio)} />
+                <MetricCell label="EV/EBITDA" value={fmtNum(stock.ev_ebitda)} />
+                <MetricCell label="ROE" value={fmtPctValue(stock.roe_pct)} />
+                <MetricCell label="Net Margin" value={fmtPctValue(stock.net_margin_pct)} />
+                <MetricCell label="Rev Growth" value={fmtPctValue(stock.rev_growth_pct)} />
+                <MetricCell label="EPS Growth" value={fmtPctValue(stock.eps_growth_pct)} />
               </div>
               <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
                 <div className="rounded-sm border border-terminal-border bg-terminal-bg p-2">
@@ -766,7 +781,8 @@ export function SecurityHubPage() {
 
         {/* Filings Intelligence + Tijori-style research pack, blended into existing tabs. */}
         {tab === "overview" ? (
-          <div className="grid gap-2 xl:grid-cols-2">
+          // Same column split as the Overview / Price row above, so the panel edges line up.
+          <div className="grid gap-2 xl:grid-cols-[1.2fr_1fr]">
             <GrowthHeadwindsSummary symbol={activeTicker} market={selectedMarket} onOpenFilings={() => {
               const next = new URLSearchParams(searchParams);
               next.set("tab", "filings");

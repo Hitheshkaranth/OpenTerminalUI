@@ -304,17 +304,43 @@ _GENERIC_PARTY_TAIL = {
     "suppliers", "supplier", "customers", "customer", "wholesalers", "wholesaler", "distributors",
     "distributor", "vendors", "vendor", "partners", "manufacturers", "companies", "hospitals",
     "pharmacies", "retailers", "clients", "governments", "contractors", "payers", "third parties",
+    "carriers", "providers", "operators", "resellers", "integrators", "csps", "oems", "odms",
+    "makers", "builders", "developers", "clouds", "aibs", "enterprises", "consumers", "users",
+    "segment", "segments", "division", "divisions", "unit", "units", "designers", "hyperscalers",
+}
+# Filings anonymise big counterparties ("One direct customer", "Another direct customer").
+_QUANTITY_LEAD = {"one", "two", "three", "four", "five", "six", "another", "several", "certain", "some",
+                  "various", "multiple", "many", "other"}
+
+
+_GENERIC_MATERIALS = {"raw materials", "raw material", "materials", "material", "components", "commodities",
+                      "inputs", "supplies", "parts"}
+
+
+# Revenue-by-geography lines get read as customers ("United States").
+_GEOGRAPHIES = {
+    "united states", "us", "usa", "china", "taiwan", "japan", "korea", "south korea", "india", "europe",
+    "emea", "apac", "asia", "asia pacific", "americas", "north america", "latin america", "germany",
+    "united kingdom", "uk", "france", "singapore", "hong kong", "canada", "mexico", "brazil", "other countries",
 }
 
 
 def is_generic_party(name: str) -> bool:
     """'wholesalers', 'three largest wholesalers', 'China-based suppliers' are categories, not companies."""
-    words = re.findall(r"[A-Za-z][A-Za-z.'-]*", name or "")
+    words = re.findall(r"[A-Za-z][A-Za-z.'-]*", re.sub(r"\([^)]*\)", " ", name or ""))
     if not words:
         return True
     if not any(w[0].isupper() for w in words):
         return True
-    return words[-1].lower() in _GENERIC_PARTY_TAIL
+    if words[0].lower() in _QUANTITY_LEAD:
+        return True
+    if " ".join(w.lower().strip(".") for w in words) in _GEOGRAPHIES:
+        return True
+    # Plural acronyms are segments ("CSPs", "OEMs", "AIBs"), and so is a name that leads with a
+    # category word ("Customers headquartered outside of the United States").
+    if len(words) == 1 and re.fullmatch(r"[A-Z]{2,}s", words[0]):
+        return True
+    return words[-1].lower() in _GENERIC_PARTY_TAIL or words[0].lower() in _GENERIC_PARTY_TAIL
 
 
 # --------------------------------------------------------------------------- #
@@ -472,21 +498,28 @@ async def extract_filings_nodes(
     from backend.filings_rag.sources import normalize_company_name
 
     nodes: list[dict[str, Any]] = []
-    seen: set[tuple[str, str]] = set()
+    try:
+        own_name = normalize_company_name(await snapshot_name(symbol))
+    except Exception:
+        own_name = ""
+
+    def same_party(a: str, b: str) -> bool:
+        # "samsung" and "samsung electronics" are one company; compare on whole words.
+        return bool(a and b) and (a == b or a.startswith(b + " ") or b.startswith(a + " "))
 
     def add(node: dict[str, Any] | None) -> None:
         if node is None:
             return
-        # One node per company per relation: the ticker used to be part of the key, so the same
-        # name with and without a (guessed) ticker showed twice.
-        key = (node["relation"], normalize_company_name(node.get("name") or ""))
-        if key in seen:
-            if node.get("symbol"):
-                for existing in nodes:
-                    if (existing["relation"], normalize_company_name(existing.get("name") or "")) == key:
-                        existing["symbol"] = existing.get("symbol") or node["symbol"]
+        name = normalize_company_name(node.get("name") or "")
+        # The filer itself showed up as its own supplier ("Microsoft" under MSFT).
+        if (node.get("symbol") or "").upper() == symbol.upper() or same_party(name, own_name):
             return
-        seen.add(key)
+        # One node per company per relation, matching "Samsung" with "Samsung Electronics Co., Ltd.";
+        # a later duplicate can still contribute the ticker the first one lacked.
+        for existing in nodes:
+            if existing["relation"] == node["relation"] and same_party(normalize_company_name(existing.get("name") or ""), name):
+                existing["symbol"] = existing.get("symbol") or node.get("symbol")
+                return
         nodes.append(node)
 
     for query in RETRIEVAL_QUERIES:
@@ -557,6 +590,9 @@ async def extract_raw_materials_from_filings(
             if extracted is None:
                 continue
             name = extracted["name"]
+            # "Raw materials" / "components" are the category heading, not a material.
+            if re.sub(r"[^a-z ]", "", name.lower()).strip() in _GENERIC_MATERIALS:
+                continue
             symbol_name = curated_symbol_for_name(name)
             key = symbol_name or name.lower()
             if key in seen:

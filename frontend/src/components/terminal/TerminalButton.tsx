@@ -58,7 +58,8 @@ export function TerminalButton({
         .trim()}
     >
       {loading ? <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-sm bg-current opacity-80" aria-hidden="true" /> : leftIcon}
-      <span>{children}</span>
+      {/* inline-flex: an icon passed as a child (svg is display:block under Tailwind) stacked above the label. */}
+      <span className="inline-flex items-center gap-1.5">{children}</span>
       {rightIcon}
     </button>
   );

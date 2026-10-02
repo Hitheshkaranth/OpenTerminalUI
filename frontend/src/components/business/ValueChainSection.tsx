@@ -272,13 +272,15 @@ export function ValueChainSection({ symbol }: ValueChainSectionProps) {
       <div className="flex flex-col gap-4">
         <HasWarnings warnings={valueChain.warnings || []} />
 
-        <div className="grid grid-cols-3 gap-3">
+        {/* Company sits in a narrow centre column between its suppliers and customers (it was an equal-width
+            empty box labelled "[LLY]"). Stacks on narrow screens. */}
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(150px,200px)_minmax(0,1fr)]">
           <ChainColumn title="Suppliers" nodes={valueChain.suppliers} emptyText="No suppliers mapped." />
-          <div className="flex flex-col items-center justify-center rounded-sm border border-terminal-border bg-terminal-panel px-3 py-6 text-center">
-            <div className="ot-type-label text-[14px] font-semibold text-terminal-text">[{valueChain.symbol}]</div>
-            {valueChain.sector ? (
-              <div className="mt-1 truncate text-terminal-muted text-[10px]">{valueChain.sector}</div>
-            ) : null}
+          <div className="flex flex-col items-center justify-center gap-1 self-center rounded-sm border border-terminal-accent/40 bg-terminal-accent/5 px-3 py-4 text-center">
+            <div className="ot-type-label text-[11px] text-terminal-muted" aria-hidden="true">supplies → </div>
+            <div className="ot-type-data text-[16px] font-semibold text-terminal-accent">{valueChain.symbol}</div>
+            {valueChain.sector ? <div className="text-[10px] text-terminal-muted">{valueChain.sector}</div> : null}
+            <div className="ot-type-label text-[11px] text-terminal-muted" aria-hidden="true">→ sells to</div>
           </div>
           <ChainColumn title="Customers" nodes={valueChain.customers} emptyText="No customers mapped." />
         </div>

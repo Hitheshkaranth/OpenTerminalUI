@@ -592,10 +592,16 @@ export function StockDetailPage() {
               description={`${ticker} · AI bull/bear thesis from fundamentals and news`}
               fetcher={() => fetchStockBriefing(ticker, selectedMarket)}
             />
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-              <PromoterHoldingsCard ticker={ticker} />
+            {/* Promoter / FII / DII holdings is an Indian-listing disclosure; on a US stock it only showed a
+                fallback 0 / 0 / 0 / 100 split. */}
+            {selectedMarket === "NSE" || selectedMarket === "BSE" ? (
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <PromoterHoldingsCard ticker={ticker} />
+                <CapexTrackerCard ticker={ticker} />
+              </div>
+            ) : (
               <CapexTrackerCard ticker={ticker} />
-            </div>
+            )}
             <ScoreCard ticker={ticker} />
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <ShareholdingChart ticker={ticker} market={selectedMarket} />

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import numpy as np
 
-from models.pure_jump_vol.backtest import backtest_positions
-from models.pure_jump_vol.fit import fit_pjv_parameters
-from models.pure_jump_vol.particle_filter import PJVParams, run_particle_filter
-from models.pure_jump_vol.signals import generate_pjv_signals
-from models.pure_jump_vol.synthetic import simulate_pure_jump_path
+from backend.pure_jump_vol.backtest import backtest_positions
+from backend.pure_jump_vol.fit import fit_pjv_parameters
+from backend.pure_jump_vol.particle_filter import PJVParams, run_particle_filter
+from backend.pure_jump_vol.signals import generate_pjv_signals
+from backend.pure_jump_vol.synthetic import simulate_pure_jump_path
 
 
 def test_particle_filter_outputs_finite_values() -> None:

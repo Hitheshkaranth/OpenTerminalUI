@@ -87,3 +87,8 @@ dist/
 
 # Accidental landing-page upload dumps (full-repo copies)
 frontend/public/landing/uploads/
+
+# Vite dependency pre-bundle cache
+.vite/
+# Local JWT used by scripts/capture_*.mjs
+.ot-token

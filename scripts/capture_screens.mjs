@@ -1,8 +1,11 @@
 import { chromium } from "@playwright/test";
 import fs from "node:fs";
-const BASE = "http://127.0.0.1:8000";
-const OUT = "../assets/screenshots"; // run from frontend/: node ../scripts/capture_screens.mjs [name,name]
-const tok = fs.readFileSync("../.swarm/ot_v1/tok.txt", "utf8").trim();
+// QA sweep: captures every major route and reports failed API calls / page errors per screen.
+// Run from frontend/: OT_BASE=… OT_TOKEN_FILE=… node ../scripts/capture_screens.mjs [name,name]
+// (README images come from scripts/capture_readme.mjs instead.)
+const BASE = process.env.OT_BASE || "http://127.0.0.1:8000";
+const OUT = process.env.OT_OUT || "../build/screen-sweep";
+const tok = fs.readFileSync(process.env.OT_TOKEN_FILE || "../.ot-token", "utf8").trim();
 const only = process.argv[2] ? process.argv[2].split(",") : null;
 
 // [file name, route, section, description, optional pre-actions]
@@ -131,7 +134,8 @@ for (const [name, route, section, desc, opts = {}] of SCREENS) {
     console.log(`${name.padEnd(26)} CRASH ${e.message.slice(0, 100)}`);
   }
 }
-const prev = fs.existsSync(`../docs/screenshots/manifest.json`) ? JSON.parse(fs.readFileSync(`../docs/screenshots/manifest.json`, "utf8")) : [];
+fs.mkdirSync(OUT, { recursive: true });
+const prev = fs.existsSync(`${OUT}/manifest.json`) ? JSON.parse(fs.readFileSync(`${OUT}/manifest.json`, "utf8")) : [];
 const merged = only ? [...prev.filter((p) => !only.includes(p.name)), ...manifest] : manifest;
-fs.writeFileSync(`../docs/screenshots/manifest.json`, JSON.stringify(merged, null, 2));
+fs.writeFileSync(`${OUT}/manifest.json`, JSON.stringify(merged, null, 2));
 await browser.close();

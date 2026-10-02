@@ -30,7 +30,8 @@ export function CapexTrackerCard({ ticker }: Props) {
     latest && previous && previous.capex > 0
       ? ((latest.capex - previous.capex) / previous.capex) * 100
       : null;
-  const deltaClass = deltaPct == null ? "text-terminal-muted" : deltaPct >= 0 ? "text-terminal-neg" : "text-terminal-pos";
+  // Higher capex is investment, not a loss: show the change neutrally rather than red-for-up.
+  const deltaClass = "text-terminal-text";
 
   return (
     <div className="rounded border border-terminal-border bg-terminal-panel p-4">

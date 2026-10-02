@@ -52,7 +52,9 @@ services:
         - action: rebuild
           path: ./frontend
         - action: rebuild
-          path: ./config
+          path: ./plugins
+        - action: rebuild
+          path: ./scripts
         - action: rebuild
           path: ./data
     restart: unless-stopped

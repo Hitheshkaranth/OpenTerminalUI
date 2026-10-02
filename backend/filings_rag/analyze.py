@@ -16,6 +16,16 @@ from backend.services.llm.factory import get_llm_provider
 
 _CHUNK_TEXT_CAP = 3000
 _CLAIM_CAP = 300
+_SUMMARY_CAP = 600
+
+
+def _clip(text: str, limit: int) -> str:
+    """Cut at a word boundary with an ellipsis; a raw slice left fragments like "…$5.1 billion i"."""
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0].rstrip(" ,;:")
+    return f"{cut}…"
 _MAG_WEIGHT = {"high": 3, "medium": 2, "low": 1}
 
 # Number immediately followed (or adjacent) by a unit token.
@@ -127,7 +137,13 @@ def _build_llm_prompt(driver: dict, chunks: list[dict]) -> tuple[str, str]:
         f"guidance (figures, wins, approvals, actions taken). Do NOT report generic risk-factor or "
         f"legal boilerplate, hypotheticals ('may', 'could', 'might'), descriptions of laws or "
         f"accounting policies, or text unrelated to this driver. Returning an empty findings list "
-        f"is correct when the chunks contain no such evidence.\n\n"
+        f"is correct when the chunks contain no such evidence.\n"
+        f"Every finding must be evidence FOR this driver as stated. For a headwind, report only evidence "
+        f"of the negative condition: if the text shows the opposite (e.g. guidance RAISED for a "
+        f"'guidance cut' driver), that is not a finding; mention it in the summary instead and set "
+        f"supports_driver false on anything you are unsure about.\n"
+        f"Write the summary for an investor in 1-3 sentences about the company; never mention "
+        f"'chunks', 'the text supplied' or this task.\n\n"
         f"DRIVER: {driver['label']}\n"
         f"Goal: {driver['description']}\n\n"
         f"Return a single JSON object of this shape and nothing else:\n"
@@ -135,7 +151,7 @@ def _build_llm_prompt(driver: dict, chunks: list[dict]) -> tuple[str, str]:
         f'{{"claim": str, "quote": str, "chunk_id": int, '
         f'"metric": str|null, "value": number|null, "unit": str|null, '
         f'"period": str|null, "magnitude": "high"|\"medium\"|\"low\", '
-        f'"confidence": number}}, ...], '
+        f'"confidence": number, "supports_driver": bool}}, ...], '
         f'"summary": str}}'
     )
     if not chunks:
@@ -276,9 +292,12 @@ async def _driver_llm_findings(driver: dict, chunks: list[dict], semaphore: asyn
     if not isinstance(findings_raw, list):
         return None
     id_map = {c.get("id"): c for c in chunks}
-    extracted = [f for f in (_extract_llm_finding(f, id_map) for f in findings_raw) if f is not None]
+    # Drop evidence the model itself marks as contradicting the driver: "guidance raised" quotes were
+    # being scored as proof of the "guidance cut" headwind.
+    supporting = [f for f in findings_raw if not (isinstance(f, dict) and f.get("supports_driver") is False)]
+    extracted = [f for f in (_extract_llm_finding(f, id_map) for f in supporting) if f is not None]
     extracted.sort(key=_driver_finding_score, reverse=True)
-    return {"findings": extracted, "summary": str(parsed.get("summary") or "")[:_CLAIM_CAP]}
+    return {"findings": extracted, "summary": _clip(str(parsed.get("summary") or ""), _SUMMARY_CAP)}
 
 
 async def analyze(

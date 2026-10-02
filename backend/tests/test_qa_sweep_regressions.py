@@ -299,3 +299,40 @@ def test_agent_tools_accept_symbol_alias():
     assert _ticker_arg({"symbol": "LLY"}) == "LLY"
     assert _ticker_arg({"ticker": "TCS", "symbol": "X"}) == "TCS"
     assert _ticker_arg({}) == ""
+
+
+def test_filings_driver_drops_contradicting_evidence_and_clips_summary(monkeypatch):
+    from backend.filings_rag import analyze as an
+
+    chunk = {"id": 7, "text": "Lilly raised its 2026 revenue guidance to $85.0 billion. Demand weakened in Europe."}
+
+    async def fake_complete_json(system, user, max_tokens=0):
+        return {
+            "findings": [
+                {"claim": "Guidance raised", "quote": "Lilly raised its 2026 revenue guidance to $85.0 billion.",
+                 "chunk_id": 7, "magnitude": "high", "confidence": 0.9, "supports_driver": False},
+                {"claim": "Weaker EU demand", "quote": "Demand weakened in Europe.",
+                 "chunk_id": 7, "magnitude": "medium", "confidence": 0.8, "supports_driver": True},
+            ],
+            "summary": "word " * 200,
+        }
+
+    monkeypatch.setattr(an, "complete_json", fake_complete_json)
+    driver = {"label": "Guidance cut / demand weakness", "description": "d"}
+    out = asyncio.run(an._driver_llm_findings(driver, [chunk], asyncio.Semaphore(1)))
+    assert [f["claim"] for f in out["findings"]] == ["Weaker EU demand"]
+    assert out["summary"].endswith("…") and not out["summary"].endswith(" …")
+    assert an._clip("from $5.1 billion in 2024", 18) == "from $5.1 billion…"
+
+
+def test_value_chain_rejects_anonymised_parties():
+    from backend.value_chain import service as vc
+
+    for generic in ["One direct customer (fiscal year 2026)", "Another direct customer", "CSPs",
+                    "Third-party cellular network carriers", "Several OEMs", "AIBs", "AI model makers",
+                    "Neocloud builders", "AI Clouds", "Customers headquartered outside of the United States",
+                    "U.S.-based Compute & Networking segment", "United States", "custom ASIC designers"]:
+        assert vc.is_generic_party(generic), generic
+    for real in ["Taiwan Semiconductor Manufacturing Company Limited", "SK Hynix Inc.", "The Coca-Cola Company",
+                 "Fabrinet", "SB Energy Corp.", "Wistron Corporation", "Cardinal Health, Inc."]:
+        assert not vc.is_generic_party(real), real

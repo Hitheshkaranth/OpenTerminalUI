@@ -11,7 +11,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from models.pure_jump_vol.signals import generate_pjv_signals
+from backend.pure_jump_vol.signals import generate_pjv_signals
 from backend.core.single_asset_backtest import generate_sma_crossover_signals
 from backend.core.execution_model import ExecutionModelConfig, parse_execution_config
 

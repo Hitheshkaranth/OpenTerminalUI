@@ -19,8 +19,6 @@ COPY backend/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY backend/ ./backend/
-COPY models/ ./models/
-COPY nlp/ ./nlp/
 COPY data/ ./data/
 COPY plugins/ ./plugins/
 COPY scripts/ ./scripts/

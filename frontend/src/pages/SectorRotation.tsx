@@ -32,11 +32,15 @@ export function SectorRotationPage() {
         </button>
       </div>
 
+      {/* Children must grow: in a flex row they shrank to their content (the themes table and the RRG chart
+          filled ~40% of the width). */}
       <div className="flex min-h-0 flex-1">
         {view === "themes" ? (
-          <ThemesBoard />
+          <div className="min-w-0 flex-1">
+            <ThemesBoard />
+          </div>
         ) : (
-          <div className="flex min-h-0 flex-1">
+          <div className="flex min-h-0 min-w-0 flex-1 [&>*]:flex-1">
             <SectorRotationMap width="100%" height="100%" defaultBenchmark="SPY" />
           </div>
         )}

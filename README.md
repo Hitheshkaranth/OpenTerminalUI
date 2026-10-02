@@ -1,492 +1,260 @@
-# OpenTerminalUI
+<div align="center">
 
-<p align="center">
-  <img src="assets/logo.png" alt="OpenTerminalUI logo" width="560" />
-</p>
+<img src="assets/logo.png" alt="OpenTerminalUI" width="420" />
 
-<p align="center">
-  <strong>The open-source financial terminal for traders, researchers, and quant teams.</strong>
-</p>
+### The open-source research terminal for equities, derivatives and quant work
 
-<p align="center">
+Bloomberg-style workflows, primary-document intelligence and a tool-using AI analyst, self-hosted on your own hardware.
+
+<p>
   <img src="https://img.shields.io/badge/version-0.8.0-0f172a" alt="Version 0.8.0" />
   <img src="https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white" alt="Python 3.11" />
-  <img src="https://img.shields.io/badge/node-22-339933?logo=node.js&logoColor=white" alt="Node 22" />
   <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black" alt="React 18" />
-  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white" alt="Vite 6" />
-  <img src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white" alt="Docker" />
+  <img src="https://img.shields.io/badge/React_18-TypeScript-61DAFB?logo=react&logoColor=black" alt="React 18 + TypeScript" />
+  <img src="https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white" alt="Docker" />
+  <img src="https://img.shields.io/badge/LLM-OpenRouter_|_LM_Studio_|_vLLM-ff6b00" alt="LLM providers" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License" />
 </p>
 
-<p align="center">
-  <a href="https://hitheshkaranth.github.io/OpenTerminalUI/">Website</a> |
-  <a href="#features">Features</a> |
-  <a href="#screenshots">Screenshots</a> |
-  <a href="#architecture">Architecture</a> |
-  <a href="#quick-start">Quick Start</a> |
-  <a href="CONTRIBUTING.md">Contributing</a>
+<p>
+  <a href="#-quick-start"><b>Quick start</b></a> ·
+  <a href="#-feature-tour"><b>Feature tour</b></a> ·
+  <a href="#-what-you-can-do-with-it"><b>Workflows</b></a> ·
+  <a href="#-architecture"><b>Architecture</b></a> ·
+  <a href="#-ai-models"><b>AI models</b></a> ·
+  <a href="https://hitheshkaranth.github.io/OpenTerminalUI/"><b>Website</b></a>
 </p>
+
+<img src="assets/readme/dashboard.jpg" alt="OpenTerminalUI market overview: indices, research workflows, ideas radar, movers, theme leaders" width="100%" />
+
+</div>
 
 ---
 
-OpenTerminalUI is a self-hosted, full-stack financial terminal that combines real-time market data, institutional-grade charting, derivatives analytics, portfolio management, and quant research into a single platform. Built with a terminal-style shell interface inspired by Bloomberg and Refinitiv, it delivers professional-grade workflows to anyone with a browser.
+## Why OpenTerminalUI
 
-**Multi-market coverage** across NSE, BSE, NYSE, NASDAQ, crypto, commodities, forex, bonds, ETFs, and mutual funds. **70+ technical indicators**, **multi-panel chart workstations**, **F&O option chains with live Greeks**, **backtesting with Model Lab**, **statistical arbitrage with Pair Trading Lab**, **Portfolio Lab and optimizer workflows**, **paper trading and trade journal**, **OMS / ops / data-quality consoles**, **saved views and launchpad workspaces**, a **tool-using AI research agent with multi-agent debate and Strategy Lab**, and an **extensible plugin system** &mdash; all running on your own hardware.
+Most retail tools stop at price charts and ratios. OpenTerminalUI is built for the research that actually moves a position: reading what a company filed, tracking what management promised, mapping who it sells to and buys from, and testing an idea before money goes in.
 
-## What's new in 0.8.0
+- **One terminal, many markets.** NSE / BSE, NYSE / NASDAQ, F&O, commodities, forex, crypto, ETFs, bonds and mutual funds, behind a keyboard-first shell (`Ctrl+G` GO bar, `Ctrl+K` palette, `Ctrl+J` agent).
+- **Evidence, not vibes.** Filings Intelligence reads 10-Ks, 10-Qs, earnings releases, annual reports and concall transcripts, and every growth engine or headwind it reports carries a verbatim, verified quote with document and page.
+- **An analyst that uses tools.** The AI agent calls 40+ read-only tools (snapshots, technicals, filings search, screens, backtests, risk) and answers with the numbers it fetched, not ones it imagined.
+- **Honest data.** Every quote carries provenance (`live / delayed / cached / synthetic`), blank metrics say why they are blank, and synthetic fallbacks are labelled, never passed off as real.
+- **Yours.** MIT-licensed, self-hosted, works offline-first with free data sources, and runs AI on a local model if you prefer.
 
-**Trust the numbers.** Every security snapshot now carries a provenance envelope (`live / delayed / cached / synthetic / unavailable`, source, as-of, latency) rendered as a chip on the Security Hub and the symbol rail; blank metrics say *why* they are blank; the status bar shows a per-provider health row; and synthetic data (the order book, when no depth feed is connected) is labelled as such and never used as a price basis.
+---
 
-**Manage providers in-app.** Settings → Data Providers shows what each provider unlocks, its live status (Kite is probed for real, so an expired daily token reads *down*), and — for admins — lets you set, mask, test and clear API keys without leaving the browser. Placeholder values are no longer counted as configured.
+## 🧭 Feature tour
 
-**Analysis → action.** Zerodha Kite holdings/positions import and CSV import (Zerodha / Groww / generic) into a holdings-first Portfolio page; Paper Buy/Sell from the symbol rail and right-click menu; alert **actions** that run on trigger (paper order, add to watchlist, webhook) with a dry-run.
+> Screenshots are captured from the running app once each page has fully loaded (`scripts/capture_readme.mjs`), across a spread of popular stocks.
 
-**One product, not 77 pages.** A grouped, collapsible navigation rail with pinned and recent pages; a symbol-aware Context Rail (quote, paper position, alerts, next events, quick actions); a unified events hub (earnings, dividends, corporate actions, F&O expiry, macro); and the global market now follows the symbol you open, so a RELIANCE header can no longer read NASDAQ.
+### Security Hub
 
-**Verified screen by screen.** Every route was captured and checked for failed API calls and page errors (`docs/screenshots/SCREENSHOTS.md`); the sweep fixed ten integration bugs, including the Backtesting *Run* button, US charts on an NSE desk, and 54 screens hitting a non-existent watchlist endpoint.
+A single page per company: DES-style snapshot, interactive price chart with range tabs and hover readout, key ratios, filings signals, reverse DCF and catalyst conviction, with tabs for financials, chart, news, ownership, estimates, peers, ESG, tape, insiders and filings.
 
-## Screenshots
+<img src="assets/readme/security-hub.jpg" alt="Security Hub overview for NVDA" width="100%" />
 
-Captured from the built app with `scripts/capture_screens.mjs` (headless Chromium, 1680×1050 @2×). Account-backed screens are seeded before capture so portfolio, watchlist, paper trading, alerts, and journal views show populated data; each screen is checked for failed API calls and page errors — see `docs/screenshots/SCREENSHOTS.md` for the per-screen manifest.
+### Filings Intelligence: RAG over company reports
 
-### Complete Feature Gallery
+Import a company's primary documents (SEC 10-K / 10-Q / 8-K earnings releases for US listings; annual reports, concall transcripts, investor presentations, order-win and USFDA announcements from NSE) or upload a PDF. The pipeline scores **21 drivers**: growth engines such as order book, new client wins, capacity expansion, approvals and guidance raises, and headwinds such as client concentration, margin pressure, regulatory action and guidance cuts. Every finding is backed by a quote that must appear verbatim in the source, with document and page. You can also ask free-form questions and get cited answers, read concall summaries, and track management guidance over time.
 
-#### Mission Control & Navigation
+<table>
+  <tr>
+    <td width="50%"><img src="assets/readme/filings-intelligence.jpg" alt="Growth engines and headwinds with verified quotes for NVDA" /></td>
+    <td width="50%"><img src="assets/readme/ai-briefing.jpg" alt="AI investment briefing for AAPL with bull case, bear case and key risks" /></td>
+  </tr>
+  <tr>
+    <td><b>Growth engines vs headwinds</b>: scored drivers, each claim linked to its filing quote and page.</td>
+    <td><b>AI investment briefing</b>: a balanced bull / bear / risks read built from fundamentals and live headlines.</td>
+  </tr>
+</table>
 
-| Mission Control | Launchpad |
+### Business research pack
+
+Tijori-style company research, blended into the Security Hub: operating KPIs extracted from filings and charted over time, revenue mix and market share, a supplier → company → customer **value chain** with every link cited, competitors, raw-material exposure, and a reverse DCF that shows the growth the current price implies.
+
+<table>
+  <tr>
+    <td width="50%"><img src="assets/readme/business-metrics.jpg" alt="Operating KPIs extracted from MSFT filings" /></td>
+    <td width="50%"><img src="assets/readme/value-chain.jpg" alt="NVDA value chain: TSMC, Samsung, SK Hynix, Micron and assemblers, each cited to the 10-K" /></td>
+  </tr>
+  <tr>
+    <td><b>Operating KPIs</b> pulled from filings with quote-level citations (MSFT).</td>
+    <td><b>Value chain</b>: NVDA's foundry, memory and assembly suppliers from its 10-K, resolved to listed tickers where they exist.</td>
+  </tr>
+</table>
+
+### AI research agent
+
+A slide-over console (`Ctrl+J`) that researches on demand. It picks tools, fetches data, and writes the answer from the results, rendering snapshots and tables as cards. Modes include **multi-agent debate** (analyst team → bull vs bear → portfolio-manager decision), **Strategy Lab** (propose → backtest → iterate → out-of-sample validation), **screen membership** and **ensemble** analysis. The same tool registry is exposed as an authenticated **MCP server** for Claude Code, Claude Desktop and other MCP clients.
+
+<img src="assets/readme/agent.jpg" alt="AI agent comparing MSFT and GOOGL using live tool calls" width="100%" />
+
+### Markets, charts and discovery
+
+<table>
+  <tr>
+    <td width="50%"><img src="assets/readme/chart.jpg" alt="TSLA candlestick chart with indicators" /></td>
+    <td width="50%"><img src="assets/readme/screener.jpg" alt="Screener with guru presets and multi-market scan" /></td>
+  </tr>
+  <tr>
+    <td><b>Charting</b>: candles, indicators, drawing tools, multi-timeframe, replay, compare and multi-pane workstations.</td>
+    <td><b>Screener</b>: guru and thematic presets, a formula engine, filings-based fields and 15+ visualisations.</td>
+  </tr>
+  <tr>
+    <td><img src="assets/readme/heatmap.jpg" alt="Market heatmap by sector and market cap" /></td>
+    <td><img src="assets/readme/themes.jpg" alt="Thematic indices vs benchmark" /></td>
+  </tr>
+  <tr>
+    <td><b>Heatmap</b>: sector and market-cap map of the session, with drill-down and top movers.</td>
+    <td><b>Thematic indices</b>: 18 investable themes (defence, railways, EMS, AI semis, GLP-1…) against a benchmark.</td>
+  </tr>
+</table>
+
+### Derivatives, quant and cross-asset
+
+<table>
+  <tr>
+    <td width="50%"><img src="assets/readme/options-strategy.jpg" alt="Options strategy builder with payoff" /></td>
+    <td width="50%"><img src="assets/readme/backtesting.jpg" alt="Backtesting control deck with performance summary" /></td>
+  </tr>
+  <tr>
+    <td><b>F&amp;O</b>: option chain with Greeks, multi-leg strategy builder, OI and PCR analysis, options flow, futures term structure, expiry calendar.</td>
+    <td><b>Backtesting</b>: 16+ strategy templates, realistic execution costs, walk-forward, Monte Carlo, Model Lab and Portfolio Lab.</td>
+  </tr>
+  <tr>
+    <td><img src="assets/readme/commodities.jpg" alt="Commodities terminal with crude oil snapshot and term structure" /></td>
+    <td><img src="assets/readme/crypto.jpg" alt="Crypto command center" /></td>
+  </tr>
+  <tr>
+    <td><b>Commodities</b>: energy, metals and agriculture with curves, seasonality, and the listed companies each move hurts or helps.</td>
+    <td><b>Crypto</b>: market board, movers, sectors, DeFi, derivatives and correlation.</td>
+  </tr>
+</table>
+
+### Workspaces
+
+<table>
+  <tr>
+    <td width="50%"><img src="assets/readme/mission-control.jpg" alt="Mission control trading desk" /></td>
+    <td width="50%"><img src="assets/readme/launchpad.jpg" alt="Launchpad multi-panel workspace" /></td>
+  </tr>
+  <tr>
+    <td><b>Mission control</b>: workspace presets for Trader, Quant, PM, Risk and Ops desks.</td>
+    <td><b>Launchpad</b>: drag-and-drop panels (charts, order book, news, alerts, AI research) with pop-outs and saved layouts.</td>
+  </tr>
+</table>
+
+<details>
+<summary><b>Everything else in the box</b></summary>
+
+| Area | What's included |
 |---|---|
-| <img src="assets/screenshots/home.png" alt="Mission Control dashboard" width="420" /> | <img src="assets/screenshots/launchpad.png" alt="Launchpad workspace" width="420" /> |
+| **Portfolio & trading** | Multi-portfolio holdings, Zerodha Kite / CSV import (Zerodha, Groww, generic), allocation and attribution, paper trading with slippage and TCA, trade journal, position sizer, shadow account |
+| **Risk** | VaR / CVaR, EWMA volatility, PCA factor exposures, stress scenarios (GFC, COVID, rate shock…), correlation regimes and clustering, exposure heatmaps |
+| **Quant research** | Factor dashboard, Alpha Zoo, statistical lab, pair-trading lab, research autopilot, strategy export (Pine / MQL5), model governance |
+| **Monitoring** | Ideas board (order wins, capex, approvals, insider and bulk deals), filings watch alerts, results tracker with QoQ / YoY scorecards, earnings calendar, intelligence timeline, events hub |
+| **Alerts** | Multi-condition rules with actions on trigger (paper order, watchlist, webhook), delivery to in-app / email / Slack / Telegram / webhook |
+| **Macro & fixed income** | Economic calendar, yield curve with inversion detection, bond analytics, forex with central-bank monitor, ETF and mutual fund analytics |
+| **Operations** | OMS with restricted lists and audit trail, ops dashboard with kill switches, data-quality console, provider status row |
+| **Extensibility** | Plugin system, sandboxed Python scripting, OpenScript custom indicators, saved views, MCP server |
 
-| Market Dashboard | Account |
+</details>
+
+---
+
+## 🛠 What you can do with it
+
+| Goal | How |
 |---|---|
-| <img src="assets/screenshots/market-dashboard.png" alt="Market dashboard" width="420" /> | <img src="assets/screenshots/account.png" alt="Account settings and profile" width="420" /> |
-
-#### Equity Research & Markets
-
-| Market View | Security Hub |
-|---|---|
-| <img src="assets/screenshots/market-view.png" alt="AAPL market chart view" width="420" /> | <img src="assets/screenshots/stock-detail.png" alt="AAPL Security Hub" width="420" /> |
-
-| India Security Hub | Financial Analysis |
-|---|---|
-| <img src="assets/screenshots/security-hub-india.png" alt="RELIANCE Security Hub" width="420" /> | <img src="assets/screenshots/financial-analysis.png" alt="Financial statement analysis" width="420" /> |
-
-| Chart Workstation | Multi-Timeframe |
-|---|---|
-| <img src="assets/screenshots/chart-workstation.png" alt="Six-pane chart workstation" width="420" /> | <img src="assets/screenshots/multi-timeframe.png" alt="Multi-timeframe analysis" width="420" /> |
-
-| DOM | Time & Sales |
-|---|---|
-| <img src="assets/screenshots/dom.png" alt="Depth of market view" width="420" /> | <img src="assets/screenshots/time-and-sales.png" alt="Time and sales tape" width="420" /> |
-
-| Split Compare | Market Heatmap |
-|---|---|
-| <img src="assets/screenshots/split-compare.png" alt="Multi-symbol split comparison" width="420" /> | <img src="assets/screenshots/market-heatmap.png" alt="Market heatmap" width="420" /> |
-
-| Hotlists | Watchlist |
-|---|---|
-| <img src="assets/screenshots/hotlists.png" alt="Hotlists" width="420" /> | <img src="assets/screenshots/watchlist.png" alt="Populated watchlist" width="420" /> |
-
-| Screener | Factor Dashboard |
-|---|---|
-| <img src="assets/screenshots/screener.png" alt="Advanced screener after running a scan" width="420" /> | <img src="assets/screenshots/factor-dashboard.png" alt="Factor dashboard" width="420" /> |
-
-| Relative Strength | Sector Rotation |
-|---|---|
-| <img src="assets/screenshots/relative-strength.png" alt="Relative strength dashboard" width="420" /> | <img src="assets/screenshots/sector-rotation.png" alt="Sector rotation dashboard" width="420" /> |
-
-| Dividends | Insider Activity |
-|---|---|
-| <img src="assets/screenshots/dividends.png" alt="Dividend dashboard" width="420" /> | <img src="assets/screenshots/insider-activity.png" alt="Insider activity monitor" width="420" /> |
-
-| Earnings Calendar |
-|---|
-| <img src="assets/screenshots/earnings-calendar.png" alt="Earnings calendar" width="420" /> |
-
-#### Portfolio, Risk & Trading
-
-| Portfolio | Portfolio Lab |
-|---|---|
-| <img src="assets/screenshots/portfolio.png" alt="Populated portfolio with holdings and risk metrics" width="420" /> | <img src="assets/screenshots/portfolio-lab.png" alt="Portfolio Lab" width="420" /> |
-
-| Portfolio Optimizer | Risk Dashboard |
-|---|---|
-| <img src="assets/screenshots/portfolio-optimizer.png" alt="Portfolio optimizer" width="420" /> | <img src="assets/screenshots/risk-dashboard.png" alt="Risk dashboard" width="420" /> |
-
-| Correlation Dashboard | Cockpit |
-|---|---|
-| <img src="assets/screenshots/correlation-dashboard.png" alt="Correlation matrix dashboard" width="420" /> | <img src="assets/screenshots/cockpit.png" alt="Cockpit priority stack" width="420" /> |
-
-| Paper Trading | Position Sizer |
-|---|---|
-| <img src="assets/screenshots/paper-trading.png" alt="Populated paper trading workspace" width="420" /> | <img src="assets/screenshots/position-sizer.png" alt="Position sizing calculator" width="420" /> |
-
-| Trade Journal | Alerts |
-|---|---|
-| <img src="assets/screenshots/trade-journal.png" alt="Trade journal with seeded entries" width="420" /> | <img src="assets/screenshots/alerts.png" alt="Alerts console with actions on trigger" width="420" /> |
-
-| Shadow Account |
-|---|
-| <img src="assets/screenshots/shadow-account.png" alt="Shadow account behavioural analytics" width="420" /> |
-
-#### Quant Research & Backtesting
-
-| Backtesting | Model Lab |
-|---|---|
-| <img src="assets/screenshots/backtesting.png" alt="Completed backtest results" width="420" /> | <img src="assets/screenshots/model-lab.png" alt="Model Lab" width="420" /> |
-
-| Model Governance | Algorithm Framework |
-|---|---|
-| <img src="assets/screenshots/model-governance.png" alt="Model governance" width="420" /> | <img src="assets/screenshots/algorithm-framework.png" alt="Algorithm framework lab" width="420" /> |
-
-| Statistical Lab | Pair Trading |
-|---|---|
-| <img src="assets/screenshots/stat-lab.png" alt="Statistical Lab" width="420" /> | <img src="assets/screenshots/pair-trading.png" alt="Pair Trading Lab with cointegration result" width="420" /> |
-
-| Alpha Zoo | Research Autopilot |
-|---|---|
-| <img src="assets/screenshots/alpha-zoo.png" alt="Alpha Zoo factor ranking" width="420" /> | <img src="assets/screenshots/research-autopilot.png" alt="Research Autopilot" width="420" /> |
-
-| Strategy Export |
-|---|
-| <img src="assets/screenshots/strategy-export.png" alt="Strategy export to Pine / MQL5" width="420" /> |
-
-#### Futures & Options
-
-| Option Chain | Greeks |
-|---|---|
-| <img src="assets/screenshots/fno-option-chain.png" alt="F&O option chain" width="420" /> | <img src="assets/screenshots/fno-greeks.png" alt="F&O Greeks page" width="420" /> |
-
-| Futures | OI Analysis |
-|---|---|
-| <img src="assets/screenshots/fno-futures.png" alt="Futures analytics" width="420" /> | <img src="assets/screenshots/fno-oi.png" alt="Open interest analysis" width="420" /> |
-
-| Strategy Builder | PCR |
-|---|---|
-| <img src="assets/screenshots/fno-strategy.png" alt="Options strategy builder" width="420" /> | <img src="assets/screenshots/fno-pcr.png" alt="Put-call ratio dashboard" width="420" /> |
-
-| Options Flow | F&O Heatmap |
-|---|---|
-| <img src="assets/screenshots/fno-flow.png" alt="Options flow dashboard" width="420" /> | <img src="assets/screenshots/fno-heatmap.png" alt="F&O heatmap" width="420" /> |
-
-| Expiry Calendar | Option Greeks Calculator |
-|---|---|
-| <img src="assets/screenshots/fno-expiry.png" alt="F&O expiry calendar" width="420" /> | <img src="assets/screenshots/option-greeks-calculator.png" alt="Option Greeks calculator" width="420" /> |
-
-#### Cross-Asset & Macro
-
-| Commodities | Forex |
-|---|---|
-| <img src="assets/screenshots/commodities.png" alt="Commodities workspace" width="420" /> | <img src="assets/screenshots/forex.png" alt="Forex workspace with EUR/USD detail" width="420" /> |
-
-| Crypto | ETF Analytics |
-|---|---|
-| <img src="assets/screenshots/crypto.png" alt="Crypto workspace" width="420" /> | <img src="assets/screenshots/etf-analytics.png" alt="ETF analytics for SPY" width="420" /> |
-
-| Mutual Funds | Bonds |
-|---|---|
-| <img src="assets/screenshots/mutual-funds.png" alt="Mutual funds workspace" width="420" /> | <img src="assets/screenshots/bonds.png" alt="Bonds workspace" width="420" /> |
-
-| Yield Curve | Bond Analytics |
-|---|---|
-| <img src="assets/screenshots/yield-curve.png" alt="Yield curve dashboard" width="420" /> | <img src="assets/screenshots/bond-analytics.png" alt="Bond analytics calculator" width="420" /> |
-
-| Economic Terminal | Data Quality |
-|---|---|
-| <img src="assets/screenshots/economic-terminal.png" alt="Economic terminal" width="420" /> | <img src="assets/screenshots/data-quality.png" alt="Data quality dashboard" width="420" /> |
-
-#### Intelligence, AI & Platform
-
-| News & Sentiment | Intelligence Timeline |
-|---|---|
-| <img src="assets/screenshots/news-sentiment.png" alt="News and sentiment for AAPL" width="420" /> | <img src="assets/screenshots/intelligence-timeline.png" alt="Intelligence timeline" width="420" /> |
-
-| Research Library |
-|---|
-| <img src="assets/screenshots/research.png" alt="Research library" width="420" /> |
-
-| OMS Compliance | Ops Dashboard |
-|---|---|
-| <img src="assets/screenshots/oms-compliance.png" alt="OMS compliance dashboard" width="420" /> | <img src="assets/screenshots/ops-dashboard.png" alt="Operations dashboard" width="420" /> |
-
-| Plugins | Settings & Data Providers |
-|---|---|
-| <img src="assets/screenshots/plugins.png" alt="Plugin manager" width="420" /> | <img src="assets/screenshots/settings.png" alt="Settings with the Data Providers panel" width="420" /> |
-
-| Saved Views | Scheduled Reports |
-|---|---|
-| <img src="assets/screenshots/saved-views.png" alt="Saved views manager" width="420" /> | <img src="assets/screenshots/reports.png" alt="Scheduled reports" width="420" /> |
-
-## Features
-
-### Terminal Shell
-
-- **GO Bar** (`Ctrl+G`) &mdash; Bloomberg-style command bar with symbol lookup and route navigation
-- **Command Palette** (`Ctrl+K`) &mdash; fuzzy search across 25+ functions, tickers, and natural language queries
-- **Function Keys** (`F1`-`F9`) &mdash; rapid workspace switching with Bloomberg-style hotkeys
-- **Grouped Navigation Rail** &mdash; Markets · Research · Charts · Derivatives · Portfolio · Quant · Risk & Ops · System, collapsible to a 64px pinned rail, with recent pages and keyboard navigation
-- **Symbol Context Rail** &mdash; on any symbol page: quote with provenance chip, paper position, symbol alerts, next events, and one-click Chart / Options / Backtest / Watchlist / Paper Buy / Paper Sell
-- **Market Follows Symbol** &mdash; opening `RELIANCE` re-points the global market to NSE (and `AAPL` to NASDAQ) so every panel agrees with the header; `NSE:RELIANCE`, `RELIANCE.NS` and `NASDAQ:AAPL` are all understood
-- **Ticker Tape** &mdash; rolling market pulse with live quotes across exchanges (toggle in Settings)
-- **Theme Engine** &mdash; Terminal Noir (default), classic, and light themes with custom accent support, managed from Settings
-- **Desktop & Mobile Layouts** &mdash; responsive design with persistent workspace framing
-
-### Data Trust & Providers
-
-- **Provenance Everywhere** &mdash; every security snapshot carries `{source, quality, as_of, latency_ms, note}`; the UI renders `LIVE · KITE`, `DELAYED · YAHOO`, `CACHED`, `SYNTHETIC` or `NO DATA`, and blank metrics explain which provider would fill them
-- **Provider Status Row** &mdash; per-provider health dots in the status bar (Kite, Alpaca, FMP, Finnhub, Yahoo, NSE, …) backed by `GET /api/providers/status` with real probes &mdash; an expired Kite token reads *down*, not *ok*
-- **Data Providers Panel** &mdash; Settings shows what each provider unlocks, its status and last error; admins can set, mask, test and clear keys in-app (written to the same `.env` the installer uses, with an honest "restart required" list). Placeholder values such as `your-api-key` are not treated as configured
-- **Synthetic Is Labelled** &mdash; generated data (the order book when no depth feed is connected) is marked `SYNTHETIC`, centred on the real last price, and never used as a price basis for orders
-
-### Charting & Technical Analysis
-
-- **Multi-Panel Workstation** &mdash; up to 9 synchronized chart panels with crosshair linking
-- **70+ Technical Indicators** &mdash; SMA, EMA, RSI, MACD, Bollinger Bands, Keltner, Supertrend, ATR, VWAP, OBV, CMF, Stochastic, CCI, ADX, Donchian, and many more
-- **Multi-Timeframe** &mdash; 1m, 2m, 5m, 15m, 30m, 1h, 4h, 1D, 1W, 1M with extended hours toggle
-- **Drawing Tools** &mdash; persistent annotations with templates, save/restore
-- **Volume Profile** &mdash; VPOC + 70% value area overlay
-- **Replay Mode** &mdash; step through historical price action bar by bar
-- **Comparison Overlays** &mdash; multi-symbol normalized or raw price comparison
-- **Alternative Charts** &mdash; Renko, Kagi, Point & Figure, Line Break
-- **Chart Export** &mdash; PNG, SVG, and CSV data export
-- **OpenScript** &mdash; custom indicator scripting with script library
-
-### Equity Research & Security Hub
-
-- **8-Tab Security Analysis** &mdash; overview, financials, chart, news/sentiment, ownership, estimates, peers, ESG
-- **Fundamental Metrics** &mdash; P/E, P/B, ROE, ROA, dividend yield, earnings growth, debt ratios
-- **Earnings Calendar** &mdash; historical surprises, upcoming events, guidance tracking
-- **Shareholding History** &mdash; promoter/FII/DII/public breakdown with trend visualization
-- **Analyst Estimates** &mdash; consensus tracking, revisions, and target prices
-- **Corporate Actions** &mdash; splits, dividends, rights, bonuses timeline
-- **Peer Comparison** &mdash; relative valuation matrices across comparable companies
-- **Insider Trading Monitor** &mdash; recent insider trades, per-stock insider activity, top buyers/sellers leaderboard, and cluster-buy detection with minimum insider thresholds
-- **Trade Journal** &mdash; trade logging with equity curve, calendar heatmap, and performance statistics
-
-### Advanced Screener
-
-- **Query Builder** &mdash; custom filters with preset formulas and arithmetic operations
-- **Custom Formula Engine** &mdash; write, save, and share custom formulas with server-side evaluation, formula library with descriptions and categories
-- **15+ Visualization Modes** &mdash; tables with sparklines, sector treemaps, heatmaps, scatter plots, radar charts, box plots, bubble charts, waterfall charts, RRG quadrants, gauge dials, distribution histograms, stacked area, and comparison bars
-- **Multi-Market Scanning** &mdash; NSE, BSE, NYSE, NASDAQ with technical and fundamental overlays
-- **Preset Management** &mdash; save, load, share, and browse community screens
-- **Score-Based Ranking** &mdash; deterministic scoring with stable ordering and explainable setup detection
-
-### Insight-Driven Stock Picking
-
-- **Multi-Factor Composite Scoring** &mdash; cross-sectional, sector-relative Value / Momentum / Quality / Low-Volatility z-scores combined into a weighted composite rank
-- **Ranked Idea Lists** &mdash; top-quintile picks per market and sector for both US (NYSE/NASDAQ) and Indian (NSE/BSE) universes
-- **Factor Dashboard** &mdash; per-symbol factor radar, factor chips, and conviction scoring with a US/India market toggle
-- **Catalyst & Conviction Engine** &mdash; LLM-extracted sentiment and upcoming catalysts from NSE/BSE and SEC filings, surfaced in the Security Hub
-- **Point-in-Time Fundamentals** &mdash; as-reported fundamental history that removes look-ahead bias from factor and fundamental backtests
-- **Why-Ranked Explanations** &mdash; composite scores, factor chips, and plain-language rationale on screener rows, with one-click routing to chart and backtest
-
-### AI Research Agent
-
-- **Conversational Console** &mdash; a slide-over agent panel (toggle with **Ctrl/Cmd + J**) that researches and analyzes stocks on demand
-- **Tool-Using Agentic Loop** &mdash; the agent autonomously calls read-only tools &mdash; screener, full stock snapshot, multi-ticker compare, and research-knowledge-base search (RAG) &mdash; and reasons over the results
-- **Screen-Aware Context** &mdash; defaults to the stock you currently have open and your selected market, so "tell me about this stock" resolves to the right ticker/exchange without re-typing it
-- **Multi-Agent Debate Mode** &mdash; an analyst team (fundamental / sentiment / technical) feeds a bull-vs-bear debate that a portfolio manager resolves into a `BUY / HOLD / SELL` decision with a conviction score
-- **Strategy Lab (idea &rarr; tested result loop)** &mdash; a bounded, read-only research loop that proposes a strategy, backtests it, changes one variable to iterate toward a target metric, then runs **mandatory out-of-sample validation** (permutation + multi-window robustness) and reports an honest verdict &mdash; refusing to call a curve-fit result an edge. Flag-gated and capped on rounds and wall-clock
-- **Beautifully Rendered Output** &mdash; answers render as styled markdown (headings, tables, lists), stock snapshots as crafted cards (logo, price, valuation/quality/growth metrics), and debates as a phase stepper with bull/bear cards and a decision banner with conviction meter
-- **Provider-Flexible** &mdash; runs against OpenRouter, OpenAI, or a local **LM Studio** model, with an automatic free-model fallback chain and per-phase model routing
-- **MCP Server (45 tools, authenticated)** &mdash; the agent tool registry is exposed over the Model Context Protocol for external clients (Claude Code, Claude Desktop), over **stdio** or **HTTP**. An API key resolves to a user, so an MCP session reaches that user's portfolio, watchlists, alerts and events &mdash; not just anonymous market data
-- **Permission-gated writes** &mdash; keys issued `read` see only the 38 read-only tools; `read_write` keys additionally reach the 7 `propose_*` tools. Proposals are never executed by the agent &mdash; they create a pending row a human confirms
-- **MCP Resources & Prompts** &mdash; watchlists, saved views, portfolio, journal and alerts are readable as `otui://` resources, plus five ready-made workflows (`morning_brief`, `position_review`, `screen_to_thesis`, `risk_check`, `idea_to_backtest`)
-- **Provenance on every result** &mdash; MCP tool results are normalised into an `{ok, data, provenance}` envelope reporting `live | delayed | cached | synthetic`, so an agent can tell real data from the provider waterfall's synthetic fallback instead of reporting mock numbers as fact
-- **Read-Only & Resilient** &mdash; the agent never places orders or mutates data, and degrades gracefully on rate limits, empty completions, or unavailable data sources
-
-### Futures & Options (F&O)
-
-- **Option Chain** &mdash; full contract listing with live Greeks (Delta, Gamma, Theta, Vega, Rho)
-- **IV Analysis** &mdash; historical and implied volatility tracking, term structure visualization
-- **Strategy Builder** &mdash; multi-leg construction for spreads, butterflies, straddles, strangles
-- **OI Analysis** &mdash; open interest trends, buildup patterns, strike-level concentration
-- **PCR Tracking** &mdash; put-call ratio monitoring with overbought/oversold signals
-- **Heatmaps** &mdash; IV/volume/OI heatmaps across the strike grid
-- **Options Flow** &mdash; unusual activity scanner with volume/OI ratios, premium tracking, heat scores, and bullish/bearish sentiment classification
-- **Futures Analytics** &mdash; term structure, basis analysis, contract specifications
-- **Expiry Calendar** &mdash; contract schedules with roll suggestions
-
-### Portfolio & Risk Management
-
-- **Multi-Portfolio CRUD** &mdash; holdings-first workspace with cost basis and transaction tracking; "Add holding" and "Import" live in the holdings panel
-- **Broker & CSV Import** &mdash; sync Zerodha Kite holdings/positions, or import Zerodha / Groww / generic CSV exports with format detection, per-row validation, preview and append/replace modes
-- **Allocation & Attribution** &mdash; sector allocation charts, contributor/detractor analysis
-- **Benchmark Overlay** &mdash; compare against indices with relative performance metrics
-- **Risk Engine** &mdash; VaR (95%), CVaR, EWMA volatility, rolling correlation, PCA factor exposures
-- **Factor Analytics** &mdash; multi-factor exposure radar, attribution waterfall, rolling factor history, and factor return comparison across market, size, value, momentum, quality, and low-volatility factors
-- **Stress Testing** &mdash; 6 predefined macro scenarios (GFC 2008, COVID 2020, rate shock, INR depreciation, tech rotation, commodity spike), custom shock builder, Monte Carlo simulation, and historical event replay
-- **Correlation Deep Dive** &mdash; correlation matrix, rolling correlation with regime detection, hierarchical clustering with dendrogram, and cross-asset dependency visualization
-- **Tax Lot Manager** &mdash; cost basis tracking across tax lots
-- **Dividend Tracker** &mdash; income tracking with ex-date calendar
-- **Paper Trading** &mdash; virtual trading engine with realistic order fills, slippage modeling, and TCA analytics; Paper Buy/Sell from the symbol rail or the right-click menu opens the HotKey panel on that symbol
-
-### Backtesting & Model Lab
-
-- **16+ Strategy Templates** &mdash; SMA/EMA crossover, mean reversion, breakout, RSI, MACD, Bollinger Bands, dual momentum, VWAP reversion, Awesome Oscillator, Heikin-Ashi, Parabolic SAR, Dual Thrust, shooting star reversal, and Bollinger W/M patterns
-- **Pair Trading Lab** &mdash; cointegration screening, hedge-ratio estimation, spread z-score diagnostics, half-life analysis, and mean-reversion trade simulations for statistical arbitrage workflows
-- **Intraday & Daily Testing** &mdash; 1m to monthly resolution with session-aware logic
-- **Vectorized Engine** &mdash; NumPy-based computation for fast large-dataset backtests
-- **Realistic Execution** &mdash; slippage, commission, partial fills, latency, and market impact simulation
-- **Result Visualization** &mdash; equity curves, drawdown charts, monthly return heatmaps, rolling Sharpe, 3D parameter surfaces, Monte Carlo paths, trade analysis
-- **Walk-Forward Analysis** &mdash; out-of-sample validation with sliding windows
-- **Parameter Sweep** &mdash; sensitivity analysis across hyperparameter ranges
-- **Experiment Tracking** &mdash; create, run, compare, and promote models through the Model Lab
-- **Model Governance** &mdash; model registry with code/data hashing, approval workflows, risk-limit monitoring, and promotion to paper trading
-- **Monte Carlo Robustness** &mdash; trade/return resampling with confidence cones, terminal-wealth distribution, and probability-of-profit
-- **Liquidity-Aware Execution** &mdash; fixed-bps, volume-weighted, and square-root market-impact slippage models with percent-of-volume caps
-- **Strategy Tear-Sheets** &mdash; standardized HTML reports with equity, drawdown, rolling Sharpe, monthly returns, and benchmark overlay
-- **Run Leaderboards** &mdash; sortable Model Lab / Portfolio Lab run comparison by Sharpe, CAGR, max drawdown, turnover, and stability
-
-### Portfolio Lab
-
-- **Multi-Asset Backtesting** &mdash; portfolio-level backtests with up to 200 assets
-- **Weighting Modes** &mdash; equal weight, volatility target, risk parity, momentum, market cap
-- **Strategy Blends** &mdash; combine up to 10 strategies with weighted sum returns
-- **Rebalance Scheduling** &mdash; weekly, monthly, quarterly, or custom frequency
-- **Attribution Analysis** &mdash; top contributors/detractors, worst drawdowns, rebalance log
-- **Correlation Matrices** &mdash; cross-asset cluster analysis
-
-### Cockpit, Workspaces & Intelligence
-
-- **Cockpit Priority Stack** &mdash; a ranked daily brief across portfolio risk, alerts, catalysts, news shocks, top movers, and model signals
-- **Unified Intelligence Timeline** &mdash; news, alerts, events, insider activity, earnings, corporate actions, model signals, and backtest runs in one chronological feed
-- **Events Hub** &mdash; `GET /api/events-hub/upcoming` merges earnings, dividends/corporate actions, F&O expiries and macro releases into one dated, impact-ranked feed; failing sources are reported, not fatal
-- **Exposure Heatmaps** &mdash; sector, factor, currency, and correlation exposure maps across Home, Cockpit, and Risk
-- **Workspace Presets** &mdash; Trader / Quant / PM / Risk / Ops presets that reconfigure dashboards, panels, and quick links
-- **Saved Views** &mdash; capture and restore page, filters, ticker, tabs, columns, and chart layout across major workflows
-- **AI Insight Cards** &mdash; Gemma-powered insights embedded consistently across Home, Cockpit, Screener, Portfolio, and Security Hub, with graceful offline fallback
-
-### Cross-Asset & Macro
-
-- **Commodities** &mdash; energy, metals, agriculture with futures term structure and seasonal analysis
-- **Forex** &mdash; major pairs, cross rates matrix, central bank monitor (Fed, ECB, BoE, BoJ, RBI, and more)
-- **Cryptocurrency** &mdash; full workspace with markets, movers, sectors, DeFi, derivatives, heatmaps, and correlation
-- **ETF Analytics** &mdash; holdings viewer, flow tracker, multi-ETF overlap analysis
-- **Mutual Funds** &mdash; search, comparison, rolling returns, SIP calculator, category rankings, fund overlap
-- **Bonds** &mdash; fixed income yields, spreads, and duration analytics
-- **Yield Curve** &mdash; interactive US Treasury curve with historical comparison and 2s10s inversion detection
-- **Economics** &mdash; global event calendar with impact coding, macro indicators dashboard
-- **Sector Rotation** &mdash; Relative Rotation Graph (RRG) with 12-week trailing momentum paths
-
-### Alerts & Breakout Scanner
-
-- **Multi-Condition Alert Builder** &mdash; compound rules with AND/OR logic, multi-field conditions (price, volume, RSI, MACD, moving averages), and natural-language summary
-- **Multi-Channel Delivery** &mdash; in-app, email, webhook, Slack, and Telegram with per-channel configuration and delivery testing
-- **Actions on Trigger** &mdash; up to five actions per rule: place a paper market order, add the symbol to a watchlist, or POST a webhook; validated on save, executed in isolation after delivery, results stored on the trigger, with a dry-run button in the builder
-- **Alert Lifecycle** &mdash; cooldown periods, expiry dates, max trigger limits, trigger history with deduplication
-- **WebSocket Push** &mdash; real-time desktop notifications on alert trigger
-- **Breakout Scanner** &mdash; automated pattern detection with confidence scoring
-- **Alert History** &mdash; full timeline with delivery status and re-trigger tracking
-
-### Operations & Compliance
-
-- **OMS** &mdash; order management with restricted list enforcement and audit trail
-- **Ops Dashboard** &mdash; feed health monitoring, kill switches, data quality panels
-
-### News & Sentiment
-
-- **Ticker-Specific News** &mdash; per-symbol news feed with multi-period filtering, scoped strictly to the selected ticker
-- **Sentiment Analysis** &mdash; bullish/bearish/neutral classification with confidence scores
-- **Market-Wide Feed** &mdash; latest headlines with source attribution and sentiment trends
-- **AI Emotion Indicator** &mdash; per-stock fear/greed gauge powered by a locally hosted **Gemma** model via **LM Studio**, surfacing a 0&ndash;100 emotion index, dominant emotion (panic &rarr; euphoria), emotion mix, and per-article bullish/bearish breakdown
-- **Local & Private** &mdash; LLM sentiment runs entirely on your own machine; gracefully falls back to the lexical/FinBERT engine when LM Studio is offline
-
-### Plugin System & Scripting
-
-- **Plugin API** &mdash; extensible architecture for custom analysis modules
-- **Included Plugins** &mdash; RSI Divergence Scanner, Sector Rotation Monitor, Unusual Volume Detector
-- **Python Scripting** &mdash; sandboxed execution with security-hardened imports
-
-### Real-Time Data
-
-- **Multi-Provider WebSocket** &mdash; Zerodha Kite (India) and Finnhub (US) real-time ticks
-- **Provider Waterfall** &mdash; automatic failover chain: primary → fallback → error, with the serving provider reported in the response provenance
-- **Multi-Level Caching** &mdash; L1 SQLite + L2 Redis with TTL-based invalidation
-- **Candle Aggregation** &mdash; tick-by-tick to any interval with distributed bar construction
-- **Redis Pub/Sub** &mdash; horizontal scaling for multi-client quote fan-out
-
-## Architecture
-
-```
-+---------------------------------------------------+
-|                   CLIENT TIER                     |
-|   React 18 + TypeScript + Vite + Tailwind CSS    |
-|   TanStack Query + Zustand + Lightweight Charts   |
-|   Recharts + Three.js + Playwright + Vitest       |
-+--------------------------+------------------------+
-                           | REST API + WebSocket
-+--------------------------+------------------------+
-|                   API GATEWAY                     |
-|   FastAPI + Uvicorn + JWT Auth + CORS Middleware  |
-|   53 Route Modules (Equity, F&O, Backtest, Risk) |
-+--------------------------+------------------------+
-                           |
-+--------------------------+------------------------+
-|                  SERVICE LAYER                    |
-|   Unified Fetcher + Screener Engine + Model Lab  |
-|   Risk Engine + Alert Scheduler + Quote Hub      |
-|   Provider Registry + Failover Chain             |
-+--------------------------+------------------------+
-                           |
-+--------------------------+------------------------+
-|                 DATA PROVIDERS                    |
-|   Zerodha Kite | Finnhub | FMP | Yahoo Finance  |
-|   NSEPython (F&O, Corporate Actions)             |
-+--------------------------+------------------------+
-                           |
-+--------------------------+------------------------+
-|                  PERSISTENCE                      |
-|   SQLite (default) | PostgreSQL 16 (production)  |
-|   Redis (cache + pub/sub + sessions)             |
-+---------------------------------------------------+
+| **Find what's driving a company** | Security Hub → **Filings** → *Fetch* (SEC / NSE) → *Analyze*: scored growth engines and headwinds, each with its source quote |
+| **Check management's track record** | **Guidance tracker** compares what was promised quarter over quarter; **concall summaries** give the takeaways with quotes |
+| **Ask a question of the filings** | *Ask the filings*: "What did they say about capacity and capex?" gets a cited answer |
+| **Map a company's ecosystem** | **Peers → Value chain**: customers and suppliers from filings, resolved to tickers, plus competitors and raw materials |
+| **Know when a commodity move matters** | **Commodities → Linked companies**: who gains and who loses when crude, steel or copper moves |
+| **Get a second opinion** | Agent console: "Is NVDA above its 52-week midpoint, and how does its P/E compare with AMD?" Or run a **debate** for a bull / bear / PM decision |
+| **Generate ideas** | Ideas board, guru screens, thematic indices, hotlists, and filings-based screener fields (e.g. strong order-book signal) |
+| **Test before you trade** | Backtest a strategy, validate it walk-forward and with Monte Carlo, then paper trade it |
+| **Watch for change** | Filings watch flags new warning letters, guidance cuts or big order wins; alerts fire actions automatically |
+
+---
+
+## 🧱 Architecture
+
+```mermaid
+flowchart LR
+  subgraph Client["Browser (React 18 + TypeScript + Vite)"]
+    UI["Terminal shell<br/>GO bar · palette · workspaces"]
+    Pages["100+ screens<br/>Security Hub · F&O · Quant · Risk"]
+    AgentUI["Agent console<br/>SSE stream"]
+  end
+
+  subgraph API["FastAPI backend"]
+    Routes["80+ route modules<br/>JWT auth · REST · WebSocket"]
+    Agent["Agent orchestrator<br/>40+ tools · debate · Strategy Lab"]
+    MCP["MCP server<br/>stdio / HTTP"]
+    Filings["Filings Intelligence<br/>parse · TF-IDF retrieve · LLM extract · verify"]
+    Research["Research pack<br/>KPIs · value chain · themes · results · ideas"]
+    Engines["Engines<br/>screener · backtest · risk · alerts · OMS"]
+    Fetcher["Unified fetcher<br/>provider waterfall + provenance"]
+  end
+
+  subgraph Data["Data & models"]
+    Providers["Kite · Yahoo · FMP · Finnhub<br/>NSE · SEC EDGAR · FRED"]
+    LLM["LLM gateway<br/>OpenRouter · OpenAI · Gemini<br/>LM Studio / vLLM (local)"]
+    Store[("SQLite / PostgreSQL<br/>Redis cache + pub/sub")]
+  end
+
+  UI --> Routes
+  Pages --> Routes
+  AgentUI --> Agent
+  Routes --> Engines & Research & Filings
+  Agent --> Fetcher & Filings & Engines
+  MCP --> Agent
+  Engines --> Fetcher
+  Research --> Filings & Fetcher
+  Fetcher --> Providers
+  Filings --> LLM
+  Agent --> LLM
+  Research --> LLM
+  Routes --> Store
+  Fetcher --> Store
 ```
 
-### Data Flow
+**How a request flows.** The React client calls `/api/*` over REST (and WebSockets for live quotes). Market data goes through the **unified fetcher**: L1 SQLite cache → L2 Redis → primary provider → fallback provider, with the serving source recorded as provenance on every response. AI features call one LLM gateway, so swapping OpenRouter for a local model is a configuration change, not a code change.
 
-Market data flows through a unified pipeline:
+**Filings Intelligence pipeline**
 
-1. **Exchange ticks** arrive via WebSocket adapters (Kite, Finnhub)
-2. **Quote Hub** fans out ticks to connected clients via `/api/ws/quotes`
-3. **Bar Aggregator** constructs OHLCV candles at all supported intervals
-4. **OHLCV Cache** persists bars in SQLite (L1) and Redis (L2)
-5. **Unified Fetcher** serves chart requests with cache-first, provider-fallback semantics
-6. **Chart Engine** renders via Lightweight Charts v5 with indicator overlays
-
-### Provider Waterfall
-
-```
-Request → L1 Cache (SQLite) → L2 Cache (Redis) → Primary Provider → Fallback Provider → 503
-             HIT → return         HIT → return       OK → cache+return    OK → cache+return
+```mermaid
+flowchart LR
+  A["Import<br/>SEC · NSE · upload"] --> B["Parse<br/>PDF / HTML / iXBRL<br/>page-aware"]
+  B --> C["Chunk<br/>~1.2k chars<br/>+ section heading"]
+  C --> D["Index<br/>per-symbol TF-IDF<br/>+ keyword boost"]
+  D --> E["Retrieve<br/>top chunks per driver"]
+  E --> F["Extract<br/>LLM, strict JSON<br/>(lexical fallback)"]
+  F --> G{"Verify<br/>quote in source?"}
+  G -- yes --> H["Score<br/>growth vs headwind"]
+  G -- no --> X["Dropped"]
 ```
 
-## System Requirements
+A finding survives only if its quote is found in the cited chunk (exact, or ≥85% token overlap with every number matching verbatim), and only if the model marks it as supporting the driver. Without an LLM, a lexical extractor still works, with results flagged as lower-confidence keyword matches.
 
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| OS | Linux, macOS, Windows 10+ | Ubuntu 22.04+ / macOS 13+ |
-| CPU | 2 cores | 4+ cores |
-| RAM | 4 GB | 8 GB+ |
-| Disk | 2 GB | 10 GB+ (historical data cache) |
-| Display | 1280 x 720 | 1920 x 1080+ |
-| Browser | Chrome 90+, Firefox 90+, Safari 15+, Edge 90+ | Latest Chrome or Firefox |
+<details>
+<summary><b>Tech stack</b></summary>
 
-### Software Dependencies
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, TypeScript, Vite, Tailwind CSS, TanStack Query, Zustand, lightweight-charts v5, Recharts, Three.js, Libraries.dev effects (thinking-orbs, border-beam, bot-avatars) |
+| Backend | Python 3.11, FastAPI, Uvicorn, SQLAlchemy, Alembic, Pydantic v2, pandas / NumPy, pypdf, BeautifulSoup |
+| AI | OpenAI-compatible LLM gateway (OpenRouter, OpenAI, Gemini, LM Studio, vLLM), MCP server, TF-IDF retrieval |
+| Data | SQLite (default) or PostgreSQL 16, Redis 7 cache and pub/sub |
+| Testing | pytest (1,400+ backend tests), Vitest (~600 frontend tests), Playwright end-to-end |
+| Delivery | Docker multi-stage image (published to GHCR on release), one-command installer |
 
-| Software | Version | Notes |
-|----------|---------|-------|
-| Docker | 20.10+ | Required for containerized deployment |
-| Docker Compose | v2.0+ | Included with Docker Desktop |
-| Python | 3.11+ | Local development only |
-| Node.js | 22+ | Local frontend development only |
-| Git | 2.30+ | For cloning the repository |
+</details>
 
-## Quick Start
+---
 
-### One command (recommended)
+## 🚀 Quick start
 
 ```bash
 git clone https://github.com/Hitheshkaranth/OpenTerminalUI.git
@@ -494,20 +262,7 @@ cd OpenTerminalUI
 ./install.sh          # macOS / Linux / WSL   (Windows: ./install.ps1)
 ```
 
-That's it. The installer **detects your host OS** (macOS, Linux, WSL, or Windows)
-and adapts, then:
-
-- creates a single `.env` from `.env.example`,
-- auto-generates strong `JWT_SECRET_KEY` and `CACHE_SIGNING_KEY` (no secret errors),
-- auto-generates a **unique admin password** and seeds an admin account, so there
-  are **no login errors** on first launch,
-- uses **Docker if available, otherwise a local Python + Node setup** (auto-detected),
-- launches the app at `http://localhost:8000` and **prints your login credentials**.
-
-**Prerequisites:** either Docker (Desktop/Engine with the daemon running) *or*, for
-the local path, Python 3.11+ and Node 20+. Nothing else to configure.
-
-**First login:** when the installer finishes it prints something like:
+The installer detects your OS, creates `.env` with strong generated secrets, seeds an admin account with a unique password, uses **Docker if available, otherwise a local Python + Node setup**, and prints your login:
 
 ```
  OpenTerminalUI is ready  ->  http://localhost:8000
@@ -515,249 +270,128 @@ the local path, Python 3.11+ and Node 20+. Nothing else to configure.
    password: <generated unique password>
 ```
 
-The same credentials are saved in your `.env` (`BOOTSTRAP_ADMIN_EMAIL` /
-`BOOTSTRAP_ADMIN_PASSWORD`). Change the password after first login. Seeding is
-skipped automatically once any user exists, so re-running never clobbers data.
-
-Force a mode if you prefer: `OTUI_MODE=docker ./install.sh` or `OTUI_MODE=local ./install.sh`.
-
-**Stopping / restarting (Docker):**
-
-```bash
-docker compose down        # stop (keeps your data + seeded admin)
-docker compose down -v      # stop and wipe the database (fresh start next time)
-./install.sh                # start again
-```
-
-### Adding API keys (one place, guided)
-
-All keys live in the single repo-root `.env`. The easiest way to add or update
-them is the interactive wizard, which shows what each key unlocks:
-
-```bash
-make keys          # or: ./scripts/setup-keys.sh
-```
-
-All keys are optional — the platform runs on built-in fallback data without them.
-
-Once the app is running, an admin can also do this from **Settings → Data Providers**: each provider shows its live status, last error and what it unlocks; "Set keys" writes the same `.env`, applies the value live where the client reads it per call (Kite access token, OpenRouter, FRED, LM Studio) and tells you which ones need a backend restart; "Test" runs the real probe.
-
-### Manual alternatives
+**Prerequisites:** Docker, *or* Python 3.11+ and Node 20+. All API keys are optional; the app runs on free fallback sources.
 
 <details>
-<summary>Docker by hand</summary>
+<summary><b>Docker by hand</b></summary>
 
 ```bash
-cp .env.example .env      # add API keys if you have them
-docker compose up --build            # Backend + Frontend + Redis (SQLite)
-docker compose --profile postgres up --build   # with PostgreSQL
+cp .env.example .env
+docker compose up --build                       # backend + frontend + Redis (SQLite)
+docker compose --profile postgres up --build    # with PostgreSQL
 ```
 </details>
 
 <details>
-<summary>Local development (hot reload)</summary>
+<summary><b>Local development (hot reload)</b></summary>
 
 ```bash
-# Backend
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
-PYTHONPATH=. uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
+PYTHONPATH=. uvicorn backend.main:app --reload --port 8000
 
-# Frontend (separate terminal)
-cd frontend && npm ci && npm run dev
+cd frontend && npm ci && npm run dev          # http://127.0.0.1:5173
 ```
-
-- Backend API: `http://127.0.0.1:8000`
-- Frontend dev server: `http://127.0.0.1:5173`
 </details>
 
-## Environment Variables
+**Adding data keys:** run `make keys` for a guided wizard, or (as an admin) use **Settings → Data Providers** in the app to set, test and clear keys live.
 
-The platform runs without API keys using fallback providers. Add keys to unlock full data access:
+| Key | Unlocks |
+|---|---|
+| `FMP_API_KEY` | US fundamentals, earnings, peers |
+| `FINNHUB_API_KEY` | US real-time WebSocket ticks |
+| `KITE_API_KEY` / `KITE_API_SECRET` / `KITE_ACCESS_TOKEN` | India NSE / BSE real-time and history, holdings import |
+| `FRED_API_KEY` | Macro series |
+| `OPENROUTER_API_KEY` | Hosted LLMs for the agent and AI features |
 
-| Variable | Purpose |
-|----------|---------|
-| `FMP_API_KEY` | Financial Modeling Prep &mdash; US equities, fundamentals, earnings |
-| `FINNHUB_API_KEY` | Finnhub &mdash; US real-time WebSocket ticks |
-| `KITE_API_KEY` | Zerodha Kite &mdash; India NSE/BSE real-time + historical |
-| `KITE_API_SECRET` | Zerodha Kite secret |
-| `KITE_ACCESS_TOKEN` | Zerodha Kite session token |
-| `JWT_SECRET_KEY` | JWT signing key for authentication (auto-generated by `install.sh`) |
-| `CACHE_SIGNING_KEY` | Cache integrity signing key (auto-generated by `install.sh`) |
-| `BOOTSTRAP_ADMIN_EMAIL` | Email for the first-run admin account (default `admin@openterminal.local`) |
-| `BOOTSTRAP_ADMIN_PASSWORD` | Password for the first-run admin (auto-generated by `install.sh`; seeding is skipped once any user exists) |
-| `DATABASE_URL` | Database connection (default: SQLite) |
-| `REDIS_URL` | Redis connection for caching and pub/sub |
-| `OPENTERMINALUI_CORS_ORIGINS` | Allowed CORS origins |
-| `OPENTERMINALUI_PREFETCH_ENABLED` | Enable background data prefetch |
-| `LM_STUDIO_*` | Local Gemma model for news sentiment &mdash; see [AI News Sentiment](#ai-news-sentiment-with-gemma-4-lm-studio) |
-| `OPENROUTER_API_KEY` | OpenRouter key powering the AI research agent (free `:free` models work) |
-| `AGENT_PROVIDER` | Agent LLM provider: `openrouter` \| `openai` \| `lmstudio` (default `openrouter`) |
-| `AGENT_MODEL` | Primary agent model id (default `openai/gpt-oss-20b:free`) |
-| `AGENT_FALLBACK_MODELS` | Comma-separated models tried when the primary is rate-limited (429) or unavailable (404) |
-| `AGENT_DEBATE_ENABLED` | Enable multi-agent debate mode in the agent console (default `true`) |
+---
 
-## AI News Sentiment with Gemma 4 (LM Studio)
+## 🤖 AI models
 
-OpenTerminalUI integrates a locally hosted **Google Gemma 4** model, served through
-[LM Studio](https://lmstudio.ai/), to power the per-stock **AI Emotion Indicator**
-on the News workspace. The model reads recent headlines for a ticker and returns a
-structured judgement &mdash; sentiment, confidence, and a market emotion &mdash; which
-the backend aggregates into a 0&ndash;100 fear/greed index, a dominant emotion, an
-emotion mix, and per-article bullish/bearish signals. All inference runs on your own
-machine; no news or prompt data leaves your hardware.
+Every AI feature (agent, briefings, filings analysis, Q&A, concall summaries, KPI and value-chain extraction, news emotion) goes through one gateway. Pick a provider:
 
-### How it works
-
-```
-News (DB / Yahoo / Google RSS)
-        │
-        ▼
-backend/services/stock_emotion.py ──▶ backend/services/lm_studio_client.py
-   (batch prompt + JSON schema)          (OpenAI-compatible /v1/chat/completions)
-        │                                          │
-        │                                          ▼
-        │                                   LM Studio  ·  Gemma 4
-        ▼
-GET /api/sentiment/emotion/{ticker}  ──▶  Emotion Indicator (News page)
-```
-
-- All articles for a ticker are analyzed in a **single batched request** (large local
-  models are slow &mdash; per-article calls would pay the latency N times over).
-- The request uses LM Studio **structured output** (`json_schema`) so the model is
-  constrained to valid, parseable JSON.
-- If LM Studio is disabled or unreachable, the feature **falls back** to the built-in
-  lexical / FinBERT sentiment engine, so the endpoint always returns a result.
-
-### Integration procedure
-
-1. **Install LM Studio** &mdash; download from [lmstudio.ai](https://lmstudio.ai/) (macOS,
-   Windows, Linux).
-2. **Download a Gemma model** &mdash; in LM Studio's *Discover* tab, search for and
-   download a **Gemma** model (e.g. `google/gemma-4-26b-a4b`, or a smaller Gemma
-   variant for faster responses).
-3. **Load the model and start the server** &mdash; load the model, open the
-   *Developer / Local Server* tab, and click **Start Server**. It listens on
-   `http://localhost:1234` and exposes the OpenAI-compatible API at `/v1`.
-4. **Note the model id** &mdash; copy the exact model id shown by LM Studio
-   (visible at `http://localhost:1234/v1/models`); you will set it as `LM_STUDIO_MODEL`.
-5. **Configure OpenTerminalUI**:
-   - **Local development** &mdash; add to `.env` (defaults already point at localhost):
-     ```bash
-     LM_STUDIO_BASE_URL=http://localhost:1234/v1
-     LM_STUDIO_MODEL=google/gemma-4-26b-a4b
-     LM_STUDIO_ENABLED=true
-     ```
-   - **Docker** &mdash; the container must reach LM Studio on the *host*. `docker-compose.yml`
-     already defaults `LM_STUDIO_BASE_URL` to `http://host.docker.internal:1234/v1` and
-     maps `host.docker.internal`. Override `LM_STUDIO_MODEL` via `.env` if your model id
-     differs.
-6. **Restart the backend** (or `docker compose up -d`) so the new settings load.
-7. **Verify** &mdash; open the **News** workspace, select any ticker, and check the
-   *Emotion Indicator* badge:
-   - `Gemma · <model id>` &mdash; the model is live and analyzing.
-   - `Lexical fallback` &mdash; LM Studio was unreachable; the built-in engine was used.
-
-### Configuration
+| Setup | Configuration |
+|---|---|
+| **Hosted (OpenRouter)** | `AGENT_PROVIDER=openrouter`, `OPENROUTER_API_KEY=…`, `AGENT_MODEL=<model id>` |
+| **Local (LM Studio)** | `AGENT_PROVIDER=lmstudio`, `LM_STUDIO_BASE_URL=http://localhost:1234/v1`, `LM_STUDIO_MODEL=<model id>` |
+| **Self-hosted gateway (vLLM etc.)** | As LM Studio, plus `LM_STUDIO_API_KEY=…` if the gateway requires a bearer token |
 
 | Variable | Default | Purpose |
-|----------|---------|---------|
-| `LM_STUDIO_BASE_URL` | `http://localhost:1234/v1` | LM Studio OpenAI-compatible endpoint. Use `http://host.docker.internal:1234/v1` from Docker. |
-| `LM_STUDIO_MODEL` | `google/gemma-4-26b-a4b` | Model id loaded in LM Studio. Must match exactly. |
-| `LM_STUDIO_ENABLED` | `true` | Master toggle for LLM emotion analysis. |
-| `LM_STUDIO_TIMEOUT_SECONDS` | `240` | Per-request timeout for the model call. |
+|---|---|---|
+| `AGENT_MAX_TOKENS` | `4096` | Per-turn budget for the agent. Reasoning models need room to think *and* answer. |
+| `AGENT_FALLBACK_MODELS` | – | Comma-separated models tried when the primary is rate-limited or unavailable |
+| `LM_STUDIO_ENABLED` | `true` | Master switch for the local-model path |
+| `OPENTERMINALUI_LM_STUDIO_TIMEOUT_SECONDS` | `240` | Per-request timeout for slow local models (also `lm_studio_timeout_seconds` in `backend/config/settings.yaml`) |
+| `FILINGS_WATCH_ENABLED` | `true` | Background polling for new filings and alerts |
 
-These can also be set under `app:` in `config/settings.yaml`.
+Reasoning models are supported: structured (JSON) calls disable thinking via `chat_template_kwargs` on local servers, so the token budget goes to the answer. If no model is reachable, features fall back to deterministic engines (lexical filings extraction, FinBERT / lexical sentiment) and say so in the UI.
 
-> **Performance:** large models such as `gemma-4-26b-a4b` are slow on consumer
-> hardware &mdash; the first analysis for a ticker can take a minute or more (results
-> are then cached). For a snappier experience, load a smaller Gemma / instruct model
-> in LM Studio and point `LM_STUDIO_MODEL` at it.
+---
 
-## Testing
+## 📁 Project structure
 
-### Backend
+```
+backend/                FastAPI app
+  api/routes/           REST route modules (equity, F&O, backtest, risk, OMS, providers…)
+  agent/                AI agent: orchestrator, tool registry, debate, Strategy Lab
+  mcp/                  MCP server (stdio / HTTP) over the agent tools
+  filings_rag/          Filings Intelligence: sources, parsing, retrieval, analysis, knowledge
+  filings_watch/        Background watcher that turns new filings into alerts
+  business_metrics/     KPI, revenue-mix and market-share extraction
+  value_chain/          Suppliers / customers / competitors / raw materials
+  thematic_indices/     Theme baskets and benchmark-relative performance
+  ideas/ results_tracker/ raw_materials/ peer_kpis/ valuation/   Research pack
+  core/                 Unified fetcher, providers, backtesting, risk, technicals
+  pure_jump_vol/        Pure-jump volatility model (fit, filter, signals)
+  services/ shared/     LLM gateway, caching, DB session, market classifier
+  tests/                pytest suite
+frontend/               React + Vite SPA
+  src/pages/            Screens
+  src/components/       Terminal design system and feature components (incl. ai/AiVisuals)
+  src/agent/            Agent console, SSE client, artifact rendering
+  src/api/              Typed API clients
+  tests/e2e/            Playwright specs
+plugins/                Example plugins
+scripts/                Installer helpers, screenshot capture, PJV research CLI (scripts/pjv)
+packaging/windows/      PyInstaller build for a Windows desktop executable
+docs/                   Architecture notes, guides and design docs
+assets/                 Logo and README screenshots
+```
+
+---
+
+## ✅ Testing
 
 ```bash
-PYTHONPATH=. python -m compileall backend
-PYTHONPATH=. pytest backend/tests -q --cov=backend --cov-fail-under=45
+PYTHONPATH=. pytest backend/tests -q            # backend
+cd frontend && npx vitest run && npm run build  # frontend unit tests + type-checked build
+cd frontend && npm run test:e2e                 # Playwright end-to-end
+make gate                                       # backend tests + frontend build
 ```
 
-### Frontend
+Re-capture the README screenshots from a running instance:
 
 ```bash
-cd frontend
-npm run build
-npx vitest run
+cd frontend && OT_BASE=http://127.0.0.1:8000 OT_TOKEN_FILE=/path/to/jwt.txt node ../scripts/capture_readme.mjs
 ```
 
-### End-to-End
+## ⌨️ Keyboard shortcuts
 
-```bash
-cd frontend
-npx playwright install chromium
-npm run test:e2e
-```
+| Keys | Action |
+|---|---|
+| `Ctrl+G` | GO bar: symbols, commands and natural-language questions |
+| `Ctrl+K` | Command palette |
+| `Ctrl+J` | Toggle the AI agent console |
+| `F1`–`F9` | Switch workspaces |
+| `1`–`7` | Chart timeframes |
+| `Esc` | Close the active panel |
 
-### Gate (all checks)
+## 🤝 Contributing
 
-```bash
-make gate
-```
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Branch as `feat/…` or `fix/…`, add tests with the change, run `make gate`, and open a PR with a clear description.
 
-## Repository Layout
+## 📄 License
 
-```
-backend/                 FastAPI app, adapters, services, routes, tests
-  adapters/              Market data provider adapters
-  agent/                 AI research agent: orchestrator, tools, debate roles
-  api/routes/            80+ route modules (equity, fno, backtest, risk, oms, providers, ...)
-  core/                  Unified fetcher, failover, service status
-  services/              48 business logic modules
-  db/                    SQLAlchemy ORM, migrations, caching
-  auth/                  JWT authentication and middleware
-  config/                Settings, environment, security
-  tests/                 870+ backend tests
-frontend/                React + Vite + TypeScript SPA
-  src/agent/             AI agent console, SSE client, artifact + markdown UI
-  src/pages/             77 page components
-  src/components/        UI components, terminal design system
-  src/fno/               F&O workspace modules
-  src/store/             Zustand state management
-  src/__tests__/         500+ unit tests
-  tests/e2e/             Playwright E2E specs
-plugins/                 Extensible plugin system with examples
-docs/                    Wiki, architecture specs, and contributor docs
-  screenshots/           Per-screen capture manifest (SCREENSHOTS.md)
-  wiki/                  Getting started, contributing guides
-data/                    Local SQLite databases and test fixtures
-frontend/public/landing/ Project website (GitHub Pages + in-app landing)
-docker-compose.yml       Container orchestration (backend + Redis + Postgres)
-Dockerfile               Multi-stage build (Node builder + Python runtime)
-Makefile                 Development commands (setup, test, gate)
-scripts/capture_screens.mjs  Headless capture + functional check of every screen
-```
+[MIT](LICENSE). Free to use, modify and distribute, including commercially.
 
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+G` | GO Bar &mdash; symbol lookup and navigation |
-| `Ctrl+K` | Command Palette &mdash; fuzzy search across all features |
-| `Ctrl+J` | AI Research Agent &mdash; toggle the agent console |
-| `F1`-`F9` | Function keys for workspace switching |
-| `1`-`7` | Timeframe hotkeys in chart views |
-| `Esc` | Close active panel or dialog |
-
-## Contributing
-
-We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
-
-1. Fork the repo and create a branch: `feat/your-feature` or `fix/your-fix`
-2. Write tests first (TDD encouraged)
-3. Run `make gate` to pass all checks
-4. Open a PR with a clear description
-
-## License
-
-[MIT](LICENSE) &mdash; free to use, modify, and distribute.
+<div align="center"><sub>Market data is provided by third-party sources and may be delayed. Nothing in this software is investment advice.</sub></div>
