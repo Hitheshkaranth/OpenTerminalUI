@@ -28,6 +28,7 @@ import { TerminalButton } from "../terminal/TerminalButton";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { TerminalTable } from "../terminal/TerminalTable";
 import { CitationHint, formatCitation } from "./citations";
+import { AiThinking } from "../ai/AiVisuals";
 
 export type BusinessMetricsSectionProps = { symbol: string; market?: string };
 
@@ -464,14 +465,17 @@ export function BusinessMetricsSection({ symbol }: BusinessMetricsSectionProps) 
       title="Business metrics"
       subtitle={metrics.engine ? `Extracted · ${metrics.engine}` : "Derived from filings"}
       actions={
-        <TerminalButton
-          size="sm"
-          variant="accent"
-          loading={extractMutation.isPending}
-          onClick={() => extractMutation.mutate()}
-        >
-          Extract from filings
-        </TerminalButton>
+        <span className="flex items-center gap-2">
+          {extractMutation.isPending ? <AiThinking activity="extracting" label="Extracting KPIs from filings…" /> : null}
+          <TerminalButton
+            size="sm"
+            variant="accent"
+            loading={extractMutation.isPending}
+            onClick={() => extractMutation.mutate()}
+          >
+            Extract from filings
+          </TerminalButton>
+        </span>
       }
     >
       <div className="space-y-5">

@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 
 import "../agentConsole.css";
 import { useStockStore } from "../../store/stockStore";
 import { useAgentStore } from "../agentStore";
 import { buildScreenContext } from "../screenContext";
 import { listThreads, deleteThread, type ThreadItem } from "../../api/agentExtras";
+import { AgentAvatar, AiWorkingBeam } from "../../components/ai/AiVisuals";
 import { ArtifactCanvas } from "./ArtifactCanvas";
 import { ChatThread } from "./ChatThread";
 import { MemoryPanel } from "./MemoryPanel";
@@ -135,13 +137,17 @@ export function AgentConsole() {
     >
       <header
         style={{
-          display: "flex", justifyContent: "space-between", alignItems: "center",
+          // Close stays pinned top-right; the controls wrap instead of overflowing the fixed-width panel
+          // (they pushed the symbol/model chips and the ✕ off-screen at any window size).
+          display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+          gap: "var(--ot-space-2)",
           padding: "var(--ot-space-2) var(--ot-space-3)",
           borderBottom: "1px solid var(--ot-color-border-default)",
           fontWeight: "var(--ot-font-weight-semibold)", color: "var(--ot-color-text-primary)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--ot-space-2)" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--ot-space-2)", rowGap: 6, flex: 1, minWidth: 0 }}>
+          <AgentAvatar busy={running} size={24} />
           <span>Agent</span>
           <ModeToggle active={debate} label="Debate" onToggle={toggleDebate} title="Multi-agent debate: analyst team → bull vs bear → portfolio-manager decision" />
           <ModeToggle active={strategy} label="Strategy Lab" onToggle={toggleStrategy} title="Strategy Lab: bounded, read-only backtest iteration with out-of-sample validation" />
@@ -185,7 +191,7 @@ export function AgentConsole() {
           {modelLabel ? (
             <span
               title="Model handling this request"
-              className="rounded border border-terminal-border px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-terminal-muted"
+              className="max-w-[16rem] truncate rounded border border-terminal-border px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-terminal-muted"
             >
               {modelLabel}
             </span>
@@ -195,9 +201,10 @@ export function AgentConsole() {
           type="button"
           onClick={() => setOpen(false)}
           aria-label="Close agent console"
-          style={{ background: "transparent", border: "none", color: "var(--ot-color-text-muted)", cursor: "pointer", fontSize: 16 }}
+          title="Close (Ctrl+J)"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-terminal-muted transition-colors hover:bg-terminal-bg hover:text-terminal-text focus-visible:outline focus-visible:outline-1 focus-visible:outline-terminal-accent"
         >
-          ✕
+          <X size={15} aria-hidden="true" />
         </button>
       </header>
 
@@ -228,29 +235,32 @@ export function AgentConsole() {
         >
           Memory
         </button>
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-          placeholder={
-            debate
-              ? `Enter a ticker for multi-agent debate${contextSymbol ? ` (default ${contextSymbol})` : ""}…`
-              : strategy
-                ? `Enter a ticker for Strategy Lab${contextSymbol ? ` (default ${contextSymbol})` : ""}…`
-              : ensemble
-                ? `Enter symbols for ensemble analysis${contextSymbol ? ` (default ${contextSymbol})` : ""}…`
-              : contextSymbol
-                ? `Ask about ${contextSymbol} or any stock…`
-                : "Ask the agent to find or analyze stocks…"
-          }
-          aria-label="Agent prompt"
-          style={{
-            flex: 1, background: "var(--ot-color-canvas-elevated)",
-            border: "1px solid var(--ot-color-border-default)", borderRadius: "var(--ot-radius-sm)",
-            color: "var(--ot-color-text-primary)", fontFamily: "var(--ot-font-ui)",
-            padding: "var(--ot-space-2)",
-          }}
-        />
+        {/* The beam runs along the composer while the agent works on the request. */}
+        <AiWorkingBeam active={running} className="min-w-0 flex-1">
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+            placeholder={
+              debate
+                ? `Enter a ticker for multi-agent debate${contextSymbol ? ` (default ${contextSymbol})` : ""}…`
+                : strategy
+                  ? `Enter a ticker for Strategy Lab${contextSymbol ? ` (default ${contextSymbol})` : ""}…`
+                : ensemble
+                  ? `Enter symbols for ensemble analysis${contextSymbol ? ` (default ${contextSymbol})` : ""}…`
+                : contextSymbol
+                  ? `Ask about ${contextSymbol} or any stock…`
+                  : "Ask the agent to find or analyze stocks…"
+            }
+            aria-label="Agent prompt"
+            style={{
+              width: "100%", background: "var(--ot-color-canvas-elevated)",
+              border: "1px solid var(--ot-color-border-default)", borderRadius: "var(--ot-radius-sm)",
+              color: "var(--ot-color-text-primary)", fontFamily: "var(--ot-font-ui)",
+              padding: "var(--ot-space-2)",
+            }}
+          />
+        </AiWorkingBeam>
         <button
           type="button"
           onClick={submit}

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 import type { StockEmotion } from "../../api/client";
 import { terminalColors } from "../../theme/terminal";
+import { AiThinking } from "../ai/AiVisuals";
 
 type Props = {
   ticker: string;
@@ -102,10 +103,13 @@ export function EmotionIndicator({ ticker, data, isLoading, isError }: Props) {
     return (
       <section className="rounded border border-terminal-border bg-terminal-panel p-3">
         <div className="text-sm font-semibold">Emotion Indicator</div>
-        <div className="mt-1 text-[11px] text-terminal-muted">
-          Analyzing {ticker} news with the local Gemma model — this can take a minute…
-        </div>
-        <div className="mt-2 h-28 animate-pulse rounded bg-terminal-bg" />
+        <AiThinking
+          variant="block"
+          activity="reading"
+          label={`Reading ${ticker} news…`}
+          hint="Scoring each headline with the AI model; this can take a minute."
+          className="mt-2 rounded bg-terminal-bg"
+        />
       </section>
     );
   }
@@ -118,7 +122,8 @@ export function EmotionIndicator({ ticker, data, isLoading, isError }: Props) {
   }
 
   const dominant = emotionMeta(data.dominant_emotion);
-  const engineLabel = data.engine === "lmstudio" ? `Gemma · ${data.model}` : "Lexical fallback";
+  // Name the model that actually answered (it isn't always Gemma); anything else is the keyword fallback.
+  const engineLabel = data.engine === "lmstudio" || data.engine === "openrouter" ? data.model || data.engine : "Lexical fallback";
   const articles = data.articles ?? [];
 
   return (

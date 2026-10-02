@@ -589,7 +589,7 @@ export function StockDetailPage() {
             />
             <AiInsightCard
               title="AI Investment Briefing"
-              description={`${ticker} · Gemma-synthesized bull/bear thesis from fundamentals and news`}
+              description={`${ticker} · AI bull/bear thesis from fundamentals and news`}
               fetcher={() => fetchStockBriefing(ticker, selectedMarket)}
             />
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">

@@ -575,6 +575,17 @@ async def analyze_technicals(args: dict[str, Any]) -> dict[str, Any]:
         high_20 = _safe_float(enriched["High"].tail(20).max()) if "High" in enriched else None
         distance_high = ((high_20 - price) / high_20 * 100) if high_20 and price is not None else None
         supertrend = last("supertrend_dir")
+        # 52-week range from the same bars (only when they span ~a year): the agent picked this tool for
+        # "is it above its 52-week midpoint?" and then reported the range as unavailable.
+        range_52w: dict[str, float | None] = {"high": None, "low": None, "midpoint": None}
+        try:
+            year = enriched[enriched.index >= enriched.index[-1] - pd.Timedelta(days=365)]
+            if "High" in year and "Low" in year and (year.index[-1] - enriched.index[0]).days >= 300:
+                hi, lo = _safe_float(year["High"].max()), _safe_float(year["Low"].min())
+                if hi is not None and lo is not None:
+                    range_52w = {"high": hi, "low": lo, "midpoint": (hi + lo) / 2}
+        except Exception:  # noqa: BLE001 - optional field
+            pass
         return {
             "ticker": ticker,
             "as_of": enriched.index[-1].isoformat(),
@@ -589,6 +600,7 @@ async def analyze_technicals(args: dict[str, Any]) -> dict[str, Any]:
             "volatility": {"atr_pct": last("atr_pct"), "bb_width_pct_rank_120": last("bb_width_pct_rank_120")},
             "volume": {"rvol_20": last("rvol_20")},
             "distance_from_20d_high_pct": distance_high,
+            "range_52w": range_52w,
             "active_setups": active_setups,
         }
     except Exception as exc:  # noqa: BLE001 - malformed provider data must not fail the agent
@@ -742,7 +754,8 @@ def build_default_registry(user_id: str | None = None) -> ToolRegistry:
     ))
     reg.register(ToolSpec(
         name="get_stock_snapshot",
-        description="Get a full price + fundamentals snapshot for a single ticker.",
+        description="Get a full price + fundamentals snapshot for a single ticker: price, day change, "
+                    "P/E, forward P/E, P/B, margins, growth, market cap, and the 52-week high/low.",
         parameters={
             "type": "object",
             "properties": {"ticker": {"type": "string"}},

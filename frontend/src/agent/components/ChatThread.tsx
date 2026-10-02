@@ -1,3 +1,4 @@
+import { AiThinking } from "../../components/ai/AiVisuals";
 import { Markdown } from "./Markdown";
 import { ProposalCard } from "./ProposalCard";
 import type { AgentMessage, AgentPhase, AgentRoleNote } from "../types";
@@ -149,14 +150,8 @@ function DecisionBanner({ decision }: { decision: Decision }) {
 // rate-limit backoffs) so long retry windows don't look frozen.
 function PendingIndicator({ status }: { status?: string }) {
   return (
-    <div className="flex items-center gap-2 py-0.5" aria-live="polite">
-      <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-terminal-accent opacity-75" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-terminal-accent" />
-      </span>
-      <span className="font-mono text-[11px] text-terminal-muted">
-        {status ?? "Thinking…"}
-      </span>
+    <div className="py-0.5">
+      <AiThinking activity="thinking" label={<span className="font-mono text-[11px]">{status ?? "Thinking…"}</span>} />
     </div>
   );
 }

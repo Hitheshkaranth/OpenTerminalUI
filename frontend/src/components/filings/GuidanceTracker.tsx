@@ -9,6 +9,7 @@ import { TerminalButton } from "../terminal/TerminalButton";
 import { TerminalBadge } from "../terminal/TerminalBadge";
 import { GuidedEmptyState } from "../dashboard/GuidedEmptyState";
 import { statusLabel, statusVariant } from "./presentation";
+import { AiThinking } from "../ai/AiVisuals";
 
 type Props = {
   symbol: string;
@@ -84,9 +85,12 @@ export function GuidanceTracker({ symbol }: Props) {
       subtitle="Management forward-looking statements"
       actions={
         hasAny ? null : (
-          <TerminalButton size="sm" loading={building} onClick={rebuild}>
-            Build Guidance
-          </TerminalButton>
+          <span className="flex items-center gap-2">
+            {building ? <AiThinking activity="extracting" label="Tracking guidance…" /> : null}
+            <TerminalButton size="sm" loading={building} onClick={rebuild}>
+              Build Guidance
+            </TerminalButton>
+          </span>
         )
       }
     >

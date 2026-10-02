@@ -8,6 +8,7 @@ import { TerminalButton } from "../terminal/TerminalButton";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { TerminalTable } from "../terminal/TerminalTable";
 import { CitationHint } from "./citations";
+import { AiThinking } from "../ai/AiVisuals";
 
 export type ValueChainSectionProps = { symbol: string; market?: string };
 
@@ -234,9 +235,12 @@ export function ValueChainSection({ symbol }: ValueChainSectionProps) {
         title="Value chain"
         subtitle="Not mapped yet"
         actions={
-          <TerminalButton size="sm" loading={extractMutation.isPending} onClick={() => extractMutation.mutate()}>
-            Extract from filings
-          </TerminalButton>
+          <span className="flex items-center gap-2">
+            {extractMutation.isPending ? <AiThinking activity="linking" label="Mapping suppliers and customers…" /> : null}
+            <TerminalButton size="sm" loading={extractMutation.isPending} onClick={() => extractMutation.mutate()}>
+              Extract from filings
+            </TerminalButton>
+          </span>
         }
       >
         <div className="flex flex-col gap-3 px-2.5 py-6">
@@ -257,9 +261,12 @@ export function ValueChainSection({ symbol }: ValueChainSectionProps) {
       title="Value chain"
       subtitle={valueChain.industry ? valueChain.industry : "Suppliers · Company · Customers"}
       actions={
-        <TerminalButton size="sm" variant="accent" loading={extractMutation.isPending} onClick={() => extractMutation.mutate()}>
-          Extract from filings
-        </TerminalButton>
+        <span className="flex items-center gap-2">
+          {extractMutation.isPending ? <AiThinking activity="linking" label="Mapping suppliers and customers…" /> : null}
+          <TerminalButton size="sm" variant="accent" loading={extractMutation.isPending} onClick={() => extractMutation.mutate()}>
+            Extract from filings
+          </TerminalButton>
+        </span>
       }
     >
       <div className="flex flex-col gap-4">

@@ -59,6 +59,13 @@ class Orchestrator:
             )
         return "\n".join(parts)
 
+    def _announced_model(self, chain: list[str]) -> str:
+        """The model the UI should show. A local server (LM Studio / vLLM) ignores the routed OpenRouter
+        chain and serves its own model, so announcing chain[0] showed e.g. "llama-3.3-70b" while Ornith ran."""
+        if getattr(self.provider, "honor_model_chain", True) is False:
+            return getattr(self.provider, "model", None) or chain[0]
+        return chain[0]
+
     @staticmethod
     def _looks_like_screening_task(prompt: str) -> bool:
         text = prompt.lower()
@@ -125,7 +132,7 @@ class Orchestrator:
 
         tool_defs = self.registry.tool_defs()
         tools_used = False
-        yield events.model(tool_models[0], "tool_use")
+        yield events.model(self._announced_model(tool_models), "tool_use")
         for _step in range(self.max_steps):
             try:
                 assistant: AssistantMessage | None = None
@@ -165,7 +172,7 @@ class Orchestrator:
                 synthesis_models = select_chain(
                     TaskProfile(phase="synthesis", intent=intent), settings,
                 )
-                yield events.model(synthesis_models[0], "synthesis")
+                yield events.model(self._announced_model(synthesis_models), "synthesis")
                 try:
                     synthesis: AssistantMessage | None = None
                     async for ev in complete_with_status(

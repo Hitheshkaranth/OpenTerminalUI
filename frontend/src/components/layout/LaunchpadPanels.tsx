@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef, type KeyboardEvent } from "react"
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
+import { AgentAvatar, AiThinking, AiWorkingBeam } from "../ai/AiVisuals";
 import {
   fetchAlerts,
   fetchMarketStatus,
@@ -27,7 +28,7 @@ import { SectorRotationMap } from "../analysis/SectorRotationMap";
 import { OptionChainTable } from "../../fno/components/OptionChainTable";
 import { PanelBody } from "./PanelChrome";
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
-import { Send, Sparkles, User, Bot, Loader2 } from "lucide-react";
+import { Send, Sparkles, User } from "lucide-react";
 import { HotKeyPanel } from "../trading/HotKeyPanel";
 
 type PanelProps = { panel: LaunchpadPanelConfig };
@@ -85,11 +86,7 @@ export function LaunchpadAIResearchPanel({ panel }: PanelProps) {
       <div ref={scrollRef} className="flex-grow overflow-auto p-3 space-y-4">
         {messages.map((m, i) => (
           <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : ''}`}>
-            {m.role === 'assistant' && (
-              <div className="h-6 w-6 shrink-0 rounded-full bg-terminal-accent/20 flex items-center justify-center text-terminal-accent">
-                <Bot size={14} />
-              </div>
-            )}
+            {m.role === 'assistant' && <AgentAvatar still size={24} className="shrink-0" />}
             <div className={`max-w-[85%] rounded-sm px-3 py-2 text-xs leading-relaxed ${
               m.role === 'user'
                 ? 'bg-terminal-accent text-terminal-bg font-bold'
@@ -106,18 +103,16 @@ export function LaunchpadAIResearchPanel({ panel }: PanelProps) {
         ))}
         {loading && (
           <div className="flex gap-3">
-            <div className="h-6 w-6 shrink-0 rounded-full bg-terminal-accent/20 flex items-center justify-center text-terminal-accent">
-              <Bot size={14} />
-            </div>
-            <div className="flex items-center gap-2 rounded-sm border border-terminal-border bg-terminal-panel px-3 py-2 text-[10px] text-terminal-muted italic">
-              <Loader2 size={12} className="animate-spin" />
-              Thinking...
+            <AgentAvatar busy size={24} className="shrink-0" />
+            <div className="rounded-sm border border-terminal-border bg-terminal-panel px-3 py-1.5">
+              <AiThinking activity="thinking" label="Thinking…" />
             </div>
           </div>
         )}
       </div>
 
       <div className="border-t border-terminal-border p-2">
+        <AiWorkingBeam active={loading}>
         <div className="flex items-center gap-2 rounded-sm border border-terminal-border bg-terminal-panel px-2">
           <input
             value={query}
@@ -134,6 +129,7 @@ export function LaunchpadAIResearchPanel({ panel }: PanelProps) {
             <Send size={16} />
           </button>
         </div>
+        </AiWorkingBeam>
       </div>
     </div>
   );

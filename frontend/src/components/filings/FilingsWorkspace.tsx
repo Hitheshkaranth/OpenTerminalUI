@@ -29,6 +29,7 @@ import { TerminalButton } from "../terminal/TerminalButton";
 import { TerminalBadge } from "../terminal/TerminalBadge";
 import { TerminalSelect } from "../terminal/TerminalSelect";
 import { TerminalInput } from "../terminal/TerminalInput";
+import { AiThinking } from "../ai/AiVisuals";
 import { GuidedEmptyState } from "../dashboard/GuidedEmptyState";
 import {
   formatCitationLabel,
@@ -429,7 +430,7 @@ export function FilingsWorkspace({ symbol }: Props) {
             Analyze
           </TerminalButton>
           {analyzeLoading ? (
-            <span className="text-[11px] text-terminal-muted">Analyzing — this can take 1–2 minutes.</span>
+            <AiThinking activity="analyzing" label="Scoring growth engines and headwinds; this can take 1–2 minutes." />
           ) : null}
           <button
             type="button"
@@ -586,7 +587,11 @@ function AskBox({
           Ask
         </TerminalButton>
       </div>
-      {result ? (
+      {asking ? (
+        <div className="mt-3">
+          <AiThinking activity="reading" label="Searching the filings and drafting a cited answer…" />
+        </div>
+      ) : result ? (
         <div className="mt-3 space-y-2">
           <div className="rounded-sm bg-terminal-bg px-2 py-2 text-xs text-terminal-text">
             {result.answer || "—"}

@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 
 import { terminalColors } from "../../theme/terminal";
+import { AiThinking } from "../ai/AiVisuals";
 
 export type InsightSection = {
   title: string;
@@ -49,8 +50,10 @@ export function AiInsightCard({ title, description, fetcher }: Props) {
     }
   }, [fetcher]);
 
-  const engineLive = data?.engine === "lmstudio";
-  const engineLabel = engineLive ? `Gemma · ${data?.model}` : "Gemma offline — lexical fallback";
+  // Any model that answered is live (LM Studio / vLLM or OpenRouter); the label names the actual model
+  // rather than assuming Gemma.
+  const engineLive = Boolean(data?.engine) && data?.engine !== "unavailable";
+  const engineLabel = engineLive ? data?.model || data?.engine : "AI unavailable";
 
   return (
     <section className="rounded border border-terminal-border bg-terminal-panel p-3">
@@ -88,12 +91,13 @@ export function AiInsightCard({ title, description, fetcher }: Props) {
       )}
 
       {status === "loading" && (
-        <div className="mt-3 space-y-2">
-          <div className="text-[11px] text-terminal-muted">
-            Generating analysis…
-          </div>
-          <div className="h-24 animate-pulse rounded bg-terminal-bg" />
-        </div>
+        <AiThinking
+          variant="block"
+          activity="writing"
+          label="Generating analysis…"
+          hint="A local model usually takes 5–20 seconds."
+          className="mt-2 rounded bg-terminal-bg"
+        />
       )}
 
       {status === "error" && (

@@ -119,3 +119,14 @@ async def test_synthesis_context_ends_on_tool_results_not_the_draft():
     assert "Tools are no longer available" in synthesis_messages[-1].content
     assert all(getattr(m, "content", None) != "Draft: AAPL" for m in synthesis_messages)
     assert events[-1]["content"] == "Final: AAPL"
+
+
+@pytest.mark.asyncio
+async def test_local_provider_announces_its_own_model_not_the_routed_chain():
+    provider = ScriptedProvider([AssistantMessage(content="Hi", tool_calls=[])])
+    provider.honor_model_chain = False
+    provider.model = "ornith-1.5-35b-a3b"
+    orch = Orchestrator(provider=provider, registry=_registry(), max_steps=2)
+    events = [e async for e in orch.run("hello")]
+    announced = [e for e in events if e["type"] == "model"]
+    assert announced and all(e.get("name") == "ornith-1.5-35b-a3b" for e in announced)

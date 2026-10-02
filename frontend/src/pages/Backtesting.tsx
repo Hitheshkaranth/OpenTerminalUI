@@ -1703,7 +1703,7 @@ export function BacktestingPage() {
       {result?.result && (
         <AiInsightCard
           title="AI Backtest Analysis"
-          description={`${activePreset?.label || strategyMode} · Gemma assessment of return, risk, and overfitting`}
+          description={`${activePreset?.label || strategyMode} · AI assessment of return, risk, and overfitting`}
           fetcher={() =>
             explainBacktest(activePreset?.label || String(strategyMode), {
               total_return: result?.result?.total_return,

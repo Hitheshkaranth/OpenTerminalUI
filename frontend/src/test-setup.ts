@@ -41,3 +41,27 @@ afterEach(() => {
   vi.clearAllTimers();
   vi.useRealTimers();
 });
+
+// Libraries.dev effects draw on <canvas> and watch IntersectionObserver, which jsdom lacks; tests
+// assert behaviour, not pixels, so render accessible stand-ins with the same labels.
+vi.mock("thinking-orbs", async () => {
+  const React = await import("react");
+  return {
+    ThinkingOrb: (props: { "aria-label"?: string; state?: string }) =>
+      React.createElement("span", { role: "img", "aria-label": props["aria-label"] ?? "Thinking", "data-orb": props.state }),
+  };
+});
+vi.mock("border-beam", async () => {
+  const React = await import("react");
+  return {
+    BorderBeam: (props: { children?: unknown; className?: string; active?: boolean }) =>
+      React.createElement("div", { className: props.className, "data-beam": props.active ? "on" : "off" }, props.children as never),
+  };
+});
+vi.mock("bot-avatars", async () => {
+  const React = await import("react");
+  return {
+    BotAvatar: (props: { "aria-label"?: string; state?: string }) =>
+      React.createElement("span", { role: "img", "aria-label": props["aria-label"] ?? "Agent", "data-bot": props.state }),
+  };
+});

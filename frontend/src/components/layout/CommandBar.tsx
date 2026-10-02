@@ -13,6 +13,7 @@ import {
   searchSymbols,
   type SearchSymbolItem,
 } from "../../api/client";
+import { AiThinking } from "../ai/AiVisuals";
 import { SparklineCell } from "../home/SparklineCell";
 import { inferRecentSecurityAssetClass, inferRecentSecurityMarket, useRecentSecurities } from "../../hooks/useRecentSecurities";
 import {
@@ -864,10 +865,7 @@ export function CommandBar({ onExecute }: Props) {
 
           <div className="max-h-[400px] overflow-auto p-4">
             {thinking ? (
-              <div className="flex items-center gap-3 py-4 text-sm text-terminal-muted">
-                <Loader2 className="h-5 w-5 animate-spin text-terminal-accent" />
-                Synthesizing market data and intent...
-              </div>
+              <AiThinking variant="block" activity="thinking" label="Working out what you asked…" />
             ) : aiResult ? (
               <div className="space-y-4">
                 <div className="text-sm leading-relaxed text-terminal-text">

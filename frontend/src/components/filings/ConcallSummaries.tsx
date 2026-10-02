@@ -8,6 +8,7 @@ import { TerminalButton } from "../terminal/TerminalButton";
 import { TerminalBadge } from "../terminal/TerminalBadge";
 import { GuidedEmptyState } from "../dashboard/GuidedEmptyState";
 import { formatCitationLabel, formatKeyNumber, toneLabel, toneVariant } from "./presentation";
+import { AiThinking } from "../ai/AiVisuals";
 
 type Props = {
   symbol: string;
@@ -164,9 +165,12 @@ export function ConcallSummaries({ symbol }: Props) {
       subtitle="Earnings-call takeaways"
       actions={
         hasAny ? null : (
-          <TerminalButton size="sm" loading={building} onClick={rebuild}>
-            Build Summaries
-          </TerminalButton>
+          <span className="flex items-center gap-2">
+            {building ? <AiThinking activity="writing" label="Summarising calls…" /> : null}
+            <TerminalButton size="sm" loading={building} onClick={rebuild}>
+              Build Summaries
+            </TerminalButton>
+          </span>
         )
       }
     >
