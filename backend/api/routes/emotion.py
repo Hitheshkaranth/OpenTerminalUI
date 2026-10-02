@@ -91,9 +91,10 @@ async def get_stock_emotion(
                 break
 
     payload = await analyze_stock_emotion(symbol, articles, period_days=days, limit=limit)
-    await cache_instance.set(
-        cache_key,
-        payload,
-        ttl=ttl_seconds("news_latest", market_open_now()),
-    )
+    if payload.get("engine") != "fallback":  # don't pin a keyword-only fallback for the whole TTL
+        await cache_instance.set(
+            cache_key,
+            payload,
+            ttl=ttl_seconds("news_latest", market_open_now()),
+        )
     return payload

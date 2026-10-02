@@ -140,6 +140,35 @@ class FMPClient:
         data = await self._get("profile", {"symbol": self._symbol(symbol)})
         return data[0] if data and isinstance(data, list) else {}
 
+    async def get_peers(self, symbol: str) -> List[str]:
+        """Peer tickers from FMP's stable `stock-peers` endpoint.
+
+        Callers (peers route, relative valuation, value chain) expected this method but it was
+        never defined, so every lookup raised AttributeError and silently returned no peers.
+        Indian peers come back as both .NS and .BO listings; return each once as a bare NSE symbol.
+        """
+        # Peer sets rarely change; cache them for a week so page views don't spend the daily FMP quota
+        # (the free plan hit 429 "Limit Reach" under normal use).
+        from backend.shared.cache import cache
+
+        cache_key = cache.build_key("fmp_peers", self._symbol(symbol), {})
+        cached = await cache.get(cache_key)
+        if isinstance(cached, list) and cached:
+            return [str(x) for x in cached]
+        rows = await self._get("stock-peers", {"symbol": self._symbol(symbol)})
+        own = self._symbol(symbol).removesuffix(".NS").removesuffix(".BO")
+        out: List[str] = []
+        for row in rows if isinstance(rows, list) else []:
+            raw = str((row or {}).get("symbol") or "").strip().upper() if isinstance(row, dict) else ""
+            if not raw or raw.endswith(".BO") and f"{raw[:-3]}.NS" in {str(r.get("symbol")).upper() for r in rows if isinstance(r, dict)}:
+                continue
+            peer = raw.removesuffix(".NS").removesuffix(".BO")
+            if peer and peer != own and peer not in out:
+                out.append(peer)
+        if out:
+            await cache.set(cache_key, out, ttl=7 * 24 * 3600)
+        return out
+
     async def get_institutional_holders(self, symbol: str, limit: int = 50) -> List[Dict[str, Any]]:
         # Stable institutional-ownership endpoints are premium-tier; returns [] gracefully
         # (callers fall back to other providers) when not subscribed.

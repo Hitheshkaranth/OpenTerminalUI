@@ -37,7 +37,7 @@ class _FakeProvider:
         self.api_key = api_key
         self.model = model
 
-    async def complete(self, messages, tools=None, *, temperature=0.1, max_tokens=1024) -> AssistantMessage:  # noqa: ANN001
+    async def complete(self, messages, tools=None, *, temperature=0.1, max_tokens=1024, **_kw) -> AssistantMessage:  # noqa: ANN001
         return AssistantMessage(
             content=(
                 '{"analyses": [{"sentiment_score": 0.5, "sentiment_label": "Bullish", '
@@ -113,7 +113,7 @@ def test_analyze_stock_emotion_via_provider(monkeypatch) -> None:
 
 def test_analyze_stock_emotion_unparseable_llm_reply_falls_back(monkeypatch) -> None:
     class _GarbageProvider(_FakeProvider):
-        async def complete(self, messages, tools=None, *, temperature=0.1, max_tokens=1024) -> AssistantMessage:  # noqa: ANN001
+        async def complete(self, messages, tools=None, *, temperature=0.1, max_tokens=1024, **_kw) -> AssistantMessage:  # noqa: ANN001
             return AssistantMessage(content="sorry, I cannot help with that")
 
     monkeypatch.setattr(stock_emotion, "get_settings", lambda: _fake_settings(provider="openrouter"))

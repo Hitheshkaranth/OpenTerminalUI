@@ -100,3 +100,22 @@ async def test_max_steps_budget_halts():
     assert events[-1]["type"] == "final"
     assert "step budget" in events[-1]["content"].lower()
     assert sum(1 for e in events if e["type"] == "tool_call") == 3
+
+
+@pytest.mark.asyncio
+async def test_synthesis_context_ends_on_tool_results_not_the_draft():
+    # Feeding the draft answer back made Ornith reply "I've already answered your question".
+    provider = ScriptedProvider([
+        AssistantMessage(content=None, tool_calls=[
+            ToolCall(id="c1", name="screen_stocks", arguments={"query": "x"})]),
+        AssistantMessage(content="Draft: AAPL", tool_calls=[]),
+        AssistantMessage(content="Final: AAPL", tool_calls=[]),
+    ])
+    orch = Orchestrator(provider=provider, registry=_registry(), max_steps=5)
+    events = [e async for e in orch.run("find cheap stocks")]
+    synthesis_messages = provider.message_batches[-1]
+    assert getattr(synthesis_messages[-2], "role", None) == "tool"
+    assert synthesis_messages[-1].role == "user"
+    assert "Tools are no longer available" in synthesis_messages[-1].content
+    assert all(getattr(m, "content", None) != "Draft: AAPL" for m in synthesis_messages)
+    assert events[-1]["content"] == "Final: AAPL"

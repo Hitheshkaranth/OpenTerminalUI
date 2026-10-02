@@ -254,4 +254,6 @@ class MultiTierCache:
             return None
 
 
-cache = MultiTierCache()
+# Path is overridable so the test suite can use a throwaway file: tests used to write fake data into
+# the same on-disk cache the app serves from (e.g. synthetic theme indices shown live for 15 min).
+cache = MultiTierCache(db_path=os.getenv("OPENTERMINALUI_CACHE_DB", "trade_screens_cache.db"))

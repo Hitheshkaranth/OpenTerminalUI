@@ -247,6 +247,9 @@ class PeerResponse(BaseModel):
     ticker: str
     universe: str
     metrics: list[PeerMetric]
+    # One row per peer (the Security Hub peers table); previously only medians were returned,
+    # so that table always showed 0 rows.
+    peers: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ETFHolding(BaseModel):

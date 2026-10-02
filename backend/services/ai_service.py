@@ -95,7 +95,11 @@ class AIQueryService:
             }
 
         if intent == "screener_results":
-            rows = await self._run_screener(params)
+            rows, skipped = await self._run_screener(params)
+            if skipped:
+                note = (f"No {', '.join(skipped)} data is available for these markets, "
+                        "so that filter was skipped.")
+                explanation = f"{explanation} {note}".strip() if explanation else note
             return {
                 "type": "screener_results",
                 "data": rows,
@@ -127,8 +131,7 @@ class AIQueryService:
 
     async def _call_lmstudio(self, query: str) -> str:
         client = get_lm_studio_client()
-        if not await client.health():
-            raise LMStudioError("LM Studio is not reachable")
+        # Call directly: a busy gateway can miss the short health probe yet answer the request.
         return await client.chat(
             [
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -138,8 +141,12 @@ class AIQueryService:
             max_tokens=400,
         )
 
-    async def _run_screener(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Execute the real multi-market screener from LLM-extracted filters."""
+    async def _run_screener(self, params: Dict[str, Any]) -> tuple[List[Dict[str, Any]], List[str]]:
+        """Execute the real multi-market screener from LLM-extracted filters.
+
+        Returns (rows, skipped_fields). A filter on a field no row in the universe has (debt_to_equity
+        today) used to zero the whole result silently; it is dropped and reported instead.
+        """
         from backend.api.routes.screener import (
             SCAN_ALLOWED_FIELDS,
             SCAN_ALLOWED_OPS,
@@ -149,7 +156,7 @@ class AIQueryService:
 
         raw_filters = params.get("filters")
         if not isinstance(raw_filters, list):
-            return []
+            return [], []
         valid_filters: List[Dict[str, Any]] = []
         for entry in raw_filters:
             if not isinstance(entry, dict):
@@ -159,7 +166,7 @@ class AIQueryService:
             if field in SCAN_ALLOWED_FIELDS and op in SCAN_ALLOWED_OPS:
                 valid_filters.append({"field": field, "op": op, "value": entry.get("value")})
         if not valid_filters:
-            return []
+            return [], []
 
         markets = [str(m).strip().upper() for m in (params.get("markets") or []) if str(m).strip()]
         try:
@@ -167,18 +174,34 @@ class AIQueryService:
         except (TypeError, ValueError):
             limit = 25
 
-        try:
-            request = ScreenerScanRequest(
-                markets=markets or ["NSE", "NYSE", "NASDAQ"],
-                filters=valid_filters,
-                limit=limit,
-            )
-            result = await run_multimarket_scan(request)
+        markets = markets or ["NSE", "NYSE", "NASDAQ"]
+
+        async def scan(filters: List[Dict[str, Any]], n: int) -> List[Dict[str, Any]]:
+            result = await run_multimarket_scan(ScreenerScanRequest(markets=markets, filters=filters, limit=n))
             rows = result.get("rows", []) if isinstance(result, dict) else []
             return rows if isinstance(rows, list) else []
+
+        try:
+            rows = await scan(valid_filters, limit)
+            if rows:
+                return rows, []
+            universe = await scan([], 500)
+
+            def has_data(field: str) -> bool:
+                for row in universe:
+                    value = row.get(field)
+                    if value is not None and value == value and value != "":  # value == value drops NaN
+                        return True
+                return False
+
+            skipped = sorted({f["field"] for f in valid_filters if not has_data(f["field"])})
+            if not skipped:
+                return [], []
+            kept = [f for f in valid_filters if f["field"] not in skipped]
+            return (await scan(kept, limit) if kept else []), skipped
         except Exception as exc:  # noqa: BLE001 - screener failures degrade to empty
             logger.error(f"AI screener execution failed: {exc}")
-            return []
+            return [], []
 
     async def _call_openai(self, query: str) -> str:
         if not self.settings.openai_api_key:

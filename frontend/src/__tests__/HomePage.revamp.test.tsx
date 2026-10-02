@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -82,11 +83,21 @@ vi.mock("../fno/api/fnoApi", () => ({
   fetchChainSummary: vi.fn(),
 }));
 
+// The Home page now hosts the Ideas radar (react-query); the app wraps everything in a
+// QueryClientProvider, so the test does too, with the ideas API stubbed.
+vi.mock("../api/ideasThemes", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/ideasThemes")>()),
+  fetchIdeasBoard: vi.fn(async () => ({ market: "IN", generated_at: "2026-10-01T00:00:00Z", categories: [], warnings: [] })),
+}));
+
 function renderPage() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <HomePage />
-    </MemoryRouter>,
+    <QueryClientProvider client={client}>
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <HomePage />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
+import { IdeasBoard } from "../components/ideas/IdeasBoard";
 import { DenseTable, type DenseTableColumn } from "../components/terminal/DenseTable";
 
 type HotlistType = "gainers" | "losers" | "most_active" | "52w_high" | "52w_low" | "gap_up" | "gap_down" | "unusual_volume";
@@ -72,6 +73,8 @@ function toRow(item: HotlistItem, index: number): HotlistRow {
 
 export function HotlistsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = searchParams.get("view") === "ideas" ? "ideas" : "lists";
   const [market, setMarket] = useState<HotlistMarket>("IN");
   const [listType, setListType] = useState<HotlistType>("gainers");
   const [rows, setRows] = useState<HotlistRow[]>([]);
@@ -165,7 +168,7 @@ export function HotlistsPage() {
   }, []);
 
   return (
-    <div className="h-full overflow-hidden px-3 py-2">
+    <div className="h-full flex flex-col overflow-hidden px-3 py-2">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1">
           {HOTLIST_TABS.map((tab) => (
@@ -201,39 +204,74 @@ export function HotlistsPage() {
         </div>
       </div>
 
-      <div className="mb-2 flex items-center justify-between text-[11px] text-terminal-muted">
-        <span>{loading ? "Refreshing..." : `Live ${HOTLIST_TABS.find((tab) => tab.id === listType)?.label ?? "Hotlist"} rankings`}</span>
-        <span>
-          Updated:{" "}
-          {updatedAt
-            ? new Date(updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
-            : "--:--:--"}
-        </span>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="inline-flex items-center gap-1 rounded-sm border border-terminal-border bg-terminal-panel p-1">
+          <button
+            type="button"
+            aria-pressed={view === "lists"}
+            className={`rounded px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] ${
+              view === "lists" ? "border border-terminal-accent bg-terminal-accent/20 text-terminal-accent" : "border-transparent text-terminal-muted hover:text-terminal-text"
+            }`}
+            onClick={() => setSearchParams({})}
+          >
+            Lists
+          </button>
+          <button
+            type="button"
+            aria-pressed={view === "ideas"}
+            className={`rounded px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] ${
+              view === "ideas" ? "border border-terminal-accent bg-terminal-accent/20 text-terminal-accent" : "border-transparent text-terminal-muted hover:text-terminal-text"
+            }`}
+            onClick={() => setSearchParams({ view: "ideas" })}
+          >
+            Ideas
+          </button>
+        </div>
       </div>
 
-      {error ? (
-        <div className="rounded border border-terminal-neg/40 bg-terminal-neg/10 px-3 py-2 text-xs text-terminal-neg">{error}</div>
-      ) : null}
-
-      {!loading && !error && rows.length === 0 ? (
-        <div className="mb-2 rounded border border-terminal-border bg-terminal-bg px-3 py-2 text-xs text-terminal-muted">
-          No symbols match this list right now (e.g. no gainers when every tracked stock is down), or price history is unavailable.
+      {view === "ideas" ? (
+        <div className="flex min-h-0 flex-1">
+          <IdeasBoard market={market} />
         </div>
-      ) : null}
+      ) : (
+        <>
+          <div className="mb-2 flex items-center justify-between text-[11px] text-terminal-muted">
+            <span>{loading ? "Refreshing..." : `Live ${HOTLIST_TABS.find((tab) => tab.id === listType)?.label ?? "Hotlist"} rankings`}</span>
+            <span>
+              Updated:{" "}
+              {updatedAt
+                ? new Date(updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+                : "--:--:--"}
+            </span>
+          </div>
 
-      <DenseTable<HotlistRow>
-        id="hotlists-main"
-        rows={rows}
-        columns={columns}
-        rowKey={(row) => `${market}:${listType}:${row.symbol}`}
-        height={640}
-        rowHeight={24}
-        onRowClick={(row) => navigate(`/equity/stocks?ticker=${encodeURIComponent(row.symbol)}`)}
-        onRowOpenInChart={(row) => navigate(`/equity/chart-workstation?ticker=${encodeURIComponent(row.symbol)}&symbol=${encodeURIComponent(row.symbol)}`)}
-        onAddToWatchlist={(row) => navigate(`/equity/watchlist?symbol=${encodeURIComponent(row.symbol)}`)}
-        onAddToPortfolio={(row) => navigate(`/equity/portfolio?symbol=${encodeURIComponent(row.symbol)}`)}
-        onViewDetails={(row) => navigate(`/equity/security/${encodeURIComponent(row.symbol)}?tab=overview`)}
-      />
+          {error ? (
+            <div className="rounded border border-terminal-neg/40 bg-terminal-neg/10 px-3 py-2 text-xs text-terminal-neg">{error}</div>
+          ) : null}
+
+          {!loading && !error && rows.length === 0 ? (
+            <div className="mb-2 rounded border border-terminal-border bg-terminal-bg px-3 py-2 text-xs text-terminal-muted">
+              No symbols match this list right now (e.g. no gainers when every tracked stock is down), or price history is unavailable.
+            </div>
+          ) : null}
+
+          <div className="flex min-h-0 flex-1">
+            <DenseTable<HotlistRow>
+              id="hotlists-main"
+              rows={rows}
+              columns={columns}
+              rowKey={(row) => `${market}:${listType}:${row.symbol}`}
+              height={640}
+              rowHeight={24}
+              onRowClick={(row) => navigate(`/equity/stocks?ticker=${encodeURIComponent(row.symbol)}`)}
+              onRowOpenInChart={(row) => navigate(`/equity/chart-workstation?ticker=${encodeURIComponent(row.symbol)}&symbol=${encodeURIComponent(row.symbol)}`)}
+              onAddToWatchlist={(row) => navigate(`/equity/watchlist?symbol=${encodeURIComponent(row.symbol)}`)}
+              onAddToPortfolio={(row) => navigate(`/equity/portfolio?symbol=${encodeURIComponent(row.symbol)}`)}
+              onViewDetails={(row) => navigate(`/equity/security/${encodeURIComponent(row.symbol)}?tab=overview`)}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }

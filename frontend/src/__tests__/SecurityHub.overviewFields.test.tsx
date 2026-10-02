@@ -40,6 +40,11 @@ vi.mock("../components/chart/TradingChart", () => ({
   TradingChart: () => <div>Mock Chart</div>,
 }));
 
+// jsdom has no canvas; lightweight-charts cannot render here.
+vi.mock("../components/security/PriceOverviewChart", () => ({
+  PriceOverviewChart: () => <div>Mock Price Chart</div>,
+}));
+
 function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location-search">{location.search}</div>;

@@ -60,6 +60,13 @@ FIELD_DEFINITIONS: list[FieldMeta] = [
     FieldMeta("altman_z_score", "Altman Z-Score", "quality", "Bankruptcy risk score", aliases=("z score",)),
     FieldMeta("quality_score", "Quality Score", "quant", "Composite quality score"),
     FieldMeta("magic_combined_rank", "Magic Combined Rank", "guru", "Greenblatt combined rank", aliases=("combined rank", "magic rank")),
+    FieldMeta("filings_growth_score", "Filings Growth Score", "Filings Intelligence", "Filing analysis growth score (0-100)", aliases=("growth score", "growth engine score")),
+    FieldMeta("filings_headwind_score", "Filings Headwind Score", "Filings Intelligence", "Filing analysis headwind score (0-100)", aliases=("headwind score", "headwind score")),
+    FieldMeta("filings_net_score", "Filings Net Score", "Filings Intelligence", "Filings growth minus headwind score", aliases=("net score", "filings net", "filings net score")),
+    FieldMeta("filings_stance", "Filings Stance", "Filings Intelligence", "Overall filing stance", "string", aliases=("stance", "filings stance")),
+    FieldMeta("order_book_value", "Order Book", "Filings Intelligence", "Latest extracted order book value", aliases=("order book", "order book value", "orderbook")),
+    FieldMeta("implied_growth_pct", "Implied Growth %", "Filings Intelligence", "Reverse-DCF implied growth when already available", aliases=("implied growth",)),
+    FieldMeta("adverse_regulatory_flag", "Adverse Regulatory Flag", "Filings Intelligence", "Adverse regulatory headwind finding present", aliases=("adverse regulatory", "regulatory flag", "adverse regulatory flag")),
 ]
 
 

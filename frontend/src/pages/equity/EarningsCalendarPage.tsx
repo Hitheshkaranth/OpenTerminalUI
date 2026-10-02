@@ -1,10 +1,13 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Filter, Search, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 
 import { fetchEarningsCalendar } from "../../api/earnings";
+import { ResultsTracker } from "../../components/results/ResultsTracker";
 import { TerminalInput } from "../../components/terminal/TerminalInput";
 import { TerminalPanel } from "../../components/terminal/TerminalPanel";
+import { TerminalTabs } from "../../components/terminal/TerminalTabs";
 import type { EarningsDate } from "../../types";
 
 const MONTHS = [
@@ -42,7 +45,18 @@ function timeBadge(time: string): string {
 }
 
 export function EarningsCalendarPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const now = new Date();
+  const view: "calendar" | "results" = searchParams.get("view") === "results" ? "results" : "calendar";
+  const setView = (next: "calendar" | "results") => {
+    const params = new URLSearchParams(searchParams);
+    if (next === "results") {
+      params.set("view", "results");
+    } else {
+      params.delete("view");
+    }
+    setSearchParams(params);
+  };
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());
   const [currentYear, setCurrentYear] = useState(now.getFullYear());
   const [symbolFilter, setSymbolFilter] = useState("");
@@ -97,6 +111,24 @@ export function EarningsCalendarPage() {
   return (
     <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(255,107,0,0.06),transparent_30rem)] p-3 md:p-5">
       <main className="mx-auto flex w-full max-w-[1400px] flex-col gap-4">
+        <div className="inline-flex w-fit items-center gap-1 rounded-sm border border-terminal-border bg-terminal-panel p-1" role="group" aria-label="Earnings view">
+          {(["calendar", "results"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={view === v}
+              onClick={() => setView(v)}
+              className={`rounded px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] ${
+                view === v ? "border border-terminal-accent bg-terminal-accent/20 text-terminal-accent" : "border border-transparent text-terminal-muted hover:text-terminal-text"
+              }`}
+            >
+              {v === "calendar" ? "Calendar" : "Results"}
+            </button>
+          ))}
+        </div>
+        {view === "results" ? (
+          <ResultsTracker />
+        ) : (
         <section className="rounded-md border border-terminal-border/70 bg-terminal-panel/95 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.18)]">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -226,6 +258,7 @@ export function EarningsCalendarPage() {
             </div>
           )}
         </section>
+        )}
       </main>
     </div>
   );

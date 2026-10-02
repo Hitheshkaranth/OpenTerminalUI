@@ -61,6 +61,27 @@ export function CatalystConvictionPanel({
     (bullish != null && bearish != null ? (bullish > bearish + 5 ? "Bullish" : bearish > bullish + 5 ? "Bearish" : "Neutral") : "Pending");
   const catalysts = (data?.upcoming_catalysts || data?.catalysts || []).slice(0, 5);
 
+  if (empty) {
+    // An empty catalyst feed is common; a one-line strip keeps it from pushing real content below the fold.
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-sm border border-terminal-border bg-terminal-bg/70 px-3 py-2">
+        <div className="min-w-0 text-xs">
+          <span className="ot-type-panel-title uppercase tracking-[0.14em] text-terminal-accent">AI Catalyst Conviction</span>
+          <span className="ml-3 text-terminal-muted">No catalyst notes ingested for {symbol} yet.</span>
+        </div>
+        {onOpenScreener ? (
+          <button
+            type="button"
+            onClick={onOpenScreener}
+            className="rounded-sm border border-terminal-border px-2 py-0.5 text-[11px] text-terminal-muted transition-colors duration-150 hover:border-terminal-accent hover:text-terminal-accent focus-visible:outline focus-visible:outline-1 focus-visible:outline-terminal-accent"
+          >
+            Open screener
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-sm border border-terminal-border bg-terminal-bg/70 p-3">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

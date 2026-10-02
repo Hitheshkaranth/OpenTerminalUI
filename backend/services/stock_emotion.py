@@ -229,7 +229,7 @@ async def _analyze_batch(
         LLMMessage(role="user", content=_build_batch_prompt(ticker, numbered)),
     ]
     max_tokens = min(3000, 120 * len(articles) + 256)
-    result = await provider.complete(messages, temperature=0.2, max_tokens=max_tokens)
+    result = await provider.complete(messages, temperature=0.2, max_tokens=max_tokens, disable_thinking=True)
     parsed = parse_json_response(result.content or "")
     analyses = parsed.get("analyses")
     if not isinstance(analyses, list):

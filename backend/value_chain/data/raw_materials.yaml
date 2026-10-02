@@ -1,0 +1,108 @@
+# Raw-material commodity mapping by industry / sector.
+#
+# Each entry names a key input to an industry plus its Yahoo-commodity-futures
+# proxy (`commodity_symbol`, e.g. CL=F for crude oil). `null` means no liquid
+# futures proxy exists for that input (e.g. pharmaceutical intermediates, cement,
+# rubber) and consumers must render it as "—" rather than a fabricated price.
+#
+# `industries` lists the industry labels this material feeds. Matching against a
+# company's snapshot sector/industry is done case-insensitively on any label.
+
+raw_materials:
+  # --- Base & specialty metals ---
+  - name: Iron Ore
+    commodity_symbol: TIO=F
+    industries: [Steel]
+
+  - name: Hot-Rolled Steel Coil
+    commodity_symbol: HRC=F
+    industries: [Steel, Auto, Auto Components]
+
+  - name: Steel Slab
+    commodity_symbol: HRC=F
+    industries: [Steel, Auto Components]
+
+  - name: Aluminium
+    commodity_symbol: ALI=F
+    industries: [Auto, Auto Components, Cables & Wires, Consumer Electronics, Packaging, Paints]
+
+  - name: Copper
+    commodity_symbol: HG=F
+    industries: [Cables & Wires, Consumer Electronics, Auto, Auto Components]
+
+  - name: Gold
+    commodity_symbol: GC=F
+    industries: [Jewellery]
+
+  - name: Silver
+    commodity_symbol: SI=F
+    industries: [Jewellery]
+
+  # --- Softs & agriculture-linked inputs ---
+  - name: Cotton
+    commodity_symbol: CT=F
+    industries: [Textiles]
+
+  - name: Soybean
+    commodity_symbol: ZS=F
+    industries: [FMCG]
+
+  - name: Corn
+    commodity_symbol: ZC=F
+    industries: [FMCG]
+
+  - name: Coffee
+    commodity_symbol: KC=F
+    industries: [FMCG]
+
+  - name: Sugar
+    commodity_symbol: SB=F
+    industries: [Sugar]
+
+  # --- Fuels & feedstock ---
+  # Brent rather than WTI: the Indian crude basket tracks Brent/Dubai.
+  - name: Crude Oil (Brent)
+    commodity_symbol: BZ=F
+    industries: [Oil & Gas, Chemicals, Paints, Tyres, Packaging, Airlines]
+
+  - name: Natural Gas
+    commodity_symbol: NG=F
+    industries: [Oil & Gas, Chemicals, Fertilizers, Power]
+
+  # ULSD / heating-oil futures are the liquid proxy for diesel and jet fuel.
+  - name: Diesel / Jet Fuel
+    commodity_symbol: HO=F
+    industries: [Airlines]
+
+  # --- Industries with no liquid futures proxy (rendered as "—") ---
+  - name: Thermal Coal
+    commodity_symbol: null
+    industries: [Power, Cement, Steel]
+
+  - name: Cement Clinker
+    commodity_symbol: null
+    industries: [Cement]
+
+  - name: Natural Rubber
+    commodity_symbol: null
+    industries: [Tyres, Auto, Auto Components]
+
+  - name: Pharmaceutical Intermediates
+    commodity_symbol: null
+    industries: [Pharmaceuticals]
+
+  - name: Semiconductor Quartz / Polysilicon
+    commodity_symbol: null
+    industries: [Semiconductors]
+
+  - name: Paint Resins & Solvents
+    commodity_symbol: null
+    industries: [Paints]
+
+  - name: Paper & Pulp
+    commodity_symbol: null
+    industries: [Packaging]
+
+  - name: Phosphate Rock
+    commodity_symbol: null
+    industries: [Fertilizers]

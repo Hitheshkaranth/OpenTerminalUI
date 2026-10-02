@@ -1,0 +1,438 @@
+# Curated thematic (niche) indices. Equal-weight buy-and-hold, built at runtime from daily closes.
+# Every IN symbol is validated against data/nse_equity_symbols_all.txt and every US ticker against live Yahoo
+# data by backend/tests/test_thematic_indices.py — the first draft of this file contained ~40 non-existent
+# or wrong symbols (e.g. SBI for SBIN, invented tickers), so keep that test green when editing.
+
+themes:
+- id: defence
+  market: IN
+  name: Defence
+  description: 'Indian defence manufacturers and suppliers: aircraft, warships, missiles, defence electronics and simulation.'
+  benchmark: ^NSEI
+  constituents:
+  - symbol: HAL
+    name: Hindustan Aeronautics
+  - symbol: BEL
+    name: Bharat Electronics
+  - symbol: BDL
+    name: Bharat Dynamics
+  - symbol: MAZDOCK
+    name: Mazagon Dock Shipbuilders
+  - symbol: COCHINSHIP
+    name: Cochin Shipyard
+  - symbol: GRSE
+    name: Garden Reach Shipbuilders
+  - symbol: BEML
+    name: BEML
+  - symbol: DATAPATTNS
+    name: Data Patterns
+  - symbol: MIDHANI
+    name: Mishra Dhatu Nigam
+  - symbol: ZENTEC
+    name: Zen Technologies
+  - symbol: PARAS
+    name: Paras Defence
+  - symbol: ASTRAMICRO
+    name: Astra Microwave
+  - symbol: SOLARINDS
+    name: Solar Industries
+- id: railways
+  market: IN
+  name: Railways
+  description: Rolling stock, rail infrastructure EPC, rail financing and rail services.
+  benchmark: ^NSEI
+  constituents:
+  - symbol: IRFC
+    name: Indian Railway Finance Corp
+  - symbol: RVNL
+    name: Rail Vikas Nigam
+  - symbol: IRCON
+    name: IRCON International
+  - symbol: RAILTEL
+    name: RailTel Corp
+  - symbol: IRCTC
+    name: IRCTC
+  - symbol: TITAGARH
+    name: Titagarh Rail Systems
+  - symbol: JWL
+    name: Jupiter Wagons
+  - symbol: TEXRAIL
+    name: Texmaco Rail
+  - symbol: RITES
+    name: RITES
+- id: electronics-manufacturing
+  market: IN
+  name: EMS / Electronics Mfg
+  description: Electronics manufacturing services and component makers benefiting from PLI and supply-chain shifts.
+  benchmark: ^NSEI
+  constituents:
+  - symbol: DIXON
+    name: Dixon Technologies
+  - symbol: KAYNES
+    name: Kaynes Technology
+  - symbol: SYRMA
+    name: Syrma SGS
+  - symbol: AMBER
+    name: Amber Enterprises
+  - symbol: AVALON
+    name: Avalon Technologies
+  - symbol: CYIENTDLM
+    name: Cyient DLM
+  - symbol: PGEL
+    name: PG Electroplast
+- id: cdmo-crams
+  market: IN
+  name: CDMO & CRAMS
+  description: Contract development, manufacturing and research services for global pharma.
+  benchmark: ^NSEI
+  constituents:
+  - symbol: DIVISLAB
+    name: Divi's Laboratories
+  - symbol: SYNGENE
+    name: Syngene International
+  - symbol: LAURUSLABS
+    name: Laurus Labs
+  - symbol: PPLPHARMA
+    name: Piramal Pharma
+  - symbol: NEULANDLAB
+    name: Neuland Laboratories
+  - symbol: GLAND
+    name: Gland Pharma
+  - symbol: COHANCE
+    name: Cohance Lifesciences
+- id: ev-auto-tech
+  market: IN
+  name: EV & Auto Tech
+  description: Electric-vehicle makers, batteries and auto-tech component suppliers.
+  benchmark: ^NSEI
+  constituents:
+  - symbol: TMPV
+    name: Tata Motors Passenger Vehicles
+  - symbol: M&M
+    name: Mahindra & Mahindra
+  - symbol: SONACOMS
+    name: Sona BLW Precision
+  - symbol: UNOMINDA
+    name: Uno Minda
+  - symbol: EXIDEIND
+    name: Exide Industries
+  - symbol: ARE&M
+    name: Amara Raja Energy & Mobility
+  - symbol: OLAELEC
+    name: Ola Electric
+  - symbol: BOSCHLTD
+    name: Bosch
+  - symbol: TVSMOTOR
+    name: TVS Motor
+- id: renewables
+  market: IN
+  name: Renewables
+  description: Solar, wind, green-power generation, module makers and green financing.
+  benchmark: ^NSEI
+  constituents:
+  - symbol: ADANIGREEN
+    name: Adani Green Energy
+  - symbol: NTPCGREEN
+    name: NTPC Green Energy
+  - symbol: SUZLON
+    name: Suzlon Energy
+  - symbol: INOXWIND
+    name: Inox Wind
+  - symbol: WAAREEENER
+    name: Waaree Energies
+  - symbol: PREMIERENE
+    name: Premier Energies
+  - symbol: TATAPOWER
+    name: Tata Power
+  - symbol: JSWENERGY
+    name: JSW Energy
+  - symbol: KPIGREEN
+    name: KPI Green Energy
+  - symbol: IREDA
+    name: IREDA
+- id: capital-goods
+  market: IN
+  name: Capital Goods
+  description: Engineering, power equipment and infrastructure EPC majors.
+  benchmark: ^NSEI
+  constituents:
+  - symbol: LT
+    name: Larsen & Toubro
+  - symbol: SIEMENS
+    name: Siemens
+  - symbol: ABB
+    name: ABB India
+  - symbol: CGPOWER
+    name: CG Power
+  - symbol: BHEL
+    name: BHEL
+  - symbol: THERMAX
+    name: Thermax
+  - symbol: CUMMINSIND
+    name: Cummins India
+  - symbol: KEC
+    name: KEC International
+  - symbol: KPIL
+    name: Kalpataru Projects
+- id: specialty-chemicals
+  market: IN
+  name: Specialty Chemicals
+  description: Fluorochemicals, intermediates, adhesives and performance chemicals.
+  benchmark: ^NSEI
+  constituents:
+  - symbol: PIDILITIND
+    name: Pidilite Industries
+  - symbol: SRF
+    name: SRF
+  - symbol: AARTIIND
+    name: Aarti Industries
+  - symbol: DEEPAKNTR
+    name: Deepak Nitrite
+  - symbol: NAVINFLUOR
+    name: Navin Fluorine
+  - symbol: CLEAN
+    name: Clean Science
+  - symbol: VINATIORGA
+    name: Vinati Organics
+  - symbol: ATUL
+    name: Atul
+  - symbol: FINEORG
+    name: Fine Organic
+- id: housing-finance
+  market: IN
+  name: Housing Finance
+  description: Housing finance companies across prime and affordable segments.
+  benchmark: ^NSEI
+  constituents:
+  - symbol: LICHSGFIN
+    name: LIC Housing Finance
+  - symbol: PNBHOUSING
+    name: PNB Housing Finance
+  - symbol: AAVAS
+    name: Aavas Financiers
+  - symbol: HOMEFIRST
+    name: Home First Finance
+  - symbol: CANFINHOME
+    name: Can Fin Homes
+  - symbol: APTUS
+    name: Aptus Value Housing
+  - symbol: BAJAJHFL
+    name: Bajaj Housing Finance
+  - symbol: AADHARHFC
+    name: Aadhar Housing Finance
+- id: hospitals
+  market: IN
+  name: Hospitals
+  description: Listed hospital chains.
+  benchmark: ^NSEI
+  constituents:
+  - symbol: APOLLOHOSP
+    name: Apollo Hospitals
+  - symbol: MAXHEALTH
+    name: Max Healthcare
+  - symbol: FORTIS
+    name: Fortis Healthcare
+  - symbol: NH
+    name: Narayana Hrudayalaya
+  - symbol: MEDANTA
+    name: Global Health (Medanta)
+  - symbol: KIMS
+    name: KIMS
+  - symbol: RAINBOW
+    name: Rainbow Children's Medicare
+  - symbol: ASTERDM
+    name: Aster DM Healthcare
+  - symbol: JLHL
+    name: Jupiter Life Line Hospitals
+- id: digital-platforms
+  market: IN
+  name: Digital Platforms
+  description: Consumer internet, marketplaces and fintech platforms.
+  benchmark: ^NSEI
+  constituents:
+  - symbol: ETERNAL
+    name: Eternal (Zomato)
+  - symbol: NYKAA
+    name: FSN E-Commerce (Nykaa)
+  - symbol: PAYTM
+    name: One97 Communications (Paytm)
+  - symbol: POLICYBZR
+    name: PB Fintech (Policybazaar)
+  - symbol: NAUKRI
+    name: Info Edge
+  - symbol: SWIGGY
+    name: Swiggy
+  - symbol: IXIGO
+    name: Le Travenues (ixigo)
+  - symbol: CARTRADE
+    name: CarTrade Tech
+  - symbol: INDIAMART
+    name: IndiaMART InterMESH
+  - symbol: JUSTDIAL
+    name: Just Dial
+- id: psu-banks
+  market: IN
+  name: PSU Banks
+  description: Public-sector banks.
+  benchmark: ^NSEI
+  constituents:
+  - symbol: SBIN
+    name: State Bank of India
+  - symbol: BANKBARODA
+    name: Bank of Baroda
+  - symbol: PNB
+    name: Punjab National Bank
+  - symbol: CANBK
+    name: Canara Bank
+  - symbol: UNIONBANK
+    name: Union Bank of India
+  - symbol: INDIANB
+    name: Indian Bank
+  - symbol: BANKINDIA
+    name: Bank of India
+  - symbol: CENTRALBK
+    name: Central Bank of India
+  - symbol: UCOBANK
+    name: UCO Bank
+  - symbol: MAHABANK
+    name: Bank of Maharashtra
+  - symbol: IOB
+    name: Indian Overseas Bank
+  - symbol: PSB
+    name: Punjab & Sind Bank
+- id: ai-semiconductors
+  market: US
+  name: AI Semiconductors
+  description: GPUs, custom AI accelerators, memory, foundry and lithography behind AI compute.
+  benchmark: SPY
+  constituents:
+  - symbol: NVDA
+    name: NVIDIA
+  - symbol: AVGO
+    name: Broadcom
+  - symbol: AMD
+    name: Advanced Micro Devices
+  - symbol: TSM
+    name: TSMC (ADR)
+  - symbol: MRVL
+    name: Marvell Technology
+  - symbol: MU
+    name: Micron Technology
+  - symbol: ARM
+    name: Arm Holdings (ADR)
+  - symbol: QCOM
+    name: Qualcomm
+  - symbol: ASML
+    name: ASML (ADR)
+- id: cybersecurity
+  market: US
+  name: Cybersecurity
+  description: Endpoint, network, cloud and identity security vendors.
+  benchmark: SPY
+  constituents:
+  - symbol: CRWD
+    name: CrowdStrike
+  - symbol: PANW
+    name: Palo Alto Networks
+  - symbol: FTNT
+    name: Fortinet
+  - symbol: ZS
+    name: Zscaler
+  - symbol: OKTA
+    name: Okta
+  - symbol: S
+    name: SentinelOne
+  - symbol: NET
+    name: Cloudflare
+  - symbol: QLYS
+    name: Qualys
+  - symbol: TENB
+    name: Tenable
+- id: glp1-obesity
+  market: US
+  name: GLP-1 & Obesity
+  description: Makers of approved GLP-1 / incretin drugs and clinical-stage obesity developers.
+  benchmark: SPY
+  constituents:
+  - symbol: LLY
+    name: Eli Lilly
+  - symbol: NVO
+    name: Novo Nordisk (ADR)
+  - symbol: VKTX
+    name: Viking Therapeutics
+  - symbol: AMGN
+    name: Amgen
+  - symbol: ALT
+    name: Altimmune
+  - symbol: RYTM
+    name: Rhythm Pharmaceuticals
+- id: cloud-software
+  market: US
+  name: Cloud Software
+  description: Enterprise SaaS and cloud data / infrastructure software.
+  benchmark: SPY
+  constituents:
+  - symbol: CRM
+    name: Salesforce
+  - symbol: NOW
+    name: ServiceNow
+  - symbol: SNOW
+    name: Snowflake
+  - symbol: MSFT
+    name: Microsoft
+  - symbol: DDOG
+    name: Datadog
+  - symbol: MDB
+    name: MongoDB
+  - symbol: WDAY
+    name: Workday
+  - symbol: ADBE
+    name: Adobe
+  - symbol: TEAM
+    name: Atlassian
+- id: nuclear-uranium
+  market: US
+  name: Nuclear & Uranium
+  description: Uranium miners, fuel, reactor technology and nuclear-heavy utilities.
+  benchmark: SPY
+  constituents:
+  - symbol: CCJ
+    name: Cameco
+  - symbol: UEC
+    name: Uranium Energy
+  - symbol: BWXT
+    name: BWX Technologies
+  - symbol: CEG
+    name: Constellation Energy
+  - symbol: VST
+    name: Vistra
+  - symbol: NNE
+    name: Nano Nuclear Energy
+  - symbol: OKLO
+    name: Oklo
+  - symbol: LEU
+    name: Centrus Energy
+  - symbol: SMR
+    name: NuScale Power
+  - symbol: NXE
+    name: NexGen Energy
+- id: space
+  market: US
+  name: Space
+  description: Launch, satellite communications, imaging and space defence.
+  benchmark: SPY
+  constituents:
+  - symbol: RKLB
+    name: Rocket Lab
+  - symbol: ASTS
+    name: AST SpaceMobile
+  - symbol: LMT
+    name: Lockheed Martin
+  - symbol: NOC
+    name: Northrop Grumman
+  - symbol: IRDM
+    name: Iridium Communications
+  - symbol: PL
+    name: Planet Labs
+  - symbol: LUNR
+    name: Intuitive Machines

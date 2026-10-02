@@ -22,6 +22,9 @@ _test_db_url = os.environ.get("OT_TEST_DATABASE_URL") or (
 )
 os.environ["DATABASE_URL"] = _test_db_url
 os.environ["OPENTERMINALUI_SQLITE_URL"] = _test_db_url
+# Same for the persistent cache (and never a shared Redis): fake test data must not reach the app.
+os.environ["OPENTERMINALUI_CACHE_DB"] = str(Path(_tempfile.mkdtemp(prefix="ot-pytest-cache-")) / "cache.db")
+os.environ.pop("REDIS_URL", None)
 
 
 # Ensure `import backend...` works even when pytest is launched from `backend/`.
@@ -29,6 +32,19 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 repo_root_str = str(REPO_ROOT)
 if repo_root_str not in sys.path:
     sys.path.insert(0, repo_root_str)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _test_db_schema():
+    """Create the schema on the throwaway test DB, as app startup does.
+
+    Without this, tests that hit real routes (e.g. login → users table) only passed when an
+    earlier test happened to create the tables, so they failed when run on their own.
+    """
+    from backend.shared.db import init_db
+
+    init_db()
+    yield
 
 
 @pytest.fixture

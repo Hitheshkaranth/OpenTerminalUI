@@ -12,6 +12,8 @@ import {
   YAxis,
 } from "recharts";
 
+import { LinkedCompanies } from "../components/commodities/LinkedCompanies";
+import { PriceOverviewChart } from "../components/security/PriceOverviewChart";
 import { SparklineCell } from "../components/home/SparklineCell";
 import { TerminalBadge } from "../components/terminal/TerminalBadge";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
@@ -40,6 +42,8 @@ type FuturesCurvePoint = {
   expiry: string;
   price: number;
   change_pct?: number;
+  // "projected" = interpolated by the backend because no quote exists for that month.
+  source?: string;
 };
 
 type SeasonalPoint = {
@@ -199,6 +203,18 @@ function buildFallbackCurve(symbol: string): FuturesCurvePoint[] {
   }));
 }
 
+// " · Backwardation (-9.4% front → back)" so the curve's meaning is stated, not left to the eye.
+function curveShapeLabel(points: FuturesCurvePoint[]): string {
+  const quoted = points.filter((p) => p.price > 0);
+  if (quoted.length < 2) return "";
+  const front = quoted[0].price;
+  const back = quoted[quoted.length - 1].price;
+  const spreadPct = ((back - front) / front) * 100;
+  if (Math.abs(spreadPct) < 0.5) return " · Flat";
+  const projected = points.some((p) => p.source === "projected") ? " · hollow points interpolated" : "";
+  return ` · ${spreadPct < 0 ? "Backwardation" : "Contango"} (${spreadPct >= 0 ? "+" : ""}${spreadPct.toFixed(1)}% front → back)${projected}`;
+}
+
 function normalizeCurve(payload: unknown, symbol: string): FuturesCurvePoint[] {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return buildFallbackCurve(symbol);
   const raw = payload as Record<string, unknown>;
@@ -219,6 +235,7 @@ function normalizeCurve(payload: unknown, symbol: string): FuturesCurvePoint[] {
         contract,
         expiry: String(row.expiry || row.contract || ""),
         price: toFiniteNumber(row.price ?? row.last),
+        source: row.source ? String(row.source) : undefined,
       };
       if (row.change_pct != null || row.changePct != null) {
         normalizedPoint.change_pct = toFiniteNumber(row.change_pct ?? row.changePct);
@@ -454,7 +471,7 @@ export function CommoditiesPage() {
                 : "Futures curve or seasonality is unavailable — those panels show seeded sample values, not market data."}
             </div>
           ) : null}
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
             <div className="rounded border border-terminal-border bg-terminal-panel/50">
               <div className="flex items-center justify-between border-b border-terminal-border px-3 py-2">
                 <div>
@@ -473,13 +490,17 @@ export function CommoditiesPage() {
                       <th className="px-3 py-2 text-right">Last</th>
                       <th className="px-3 py-2 text-right">Chg</th>
                       <th className="px-3 py-2 text-right">Chg%</th>
+                      <th className="px-3 py-2 text-right">1M</th>
                       <th className="px-3 py-2 text-right">Volume</th>
-                      <th className="px-3 py-2 text-left">Trend</th>
+                      <th className="px-3 py-2 text-left">1M trend</th>
                     </tr>
                   </thead>
                   <tbody>
                     {activeCategory.items.map((item) => {
                       const selected = item.symbol === selectedCommodity?.symbol;
+                      const spark = item.sparkline ?? [];
+                      // Needs real history: a two-point (prev close, last) line is not a monthly trend.
+                      const monthPct = spark.length >= 5 && spark[0] > 0 ? (spark[spark.length - 1] / spark[0] - 1) * 100 : null;
                       return (
                         <tr
                           key={item.symbol}
@@ -488,7 +509,7 @@ export function CommoditiesPage() {
                           }`}
                           onClick={() => setSelectedSymbol(item.symbol)}
                         >
-                          <td className="px-3 py-2">
+                          <td className="px-3 py-1.5">
                             <div className="font-medium text-terminal-text">{item.symbol}</div>
                             <div className="text-[11px] text-terminal-muted">{item.name}</div>
                           </td>
@@ -499,15 +520,24 @@ export function CommoditiesPage() {
                           <td className={`px-3 py-2 text-right ot-type-data ${item.change_pct >= 0 ? "text-terminal-pos" : "text-terminal-neg"}`}>
                             {formatSignedPercent(item.change_pct)}
                           </td>
-                          <td className="px-3 py-2 text-right ot-type-data text-terminal-muted">{formatCompactNumber(item.volume)}</td>
-                          <td className="px-3 py-2">
-                            <SparklineCell
-                              points={item.sparkline}
-                              width={120}
-                              height={30}
-                              ariaLabel={`${item.symbol} sparkline`}
-                              className="min-w-[120px]"
-                            />
+                          <td className={`px-3 py-1.5 text-right ot-type-data ${monthPct == null ? "text-terminal-muted" : monthPct >= 0 ? "text-terminal-pos" : "text-terminal-neg"}`}>
+                            {monthPct == null ? "\u2014" : formatSignedPercent(monthPct)}
+                          </td>
+                          <td className="px-3 py-1.5 text-right ot-type-data text-terminal-muted">{formatCompactNumber(item.volume)}</td>
+                          <td className="px-3 py-1.5">
+                            {spark.length >= 5 ? (
+                              <SparklineCell
+                                points={spark}
+                                width={120}
+                                height={28}
+                                color={monthPct != null && monthPct < 0 ? "var(--ot-color-market-down)" : "var(--ot-color-market-up)"}
+                                areaColor="transparent"
+                                ariaLabel={`${item.symbol} last month of daily closes`}
+                                className="!min-h-0 w-[120px] [&_svg]:!h-7 [&_svg]:!min-h-0"
+                              />
+                            ) : (
+                              <span className="text-[11px] text-terminal-muted">No history</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -533,30 +563,31 @@ export function CommoditiesPage() {
                 }
               >
                 {selectedCommodity ? (
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="rounded border border-terminal-border bg-terminal-bg/40 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-[0.16em] text-terminal-muted">Last</div>
-                      <div className="mt-1 ot-type-data text-lg text-terminal-text">
-                        {selectedCommodity.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                  <div className="space-y-3">
+                    <dl className="grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
+                      <div>
+                        <dt className="ot-type-label text-terminal-muted">Last</dt>
+                        <dd className="ot-type-data text-base text-terminal-text">{selectedCommodity.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}</dd>
                       </div>
-                    </div>
-                    <div className="rounded border border-terminal-border bg-terminal-bg/40 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-[0.16em] text-terminal-muted">Daily Move</div>
-                      <div className={`mt-1 ot-type-data text-lg ${selectedCommodity.change_pct >= 0 ? "text-terminal-pos" : "text-terminal-neg"}`}>
-                        {formatSignedPercent(selectedCommodity.change_pct)}
+                      <div>
+                        <dt className="ot-type-label text-terminal-muted">Day</dt>
+                        <dd className={`ot-type-data text-base ${selectedCommodity.change_pct >= 0 ? "text-terminal-pos" : "text-terminal-neg"}`}>
+                          {selectedCommodity.change >= 0 ? "+" : ""}{selectedCommodity.change.toFixed(2)} ({formatSignedPercent(selectedCommodity.change_pct)})
+                        </dd>
                       </div>
-                    </div>
-                    <div className="rounded border border-terminal-border bg-terminal-bg/40 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-[0.16em] text-terminal-muted">Volume</div>
-                      <div className="mt-1 ot-type-data text-lg text-terminal-text">{formatCompactNumber(selectedCommodity.volume)}</div>
-                    </div>
+                      <div>
+                        <dt className="ot-type-label text-terminal-muted">Volume</dt>
+                        <dd className="ot-type-data text-base text-terminal-text">{formatCompactNumber(selectedCommodity.volume)}</dd>
+                      </div>
+                    </dl>
+                    <PriceOverviewChart key={selectedCommodity.symbol} symbol={selectedCommodity.symbol} height={190} />
                   </div>
                 ) : null}
               </TerminalPanel>
 
               <TerminalPanel
                 title="Term Structure"
-                subtitle={selectedCommodity ? `${selectedCommodity.symbol} futures curve` : "Select a contract"}
+                subtitle={selectedCommodity ? `${selectedCommodity.symbol} futures curve${curveShapeLabel(curvePoints)}` : "Select a contract"}
                 actions={detailsLoading ? <TerminalBadge variant="info" dot>Updating</TerminalBadge> : null}
                 bodyClassName="h-[260px]"
               >
@@ -569,7 +600,28 @@ export function CommoditiesPage() {
                       contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", fontSize: "11px" }}
                       formatter={(value) => formatChartTooltipValue(value, "Price")}
                     />
-                    <Line type="monotone" dataKey="price" stroke="var(--ot-color-accent-primary)" strokeWidth={2.2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                    <Line
+                      type="monotone"
+                      dataKey="price"
+                      stroke="var(--ot-color-accent-primary)"
+                      strokeWidth={2}
+                      activeDot={{ r: 5 }}
+                      // Interpolated months are drawn hollow so they never read as quoted prices.
+                      dot={(props: { cx?: number; cy?: number; index?: number }) => {
+                        const projected = curvePoints[props.index ?? -1]?.source === "projected";
+                        return (
+                          <circle
+                            key={`dot-${props.index}`}
+                            cx={props.cx}
+                            cy={props.cy}
+                            r={3}
+                            stroke="var(--ot-color-accent-primary)"
+                            strokeWidth={1.5}
+                            fill={projected ? "var(--ot-color-surface-1)" : "var(--ot-color-accent-primary)"}
+                          />
+                        );
+                      }}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </TerminalPanel>
@@ -577,6 +629,8 @@ export function CommoditiesPage() {
           </div>
         </div>
       </TerminalPanel>
+
+      {selectedCommodity ? <LinkedCompanies commoditySymbol={selectedCommodity.symbol} /> : null}
 
       <TerminalPanel
         title="Seasonality"

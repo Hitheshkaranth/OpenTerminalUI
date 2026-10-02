@@ -1,0 +1,611 @@
+# Curated commodity -> linked companies (rewritten by QC; the first draft mislabelled TIO=F (iron ore) as titanium
+# dioxide, mixed up tickers (AAL = American Airlines, not Anglo American) and listed Indian OMCs as helped by crude).
+#   input_cost   : the company buys it -> a price rise HURTS it
+#   output_price : the company sells/produces it -> a price rise HELPS it
+# Every IN symbol is validated against data/nse_equity_symbols_all.txt by backend/tests/test_raw_material_links.py.
+
+commodities:
+- commodity_symbol: CL=F
+  name: WTI Crude Oil
+  impact_note: Rising crude lifts upstream producers; it raises input costs for paints, tyres, petrochemicals and airlines, and squeezes
+    Indian oil marketing companies whose pump prices are held down.
+  input_cost:
+  - symbol: ASIANPAINT
+    name: Asian Paints
+    market: IN
+    sensitivity: medium
+    industry: Paints
+  - symbol: BERGEPAINT
+    name: Berger Paints
+    market: IN
+    sensitivity: medium
+    industry: Paints
+  - symbol: PIDILITIND
+    name: Pidilite Industries
+    market: IN
+    sensitivity: medium
+    industry: Adhesives
+  - symbol: MRF
+    name: MRF
+    market: IN
+    sensitivity: medium
+    industry: Tyres
+  - symbol: APOLLOTYRE
+    name: Apollo Tyres
+    market: IN
+    sensitivity: medium
+    industry: Tyres
+  - symbol: INDIGO
+    name: InterGlobe Aviation
+    market: IN
+    sensitivity: high
+    industry: Airlines
+  - symbol: IOC
+    name: Indian Oil Corporation
+    market: IN
+    sensitivity: medium
+    industry: Oil marketing
+  - symbol: BPCL
+    name: Bharat Petroleum
+    market: IN
+    sensitivity: medium
+    industry: Oil marketing
+  - symbol: HINDPETRO
+    name: Hindustan Petroleum
+    market: IN
+    sensitivity: medium
+    industry: Oil marketing
+  - symbol: DAL
+    name: Delta Air Lines
+    market: US
+    sensitivity: high
+    industry: Airlines
+  - symbol: UAL
+    name: United Airlines
+    market: US
+    sensitivity: high
+    industry: Airlines
+  - symbol: LYB
+    name: LyondellBasell
+    market: US
+    sensitivity: medium
+    industry: Petrochemicals
+  output_price:
+  - symbol: ONGC
+    name: Oil & Natural Gas Corp
+    market: IN
+    sensitivity: high
+    industry: Upstream oil & gas
+  - symbol: OIL
+    name: Oil India
+    market: IN
+    sensitivity: high
+    industry: Upstream oil & gas
+  - symbol: XOM
+    name: Exxon Mobil
+    market: US
+    sensitivity: high
+    industry: Integrated oil
+  - symbol: CVX
+    name: Chevron
+    market: US
+    sensitivity: high
+    industry: Integrated oil
+  - symbol: COP
+    name: ConocoPhillips
+    market: US
+    sensitivity: high
+    industry: Upstream oil & gas
+  - symbol: OXY
+    name: Occidental Petroleum
+    market: US
+    sensitivity: high
+    industry: Upstream oil & gas
+  - symbol: EOG
+    name: EOG Resources
+    market: US
+    sensitivity: high
+    industry: Upstream oil & gas
+- commodity_symbol: NG=F
+  name: Natural Gas (Henry Hub)
+  impact_note: US gas prices drive margins of gas producers and costs for nitrogen-fertiliser makers; Indian city-gas distributors import
+    LNG, whose prices move with global gas.
+  input_cost:
+  - symbol: CF
+    name: CF Industries
+    market: US
+    sensitivity: high
+    industry: Fertilisers
+  - symbol: GUJGASLTD
+    name: Gujarat Gas
+    market: IN
+    sensitivity: medium
+    industry: City gas distribution
+  - symbol: IGL
+    name: Indraprastha Gas
+    market: IN
+    sensitivity: medium
+    industry: City gas distribution
+  - symbol: MGL
+    name: Mahanagar Gas
+    market: IN
+    sensitivity: medium
+    industry: City gas distribution
+  - symbol: CHAMBLFERT
+    name: Chambal Fertilisers
+    market: IN
+    sensitivity: low
+    industry: Fertilisers
+  output_price:
+  - symbol: EQT
+    name: EQT Corp
+    market: US
+    sensitivity: high
+    industry: Gas producer
+  - symbol: EXE
+    name: Expand Energy
+    market: US
+    sensitivity: high
+    industry: Gas producer
+  - symbol: LNG
+    name: Cheniere Energy
+    market: US
+    sensitivity: medium
+    industry: LNG exporter
+- commodity_symbol: HG=F
+  name: Copper
+  impact_note: Copper is the main input for cables, wires and electricals; miners and smelters gain when it rises.
+  input_cost:
+  - symbol: POLYCAB
+    name: Polycab India
+    market: IN
+    sensitivity: medium
+    industry: Cables & wires
+  - symbol: KEI
+    name: KEI Industries
+    market: IN
+    sensitivity: medium
+    industry: Cables & wires
+  - symbol: HAVELLS
+    name: Havells India
+    market: IN
+    sensitivity: medium
+    industry: Electricals
+  - symbol: FINCABLES
+    name: Finolex Cables
+    market: IN
+    sensitivity: medium
+    industry: Cables & wires
+  output_price:
+  - symbol: HINDCOPPER
+    name: Hindustan Copper
+    market: IN
+    sensitivity: high
+    industry: Copper mining
+  - symbol: VEDL
+    name: Vedanta
+    market: IN
+    sensitivity: medium
+    industry: Diversified metals
+  - symbol: HINDALCO
+    name: Hindalco Industries
+    market: IN
+    sensitivity: medium
+    industry: Aluminium & copper
+  - symbol: FCX
+    name: Freeport-McMoRan
+    market: US
+    sensitivity: high
+    industry: Copper mining
+  - symbol: SCCO
+    name: Southern Copper
+    market: US
+    sensitivity: high
+    industry: Copper mining
+  - symbol: BHP
+    name: BHP Group (ADR)
+    market: US
+    sensitivity: medium
+    industry: Diversified mining
+- commodity_symbol: ALI=F
+  name: Aluminium
+  impact_note: Aluminium producers gain from higher prices; can makers and other heavy users face higher costs.
+  input_cost:
+  - symbol: BALL
+    name: Ball Corp
+    market: US
+    sensitivity: medium
+    industry: Packaging (cans)
+  - symbol: CCK
+    name: Crown Holdings
+    market: US
+    sensitivity: medium
+    industry: Packaging (cans)
+  output_price:
+  - symbol: HINDALCO
+    name: Hindalco Industries
+    market: IN
+    sensitivity: high
+    industry: Aluminium
+  - symbol: NATIONALUM
+    name: National Aluminium
+    market: IN
+    sensitivity: high
+    industry: Aluminium
+  - symbol: VEDL
+    name: Vedanta
+    market: IN
+    sensitivity: high
+    industry: Diversified metals
+  - symbol: AA
+    name: Alcoa
+    market: US
+    sensitivity: high
+    industry: Aluminium
+  - symbol: CENX
+    name: Century Aluminum
+    market: US
+    sensitivity: high
+    industry: Aluminium
+- commodity_symbol: GC=F
+  name: Gold
+  impact_note: Jewellers carry gold inventory and face demand elasticity; miners and royalty companies gain; gold-loan NBFCs benefit
+    as collateral values rise.
+  input_cost:
+  - symbol: TITAN
+    name: Titan Company
+    market: IN
+    sensitivity: medium
+    industry: Jewellery
+  - symbol: KALYANKJIL
+    name: Kalyan Jewellers
+    market: IN
+    sensitivity: medium
+    industry: Jewellery
+  - symbol: SENCO
+    name: Senco Gold
+    market: IN
+    sensitivity: medium
+    industry: Jewellery
+  - symbol: SIG
+    name: Signet Jewelers
+    market: US
+    sensitivity: low
+    industry: Jewellery
+  output_price:
+  - symbol: MUTHOOTFIN
+    name: Muthoot Finance
+    market: IN
+    sensitivity: medium
+    industry: Gold loans
+  - symbol: MANAPPURAM
+    name: Manappuram Finance
+    market: IN
+    sensitivity: medium
+    industry: Gold loans
+  - symbol: NEM
+    name: Newmont
+    market: US
+    sensitivity: high
+    industry: Gold mining
+  - symbol: B
+    name: Barrick Mining
+    market: US
+    sensitivity: high
+    industry: Gold mining
+  - symbol: AEM
+    name: Agnico Eagle Mines
+    market: US
+    sensitivity: high
+    industry: Gold mining
+  - symbol: KGC
+    name: Kinross Gold
+    market: US
+    sensitivity: high
+    industry: Gold mining
+  - symbol: FNV
+    name: Franco-Nevada
+    market: US
+    sensitivity: medium
+    industry: Royalties
+- commodity_symbol: SI=F
+  name: Silver
+  impact_note: Silver producers gain; Hindustan Zinc is among the world's largest silver producers.
+  input_cost: []
+  output_price:
+  - symbol: HINDZINC
+    name: Hindustan Zinc
+    market: IN
+    sensitivity: high
+    industry: Zinc & silver
+  - symbol: PAAS
+    name: Pan American Silver
+    market: US
+    sensitivity: high
+    industry: Silver mining
+  - symbol: HL
+    name: Hecla Mining
+    market: US
+    sensitivity: high
+    industry: Silver mining
+  - symbol: AG
+    name: First Majestic Silver
+    market: US
+    sensitivity: high
+    industry: Silver mining
+  - symbol: CDE
+    name: Coeur Mining
+    market: US
+    sensitivity: high
+    industry: Precious metals mining
+- commodity_symbol: HRC=F
+  name: Hot-Rolled Steel Coil
+  impact_note: Steelmakers gain from higher HRC prices; auto, machinery and equipment makers pay more for steel.
+  input_cost:
+  - symbol: MARUTI
+    name: Maruti Suzuki
+    market: IN
+    sensitivity: low
+    industry: Autos
+  - symbol: TMCV
+    name: Tata Motors (Commercial Vehicles)
+    market: IN
+    sensitivity: medium
+    industry: Commercial vehicles
+  - symbol: ASHOKLEY
+    name: Ashok Leyland
+    market: IN
+    sensitivity: medium
+    industry: Commercial vehicles
+  - symbol: GM
+    name: General Motors
+    market: US
+    sensitivity: medium
+    industry: Autos
+  - symbol: CAT
+    name: Caterpillar
+    market: US
+    sensitivity: medium
+    industry: Machinery
+  - symbol: DE
+    name: Deere & Company
+    market: US
+    sensitivity: medium
+    industry: Machinery
+  output_price:
+  - symbol: JSWSTEEL
+    name: JSW Steel
+    market: IN
+    sensitivity: high
+    industry: Steel
+  - symbol: TATASTEEL
+    name: Tata Steel
+    market: IN
+    sensitivity: high
+    industry: Steel
+  - symbol: JINDALSTEL
+    name: Jindal Steel
+    market: IN
+    sensitivity: high
+    industry: Steel
+  - symbol: SAIL
+    name: Steel Authority of India
+    market: IN
+    sensitivity: high
+    industry: Steel
+  - symbol: NUE
+    name: Nucor
+    market: US
+    sensitivity: high
+    industry: Steel
+  - symbol: STLD
+    name: Steel Dynamics
+    market: US
+    sensitivity: high
+    industry: Steel
+  - symbol: CLF
+    name: Cleveland-Cliffs
+    market: US
+    sensitivity: high
+    industry: Steel
+- commodity_symbol: TIO=F
+  name: Iron Ore (62% Fe)
+  impact_note: Iron-ore miners gain; steelmakers without captive mines pay more for ore.
+  input_cost:
+  - symbol: JSWSTEEL
+    name: JSW Steel
+    market: IN
+    sensitivity: medium
+    industry: Steel
+  output_price:
+  - symbol: NMDC
+    name: NMDC
+    market: IN
+    sensitivity: high
+    industry: Iron ore mining
+  - symbol: LLOYDSME
+    name: Lloyds Metals & Energy
+    market: IN
+    sensitivity: medium
+    industry: Iron ore & steel
+  - symbol: VALE
+    name: Vale (ADR)
+    market: US
+    sensitivity: high
+    industry: Iron ore mining
+  - symbol: RIO
+    name: Rio Tinto (ADR)
+    market: US
+    sensitivity: high
+    industry: Diversified mining
+  - symbol: BHP
+    name: BHP Group (ADR)
+    market: US
+    sensitivity: high
+    industry: Diversified mining
+- commodity_symbol: CT=F
+  name: Cotton
+  impact_note: Cotton is the core input for spinners, home textiles and apparel brands.
+  input_cost:
+  - symbol: KPRMILL
+    name: KPR Mill
+    market: IN
+    sensitivity: medium
+    industry: Textiles
+  - symbol: VTL
+    name: Vardhman Textiles
+    market: IN
+    sensitivity: medium
+    industry: Textiles
+  - symbol: TRIDENT
+    name: Trident
+    market: IN
+    sensitivity: medium
+    industry: Home textiles
+  - symbol: WELSPUNLIV
+    name: Welspun Living
+    market: IN
+    sensitivity: medium
+    industry: Home textiles
+  - symbol: ARVIND
+    name: Arvind
+    market: IN
+    sensitivity: medium
+    industry: Textiles
+  - symbol: PVH
+    name: PVH Corp
+    market: US
+    sensitivity: low
+    industry: Apparel
+  - symbol: RL
+    name: Ralph Lauren
+    market: US
+    sensitivity: low
+    industry: Apparel
+  - symbol: LEVI
+    name: Levi Strauss
+    market: US
+    sensitivity: low
+    industry: Apparel
+  output_price: []
+- commodity_symbol: SB=F
+  name: Sugar (Raw)
+  impact_note: Sugar mills gain from higher realisations (Indian prices are partly regulated); confectionery and biscuit makers pay
+    more.
+  input_cost:
+  - symbol: BRITANNIA
+    name: Britannia Industries
+    market: IN
+    sensitivity: medium
+    industry: Packaged foods
+  - symbol: NESTLEIND
+    name: Nestle India
+    market: IN
+    sensitivity: low
+    industry: Packaged foods
+  - symbol: MDLZ
+    name: Mondelez International
+    market: US
+    sensitivity: medium
+    industry: Confectionery
+  - symbol: HSY
+    name: Hershey
+    market: US
+    sensitivity: medium
+    industry: Confectionery
+  output_price:
+  - symbol: BALRAMCHIN
+    name: Balrampur Chini Mills
+    market: IN
+    sensitivity: high
+    industry: Sugar
+  - symbol: TRIVENI
+    name: Triveni Engineering
+    market: IN
+    sensitivity: high
+    industry: Sugar
+  - symbol: EIDPARRY
+    name: EID Parry
+    market: IN
+    sensitivity: medium
+    industry: Sugar
+  - symbol: RENUKA
+    name: Shree Renuka Sugars
+    market: IN
+    sensitivity: high
+    industry: Sugar
+- commodity_symbol: ZC=F
+  name: Corn
+  impact_note: Corn is the main feed grain; poultry producers' costs rise with it.
+  input_cost:
+  - symbol: VENKEYS
+    name: Venky's (India)
+    market: IN
+    sensitivity: medium
+    industry: Poultry & feed
+  - symbol: GODREJAGRO
+    name: Godrej Agrovet
+    market: IN
+    sensitivity: medium
+    industry: Animal feed
+  - symbol: TSN
+    name: Tyson Foods
+    market: US
+    sensitivity: medium
+    industry: Meat & poultry
+  - symbol: PPC
+    name: Pilgrim's Pride
+    market: US
+    sensitivity: medium
+    industry: Poultry
+  output_price: []
+- commodity_symbol: KC=F
+  name: Coffee (Arabica)
+  impact_note: Higher coffee prices raise costs for coffee chains and roasters.
+  input_cost:
+  - symbol: SBUX
+    name: Starbucks
+    market: US
+    sensitivity: medium
+    industry: Coffee chains
+  - symbol: KDP
+    name: Keurig Dr Pepper
+    market: US
+    sensitivity: medium
+    industry: Beverages
+  - symbol: TATACONSUM
+    name: Tata Consumer Products
+    market: IN
+    sensitivity: low
+    industry: Beverages
+  - symbol: NESTLEIND
+    name: Nestle India
+    market: IN
+    sensitivity: low
+    industry: Packaged foods
+  output_price: []
+- commodity_symbol: CC=F
+  name: Cocoa
+  impact_note: Cocoa is the key input for chocolate makers.
+  input_cost:
+  - symbol: HSY
+    name: Hershey
+    market: US
+    sensitivity: high
+    industry: Confectionery
+  - symbol: MDLZ
+    name: Mondelez International
+    market: US
+    sensitivity: medium
+    industry: Confectionery
+  - symbol: NESTLEIND
+    name: Nestle India
+    market: IN
+    sensitivity: low
+    industry: Packaged foods
+  - symbol: BRITANNIA
+    name: Britannia Industries
+    market: IN
+    sensitivity: low
+    industry: Packaged foods
+  output_price: []

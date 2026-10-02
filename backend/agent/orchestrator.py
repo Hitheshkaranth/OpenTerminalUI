@@ -131,6 +131,7 @@ class Orchestrator:
                 assistant: AssistantMessage | None = None
                 async for ev in complete_with_status(
                     self.provider, messages, tools=tool_defs, models=tool_models,
+                    max_tokens=settings.agent_max_tokens,
                 ):
                     if ev["type"] == "result":
                         assistant = ev["message"]
@@ -152,7 +153,15 @@ class Orchestrator:
                 if not tools_used:
                     yield events.final(original_answer)
                     return
-                messages.append(assistant)
+                # Don't feed the draft back: a conversation ending on the model's own finished answer
+                # made it reply "I've already answered your question" instead of the answer. Ending on
+                # the tool results lets the synthesis model write the answer from the evidence. It has no
+                # tools, so say so — otherwise it narrated "Let me pull the 1-year bars…" as its answer.
+                messages.append(LLMMessage(role="user", content=(
+                    "Tools are no longer available. Using only the tool results above, answer my "
+                    f"original question now: {user_prompt}\nIf a figure is not in the results, say so "
+                    "briefly instead of promising to fetch it."
+                )))
                 synthesis_models = select_chain(
                     TaskProfile(phase="synthesis", intent=intent), settings,
                 )
@@ -161,6 +170,7 @@ class Orchestrator:
                     synthesis: AssistantMessage | None = None
                     async for ev in complete_with_status(
                         self.provider, messages, models=synthesis_models,
+                        max_tokens=settings.agent_max_tokens,
                     ):
                         if ev["type"] == "result":
                             synthesis = ev["message"]

@@ -9,6 +9,7 @@ import {
   updateAlert,
 } from "../api/client";
 import { AlertBuilder } from "../components/Alerts/AlertBuilder";
+import { FilingsWatchPanel } from "../components/filingswatch/FilingsWatchPanel";
 import { TerminalTabs, type TerminalTabItem } from "../components/terminal/TerminalTabs";
 import { useAlertsStore } from "../store/alertsStore";
 import type { AlertRule, AlertTriggerEvent } from "../types";
@@ -157,6 +158,8 @@ export function AlertsPage() {
 
   return (
     <div className="space-y-4 p-3">
+      <FilingsWatchPanel />
+
       <div className="flex flex-col gap-3 rounded border border-terminal-border bg-terminal-panel p-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="text-sm font-semibold text-terminal-accent">Alerts Console</div>

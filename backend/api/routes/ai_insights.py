@@ -64,9 +64,11 @@ async def stock_briefing(
             f"Price: {_fmt(snap.get('current_price'))} | Day change: {_fmt(snap.get('change_pct'), '%')}",
             f"Market cap: {_fmt(snap.get('market_cap'))}",
             f"P/E: {_fmt(snap.get('pe_ratio') or snap.get('pe'))} | "
-            f"P/B: {_fmt(snap.get('pb_ratio') or snap.get('pb'))}",
-            f"ROE: {_fmt(snap.get('roe'))} | Debt/Equity: {_fmt(snap.get('debt_to_equity'))}",
-            f"52-week range: {_fmt(snap.get('week52_low'))} - {_fmt(snap.get('week52_high'))}",
+            f"P/B: {_fmt(snap.get('pb_ratio') or snap.get('pb') or snap.get('pb_calc'))}",
+            f"ROE: {_fmt(snap.get('roe_pct') or snap.get('roe'), '%')} | "
+            f"Net margin: {_fmt(snap.get('net_margin_pct'), '%')} | Revenue growth: {_fmt(snap.get('rev_growth_pct'), '%')}",
+            f"52-week range: {_fmt(snap.get('low_52w') or snap.get('week52_low'))} - "
+            f"{_fmt(snap.get('high_52w') or snap.get('week52_high'))}",
         ]
     )
     news_block = "\n".join(f"- {h}" for h in headlines) or "- (no recent headlines available)"
@@ -83,14 +85,16 @@ async def stock_briefing(
     result = await run_insight(
         system_prompt,
         user_content,
-        max_tokens=900,
+        max_tokens=2000,
         unavailable_summary=(
             f"AI briefing for {symbol} is unavailable - start LM Studio with a Gemma "
             "model to enable it."
         ),
     )
     payload = {"ticker": symbol, "company_name": name, **result}
-    await cache_instance.set(cache_key, payload, ttl=ttl_seconds("news_latest", market_open_now()))
+    # Never cache a failure: one timeout used to pin "unavailable" for the whole TTL.
+    if result.get("engine") != "unavailable":
+        await cache_instance.set(cache_key, payload, ttl=ttl_seconds("news_latest", market_open_now()))
     return payload
 
 
@@ -116,7 +120,7 @@ async def backtest_explain(payload: dict[str, Any]) -> dict[str, Any]:
     return await run_insight(
         system_prompt,
         user_content,
-        max_tokens=900,
+        max_tokens=2000,
         unavailable_summary="AI backtest analysis is unavailable - start LM Studio with a Gemma model.",
     )
 
@@ -148,7 +152,7 @@ async def collection_briefing(payload: dict[str, Any]) -> dict[str, Any]:
     return await run_insight(
         system_prompt,
         user_content,
-        max_tokens=900,
+        max_tokens=2000,
         unavailable_summary=f"AI {scope} analysis is unavailable - start LM Studio with a Gemma model.",
     )
 
@@ -174,6 +178,6 @@ async def risk_insights(payload: dict[str, Any]) -> dict[str, Any]:
     return await run_insight(
         system_prompt,
         user_content,
-        max_tokens=900,
+        max_tokens=2000,
         unavailable_summary="AI risk analysis is unavailable - start LM Studio with a Gemma model.",
     )

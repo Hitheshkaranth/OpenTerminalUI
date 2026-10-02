@@ -81,8 +81,20 @@ async def get_peers(ticker: str) -> PeerResponse:
         target_pe = _to_float(target_snap.get("pe"))
         metrics.append(PeerMetric(metric="PE", target_value=target_pe or 0.0, peer_median=None))
 
+    peer_rows = [
+        {
+            "symbol": peer,
+            "company_name": snap.get("company_name"),
+            "market_cap": _to_float(snap.get("market_cap")),
+            "pe": _to_float(snap.get("pe")),
+            "change_pct": _to_float(snap.get("change_pct")),
+        }
+        for peer, snap in zip(subset, results[:-1])
+        if isinstance(snap, dict)
+    ]
     return PeerResponse(
         ticker=symbol,
         universe="FMP Peers",
         metrics=metrics,
+        peers=peer_rows,
     )

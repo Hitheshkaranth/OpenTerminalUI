@@ -41,7 +41,7 @@ def get_llm_provider(
     if provider == "lmstudio":
         return OpenAICompatibleProvider(
             base_url=settings.lm_studio_base_url,
-            api_key=None,
+            api_key=api_key or settings.lm_studio_api_key or None,
             model=model or settings.lm_studio_model,
             timeout=timeout,
             # The router's ":free" OpenRouter ids would 404 on a local server.

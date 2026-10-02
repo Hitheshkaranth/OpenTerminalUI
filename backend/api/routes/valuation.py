@@ -126,30 +126,10 @@ async def custom_dcf(ticker: str, req: DcfRequest) -> DcfResponse:
     )
 
 
-@router.get("/valuation/{ticker}/reverse-dcf")
-async def reverse_dcf(ticker: str) -> dict[str, float | str | None]:
-    start_data = await _get_dcf_inputs(ticker)
+# GET /valuation/{ticker}/reverse-dcf is served by backend/valuation/routes.py (implied growth, history,
+# verdict, sensitivity). The older handler registered here first and shadowed it, returning only
+# {ticker, implied_growth_pct} — derived from net income with an invented 8% fallback margin.
 
-    market_cap = start_data["market_cap"]
-    revenue = start_data["revenue"]
-    net_income = start_data["net_income"]
-
-    net_margin = (net_income / revenue) if revenue > 0 else 0.08
-    base_fcf = revenue * net_margin if revenue > 0 else market_cap * 0.03
-
-    implied = reverse_dcf_implied_growth(
-        target_equity_value=market_cap,
-        base_fcf=base_fcf,
-        years=5,
-        discount_rate=0.12,
-        terminal_growth=0.04,
-        net_debt=start_data["net_debt"]
-    )
-
-    return {
-        "ticker": ticker.upper(),
-        "implied_growth_pct": (implied * 100) if implied is not None else None
-    }
 
 def _to_float(value: Any) -> float | None:
     if value in (None, "", "-", "NA", "N/A"):

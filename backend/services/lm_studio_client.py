@@ -35,6 +35,10 @@ class LMStudioClient:
         self.base_url = (base_url or settings.lm_studio_base_url).rstrip("/")
         self.model = model or settings.lm_studio_model
         self.timeout = float(timeout or settings.lm_studio_timeout_seconds)
+        # Key-protected OpenAI-compatible gateways (vLLM / LiteLLM) reject unauthenticated calls;
+        # without this header health() failed and every insight reported "unavailable".
+        key = getattr(settings, "lm_studio_api_key", "") or ""
+        self._headers = {"Authorization": f"Bearer {key}"} if key else {}
 
     async def chat(
         self,
@@ -44,6 +48,7 @@ class LMStudioClient:
         max_tokens: int = 512,
         json_schema: dict[str, Any] | None = None,
         frequency_penalty: float = 0.0,
+        disable_thinking: bool = True,
     ) -> str:
         """Send a chat completion request and return the assistant message text.
 
@@ -59,6 +64,11 @@ class LMStudioClient:
         }
         if frequency_penalty:
             payload["frequency_penalty"] = frequency_penalty
+        if disable_thinking:
+            # Every caller wants a short structured answer; reasoning models (Qwen/Ornith on vLLM)
+            # otherwise spend max_tokens thinking and return empty content. Servers that do not
+            # know the template flag ignore it.
+            payload["chat_template_kwargs"] = {"enable_thinking": False}
         if json_schema is not None:
             payload["response_format"] = {
                 "type": "json_schema",
@@ -66,7 +76,7 @@ class LMStudioClient:
             }
         url = f"{self.base_url}/chat/completions"
         try:
-            async with httpx.AsyncClient(timeout=self.timeout, trust_env=False) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, trust_env=False, headers=self._headers) as client:
                 resp = await client.post(url, json=payload)
                 resp.raise_for_status()
                 data = resp.json()
@@ -79,6 +89,7 @@ class LMStudioClient:
                     max_tokens=max_tokens,
                     json_schema=None,
                     frequency_penalty=frequency_penalty,
+                    disable_thinking=disable_thinking,
                 )
             status = exc.response.status_code if exc.response is not None else "?"
             raise LMStudioError(f"LM Studio HTTP {status}") from exc
@@ -92,7 +103,7 @@ class LMStudioClient:
     async def health(self) -> bool:
         """Return True when the LM Studio model endpoint is reachable."""
         try:
-            async with httpx.AsyncClient(timeout=min(5.0, self.timeout), trust_env=False) as client:
+            async with httpx.AsyncClient(timeout=min(5.0, self.timeout), trust_env=False, headers=self._headers) as client:
                 resp = await client.get(f"{self.base_url}/models")
                 resp.raise_for_status()
             return True

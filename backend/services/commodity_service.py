@@ -648,6 +648,33 @@ class CommodityService:
 
         raise RuntimeError(f"No seasonal history available for {item.yahoo_symbol}")
 
+    async def _attach_history_sparklines(self, payload: CommodityQuotesResponse, sessions: int = 22) -> None:
+        """Replace the two-point (prev close, last) sparkline with ~1 month of real daily closes.
+
+        The quote alone only knows two prices, which every chart drew as an identical straight line
+        under a "Trend" header. History is best effort: on failure the honest two-point line stays.
+        """
+        fetcher = await self._fetcher_factory()
+        sem = asyncio.Semaphore(6)
+
+        async def closes(symbol: str) -> list[float]:
+            async with sem:
+                try:
+                    raw = await asyncio.wait_for(fetcher.yahoo.get_chart(symbol, range_str="2mo", interval="1d"), timeout=10)
+                except Exception:
+                    return []
+            frame = _parse_yahoo_chart(raw if isinstance(raw, dict) else {})
+            if frame.empty or "Close" not in frame:
+                return []
+            values = [float(v) for v in frame["Close"].tolist() if v is not None and float(v) > 0]
+            return [round(v, 4) for v in values[-sessions:]]
+
+        items = [item for category in payload.categories for item in category.items]
+        series = await asyncio.gather(*(closes(item.symbol) for item in items))
+        for item, values in zip(items, series):
+            if len(values) >= 5:
+                item.sparkline = values
+
     async def get_quotes(self) -> CommodityQuotesResponse:
         cache_key = self._cache_key("commodities_quotes", "universe")
         stale_key = self._cache_key("commodities_quotes", "universe_stale")
@@ -656,6 +683,7 @@ class CommodityService:
             return cached
         try:
             payload = await self._fetch_live_quotes()
+            await self._attach_history_sparklines(payload)
         except Exception:
             stale = _restore_model(CommodityQuotesResponse, await self._cache.get(stale_key))
             if isinstance(stale, CommodityQuotesResponse):

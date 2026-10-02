@@ -37,6 +37,8 @@ class AppSettings(BaseModel):
     ollama_base_url: str = "http://localhost:11434"
     lm_studio_base_url: str = "http://localhost:1234/v1"
     lm_studio_model: str = "google/gemma-4-26b-a4b"
+    # Optional bearer key for secured OpenAI-compatible gateways (vLLM / LiteLLM / LM Studio behind auth).
+    lm_studio_api_key: str = ""
     lm_studio_enabled: bool = True
     lm_studio_timeout_seconds: float = 240.0
     # Agent framework (multi-provider LLM)
@@ -83,6 +85,9 @@ class AppSettings(BaseModel):
     agent_strategy_loop_max_rounds: int = 3
     agent_screener_enabled: bool = True
     agent_timeout_seconds: float = 120.0
+    # Per-turn completion budget. Reasoning models (Ornith) spent the old 1024 default thinking and
+    # returned their reasoning instead of a tool call or an answer.
+    agent_max_tokens: int = 4096
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_api_key: str | None = None
     price_cache_ttl_seconds: int = 60
@@ -252,6 +257,7 @@ def get_settings() -> AppSettings:
             or _env("OLLAMA_BASE_URL")
             or app_cfg.get("ollama_base_url", "http://localhost:11434")
         ),
+        lm_studio_api_key=_env("LM_STUDIO_API_KEY") or "",
         lm_studio_base_url=(
             _env("OPENTERMINALUI_LM_STUDIO_BASE_URL")
             or _env("LM_STUDIO_BASE_URL")
@@ -350,6 +356,10 @@ def get_settings() -> AppSettings:
         agent_timeout_seconds=float(
             _env("OPENTERMINALUI_AGENT_TIMEOUT_SECONDS")
             or str(app_cfg.get("agent_timeout_seconds", 120.0))
+        ),
+        agent_max_tokens=int(
+            _env("AGENT_MAX_TOKENS")
+            or str(app_cfg.get("agent_max_tokens", 4096))
         ),
         openrouter_base_url=(
             _env("OPENTERMINALUI_OPENROUTER_BASE_URL")

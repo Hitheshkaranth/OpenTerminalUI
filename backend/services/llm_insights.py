@@ -135,7 +135,9 @@ async def run_insight(
             pass
 
     client = get_lm_studio_client()
-    if not settings.lm_studio_enabled or not await client.health():
+    # No health pre-check: on a busy shared gateway the 5 s /models probe timed out and the insight
+    # reported "unavailable" without ever asking the model. A real failure is caught below.
+    if not settings.lm_studio_enabled:
         return base
 
     messages = [

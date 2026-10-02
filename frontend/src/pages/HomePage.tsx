@@ -12,6 +12,7 @@ import {
   type NewsLatestApiItem,
 } from "../api/client";
 import { fetchDashboardResults, type DashboardResults } from "../api/intelligence";
+import { marketFromDesk } from "../api/ideasThemes";
 import { ExposureHeatmap } from "../components/dashboard/ExposureHeatmap";
 import { GuidedEmptyState } from "../components/dashboard/GuidedEmptyState";
 import { IntelligenceTimeline } from "../components/dashboard/IntelligenceTimeline";
@@ -23,6 +24,7 @@ import { PortfolioMiniChart } from "../components/home/PortfolioMiniChart";
 import { ProfileCompletionRing } from "../components/home/ProfileCompletionRing";
 import { QuickNavGrid, type QuickNavSection } from "../components/home/QuickNavGrid";
 import { SystemHealthBar, type SystemHealthItem } from "../components/home/SystemHealthBar";
+import { IdeasRadar } from "../components/ideas/IdeasRadar";
 import { AiInsightCard } from "../components/terminal/AiInsightCard";
 import { TerminalShell } from "../components/layout/TerminalShell";
 import { useAuth } from "../contexts/AuthContext";
@@ -240,6 +242,7 @@ export function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const selectedMarket = useSettingsStore((s) => s.selectedMarket);
+  const ideasMarket = marketFromDesk(selectedMarket);
   const displayCurrency = useSettingsStore((s) => s.displayCurrency);
   const realtimeMode = useSettingsStore((s) => s.realtimeMode);
   const newsAutoRefresh = useSettingsStore((s) => s.newsAutoRefresh);
@@ -707,6 +710,16 @@ export function HomePage() {
                 fetcher={() => fetchCollectionBriefing(MARKET_PULSE_SYMBOLS, "global markets")}
               />
             </div>
+
+            <section className="rounded-sm border border-terminal-border bg-terminal-panel/80 p-3" aria-label="Ideas radar">
+              <div className="mb-3">
+                <h2 className="ot-type-panel-title uppercase tracking-[0.14em] text-terminal-accent">Ideas Radar</h2>
+                <p className="mt-1 text-sm text-terminal-muted">
+                  Quick hits from the ideas board in the {ideasMarket} desk.
+                </p>
+              </div>
+              <IdeasRadar market={ideasMarket} />
+            </section>
 
             {showHomeSection("portfolio") || showHomeSection("health") || showHomeSection("news") ? (
             <section className="grid gap-3 xl:grid-cols-[minmax(0,1.85fr)_minmax(0,1fr)]" aria-label="Portfolio HQ">

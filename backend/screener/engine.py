@@ -10,6 +10,7 @@ import pandas as pd
 
 from backend.services.materialized_store import load_screener_df
 from .fields import has_field
+from .filings_fields import NUMERIC_KEYS, STRING_KEYS, load_filings_fields
 from .models import compute_many
 from .parser import ParsedQuery, parse_query
 
@@ -173,6 +174,45 @@ def _enrich_columns(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _inject_filings_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Merge filings-intelligence fields into the screen DataFrame.
+
+    Growth/headwind/net scores, stance, adverse-regulatory flag, the latest
+    order-book KPI and (when cheaply available) implied growth are sourced from
+    the filings DB and merged as columns so a screen can filter/sort on them.
+    Best-effort: any lookup problem is swallowed and leaves the frame with the
+    numeric columns set to NaN and the stance column to None — never a 0, so
+    symbols without filings analysis are excluded from numeric comparisons.
+    """
+    if df is None or df.empty or "ticker" not in df.columns:
+        return df
+
+    tickers = df["ticker"].astype(str).str.strip()
+    symbols = sorted({str(t).upper() for t in tickers if str(t).strip() not in ("", "nan", "none")})
+    if not symbols:
+        return df
+
+    try:
+        from backend.shared.db import SessionLocal
+
+        session = SessionLocal()
+        try:
+            values = load_filings_fields(session, symbols)
+        finally:
+            session.close()
+    except Exception:
+        return df
+
+    def _fields_for(ticker: str) -> dict:
+        return values.get(str(ticker).upper()) or {}
+
+    for key in NUMERIC_KEYS:
+        df[key] = pd.to_numeric([_fields_for(t).get(key) for t in tickers], errors="coerce")
+    for key in STRING_KEYS:
+        df[key] = [_fields_for(t).get(key) for t in tickers]
+    return df
+
+
 def _make_sparkline(seed: str, base: float) -> list[float]:
     h = hashlib.md5(seed.encode("utf-8")).hexdigest()
     points: list[float] = []
@@ -190,9 +230,11 @@ class ScreenerEngine:
         self._cache: dict[str, dict[str, Any]] = {}
 
     def _load_data(self, universe: str, market: str = "IN") -> pd.DataFrame:
-        symbols = _load_universe_symbols(universe, market=market)
-        raw = load_screener_df(symbols)
-        return _enrich_columns(raw)
+        universe_symbols = _load_universe_symbols(universe, market=market)
+        raw = load_screener_df(universe_symbols)
+        enriched = _enrich_columns(raw)
+        _inject_filings_columns(enriched)
+        return enriched
 
     def _apply_filter(self, df: pd.DataFrame, parsed: ParsedQuery) -> pd.DataFrame:
         if df.empty or not parsed.filter_expr.strip():

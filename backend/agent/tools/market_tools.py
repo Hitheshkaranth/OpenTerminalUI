@@ -170,7 +170,7 @@ def _backtest_symbol_empty(ticker: str, short_window: int, long_window: int, not
 
 async def backtest_symbol(args: dict[str, Any]) -> dict[str, Any]:
     """Run a compact SMA-crossover backtest for one symbol; never raises."""
-    ticker = str(args.get("ticker", "")).strip().upper()
+    ticker = _ticker_arg(args).strip().upper()
     strategy = str(args.get("strategy", "sma_crossover"))
     range_str = str(args.get("range", "3y"))
     try:
@@ -456,11 +456,28 @@ async def screen_stocks(args: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
+def _ticker_arg(args: dict[str, Any]) -> str:
+    # Models send "symbol" about as often as "ticker"; reading only "ticker" ran the tool on "".
+    return str(args.get("ticker") or args.get("symbol") or "")
+
+
 async def get_stock_snapshot(args: dict[str, Any]) -> dict[str, Any]:
-    """Fetch a full fundamentals/price snapshot for one ticker."""
-    symbol = str(args.get("ticker", "")).strip().upper()
+    """Fetch a full fundamentals/price snapshot for one ticker, with the 52-week range."""
+    from backend.api.routes.stocks import _session_stats_from_history
+
+    symbol = _ticker_arg(args).strip().upper()
     fetcher = await get_unified_fetcher()
-    return await fetcher.fetch_stock_snapshot(symbol)
+    snap = dict(await fetcher.fetch_stock_snapshot(symbol) or {})
+    # The raw snapshot has no 52-week high/low, so "is it above its 52-week midpoint?" was unanswerable.
+    try:
+        history = await asyncio.wait_for(fetcher.fetch_history(symbol, range_str="1y", interval="1d"), timeout=8)
+        stats = _session_stats_from_history(history if isinstance(history, dict) else {})
+        for key, value in stats.items():
+            if value is not None and snap.get(key) is None:
+                snap[key] = value
+    except Exception:  # noqa: BLE001 - agent tools must never raise
+        pass
+    return snap
 
 
 async def compare_stocks(args: dict[str, Any]) -> dict[str, Any]:
@@ -510,7 +527,7 @@ async def search_research(args: dict[str, Any]) -> dict[str, Any]:
 
 async def analyze_technicals(args: dict[str, Any]) -> dict[str, Any]:
     """Return a compact technical snapshot and currently actionable setups."""
-    ticker = str(args.get("ticker", "")).strip().upper()
+    ticker = _ticker_arg(args).strip().upper()
     range_str = str(args.get("range", "1y"))
     interval = str(args.get("interval", "1d"))
     if not ticker:
@@ -684,6 +701,7 @@ def build_default_registry(user_id: str | None = None) -> ToolRegistry:
     from backend.agent.tools.derivatives_tools import derivatives_tool_specs
     from backend.agent.tools.macro_tools import macro_tool_specs
     from backend.agent.tools.analytics_tools import analytics_tool_specs
+    from backend.agent.tools.filings_tools import filings_tool_specs
 
     if user_id:
         from backend.agent.tools.portfolio_tools import portfolio_tool_specs
@@ -702,6 +720,7 @@ def build_default_registry(user_id: str | None = None) -> ToolRegistry:
         *derivatives_tool_specs(),
         *macro_tool_specs(),
         *analytics_tool_specs(),
+        *filings_tool_specs(),
     ])
     reg.register(ToolSpec(
         name="screen_stocks",

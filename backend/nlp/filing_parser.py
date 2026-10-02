@@ -207,7 +207,7 @@ async def _llm_extract(symbol: str, documents: list[dict[str, Any]]) -> dict[str
             {"role": "user", "content": f"Symbol: {symbol}\n\n{content}"},
         ],
         temperature=0.0,
-        max_tokens=700,
+        max_tokens=1500,
         json_schema=schema,
     )
     parsed = parse_json_response(response)

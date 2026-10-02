@@ -311,9 +311,14 @@ class EarningsService:
         return rows if isinstance(rows, list) else []
 
     async def _quarterly_from_yfinance(self, symbol: str) -> list[dict[str, Any]]:
-        yf_symbol = symbol.upper()
-        if "." not in yf_symbol:
-            yf_symbol = f"{yf_symbol}.NS"
+        # Resolve the Yahoo symbol by market: blindly appending ".NS" turned AAPL into AAPL.NS,
+        # so every US company had no quarterly financials when FMP's quarterly feed is empty.
+        try:
+            from backend.shared.market_classifier import market_classifier
+
+            yf_symbol = await market_classifier.yfinance_symbol(symbol.upper())
+        except Exception:
+            yf_symbol = symbol.upper() if "." in symbol else f"{symbol.upper()}.NS"
 
         def _read() -> list[dict[str, Any]]:
             ticker = yf.Ticker(yf_symbol)

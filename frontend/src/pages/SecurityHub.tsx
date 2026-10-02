@@ -12,6 +12,16 @@ import {
   generateAdvancedReport,
 } from "../api/client";
 import { CatalystConvictionPanel } from "../components/dashboard/CatalystConvictionPanel";
+import { PriceOverviewChart } from "../components/security/PriceOverviewChart";
+import { BusinessMetricsSection } from "../components/business/BusinessMetricsSection";
+import { ReverseDcfCard } from "../components/business/ReverseDcfCard";
+import { ValueChainSection } from "../components/business/ValueChainSection";
+import { ConcallSummaries } from "../components/filings/ConcallSummaries";
+import { FilingsWorkspace } from "../components/filings/FilingsWorkspace";
+import { GrowthHeadwindsSummary } from "../components/filings/GrowthHeadwindsSummary";
+import { GuidanceTracker } from "../components/filings/GuidanceTracker";
+import { PeerKpiComparison } from "../components/peers/PeerKpiComparison";
+import { ResearchNoteButton } from "../components/research/ResearchNoteButton";
 import { GuidedEmptyState } from "../components/dashboard/GuidedEmptyState";
 import { TradingChart } from "../components/chart/TradingChart";
 import { TimeAndSales } from "../components/market/TimeAndSales";
@@ -34,7 +44,7 @@ import { normalizeTicker } from "../utils/ticker";
 import type { ChartPoint } from "../types";
 import { ProvenanceChip } from "../components/common/ProvenanceChip";
 
-type HubTab = "overview" | "financials" | "chart" | "news" | "ownership" | "estimates" | "peers" | "esg" | "tape" | "insider";
+type HubTab = "overview" | "financials" | "chart" | "news" | "ownership" | "estimates" | "peers" | "esg" | "tape" | "insider" | "filings";
 
 const HUB_TABS: TerminalTabItem[] = [
   { id: "overview", label: "Overview" },
@@ -47,6 +57,7 @@ const HUB_TABS: TerminalTabItem[] = [
   { id: "esg", label: "ESG" },
   { id: "tape", label: "Tape" },
   { id: "insider", label: "Insider" },
+  { id: "filings", label: "Filings" },
 ];
 
 function MiniRangeBar({ low, high, current }: { low: number | null; high: number | null; current: number | null }) {
@@ -59,27 +70,6 @@ function MiniRangeBar({ low, high, current }: { low: number | null; high: number
       <div className="absolute inset-y-0 left-0 rounded bg-[#FF6B00]/20" style={{ width: `${pct}%` }} />
       <div className="absolute top-[-3px] h-3 w-[2px] bg-[#FF6B00]" style={{ left: `${pct}%` }} />
     </div>
-  );
-}
-
-function TinyPriceChart({ points }: { points: ChartPoint[] }) {
-  const values = points.map((p) => Number(p.c)).filter(Number.isFinite);
-  if (!values.length) return <div className="h-28 rounded border border-terminal-border bg-terminal-bg" />;
-  const width = 420;
-  const height = 110;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = Math.max(1e-9, max - min);
-  const poly = values
-    .map((v, i) => `${(i / Math.max(1, values.length - 1)) * width},${height - ((v - min) / span) * height}`)
-    .join(" ");
-  const last = values[values.length - 1];
-  const first = values[0];
-  const up = last >= first;
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-28 w-full rounded border border-terminal-border bg-terminal-bg">
-      <polyline fill="none" stroke={up ? "#00e676" : "#ff3d3d"} strokeWidth="2" points={poly} />
-    </svg>
   );
 }
 
@@ -99,6 +89,13 @@ function MetricCell({ label, value, accent = false, hint }: { label: string; val
 // Number(null) and Number("") are 0, which would render missing data as a real zero.
 function toNum(v: unknown) {
   return v == null || v === "" ? NaN : Number(v);
+}
+
+// 1.03T / 2.44M / 412.5K: large magnitudes are unreadable as 13-digit integers.
+function fmtCompact(v: unknown) {
+  const n = toNum(v);
+  if (!Number.isFinite(n)) return "-";
+  return n.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 2 });
 }
 
 function fmtNum(v: unknown) {
@@ -349,7 +346,7 @@ export function SecurityHubPage() {
             <div className="grid min-w-[280px] grid-cols-3 gap-2">
               <MetricCell label="Last" value={fmtNum(currentPrice)} accent />
               <MetricCell label="Change %" value={fmtPct(stock.change_pct)} />
-              <MetricCell label="Volume" value={fmtNum(stock.volume)} />
+              <MetricCell label="Volume" value={fmtCompact(stock.volume)} />
             </div>
           </div>
           <div className="mt-2 flex items-center justify-between">
@@ -383,6 +380,7 @@ export function SecurityHubPage() {
             >
               EXPORT REPORT
             </TerminalButton>
+            <ResearchNoteButton symbol={activeTicker} market={selectedMarket} />
           </div>
         </div>
 
@@ -390,7 +388,7 @@ export function SecurityHubPage() {
           <div className="grid grid-cols-1 gap-2 xl:grid-cols-[1.2fr_1fr]">
             <TerminalPanel title="Overview" subtitle="DES-style snapshot" actions={<ProvenanceChip provenance={stockQuery.data?.provenance ?? undefined} />} bodyClassName="grid gap-2">
               <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-                <MetricCell label="Market Cap" value={fmtNum(marketCap)} hint="Requires FMP or Yahoo summary data" />
+                <MetricCell label="Market Cap" value={fmtCompact(marketCap)} hint="Requires FMP or Yahoo summary data" />
                 <MetricCell label="P/E" value={fmtNum(peRatio)} hint="Requires FMP or Yahoo summary data" />
                 <MetricCell label="Div Yield" value={Number.isFinite(dividendYield) ? `${dividendYield.toFixed(2)}%` : "-"} hint="Requires FMP or Yahoo summary data" />
                 <MetricCell label="52W Range" value={`${fmtNum(week52Low)} - ${fmtNum(week52High)}`} />
@@ -407,6 +405,9 @@ export function SecurityHubPage() {
               <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
                 <div className="rounded-sm border border-terminal-border bg-terminal-bg p-2">
                   <div className="mb-1 ot-type-label text-terminal-muted">Analyst Consensus</div>
+                  {!analyst.consensus && !(Number(analyst.buy_pct) || Number(analyst.hold_pct) || Number(analyst.sell_pct)) ? (
+                    <div className="text-xs text-terminal-muted">No analyst ratings from the current data source.</div>
+                  ) : (
                   <div className="flex items-center gap-2">
                     <div className="relative h-3 flex-1 rounded bg-[#1A2332]">
                       <div className="absolute inset-y-0 left-0 bg-emerald-500/35" style={{ width: `${Math.min(100, Math.max(0, Number(analyst.buy_pct) || 0))}%` }} />
@@ -415,6 +416,7 @@ export function SecurityHubPage() {
                     </div>
                     <TerminalBadge variant="neutral">{String(analyst.consensus || "N/A")}</TerminalBadge>
                   </div>
+                  )}
                 </div>
                 <div className="rounded-sm border border-terminal-border bg-terminal-bg p-2">
                   <div className="mb-1 ot-type-label text-terminal-muted">Classification</div>
@@ -428,22 +430,15 @@ export function SecurityHubPage() {
               </div>
             </TerminalPanel>
 
-            <TerminalPanel title="6M Price Chart" subtitle="Compact overview chart" bodyClassName="space-y-2">
-              <TinyPriceChart points={histData} />
+            <TerminalPanel title="Price" subtitle="Hover the chart for any day's close" bodyClassName="space-y-2">
+              <PriceOverviewChart symbol={activeTicker} />
               <div className="grid grid-cols-3 gap-2 text-xs">
                 <MetricCell label="Prev Close" value={fmtNum(stock.previous_close)} />
-                <MetricCell label="Avg Volume" value={fmtNum(stock.avg_volume)} />
+                <MetricCell label="Avg Volume (30d)" value={fmtCompact(stock.avg_volume)} />
                 <MetricCell label="Beta" value={fmtNum(stock.beta)} />
               </div>
             </TerminalPanel>
 
-            <div className="xl:col-span-2">
-              <CatalystConvictionPanel
-                symbol={activeTicker}
-                market={selectedMarket}
-                onOpenScreener={() => navigate(`/equity/screener?symbol=${encodeURIComponent(activeTicker)}`)}
-              />
-            </div>
           </div>
         ) : null}
 
@@ -769,6 +764,35 @@ export function SecurityHubPage() {
           </div>
         ) : null}
 
+        {/* Filings Intelligence + Tijori-style research pack, blended into existing tabs. */}
+        {tab === "overview" ? (
+          <div className="grid gap-2 xl:grid-cols-2">
+            <GrowthHeadwindsSummary symbol={activeTicker} market={selectedMarket} onOpenFilings={() => {
+              const next = new URLSearchParams(searchParams);
+              next.set("tab", "filings");
+              setSearchParams(next, { replace: true });
+            }} />
+            <ReverseDcfCard symbol={activeTicker} market={selectedMarket} compact />
+            <div className="xl:col-span-2">
+              <CatalystConvictionPanel
+                symbol={activeTicker}
+                market={selectedMarket}
+                onOpenScreener={() => navigate(`/equity/screener?symbol=${encodeURIComponent(activeTicker)}`)}
+              />
+            </div>
+          </div>
+        ) : null}
+        {tab === "financials" ? (
+          <div className="grid gap-2">
+            <BusinessMetricsSection symbol={activeTicker} market={selectedMarket} />
+            <ReverseDcfCard symbol={activeTicker} market={selectedMarket} />
+          </div>
+        ) : null}
+        {tab === "news" ? <ConcallSummaries symbol={activeTicker} market={selectedMarket} /> : null}
+        {tab === "estimates" ? <GuidanceTracker symbol={activeTicker} market={selectedMarket} /> : null}
+        {tab === "peers" ? <PeerKpiComparison symbol={activeTicker} market={selectedMarket} /> : null}
+        {tab === "peers" ? <ValueChainSection symbol={activeTicker} market={selectedMarket} /> : null}
+        {tab === "filings" ? <FilingsWorkspace symbol={activeTicker} market={selectedMarket} /> : null}
         {tab === "insider" ? <InsiderStockDetail ticker={activeTicker} /> : null}
       </div>
     </div>

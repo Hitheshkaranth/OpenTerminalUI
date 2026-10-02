@@ -142,4 +142,21 @@ api_router.include_router(economics_router)
 # it is mounted under "/api" alongside the other API-key surfaces.
 api_router.include_router(build_mcp_router(), prefix="/api")
 
+# Filings Intelligence + Tijori-style research pack (swarm fi_v1). Routers carry full /api prefixes.
+from backend.filings_rag.routes import router as filings_rag_router  # noqa: E402
+from backend.business_metrics.routes import router as business_metrics_router  # noqa: E402
+from backend.value_chain.routes import router as value_chain_router  # noqa: E402
+from backend.valuation.routes import router as valuation_router  # noqa: E402
+from backend.thematic_indices.routes import router as thematic_indices_router  # noqa: E402
+from backend.ideas.routes import router as ideas_router  # noqa: E402
+from backend.peer_kpis.routes import router as peer_kpis_router  # noqa: E402
+from backend.results_tracker.routes import router as results_tracker_router  # noqa: E402
+from backend.raw_materials.routes import router as raw_materials_router  # noqa: E402
+from backend.filings_watch.routes import router as filings_watch_router  # noqa: E402
+
+for _r in (filings_rag_router, business_metrics_router, value_chain_router, valuation_router, thematic_indices_router, ideas_router,
+           peer_kpis_router, results_tracker_router, raw_materials_router, filings_watch_router):
+    api_router.include_router(_r)
+
+
 __all__ = ["api_router"]

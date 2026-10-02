@@ -336,7 +336,19 @@ async def _hydrate_missing_screener_rows(
     if df.empty:
         stored_tickers: set[str] = set()
     else:
-        stored_tickers = set(df["ticker"].astype(str).str.upper())
+        # Rows hydrated before the snapshot fundamentals were kept have no ROE/margins/growth at all;
+        # treat them as missing (at most once a day) so they refill instead of staying blank forever.
+        fundamentals = [c for c in ("roe_pct", "op_margin_pct", "rev_growth_pct") if c in df.columns]
+        complete = (
+            df[fundamentals].notna().any(axis=1) if fundamentals else pd.Series(True, index=df.index)
+        )
+        if "updated_at" in df.columns:
+            updated = pd.to_datetime(df["updated_at"], errors="coerce", utc=True)
+            recent = (updated > (pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=1))).fillna(False)
+        else:
+            recent = pd.Series(True, index=df.index)  # no timestamps: trust what's stored
+        keep = df[complete | recent]
+        stored_tickers = set(keep["ticker"].astype(str).str.upper())
 
     missing = [t for t in tickers if t not in stored_tickers]
     if not missing:
@@ -367,15 +379,17 @@ async def _hydrate_missing_screener_rows(
                     "current_price": snap.get("current_price"),
                     "market_cap": snap.get("market_cap"),
                     "pe": snap.get("pe"),
-                    "pb_calc": None,
-                    "ps_calc": None,
-                    "ev_ebitda": None,
-                    "roe_pct": None,
-                    "roa_pct": None,
-                    "op_margin_pct": None,
-                    "net_margin_pct": None,
-                    "rev_growth_pct": None,
-                    "eps_growth_pct": None,
+                    # Keep the snapshot's fundamentals: these were hard-coded to None, so ~95% of NSE rows
+                    # had no ROE/margins and every ROE or growth filter matched almost nothing.
+                    "pb_calc": snap.get("pb_calc"),
+                    "ps_calc": snap.get("ps_calc"),
+                    "ev_ebitda": snap.get("ev_ebitda"),
+                    "roe_pct": snap.get("roe_pct"),
+                    "roa_pct": snap.get("roa_pct"),
+                    "op_margin_pct": snap.get("op_margin_pct"),
+                    "net_margin_pct": snap.get("net_margin_pct"),
+                    "rev_growth_pct": snap.get("rev_growth_pct"),
+                    "eps_growth_pct": snap.get("eps_growth_pct"),
                     "beta": snap.get("beta"),
                     "piotroski_f_score": None,
                     "altman_z_score": None,

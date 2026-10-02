@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import asyncio
 import os
 import sys
@@ -84,6 +86,12 @@ async def lifespan(app: FastAPI):
     if _scanner_alert_scheduler:
         await _scanner_alert_scheduler.start(hub, interval_seconds=900)
 
+    from backend.filings_watch.scheduler import start_filings_watch, stop_filings_watch
+    try:
+        await start_filings_watch()
+    except Exception:
+        logging.getLogger(__name__).exception("filings watch failed to start")
+
     yield
 
     if _prefetch_worker:
@@ -96,6 +104,10 @@ async def lifespan(app: FastAPI):
         await _pcr_snapshot_service.stop()
     if _scanner_alert_scheduler:
         await _scanner_alert_scheduler.stop()
+    try:
+        await stop_filings_watch()
+    except Exception:
+        logging.getLogger(__name__).exception("filings watch failed to stop")
 
     await hub.shutdown()
     await shutdown_unified_fetcher()

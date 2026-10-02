@@ -11,6 +11,13 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
+
+def _to_num(value) -> float | None:
+    try:
+        return float(str(value).replace(",", "")) if value not in (None, "", "-") else None
+    except ValueError:
+        return None
+
 class NSEBlockedError(RuntimeError):
     """Raised when NSE is hard-blocking requests (HTTP 403/401) and the
     circuit breaker is open. Callers should fall back to another provider."""
@@ -243,13 +250,29 @@ class NSEClient:
         """
         return await self._request("/chart-databyindex", {"index": symbol, "preopen": "true" if pre_open else "false"})
 
+    async def _large_deals(self, key: str) -> dict:
+        # NSE retired /snapshot-capital-market-bulk-block-deals (404); the large-deal snapshot
+        # carries bulk, block and short deals. Rows keep NSE's keys (qty, watp) and also expose
+        # quantity / tradePrice / dealValue for existing consumers (Dashboard bulk-deals table).
+        payload = await self._request("/snapshot-capital-market-largedeal")
+        rows = payload.get(key) if isinstance(payload, dict) else None
+        out = []
+        for row in rows if isinstance(rows, list) else []:
+            if not isinstance(row, dict):
+                continue
+            qty = _to_num(row.get("qty"))
+            price = _to_num(row.get("watp"))
+            out.append({**row, "quantity": qty, "tradePrice": price,
+                        "dealValue": qty * price if qty is not None and price is not None else None})
+        return {"as_on_date": payload.get("as_on_date") if isinstance(payload, dict) else None, "data": out}
+
     async def get_bulk_deals(self) -> dict:
         """Get snapshot of bulk deals"""
-        return await self._request("/snapshot-capital-market-bulk-block-deals", {"section": "bulk"})
+        return await self._large_deals("BULK_DEALS_DATA")
 
     async def get_block_deals(self) -> dict:
         """Get snapshot of block deals"""
-        return await self._request("/snapshot-capital-market-bulk-block-deals", {"section": "block"})
+        return await self._large_deals("BLOCK_DEALS_DATA")
 
     async def close(self):
         """Close all sessions"""
