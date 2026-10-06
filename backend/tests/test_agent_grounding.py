@@ -40,7 +40,8 @@ def test_verified_figures_cite_their_source_and_provenance():
     s1 = next(s for s in report["sources"] if s["id"] == "S1")
     assert (s1["tool"], s1["provider"], s1["quality"]) == ("get_stock_snapshot", "yahoo", "delayed")
     assert s1["as_of"] == "2026-10-06T09:00:00Z"
-    assert report["summary"] == {"total": 3, "verified": 3, "mismatch": 0, "unsourced": 0, "low_quality": 0}
+    assert report["summary"] == {"total": 3, "verified": 3, "mismatch": 0, "unsourced": 0, "low_quality": 0,
+                                 "conflicts": 0, "stale": 0, "statements_checked": 0, "statements_contradicted": 0}
     assert "₹3,456.8⟦v:S1⟧" in report["annotated"]
 
 
@@ -261,3 +262,14 @@ def test_words_starting_with_a_month_are_not_dates():
     figures = [f.text for f in extract_figures(
         "Operating margin 66.2%, a decline 15.5%; reported Aug 26, 2026 and Oct 6; 6 Oct 2026.")]
     assert figures == ["66.2%", "15.5%"]
+
+
+def test_a_period_before_closing_markup_ends_the_sentence():
+    ledger = GroundingLedger()
+    ledger.add("analyze_technicals", {"ticker": "AAPL", "price": 333.04, "trend": {"ema_50": 324.27}}, args={"ticker": "AAPL"})
+    claims = ground_text("- **50-day EMA — both above.** AAPL at 333.04 vs. its 50-day EMA 324.27", ledger)["claims"]
+    assert [(c["status"], c["path"]) for c in claims] == [("verified", "price"), ("verified", "trend.ema_50")]
+
+
+def test_oscillator_thresholds_in_a_definition_are_not_figures():
+    assert [f.text for f in extract_figures("Overbought is conventionally RSI > 70; oversold is RSI < 30.")] == []

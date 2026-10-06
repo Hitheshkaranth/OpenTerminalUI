@@ -74,7 +74,10 @@ function RoleCard({ note }: { note: AgentRoleNote }) {
         <GroundingContext.Provider value={note.grounding ?? null}>
           <Markdown content={note.grounding?.annotated ?? note.content} />
         </GroundingContext.Provider>
-        {note.grounding && note.grounding.summary.total > 0 ? <SourcesPanel report={note.grounding} /> : null}
+        {note.grounding &&
+        (note.grounding.summary.total > 0 || note.grounding.statements?.length || note.grounding.conflicts?.length) ? (
+          <SourcesPanel report={note.grounding} />
+        ) : null}
       </div>
     </div>
   );

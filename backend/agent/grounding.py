@@ -20,7 +20,7 @@ import json
 import math
 import re
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Iterable
+from typing import Any, AsyncIterator, Awaitable, Callable, Iterable
 
 from backend.agent.events import ARTIFACT_KINDS
 
@@ -140,6 +140,10 @@ _SKIP_SPANS = (
     re.compile(r"https?://\S+"),
     re.compile(r"(?i:\b(?:rsi|ema|sma|dma|wma|atr|roc|macd|adx|cci|stoch|bb|bollinger|supertrend)\s*\(\s*\d+(?:\s*,\s*\d+)*\s*\))"),
     re.compile(r"(?i:conviction)\s*:?\s*\d{1,3}"),  # the PM's own score is an opinion, not data
+    # Oscillator thresholds are conventions, not data: "below the 70 overbought line", "oversold (< 30)".
+    re.compile(r"(?i:\b(?:70|80|30|20)\b(?=[^.\n]{0,25}\b(?:overbought|oversold|threshold|line|mark)\b))"),
+    re.compile(r"(?i:(?:overbought|oversold)[^.\n\d]{0,40}\b(?:70|80|30|20)\b)"),
+    re.compile(r"(?i:\brsi\s*(?:[<>≥≤]=?|above|below|over|under)\s*(?:70|80|30|20)\b)"),
 )
 _PERIOD_AFTER = re.compile(
     r"[\s-]?(?:days?|weeks?|months?|years?|yrs?|y|d|w|dma|sma|ema|periods?|sessions?|bars?|quarters?|windows?|wk|"
@@ -154,6 +158,7 @@ _APPROX_BEFORE = re.compile(
     r"(?:~|≈|about|around|roughly|approximately|approx\.?|nearly|almost|over|under|above|below|more than|less than|close to)\s*$",
     re.I)
 # Level metrics: a "%" figure beside them is a distance from the level, not the level itself.
+_DISTANCE_AFTER = re.compile(r"\s*(?:above|below|higher|lower|over|under|ahead|behind|off|beneath|short)\b", re.I)
 _LEVEL_METRICS = {"price", "prev_close", "open", "day_high", "day_low", "high_52w", "low_52w", "ema_50", "ema_200", "market_cap"}
 # Forward-looking words: the figure is an opinion/projection, so a live value can't contradict it.
 _FORWARD = re.compile(
@@ -162,7 +167,8 @@ _FORWARD = re.compile(
 _CODE_SPAN = re.compile(r"`[^`\n]+`")
 _LINK_SPAN = re.compile(r"\[[^\]\n]*\]\([^)\n]*\)")
 _TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{2,}")
-_SENTENCE_BREAK = re.compile(r"[.!?](?=\s)|\n|;|\|")
+# A period before closing markup still ends the sentence: "both above.** AAPL at 333.04".
+_SENTENCE_BREAK = re.compile(r"[.!?](?=[*_)\]\"'”’]*\s)|\n|;|\|")
 
 
 _KEY_BEFORE = re.compile(r"""(["']?)([A-Za-z_][A-Za-z0-9_]*)\1\s*[:=]\s*["']?$""")
@@ -336,6 +342,13 @@ def _subject_of(node: dict[str, Any], inherited: str | None) -> str | None:
     return inherited
 
 
+# Lists of instruments/levels/bars inside a result: their "price"/"ltp"/"close" fields are an order-book
+# level, an option strike's premium or a past bar, not the stock's price, so they get no stock-level metric.
+_UNLABELLED_CONTAINERS = re.compile(
+    r"(?:^|\.)(?:bids|asks|depth|levels|strikes|chain|ce|pe|calls|puts|equity_curve|curve|bars|candles|history|"
+    r"windows|headlines|articles|items|events|trades|deals)(?:\[\d+\])?\.")  # a container segment, not the leaf key
+
+
 def _walk(value: Any, path: str, key: str | None, parent: str | None, subject: str | None,
           sink: list[Leaf], source_id: str, kind: str) -> None:
     if len(sink) >= _MAX_LEAVES_PER_SOURCE:
@@ -345,7 +358,8 @@ def _walk(value: Any, path: str, key: str | None, parent: str | None, subject: s
     if isinstance(value, (int, float)):
         f = float(value)
         if math.isfinite(f):
-            sink.append(Leaf(source_id, path, f, _metric_for(key, parent) if key else None, subject, kind))
+            metric = _metric_for(key, parent) if key and not _UNLABELLED_CONTAINERS.search(path) else None
+            sink.append(Leaf(source_id, path, f, metric, subject, kind))
         return
     if isinstance(value, str):
         stripped = value.strip()
@@ -404,12 +418,31 @@ def _provenance(tool: str, result: Any) -> tuple[dict[str, Any], Any]:
     return {"source": provider, "quality": quality, "as_of": None, "note": note}, data
 
 
+_MAX_TEXTS_PER_SOURCE = 400
+
+
+def _collect_texts(value: Any, path: str, source_id: str, sink: list[tuple[str, str, str]]) -> None:
+    if sum(1 for t in sink if t[0] == source_id) >= _MAX_TEXTS_PER_SOURCE:
+        return
+    if isinstance(value, str):
+        if len(value.strip()) >= 20:
+            sink.append((source_id, path, value[:4000]))
+    elif isinstance(value, dict):
+        for k, v in value.items():
+            _collect_texts(v, f"{path}.{k}" if path else str(k), source_id, sink)
+    elif isinstance(value, (list, tuple)):
+        for i, v in enumerate(value[:_MAX_LIST_ITEMS]):
+            _collect_texts(v, f"{path}[{i}]", source_id, sink)
+
+
 class GroundingLedger:
     """Every piece of evidence the run has seen, numbered in arrival order."""
 
     def __init__(self, prompt: str | None = None) -> None:
         self.sources: list[Source] = []
         self._calls: dict[str, dict[str, Any]] = {}
+        # (source_id, path, text) for prose fields (headlines, filing quotes) — quotes are checked against these.
+        self.texts: list[tuple[str, str, str]] = []
         if prompt:
             src = Source("S0", "your_request", None, {}, "your request", "user", None, None)
             _walk(prompt, "prompt", None, None, None, src.leaves, src.id, "parameter")
@@ -432,6 +465,7 @@ class GroundingLedger:
             if isinstance(src.args.get(key), str) and src.args[key].strip():
                 subject = src.args[key].strip().upper()
         _walk(data, "", None, None, subject, src.leaves, src.id, "value")
+        _collect_texts(data, "", src.id, self.texts)
         for key, value in src.args.items():
             _walk(value, f"args.{key}", str(key), None, subject, src.leaves, src.id, "parameter")
         self.sources.append(src)
@@ -618,19 +652,22 @@ def _fmt(value: float, decimals: int) -> str:
 PROPOSAL_ROLES = {"strategy_researcher"}
 
 
-def ground_text(text: str, ledger: GroundingLedger, *, contradict: bool = True) -> dict[str, Any]:
+def ground_text(text: str, ledger: GroundingLedger, *, contradict: bool = True, run_wide: bool = True) -> dict[str, Any]:
     """Check every figure in ``text`` against the ledger; return claims, sources and an
     annotated copy of the text with a ``⟦status:source⟧`` marker after each figure."""
     figures = extract_figures(text)
     leaves = ledger.leaves
     subjects = {leaf.subject for leaf in leaves if leaf.subject}
     claims: list[dict[str, Any]] = []
+    chosen_leaves: list[Leaf | None] = []
     prev_end = 0
     carried: str | None = None  # metric of the previous figure, while still in the same sentence
     for fig in figures:
         same_sentence = not _SENTENCE_BREAK.search(text, prev_end, fig.start) if prev_end else False
         metric, clause, sentence = _context(text, fig, prev_end)
         prev_end = fig.end
+        if metric in _LEVEL_METRICS and _DISTANCE_AFTER.match(text, fig.end):
+            metric = None  # "~$8.74 above (the EMA)": a distance the model worked out, not the level
         if fig.unit in ("%", "bps") and metric in _LEVEL_METRICS:
             # "4.0% below the 52-week high" is the distance from the level, not the level.
             metric = {"high_52w": "pct_below_52w_high", "low_52w": "pct_above_52w_low"}.get(metric)
@@ -699,7 +736,7 @@ def ground_text(text: str, ledger: GroundingLedger, *, contradict: bool = True) 
             relabelled = None
         # "~50% step-up" with no metric named is the model's estimate; matching it by value alone
         # would pin it to whichever field happens to be near 50.
-        if status == "unsourced" and not (fig.approx and (metric is None or inherited)):
+        if status == "unsourced" and not (fig.approx and fig.decimals == 0 and (metric is None or inherited)):
             for pool in pools:
                 numeric = [leaf for leaf in pool if _leaf_matches(fig, leaf)]
                 if numeric:
@@ -708,6 +745,7 @@ def ground_text(text: str, ledger: GroundingLedger, *, contradict: bool = True) 
                                                    int(leaf.source_id[1:] or 0)), reverse=True)
                     status, chosen = "verified", numeric[0]
                     break
+        chosen_leaves.append(chosen)
         src = ledger.source(chosen.source_id) if chosen else None
         claim: dict[str, Any] = {
             "text": fig.text.strip(), "value": fig.value, "start": fig.start, "end": fig.end,
@@ -727,6 +765,36 @@ def ground_text(text: str, ledger: GroundingLedger, *, contradict: bool = True) 
             claim["warning"] = f"labelled {metric} but the value is {relabelled}"
         claims.append(claim)
 
+    # v2: do the sources agree with each other and are they fresh; are the statements true.
+    from backend.agent.reconcile import reconcile
+
+    checks = reconcile(ledger)
+    conflicts, stale = checks["conflicts"], checks["stale"]
+    disagreeing = {(c["subject"], c["metric"]): c for c in conflicts}
+    stale_ids = {s["source_id"]: s for s in stale}
+    for claim, leaf in zip(claims, chosen_leaves):
+        if claim["status"] != "verified" or leaf is None:
+            continue
+        conflict = disagreeing.get((leaf.subject, leaf.metric))
+        if conflict:
+            others = ", ".join(f"{v['source_id']} {_fmt(v['value'], 1)}" for v in conflict["values"])
+            claim["warning"] = f"sources disagree: {others}"
+        elif leaf.source_id in stale_ids and not claim.get("warning"):
+            claim["warning"] = f"source is stale ({stale_ids[leaf.source_id]['age_hours']:g}h old)"
+    if not run_wide:
+        # A debate/persona note lists only the conflicts and stale sources its own figures rely on;
+        # the final answer carries the run-wide list, so each card doesn't repeat it.
+        used_keys = {(leaf.subject, leaf.metric) for leaf in chosen_leaves if leaf is not None}
+        used_ids = {leaf.source_id for leaf in chosen_leaves if leaf is not None}
+        conflicts = [c for c in conflicts if (c["subject"], c["metric"]) in used_keys]
+        stale = [s for s in stale if s["source_id"] in used_ids]
+    try:
+        from backend.agent.claim_checks import check_statements
+
+        statements = check_statements(text, ledger, ledger.texts)
+    except Exception:  # noqa: BLE001 - a statement check must never cost the figure check
+        statements = []
+
     used = {c["source_id"] for c in claims if c["source_id"]}
     counts = {k: sum(1 for c in claims if c["status"] == k) for k in ("verified", "mismatch", "unsourced")}
     return {
@@ -734,9 +802,16 @@ def ground_text(text: str, ledger: GroundingLedger, *, contradict: bool = True) 
         "sources": [s.summary() for s in ledger.sources if s.id in used or s.id != "S0"],
         "summary": {
             "total": len(claims), **counts,
-            "low_quality": sum(1 for c in claims if c.get("warning", "").startswith("source quality")),
+            "low_quality": sum(1 for c in claims if c.get("warning", "").startswith(("source quality", "source is stale"))),
+            "conflicts": len(conflicts),
+            "stale": len(stale),
+            "statements_checked": len(statements),
+            "statements_contradicted": sum(1 for st in statements if st.get("status") == "contradicted"),
         },
         "annotated": annotate(text, claims),
+        "conflicts": conflicts,
+        "stale": stale,
+        "statements": statements,
     }
 
 
@@ -765,9 +840,15 @@ def grounding_event(target: str, report: dict[str, Any], role_index: int | None 
     return event
 
 
-async def ground_stream(stream: AsyncIterator[dict[str, Any]], *, prompt: str | None = None) -> AsyncIterator[dict[str, Any]]:
+Repairer = Callable[[str, dict[str, Any], "GroundingLedger"], Awaitable[tuple[str, dict[str, Any], dict[str, Any]]]]
+
+
+async def ground_stream(
+    stream: AsyncIterator[dict[str, Any]], *, prompt: str | None = None, repair: Repairer | None = None,
+) -> AsyncIterator[dict[str, Any]]:
     """Pass every event through, adding a grounding event after each role_message and just
-    before each final (so ``final`` stays the last event of the stream)."""
+    before each final (so ``final`` stays the last event of the stream). With ``repair``, a final
+    answer whose figures or statements contradict their sources gets one corrective revision."""
     ledger = GroundingLedger(prompt)
     role_index = 0
     async for event in stream:
@@ -777,9 +858,21 @@ async def ground_stream(stream: AsyncIterator[dict[str, Any]], *, prompt: str | 
         try:
             if etype in ("role_message", "final"):
                 report = ground_text(str(event.get("content") or ""), ledger,
-                                     contradict=event.get("role") not in PROPOSAL_ROLES)
+                                     contradict=event.get("role") not in PROPOSAL_ROLES,
+                                     run_wide=etype == "final")
         except Exception:  # noqa: BLE001 - verification must never break the answer stream
             report = None
+        if etype == "final" and report is not None and repair is not None:
+            summary = report["summary"]
+            issues = summary.get("mismatch", 0) + summary.get("statements_contradicted", 0)
+            if issues:
+                yield {"type": "status", "text": f"Correcting {issues} item(s) that contradict the sources…"}
+                try:
+                    content, report, info = await repair(str(event.get("content") or ""), report, ledger)
+                    report["repair"] = info
+                    event = {**event, "content": content}
+                except Exception:  # noqa: BLE001
+                    pass
         if etype == "final" and report is not None:
             yield grounding_event("final", report)
         yield event

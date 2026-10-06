@@ -38,12 +38,89 @@ export interface GroundingClaim {
   warning?: string;
 }
 
+/** One source's value in a cross-source disagreement. */
+export interface GroundingConflictValue {
+  source_id: string;
+  path: string;
+  value: number;
+  provider: string;
+  quality: string;
+}
+
+/** The same metric for the same ticker disagrees across sources. */
+export interface GroundingConflict {
+  subject: string;
+  metric: string;
+  values: GroundingConflictValue[];
+  /** (max-min)/max*100 after fraction normalisation, 1 decimal. */
+  spread_pct: number;
+  severity: "high" | "medium";
+}
+
+/** A source older than its freshness budget. */
+export interface GroundingStale {
+  source_id: string;
+  tool: string;
+  as_of: string;
+  age_hours: number;
+  threshold_hours: number;
+}
+
+export interface GroundingEvidence {
+  source_id: string;
+  path: string;
+  value: number;
+}
+
+/** A non-numeric claim (comparison, threshold, direction, quote) checked against the data. */
+export interface GroundingStatement {
+  text: string;
+  start: number;
+  end: number;
+  kind: "comparison" | "threshold" | "direction" | "quote";
+  status: "verified" | "contradicted" | "unverifiable";
+  evidence: GroundingEvidence[];
+  explanation: string;
+}
+
+export interface GroundingSummary {
+  total: number;
+  verified: number;
+  mismatch: number;
+  unsourced: number;
+  low_quality: number;
+  conflicts?: number;
+  stale?: number;
+  statements_checked?: number;
+  statements_contradicted?: number;
+}
+
+export interface GroundingRepairChange {
+  from: string;
+  to: string;
+  source_id: string;
+}
+
+/** Present only when the agent attempted to auto-correct figures that contradicted their sources. */
+export interface GroundingRepair {
+  attempted: boolean;
+  applied: boolean;
+  before: GroundingSummary;
+  after: GroundingSummary;
+  changes: GroundingRepairChange[];
+  reason: string;
+}
+
 export interface GroundingReport {
   claims: GroundingClaim[];
   sources: GroundingSource[];
-  summary: { total: number; verified: number; mismatch: number; unsourced: number; low_quality: number };
+  summary: GroundingSummary;
   /** The text with a ⟦status:source⟧ marker after each figure. */
   annotated: string;
+  conflicts?: GroundingConflict[];
+  stale?: GroundingStale[];
+  statements?: GroundingStatement[];
+  repair?: GroundingRepair;
 }
 
 export interface RunContext {

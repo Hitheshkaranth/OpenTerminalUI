@@ -120,6 +120,26 @@ def get_run(run_id: str, user=Depends(get_current_user), db: Session = Depends(g
     }
 
 
+# Modes whose final answer is written by the model (strategy/ensemble finals are generated from tool
+# output by code, so a contradiction there would be a checker error, not something a rewrite fixes).
+_MODEL_WRITTEN_FINALS = {"standard", "deep", "debate", "screener"}
+
+
+def _repairer(provider: Any, settings: Any):
+    """One corrective revision of a final answer whose figures/statements contradict their sources."""
+    async def repair(text: str, report: Dict[str, Any], ledger: Any):
+        from backend.agent.grounding import ground_text
+        from backend.agent.repair import repair_answer
+        from backend.services.llm.model_router import TaskProfile, select_chain
+
+        return await repair_answer(
+            provider, text, report, regrade=lambda revised: ground_text(revised, ledger),
+            models=select_chain(TaskProfile(phase="synthesis"), settings),
+            max_tokens=settings.agent_max_tokens, timeout_s=120,
+        )
+    return repair
+
+
 # --- Stream ---
 @router.get("/runs/{run_id}/stream")
 async def stream_run(run_id: str, user=Depends(get_current_user)) -> StreamingResponse:
@@ -238,6 +258,7 @@ async def stream_run(run_id: str, user=Depends(get_current_user)) -> StreamingRe
         stream = ground_stream(
             orchestrator.run(*run_args, screen_context=spec["context"], **run_kwargs),
             prompt=spec.get("prompt"),
+            repair=_repairer(provider, settings) if spec["mode"] in _MODEL_WRITTEN_FINALS else None,
         )
         async for event in stream:
             if event.get("type") == "final":
