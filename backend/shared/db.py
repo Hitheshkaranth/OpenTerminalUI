@@ -36,6 +36,17 @@ def init_db() -> None:
     _ensure_backtest_columns()
     _ensure_fundamentals_pit_columns()
     _ensure_alerts_columns()
+    _ensure_agent_run_columns()
+
+
+def _ensure_agent_run_columns() -> None:
+    inspector = inspect(engine)
+    if not inspector.has_table("agent_runs"):
+        return
+    existing = {str(column["name"]) for column in inspector.get_columns("agent_runs")}
+    if "grounding_json" not in existing:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE agent_runs ADD COLUMN grounding_json TEXT"))
 
 
 def _ensure_news_sentiment_columns() -> None:

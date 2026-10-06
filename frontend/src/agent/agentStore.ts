@@ -80,6 +80,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
           phases: [],
           roles: [],
           pending: false,
+          grounding: m.grounding ?? undefined,
         });
       }
     }
@@ -143,6 +144,14 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         case "token":
           msg.content += event.text;
           break;
+        case "grounding": {
+          const { type: _t, target, role_index, ...report } = event;
+          if (target === "final") msg.grounding = report;
+          else if (role_index != null && msg.roles[role_index]) {
+            msg.roles[role_index] = { ...msg.roles[role_index], grounding: report };
+          }
+          break;
+        }
         case "final":
           msg.content = event.content;
           msg.status = undefined;

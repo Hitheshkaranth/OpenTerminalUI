@@ -6,7 +6,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from backend.agent.events import artifact, error, final, phase, role_message, status
+from backend.agent.events import artifact, error, final, phase, role_message, status, tool_call, tool_result
 from backend.agent.playbook import EVIDENCE_SYNTHESIS
 from backend.agent.ensemble.personas import PERSONAS
 from backend.agent.ensemble.scorecard import persona_weights, store_signals
@@ -342,8 +342,15 @@ class EnsembleOrchestrator:
         facts_map: dict[str, str] = {}
         snapshots: dict[str, dict] = {}
         for sym in symbols:
-            snapshot = await _call_tool(self.registry, "get_stock_snapshot", {"ticker": sym})
-            technicals = await _call_tool(self.registry, "analyze_technicals", {"ticker": sym})
+            fetched: dict[str, dict | None] = {}
+            for tool_name in ("get_stock_snapshot", "analyze_technicals"):
+                # Surface each fetch as a tool step so the facts the personas reason over are citable sources.
+                call_id = f"ensemble-{tool_name}-{sym}"
+                yield tool_call(call_id, tool_name, {"ticker": sym})
+                fetched[tool_name] = await _call_tool(self.registry, tool_name, {"ticker": sym})
+                yield tool_result(call_id, tool_name, fetched[tool_name] or {"error": "no data"},
+                                  is_error=fetched[tool_name] is None)
+            snapshot, technicals = fetched["get_stock_snapshot"], fetched["analyze_technicals"]
             if isinstance(snapshot, dict):
                 snapshots[sym] = snapshot
             facts_map[sym] = _build_facts(sym, snapshot, technicals)
@@ -412,6 +419,9 @@ class EnsembleOrchestrator:
         # Consensus
         consensus = _consensus(all_signals, personas, weights)
 
+        avg_raw = sum(c["score"] for c in consensus) / len(consensus) if consensus else None
+        avg_score = round(avg_raw, 1) if avg_raw is not None else None
+
         # Emit signal_table artifact
         as_of = datetime.now(timezone.utc).isoformat()
         persona_weights_out = [
@@ -435,6 +445,7 @@ class EnsembleOrchestrator:
                     for s in all_signals
                 ],
                 "consensus": consensus,
+                "avg_score": avg_score,
             },
         )
 
@@ -456,15 +467,14 @@ class EnsembleOrchestrator:
             lines.append(f"- **{p.label}**: {bl}B / {br}B / {ne}N → {lean}")
 
         lines.append("")
-        if consensus:
-            avg_score = sum(c["score"] for c in consensus) / len(consensus)
-            if avg_score >= 25:
+        if avg_raw is not None:
+            if avg_raw >= 25:
                 verdict = "BUY"
-            elif avg_score <= -25:
+            elif avg_raw <= -25:
                 verdict = "SELL"
             else:
                 verdict = "HOLD"
-            lines.append(f"**Consensus: {verdict}** (avg score: {round(avg_score, 1)})")
+            lines.append(f"**Consensus: {verdict}** (avg score: {avg_score})")
         else:
             lines.append("**Consensus: No signals generated**")
 

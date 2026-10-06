@@ -18,17 +18,27 @@ ACTION_DISCIPLINE = (
     "with get_portfolio or get_paper_positions to avoid duplicate or conflicting positions."
 )
 
+GROUNDING_RULES = (
+    "Every figure you write is automatically checked against the tool results and shown to the user "
+    "with its source; figures that don't match are flagged. So: copy figures exactly as the data gives "
+    "them (you may round to fewer decimals, never change units), put the metric name right next to each "
+    "figure (\"P/E 23.4\", not \"23.4\"), and if you derive a number (a difference, a ratio) state the "
+    "source figures it came from."
+)
+
 EVIDENCE_DISCIPLINE = (
     "Evidence discipline: call the provided tools to fetch real data BEFORE making any claim. "
     "Cite concrete numbers (price, ratios, growth, dates) from tool results. Never fabricate figures "
-    "or fill gaps from memory — if a datum is unavailable, say so explicitly."
+    "or fill gaps from memory — if a datum is unavailable, say so explicitly. "
+    + GROUNDING_RULES
 )
 
 EVIDENCE_SYNTHESIS = (
     "Evidence discipline: you have NO tools in this step — reason only over the analyst notes "
     "supplied in the message. Cite the concrete numbers (price, ratios, growth, dates) already "
     "present in those notes. Never fabricate figures or fill gaps from memory; if a datum is "
-    "missing from the notes, say so explicitly rather than asking to fetch it."
+    "missing from the notes, say so explicitly rather than asking to fetch it. "
+    + GROUNDING_RULES
 )
 
 STRUCTURED_OUTPUT = (

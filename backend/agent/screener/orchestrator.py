@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import Any, AsyncGenerator
 
 from backend.agent import events
+from backend.core.provenance import make_provenance
 from backend.screener.engine import ScreenerEngine
 from backend.screener.parser import parse_query
 from backend.screener.presets import list_presets
@@ -15,6 +16,14 @@ class ScreenerAgentOrchestrator:
     def __init__(self, *, provider: Any, engine: Any = None) -> None:
         self.provider = provider
         self.engine = engine or ScreenerEngine()
+
+    @staticmethod
+    def _json_number(value: Any) -> float | None:
+        try:
+            f = float(value)
+        except (TypeError, ValueError):
+            return None
+        return f if math.isfinite(f) else None
 
     @staticmethod
     def _display_value(value: Any) -> str:
@@ -31,20 +40,14 @@ class ScreenerAgentOrchestrator:
             return f"{value:.2f}"
         return str(value)
 
+    _FUNDAMENTAL_KEYS = (
+        "pe", "roe", "roce", "debt_equity", "revenue_growth", "opm", "market_cap", "promoter_holding",
+    )
+
     @classmethod
     def _fundamentals(cls, row: Any) -> dict[str, str]:
         data = row.iloc[0]
-        keys = [
-            "pe",
-            "roe",
-            "roce",
-            "debt_equity",
-            "revenue_growth",
-            "opm",
-            "market_cap",
-            "promoter_holding",
-        ]
-        return {key: cls._display_value(data[key]) for key in keys if key in row.columns}
+        return {key: cls._display_value(data[key]) for key in cls._FUNDAMENTAL_KEYS if key in row.columns}
 
     @staticmethod
     def _group_passed(passed: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
@@ -105,10 +108,12 @@ class ScreenerAgentOrchestrator:
         us_first = market_code in self._US_MARKETS
         # Use the broadest available universe ("all") for each market so coverage is not limited to
         # the Nifty 500 / S&P 500 index members.
+        # "all" is not a universe key: the loader fell back to the NSE list for both markets, so US
+        # tickers (AAPL) were never found. Use each market's broadest real universe.
         universes = (
-            [("all", "US"), ("all", "IN")]
+            [("us_all", "US"), ("all_nse", "IN")]
             if us_first
-            else [("all", "IN"), ("all", "US")]
+            else [("all_nse", "IN"), ("us_all", "US")]
         )
         wanted = [c.strip().upper() for c in candidates if c and c.strip()]
         for universe, mkt in universes:
@@ -171,6 +176,15 @@ class ScreenerAgentOrchestrator:
 
             grouped = self._group_passed(passed)
             fundamentals = self._fundamentals(row)
+            # The fundamentals row is the ground truth for every figure in the interpretation; emit it as a
+            # tool step so the grounding layer (and the user) can cite it.
+            yield events.tool_call("screener-fundamentals", "screener_fundamentals", {"ticker": symbol})
+            yield events.tool_result("screener-fundamentals", "screener_fundamentals", {
+                "ticker": symbol,
+                **{key: self._json_number(row.iloc[0][key]) for key in self._FUNDAMENTAL_KEYS if key in row.columns},
+                "screens_passed": len(passed), "screens_evaluated": evaluated_count,
+                "provenance": make_provenance("screener fundamentals store", "cached"),
+            })
             membership_summary = self._membership_markdown(symbol, grouped, len(passed), evaluated_count)
             fundamentals_summary = self._fundamentals_markdown(fundamentals)
 

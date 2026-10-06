@@ -1,4 +1,5 @@
 import { api } from "./base";
+import type { GroundingReport } from "../agent/types";
 
 // ── C12: Threads ────────────────────────────────────────────────────────────
 
@@ -17,6 +18,7 @@ export interface ThreadDetail {
     content: string;
     run_id: string | null;
     created_at: string;
+    grounding?: GroundingReport | null;
   }[];
 }
 

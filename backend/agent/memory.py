@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -134,6 +135,16 @@ def get_thread(db: Session, user_id: str, thread_id: str) -> dict[str, Any] | No
         .order_by(AgentMessage.created_at.asc())
         .all()
     )
+    run_ids = {m.run_id for m in msgs if m.role == "assistant" and m.run_id}
+    grounding: dict[str, Any] = {}
+    if run_ids:
+        for run_id, raw in db.query(AgentRun.id, AgentRun.grounding_json).filter(
+            AgentRun.id.in_(run_ids), AgentRun.user_id == user_id,
+        ):
+            try:
+                grounding[run_id] = json.loads(raw) if raw else None
+            except (TypeError, ValueError):
+                grounding[run_id] = None
     return {
         "thread_id": t.id,
         "messages": [
@@ -143,6 +154,7 @@ def get_thread(db: Session, user_id: str, thread_id: str) -> dict[str, Any] | No
                 "content": m.content[:_TRUNC] if m.content else "",
                 "run_id": m.run_id,
                 "created_at": m.created_at,
+                **({"grounding": grounding.get(m.run_id)} if m.role == "assistant" and m.run_id else {}),
             }
             for m in msgs
         ],
@@ -176,11 +188,15 @@ def create_run(db: Session, user_id: str, run_id: str, thread_id: str | None, mo
     return run
 
 
-def finish_run(db: Session, run_id: str, final: str | None, status: str) -> None:
+def finish_run(
+    db: Session, run_id: str, final: str | None, status: str, grounding: dict[str, Any] | None = None,
+) -> None:
     run = db.query(AgentRun).filter(AgentRun.id == run_id).first()
     if run:
         run.final = final
         run.status = status
+        if grounding is not None:
+            run.grounding_json = json.dumps(grounding, default=str)
         run.finished_at = datetime.now(timezone.utc)
         db.flush()
 

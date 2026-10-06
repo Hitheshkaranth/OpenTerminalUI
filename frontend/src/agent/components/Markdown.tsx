@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SourceChip } from "./Grounding";
 
 /**
  * Dependency-free markdown renderer scoped to what the agent emits:
@@ -10,11 +11,11 @@ import type { ReactNode } from "react";
 let keySeq = 0;
 const k = () => `md${keySeq++}`;
 
-// --- inline: **bold**, `code`, [text](url) -------------------------------
+// --- inline: **bold**, `code`, [text](url), ⟦grounding marker⟧ ------------
 function renderInline(text: string): ReactNode[] {
   const nodes: ReactNode[] = [];
-  // Single regex pass over the three inline constructs, in order of appearance.
-  const re = /\*\*([^*]+)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\)/g;
+  // Single regex pass over the inline constructs, in order of appearance.
+  const re = /\*\*([^*]+)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\)|⟦([vwxu])(?::([^:⟧]+))?(?::([^⟧]*))?⟧/g;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
@@ -22,7 +23,7 @@ function renderInline(text: string): ReactNode[] {
     if (m[1] !== undefined) {
       nodes.push(
         <strong key={k()} className="font-semibold text-terminal-text">
-          {m[1]}
+          {renderInline(m[1])}
         </strong>,
       );
     } else if (m[2] !== undefined) {
@@ -34,6 +35,8 @@ function renderInline(text: string): ReactNode[] {
           {m[2]}
         </code>,
       );
+    } else if (m[5] !== undefined) {
+      nodes.push(<SourceChip key={k()} kind={m[5]} sourceId={m[6]} expected={m[7]} />);
     } else if (m[3] !== undefined && !/^(https?:\/\/|\/(?!\/))/i.test(m[4].trim())) {
       // Unsafe scheme (javascript:, data:, ...) — render the label as plain text.
       nodes.push(m[3]);
@@ -103,6 +106,11 @@ function Table({ rows }: { rows: string[] }) {
       </table>
     </div>
   );
+}
+
+/** Inline-only rendering (bold, code, links, source chips) for single-line text. */
+export function InlineMarkdown({ content }: { content: string }) {
+  return <>{renderInline(content)}</>;
 }
 
 export function Markdown({ content }: { content: string }) {

@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.agent.grounding import ground_stream
 from backend.agent.orchestrator import Orchestrator
 from backend.agent.debate import DebateOrchestrator
 from backend.agent.screener import ScreenerAgentOrchestrator
@@ -231,10 +232,18 @@ async def stream_run(run_id: str, user=Depends(get_current_user)) -> StreamingRe
 
     async def event_stream():
         final_content = None
+        final_grounding = None
         error_content = None
-        async for event in orchestrator.run(*run_args, screen_context=spec["context"], **run_kwargs):
+        # Every figure in a final/role message is checked against the tool results the run collected.
+        stream = ground_stream(
+            orchestrator.run(*run_args, screen_context=spec["context"], **run_kwargs),
+            prompt=spec.get("prompt"),
+        )
+        async for event in stream:
             if event.get("type") == "final":
                 final_content = event.get("content")
+            if event.get("type") == "grounding" and event.get("target") == "final":
+                final_grounding = {k: v for k, v in event.items() if k not in ("type", "target")}
             if event.get("type") == "error":
                 error_content = event.get("message") or event.get("content")
             yield f"data: {json.dumps(event, default=str)}\n\n"
@@ -250,7 +259,7 @@ async def stream_run(run_id: str, user=Depends(get_current_user)) -> StreamingRe
                     memory_service.append_message(
                         _db, user_id, thread_id, "assistant", final_content, run_id)
                     _db.commit()
-                memory_service.finish_run(_db, run_id, final_content, "done")
+                memory_service.finish_run(_db, run_id, final_content, "done", final_grounding)
                 _db.commit()
             except Exception:
                 logger.exception("Failed to persist stream result")

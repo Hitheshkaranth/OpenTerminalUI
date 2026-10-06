@@ -15,7 +15,8 @@ const cell: React.CSSProperties = {
 
 function RowsTable({ rows }: { rows: Record<string, unknown>[] }) {
   if (!rows.length) return <div style={{ color: "var(--ot-color-text-muted)" }}>No rows.</div>;
-  const cols = Object.keys(rows[0]);
+  // provenance is per-row metadata, not a column (the answer's Ground truth panel cites it).
+  const cols = Object.keys(rows[0]).filter((c) => c !== "provenance");
   return (
     <table style={{ borderCollapse: "collapse", width: "100%" }}>
       <thead>

@@ -180,7 +180,8 @@ class UnifiedFetcher:
             try:
                 rows = await get_adapter_registry().invoke(exchange, "get_history", adapter_symbol, interval, start_date, end_date)
                 if isinstance(rows, list) and rows:
-                    return _chart_payload_from_rows(rows)
+                    # "_source" lets callers (the agent's grounding layer) cite which provider served the bars.
+                    return {**_chart_payload_from_rows(rows), "_source": f"adapter:{exchange}"}
             except Exception as e:
                 logger.debug("Adapter history failed for %s via %s: %s", symbol, exchange, e)
 
@@ -188,14 +189,14 @@ class UnifiedFetcher:
             yahoo_sym = await market_classifier.yfinance_symbol(symbol)
             data = await self.yahoo.get_chart(yahoo_sym, range_str, interval)
             if data and "chart" in data:
-                return data
+                return {**data, "_source": "yahoo"}
         except Exception as e:
             logger.warning(f"Yahoo history failed for {symbol}: {e}")
 
         try:
             fmp_data = await self.fmp.get_historical_price_full(symbol)
             if fmp_data:
-                return fmp_data
+                return {**fmp_data, "_source": "fmp"} if isinstance(fmp_data, dict) else fmp_data
         except Exception as e:
             logger.warning(f"FMP history failed for {symbol}: {e}")
 

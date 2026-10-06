@@ -8,7 +8,43 @@ export type AgentEvent =
   | { type: "phase"; key: string; label: string }
   | { type: "role_message"; role: string; content: string }
   | { type: "final"; content: string }
+  | ({ type: "grounding"; target: "final" | "role"; role_index?: number } & GroundingReport)
   | { type: "error"; message: string };
+
+/** A tool result the run collected, cited as the ground truth for figures in the answer. */
+export interface GroundingSource {
+  id: string;
+  tool: string;
+  call_id: string | null;
+  args: Record<string, unknown>;
+  provider: string;
+  quality: string;
+  as_of: string | null;
+  note: string | null;
+}
+
+export interface GroundingClaim {
+  text: string;
+  value: number;
+  metric: string | null;
+  status: "verified" | "mismatch" | "unsourced";
+  approx: boolean;
+  in_code: boolean;
+  source_id: string | null;
+  path: string | null;
+  source_value: number | null;
+  subject: string | null;
+  expected?: string;
+  warning?: string;
+}
+
+export interface GroundingReport {
+  claims: GroundingClaim[];
+  sources: GroundingSource[];
+  summary: { total: number; verified: number; mismatch: number; unsourced: number; low_quality: number };
+  /** The text with a ⟦status:source⟧ marker after each figure. */
+  annotated: string;
+}
 
 export interface RunContext {
   route?: string;
@@ -34,6 +70,7 @@ export interface AgentPhase {
 export interface AgentRoleNote {
   role: string;
   content: string;
+  grounding?: GroundingReport;
 }
 
 export interface AgentMessage {
@@ -45,6 +82,7 @@ export interface AgentMessage {
   roles: AgentRoleNote[];
   pending: boolean;
   model?: string;
+  grounding?: GroundingReport;
   /** Transient live progress note for the active turn (e.g. "Contacting llama…",
    * "rate-limited; retrying in 15s…"). Not part of the persisted answer. */
   status?: string;

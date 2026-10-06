@@ -21,6 +21,7 @@ from backend.core.single_asset_backtest import BacktestEngine, generate_sma_cros
 from backend.core.backtesting_models import BacktestConfig
 from backend.core.backtester import BacktestConfig as RotationConfig, backtest_momentum_rotation
 from backend.core.backtest_robustness import multi_window_robustness, permutation_test
+from backend.core.provenance import make_provenance, provenance_from_snapshot
 
 # Compact set of columns returned to the agent (the full screener row carries viz
 # data, scores and sparklines that just bloat the LLM context).
@@ -141,6 +142,18 @@ def _normalize_screener_query(query: str) -> str:
     return normalized
 
 
+_HISTORY_QUALITY = {"yahoo": "delayed", "fmp": "delayed"}
+
+
+def _history_provenance(raw: Any, what: str, as_of: str | None = None) -> dict[str, Any]:
+    """Provenance for figures computed from a price-history payload (the fetcher tags its provider)."""
+    source = raw.get("_source") if isinstance(raw, dict) else None
+    if not source:
+        return make_provenance("price history", "unreported", as_of=as_of, note=f"{what}; provider not reported")
+    quality = _HISTORY_QUALITY.get(source, "live" if str(source).startswith("adapter:") else "unreported")
+    return make_provenance(source, quality, as_of=as_of, note=f"{what} from {source} daily bars")
+
+
 def _technical_empty(ticker: str, note: str) -> dict[str, Any]:
     return {
         "ticker": ticker, "as_of": None, "price": None,
@@ -233,6 +246,7 @@ async def backtest_symbol(args: dict[str, Any]) -> dict[str, Any]:
             "ticker": ticker, "strategy": "sma_crossover",
             "params": {"short_window": short_window, "long_window": long_window},
             "bars": result.bars, "metrics": metrics, "equity_curve": curve,
+            "provenance": _history_provenance(raw, "SMA-crossover backtest", curve[-1]["date"] if curve else None),
         }
     except asyncio.TimeoutError:
         return _backtest_symbol_empty(ticker, short_window, long_window, "Backtest timed out after 60 seconds.")
@@ -290,6 +304,8 @@ async def backtest_basket(args: dict[str, Any]) -> dict[str, Any]:
             "summary": {"strategy": metrics("strategy"), "benchmark": metrics("benchmark"),
                         "alpha_total_return_pct": _safe_float(raw_summary.get("alpha_total_return")) * 100},
             "equity_curve": rows,
+            "provenance": make_provenance("yahoo", "delayed", as_of=rows[-1]["date"] if rows else None,
+                                          note="momentum-rotation backtest over yfinance adjusted closes"),
         }
     except asyncio.TimeoutError:
         return {**base, "note": "Basket backtest timed out after 90 seconds."}
@@ -446,6 +462,8 @@ async def screen_stocks(args: dict[str, Any]) -> dict[str, Any]:
         "analysis": _screen_analysis(trimmed, count),
         "top_candidates": top_candidates,
         "results": trimmed,
+        "provenance": make_provenance("screener fundamentals store", "cached",
+                                      note=f"{universe} ({market}) fundamentals snapshot"),
     }
     if count == 0:
         payload["note"] = (
@@ -469,6 +487,7 @@ async def get_stock_snapshot(args: dict[str, Any]) -> dict[str, Any]:
     fetcher = await get_unified_fetcher()
     snap = dict(await fetcher.fetch_stock_snapshot(symbol) or {})
     # The raw snapshot has no 52-week high/low, so "is it above its 52-week midpoint?" was unanswerable.
+    snap["provenance"] = provenance_from_snapshot(snap)
     try:
         history = await asyncio.wait_for(fetcher.fetch_history(symbol, range_str="1y", interval="1d"), timeout=8)
         stats = _session_stats_from_history(history if isinstance(history, dict) else {})
@@ -499,7 +518,7 @@ async def compare_stocks(args: dict[str, Any]) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     for sym in tickers:
         snap = await fetcher.fetch_stock_snapshot(sym)
-        row = {"symbol": sym}
+        row = {"symbol": sym, "provenance": provenance_from_snapshot(snap or {})}
         if metrics:
             for m in metrics:
                 row[m] = snap.get(m)
@@ -600,6 +619,7 @@ async def analyze_technicals(args: dict[str, Any]) -> dict[str, Any]:
         return {
             "ticker": ticker,
             "as_of": enriched.index[-1].isoformat(),
+            "provenance": _history_provenance(raw, "indicators", enriched.index[-1].isoformat()),
             "price": price,
             "trend": {
                 "ema_9": last("ema_9"), "ema_21": last("ema_21"), "ema_50": ema_50, "ema_200": ema_200,

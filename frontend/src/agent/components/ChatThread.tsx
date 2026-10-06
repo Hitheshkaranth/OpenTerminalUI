@@ -1,7 +1,8 @@
 import { AiThinking } from "../../components/ai/AiVisuals";
-import { Markdown } from "./Markdown";
+import { InlineMarkdown, Markdown } from "./Markdown";
+import { GroundingContext, SourcesPanel } from "./Grounding";
 import { ProposalCard } from "./ProposalCard";
-import type { AgentMessage, AgentPhase, AgentRoleNote } from "../types";
+import type { AgentMessage, AgentPhase, AgentRoleNote, GroundingReport } from "../types";
 
 // Role → display label, short avatar glyph and accent tone. Mirrors the debate
 // roles emitted by the backend; tones map to the home palette.
@@ -69,8 +70,11 @@ function RoleCard({ note }: { note: AgentRoleNote }) {
           {meta.label}
         </span>
       </div>
-      <div className="px-2.5 py-2 text-xs leading-5 text-terminal-muted">
-        <Markdown content={note.content} />
+      <div className="flex flex-col gap-1.5 px-2.5 py-2 text-xs leading-5 text-terminal-muted">
+        <GroundingContext.Provider value={note.grounding ?? null}>
+          <Markdown content={note.grounding?.annotated ?? note.content} />
+        </GroundingContext.Provider>
+        {note.grounding && note.grounding.summary.total > 0 ? <SourcesPanel report={note.grounding} /> : null}
       </div>
     </div>
   );
@@ -138,7 +142,9 @@ function DecisionBanner({ decision }: { decision: Decision }) {
           </div>
         ) : null}
         {decision.rationale ? (
-          <p className="mt-2.5 text-[13px] leading-5 text-terminal-text">{decision.rationale}</p>
+          <p className="mt-2.5 text-[13px] leading-5 text-terminal-text">
+            <InlineMarkdown content={decision.rationale} />
+          </p>
         ) : null}
       </div>
     </div>
@@ -157,10 +163,18 @@ function PendingIndicator({ status }: { status?: string }) {
 }
 
 // --- assistant body ------------------------------------------------------
-function AssistantBody({ content }: { content: string }) {
-  const decision = parseDecision(content);
-  if (decision) return <DecisionBanner decision={decision} />;
-  return <Markdown content={content} />;
+function AssistantBody({ content, grounding }: { content: string; grounding?: GroundingReport }) {
+  // The annotated copy carries a source chip after every figure; fall back to the raw answer.
+  const text = grounding?.annotated || content;
+  const decision = parseDecision(text);
+  return (
+    <GroundingContext.Provider value={grounding ?? null}>
+      <div className="flex flex-col gap-2">
+        {decision ? <DecisionBanner decision={decision} /> : <Markdown content={text} />}
+        {grounding ? <SourcesPanel report={grounding} /> : null}
+      </div>
+    </GroundingContext.Provider>
+  );
 }
 
 interface ProposalEntry { step: { id: string; name: string; isError: boolean; result?: unknown }; proposal: { proposal_id: string; type: string; summary: string; payload: unknown; status: string; expires_at: string } }
@@ -207,7 +221,7 @@ function ChatThreadInner({ messages, proposalReplacements }: { messages: AgentMe
           {m.pending && !m.content ? (
             <PendingIndicator status={m.status} />
           ) : m.role === "assistant" ? (
-            m.content ? <AssistantBody content={m.content} /> : null
+            m.content ? <AssistantBody content={m.content} grounding={m.grounding} /> : null
           ) : (
             <div
               style={{

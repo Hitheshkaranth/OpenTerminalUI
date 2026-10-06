@@ -41,6 +41,8 @@ class AgentRun(Base):
     mode: Mapped[str] = mapped_column(String(32), default="standard")
     prompt: Mapped[str] = mapped_column(Text, default="")
     final: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # JSON grounding report for ``final``: each figure, its source tool result and whether it matched.
+    grounding_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="running", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
