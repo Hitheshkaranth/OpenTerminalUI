@@ -102,6 +102,9 @@ class Orchestrator:
         history: list[LLMMessage] | None = None, memory_directive: str | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         settings = get_settings()
+        from backend.agent.run_context import active_market
+
+        active_market.set(str((screen_context or {}).get("market") or "").strip().upper() or None)
         intent = classify_intent(user_prompt)
         tool_models = select_chain(
             TaskProfile(mode="deep" if self.max_steps > 12 else "standard", phase="tool_use", intent=intent),

@@ -51,13 +51,17 @@ def _clamp(value: Any, default: int, lo: int, hi: int) -> int:
 # ---------------------------------------------------------------------------
 
 async def get_news_sentiment(args: dict[str, Any]) -> dict[str, Any]:
+    from backend.agent.run_context import active_market
+
     symbol = str(args.get("symbol") or "").strip().upper() or None
     limit = _clamp(args.get("limit"), default=20, lo=1, hi=100)
+    # Explicit market, else the market the user is on; without one "CCL" resolved to NYSE (Carnival).
+    market = str(args.get("market") or active_market.get() or "").strip().upper() or None
 
     try:
         if symbol:
-            headlines_payload = await _get_news_by_ticker(ticker=symbol, limit=limit, market=None)
-            aggregate = await _get_news_sentiment_route(ticker=symbol, days=7, market=None)
+            headlines_payload = await _get_news_by_ticker(ticker=symbol, limit=limit, market=market)
+            aggregate = await _get_news_sentiment_route(ticker=symbol, days=7, market=market)
         else:
             headlines_payload = await _get_latest_news(limit=limit)
             aggregate = await _get_news_sentiment_summary(days=7, limit=max(limit, 20))
@@ -272,6 +276,8 @@ def news_tool_specs(user_id: str) -> list[ToolSpec]:
                 "type": "object",
                 "properties": {
                     "symbol": {"type": "string", "description": "Optional ticker. Omit for market-wide news."},
+                    "market": {"type": "string", "description": "Exchange for the ticker, e.g. NSE, BSE, NASDAQ. "
+                               "Defaults to the market the user is viewing."},
                     "limit": {"type": "integer", "default": 20, "minimum": 1, "maximum": 100},
                 },
             },

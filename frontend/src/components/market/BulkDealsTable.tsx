@@ -16,8 +16,9 @@ export const BulkDealsTable: React.FC = () => {
         : [];
 
     if (isLoading) return <div className="h-64 animate-pulse rounded border border-terminal-border bg-terminal-panel"></div>;
-    if (error) return <div className="text-terminal-neg">Failed to load bulk deals</div>;
-    if (!rows.length) return <div className="text-terminal-muted">No bulk deals found today</div>;
+    if (error) return <div className="px-2.5 py-4 text-[11px] text-terminal-neg">Failed to load bulk deals.</div>;
+    // Explicit size: the empty state inherited a heading-sized font from the dashboard panel.
+    if (!rows.length) return <div className="px-2.5 py-4 text-[11px] text-terminal-muted">No bulk deals found today.</div>;
 
     return (
         <div className="overflow-hidden rounded border border-terminal-border bg-terminal-panel p-4">

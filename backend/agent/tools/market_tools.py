@@ -477,6 +477,17 @@ async def get_stock_snapshot(args: dict[str, Any]) -> dict[str, Any]:
                 snap[key] = value
     except Exception:  # noqa: BLE001 - agent tools must never raise
         pass
+    # Pre-computed 52-week position: left to the model, the arithmetic came out wrong on some runs
+    # ("74% of the range" for a stock at 56%).
+    try:
+        price, hi, lo = (float(snap[k]) for k in ("current_price", "high_52w", "low_52w"))
+        if hi > lo > 0:
+            snap["range_52w_position_pct"] = round((price - lo) / (hi - lo) * 100, 1)
+            snap["pct_below_52w_high"] = round((hi - price) / hi * 100, 1)
+            snap["pct_above_52w_low"] = round((price - lo) / lo * 100, 1)
+            snap["range_52w_midpoint"] = round((hi + lo) / 2, 2)
+    except (KeyError, TypeError, ValueError):
+        pass
     return snap
 
 

@@ -6,6 +6,7 @@ import { useMarketStatus } from "../../hooks/useStocks";
 import { useAlertsStore } from "../../store/alertsStore";
 import { useQuotesStore } from "../../realtime/useQuotesStream";
 import { useProvidersStatus } from "../../api/providers";
+import { useAgentStore } from "../../agent/agentStore";
 
 function formatZone(now: Date, timeZone: string) {
   return now.toLocaleTimeString([], {
@@ -40,6 +41,8 @@ function Dot({ tone }: { tone: "green" | "yellow" | "red" | "gray" }) {
 }
 
 export function MarketStatusBar(_props: { tickerOverride?: string | null } = {}) {
+  const agentOpen = useAgentStore((st) => st.open);
+  const toggleAgent = useAgentStore((st) => st.toggleOpen);
   const { data: marketStatus } = useMarketStatus();
   const unreadAlerts = useAlertsStore((s) => s.unreadCount);
   const connectionState = useQuotesStore((s) => s.connectionState);
@@ -112,6 +115,17 @@ export function MarketStatusBar(_props: { tickerOverride?: string | null } = {})
             <span>NYSE: {nyseOpen}</span>
           </span>
           {marketPayload.nextOpenTime ? <span className="text-terminal-muted">NEXT OPEN {String(marketPayload.nextOpenTime)}</span> : null}
+          {/* Desktop home of the agent launcher: as a floating button it covered page controls and this bar. */}
+          {!agentOpen ? (
+            <button
+              type="button"
+              onClick={toggleAgent}
+              aria-label="Open agent console (Ctrl+J)"
+              className="hidden items-center gap-1 rounded-sm border border-terminal-accent/60 px-1.5 leading-4 text-terminal-accent transition-colors hover:bg-terminal-accent/15 md:inline-flex"
+            >
+              AGENT <span className="opacity-60">⌃J</span>
+            </button>
+          ) : null}
         </div>
 
         <div className="inline-flex items-center gap-3 ot-type-data whitespace-nowrap">

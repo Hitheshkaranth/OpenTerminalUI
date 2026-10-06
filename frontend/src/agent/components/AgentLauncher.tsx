@@ -7,7 +7,7 @@ export function AgentLauncher() {
   if (open) return null;
   return (
     <button type="button" className="ot-agent-launcher" onClick={toggleOpen} aria-label="Open agent console (Ctrl+J)">
-      Agent
+      Agent <kbd aria-hidden="true">⌃J</kbd>
     </button>
   );
 }

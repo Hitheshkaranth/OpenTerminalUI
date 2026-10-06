@@ -1,3 +1,4 @@
+import { parseInstrument } from "../lib/instrument";
 import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
 import type { RunContext } from "./types";
@@ -16,7 +17,8 @@ const EQUITY_SYMBOL_ROUTES = [
 ];
 
 // Explicit ":ticker" URL routes (e.g. /equity/security/RELIANCE, /stock/AAPL).
-const URL_SYMBOL_RE = /\/(?:stock|equity\/security|crypto|forex|commodities)\/([A-Za-z0-9.\-&]+)/;
+// ":" is allowed so "NSE:CCL" is read whole (it used to yield the symbol "NSE").
+const URL_SYMBOL_RE = /\/(?:stock|equity\/security|crypto|forex|commodities)\/([A-Za-z0-9.\-&:%]+)/;
 
 /** Capture lightweight context about the screen the user is on so the agent
  *  defaults to the stock currently open (no need to re-type the ticker). */
@@ -26,8 +28,11 @@ export function buildScreenContext(): RunContext {
 
   // 1) Prefer a ticker explicitly present in the URL.
   const match = path.match(URL_SYMBOL_RE);
+  let urlExchange: string | null = null;
   if (match) {
-    ctx.symbol = decodeURIComponent(match[1]).toUpperCase();
+    const parsed = parseInstrument(decodeURIComponent(match[1]).toUpperCase());
+    ctx.symbol = parsed.symbol;
+    urlExchange = parsed.exchange;
   } else if (EQUITY_SYMBOL_ROUTES.some((r) => path === r || path.startsWith(`${r}/`))) {
     // 2) Otherwise fall back to the active symbol held in the stock store
     //    (the stock detail / cockpit / chart pages drive this).
@@ -38,7 +43,8 @@ export function buildScreenContext(): RunContext {
   // Carry the user's selected market so the agent resolves the right exchange
   // (e.g. an Indian name like "Supra Life Science" -> NSE, not a US ticker).
   try {
-    const market = useSettingsStore.getState().selectedMarket;
+    // An exchange named in the URL (NSE:CCL) is more specific than the global selection.
+    const market = urlExchange || useSettingsStore.getState().selectedMarket;
     if (market) ctx.market = market;
   } catch {
     // settings store unavailable (e.g. in isolated tests) — context stays minimal.

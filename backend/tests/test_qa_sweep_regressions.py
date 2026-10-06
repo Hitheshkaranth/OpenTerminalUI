@@ -336,3 +336,28 @@ def test_value_chain_rejects_anonymised_parties():
     for real in ["Taiwan Semiconductor Manufacturing Company Limited", "SK Hynix Inc.", "The Coca-Cola Company",
                  "Fabrinet", "SB Energy Corp.", "Wistron Corporation", "Cardinal Health, Inc."]:
         assert not vc.is_generic_party(real), real
+
+
+def test_agent_news_tool_uses_the_users_market(monkeypatch):
+    from backend.agent.run_context import active_market
+    from backend.agent.tools import news_tools
+
+    seen = {}
+
+    async def fake_by_ticker(ticker, limit, market):
+        seen["headlines"] = market
+        return {"items": []}
+
+    async def fake_sentiment(ticker, days, market):
+        seen["sentiment"] = market
+        return {}
+
+    monkeypatch.setattr(news_tools, "_get_news_by_ticker", fake_by_ticker)
+    monkeypatch.setattr(news_tools, "_get_news_sentiment_route", fake_sentiment)
+
+    async def run():
+        active_market.set("NSE")  # set inside the task, as the orchestrator does for each run
+        await news_tools.get_news_sentiment({"symbol": "CCL"})
+
+    asyncio.run(run())
+    assert seen == {"headlines": "NSE", "sentiment": "NSE"}

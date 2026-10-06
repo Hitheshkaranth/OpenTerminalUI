@@ -21,19 +21,36 @@
 @media (prefers-reduced-motion: reduce) {
   .ot-agent-panel { transition: none; }
 }
+/* Compact pill that sits just above the status bar: the old 44px button floated 16px from the corner,
+   on top of the status bar and of page controls (e.g. "Open screener") on a 1512px MacBook screen. */
 .ot-agent-launcher {
   position: fixed;
-  bottom: var(--ot-space-4);
-  right: var(--ot-space-4);
+  bottom: 30px;
+  right: 14px;
   z-index: 1100;
-  border-radius: var(--ot-radius-md);
-  border: 1px solid var(--ot-color-border-default);
-  background: var(--ot-color-accent-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--ot-color-accent-primary);
+  background: color-mix(in srgb, var(--ot-color-accent-primary) 88%, transparent);
   color: var(--ot-color-text-inverse);
   font-family: var(--ot-font-ui);
+  font-size: 12px;
   font-weight: var(--ot-font-weight-semibold);
-  padding: var(--ot-space-2) var(--ot-space-3);
+  line-height: 1;
+  padding: 6px 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   cursor: pointer;
+}
+/* Desktop uses the status-bar button instead; the floating pill stays for phones (no status bar). */
+@media (min-width: 768px) {
+  .ot-agent-launcher { display: none; }
+}
+.ot-agent-launcher kbd {
+  font: inherit;
+  font-size: 10px;
+  opacity: 0.7;
 }
 /* Below md the shell shows a fixed MobileBottomNav (~58px + safe area); lift the
    launcher above it so it never covers the nav's rightmost (Portfolio) tab. */

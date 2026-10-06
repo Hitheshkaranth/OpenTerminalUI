@@ -36,7 +36,7 @@ import { TerminalTabs, type TerminalTabItem } from "../components/terminal/Termi
 import { TerminalInput } from "../components/terminal/TerminalInput";
 import { X, Search, FileText } from "lucide-react";
 import { useAnalystConsensus, useFinancials, usePeerComparison, useStock, useStockHistory } from "../hooks/useStocks";
-import { isExchange, countryForExchange } from "../lib/instrument";
+import { isExchange, countryForExchange, parseInstrument } from "../lib/instrument";
 import { quickAddToFirstPortfolio } from "../shared/portfolioQuickAdd";
 import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
@@ -165,7 +165,24 @@ export function SecurityHubPage() {
   const storeTicker = useStockStore((s) => s.ticker);
   const setTicker = useStockStore((s) => s.setTicker);
   const loadTicker = useStockStore((s) => s.load);
-  const activeTicker = (tickerParam || searchParams.get("ticker") || storeTicker || "RELIANCE").toUpperCase();
+  const rawTicker = (tickerParam || searchParams.get("ticker") || storeTicker || "RELIANCE").toUpperCase();
+  // "NSE:CCL" / "CCL.NS" name the listing explicitly. The raw string used to be used as the ticker, so
+  // NSE:CCL rendered as an unknown NASDAQ security, and a bare "CCL" stayed on whatever market was
+  // selected (Carnival on NYSE rather than CCL Products on NSE).
+  const parsedInstrument = useMemo(() => parseInstrument(rawTicker), [rawTicker]);
+  const activeTicker = parsedInstrument.symbol || rawTicker;
+  const setSelectedMarket = useSettingsStore((s) => s.setSelectedMarket);
+  const setSelectedCountry = useSettingsStore((s) => s.setSelectedCountry);
+  // The explicit exchange wins (kept in the URL so the link stays shareable).
+  useEffect(() => {
+    const ex = parsedInstrument.exchange;
+    if (!ex) return;
+    if (ex !== selectedMarket) {
+      const country = countryForExchange(ex);
+      if (country !== selectedCountry) setSelectedCountry(country);
+      setSelectedMarket(ex);
+    }
+  }, [parsedInstrument.exchange, selectedMarket, selectedCountry, setSelectedMarket, setSelectedCountry]);
   const tabFromUrl = (searchParams.get("tab") || "overview").toLowerCase() as HubTab;
   const tab = HUB_TABS.some((t) => t.id === tabFromUrl) ? tabFromUrl : "overview";
   const [newsSelectedIndex, setNewsSelectedIndex] = useState(0);
@@ -221,13 +238,14 @@ export function SecurityHubPage() {
 
   // Market follows the symbol: a snapshot that resolves to a different exchange
   // re-points the global market/country so every other panel agrees with the header.
-  const setSelectedMarket = useSettingsStore((s) => s.setSelectedMarket);
-  const setSelectedCountry = useSettingsStore((s) => s.setSelectedCountry);
   const setInstrument = useStockStore((s) => s.setInstrument);
   const queryClient = useQueryClient();
   useEffect(() => {
     const ex = stockQuery.data?.exchange;
     if (!isExchange(ex)) return;
+    // A snapshot fetched before an explicit exchange applied (e.g. CCL under NYSE = Carnival) must not
+    // drag the market away from the listing the URL asked for.
+    if (parsedInstrument.exchange && ex !== parsedInstrument.exchange) return;
     setInstrument({ symbol: activeTicker, exchange: ex });
     if (ex !== selectedMarket) {
       // Seed the snapshot under the resolved market so the header doesn't drop back to "Loading" while
@@ -237,7 +255,7 @@ export function SecurityHubPage() {
       if (country !== selectedCountry) setSelectedCountry(country);
       setSelectedMarket(ex);
     }
-  }, [stockQuery.data, activeTicker, selectedMarket, selectedCountry, setSelectedMarket, setSelectedCountry, setInstrument, queryClient]);
+  }, [stockQuery.data, activeTicker, parsedInstrument.exchange, selectedMarket, selectedCountry, setSelectedMarket, setSelectedCountry, setInstrument, queryClient]);
 
   const historyQuery = useStockHistory(activeTicker, "6mo", "1d");
   const annualFinancialsQuery = useFinancials(activeTicker, "annual");
