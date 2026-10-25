@@ -47,7 +47,28 @@ Most retail tools stop at price charts and ratios. OpenTerminalUI is built for t
 
 ## 🧭 Feature tour
 
-> Screenshots are captured from the running app once each page has fully loaded (`scripts/capture_readme.mjs`), across a spread of popular stocks.
+> Screenshots are captured from the running app using `scripts/capture_readme.mjs` and browser verification. The research dossier screenshots below use Apple's published FY2025 Q1 statements; they show historical research, not a current investment recommendation.
+
+### Company research dossiers
+
+Keep a company thesis, assumptions, catalysts and invalidation conditions alongside the evidence. Company logos, names, tickers, exchanges and sector metadata make each dossier recognizable, with direct links to the company overview and website. Missing logos fall back to the ticker.
+
+<img src="assets/readme/research-dossiers.png" alt="Apple research dossier with company logo, NASDAQ identity, investment thesis and saved research navigation" width="100%" />
+
+Supporting, opposing and neutral evidence retain source links and publication dates. Search ingested filings, attach passages, review revision history, and check for new source changes without duplicating prior observations. Read-only sharing uses revocable, frozen snapshots.
+
+<table>
+  <tr>
+    <td width="74%"><img src="assets/readme/research-evidence.png" alt="Apple financial evidence showing services growth, Greater China exposure, source links and publication dates" /></td>
+    <td width="26%"><img src="assets/readme/research-mobile.png" alt="Mobile research dossier showing Apple identity, company links and thesis controls" /></td>
+  </tr>
+  <tr>
+    <td><b>Source-backed research</b>: evidence from Apple's official statements, with each claim's relationship to the thesis visible.</td>
+    <td><b>Mobile review</b>: company identity, research actions and readable thesis content.</td>
+  </tr>
+</table>
+
+Frozen-data experiments display training and validation results, simulation costs and source provenance, with deterministic replay for supported SMA inputs. Historical availability is validated rather than guessed. See the [real-data validation report](docs/REAL_DATA_VALIDATION.md) and [research workspace guide](docs/RESEARCH_WORKSPACE_UPGRADE.md) for tested behavior and current limits.
 
 ### Security Hub
 
