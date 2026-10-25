@@ -82,10 +82,10 @@ export function runReflections(benchmarkDays = 0): Promise<ReflectionResult> {
 
 export interface ProposalItem {
   proposal_id: string;
-  type: "paper_order" | "alert" | "watchlist_add";
+  type: "paper_order" | "alert" | "watchlist_add" | "watchlist_remove" | "rebalance" | "journal_entry" | "screener_alert";
   summary: string;
   payload: Record<string, unknown>;
-  status: "pending" | "confirmed" | "rejected" | "expired" | "failed";
+  status: "pending" | "executing" | "confirmed" | "rejected" | "expired" | "failed";
   expires_at: string;
   created_at?: string;
   rationale?: string;
@@ -98,8 +98,11 @@ export interface ProposalsResponse {
 
 export interface ConfirmResponse {
   id: string;
-  status: "confirmed" | "failed";
+  status: "confirmed" | "executing" | "failed";
   result: Record<string, unknown> | null;
+}
+export function getProposal(id: string): Promise<ProposalItem> {
+  return api.get(`/agent/proposals/${encodeURIComponent(id)}`).then((r) => r.data);
 }
 
 export function listProposals(status?: string): Promise<ProposalsResponse> {

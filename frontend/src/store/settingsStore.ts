@@ -76,6 +76,12 @@ type SettingsState = {
   newsAutoRefresh: boolean;
   newsRefreshSec: number;
   themeVariant: ThemeVariant;
+  density: "compact" | "comfortable";
+  textScale: number;
+  terminalEffects: boolean;
+  setDensity: (value: "compact" | "comfortable") => void;
+  setTextScale: (value: number) => void;
+  setTerminalEffects: (value: boolean) => void;
   customAccentColor: string;
   hudOverlayEnabled: boolean;
   tickerTapeVisible: boolean;
@@ -120,6 +126,12 @@ export const useSettingsStore = create<SettingsState>()(
       newsAutoRefresh: true,
       newsRefreshSec: 60,
       themeVariant: "terminal-noir",
+      density: "comfortable",
+      textScale: 1,
+      terminalEffects: false,
+      setDensity: (density) => set({ density }),
+      setTextScale: (value) => set({ textScale: Number.isFinite(value) ? Math.max(0.9, Math.min(1.4, value)) : 1 }),
+      setTerminalEffects: (terminalEffects) => set({ terminalEffects }),
       customAccentColor: "#FF6B00",
       hudOverlayEnabled: false,
       tickerTapeVisible: true,
@@ -171,6 +183,9 @@ export const useSettingsStore = create<SettingsState>()(
         return {
           ...current,
           ...persisted,
+          density: persisted.density === "compact" ? "compact" : "comfortable",
+          textScale: typeof persisted.textScale === "number" && Number.isFinite(persisted.textScale) ? Math.max(0.9, Math.min(1.4, persisted.textScale)) : 1,
+          terminalEffects: persisted.terminalEffects === true,
           selectedCountry,
           selectedMarket: normalizePersistedMarket((persisted as any).selectedMarket, selectedCountry),
           themeVariant:

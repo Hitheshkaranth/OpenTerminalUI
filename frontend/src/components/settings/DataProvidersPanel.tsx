@@ -206,6 +206,16 @@ export function DataProvidersPanel() {
 
   return (
     <div>
+      <section aria-label="Provider setup checklist" className="mb-4 border-b border-terminal-border pb-4">
+        <h3 className="mb-2 text-sm font-semibold">Set up your research desk</h3>
+        <p className="mb-3 text-sm text-terminal-muted">Choose the capabilities you need, configure a provider, then test the connection. A configured key does not guarantee coverage for every instrument.</p>
+        <ul className="space-y-2 text-sm">
+          {data.providers.filter((provider) => provider.unlocks.length > 0).map((provider) => <li key={provider.id} className="flex flex-wrap items-center justify-between gap-2">
+            <span><strong>{provider.name}</strong>: {provider.unlocks.join(", ")}</span>
+            <span>{provider.status === "ok" ? "Connection healthy" : provider.status === "degraded" ? "Limited availability" : provider.configured ? "Connection needs attention" : "Setup required"}{isAdmin && provider.env_keys.length > 0 && <button type="button" className="ml-2 underline" onClick={() => setOpenProvider(provider.id)}>Configure {provider.name}</button>}</span>
+          </li>)}
+        </ul>
+      </section>
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-terminal-muted">Overall:</span>

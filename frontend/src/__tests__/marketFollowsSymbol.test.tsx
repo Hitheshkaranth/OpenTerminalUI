@@ -29,6 +29,10 @@ vi.mock("../api/client", () => ({
 vi.mock("../components/chart/TradingChart", () => ({
   TradingChart: () => <div>Mock Chart</div>,
 }));
+// This test exercises market selection, not the canvas renderer or live chart API.
+vi.mock("../components/security/PriceOverviewChart", () => ({
+  PriceOverviewChart: () => <div>Price overview</div>,
+}));
 
 function renderHub(route = "/equity/security/RELIANCE") {
   const queryClient = new QueryClient({

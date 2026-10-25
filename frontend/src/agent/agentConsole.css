@@ -8,12 +8,17 @@
   flex-direction: column;
   background: var(--ot-color-canvas);
   border-left: 1px solid var(--ot-color-border-default);
-  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
   z-index: 1200;
   transform: translateX(0);
   transition: transform 180ms ease;
   font-family: var(--ot-font-ui);
 }
+.ot-agent-panel--expanded { width: min(1120px, 100vw); }
+@media (min-width: 1200px) {
+  body.ot-agent-docked .ot-route-layer { margin-right: 560px; }
+}
+.ot-agent-panel :is(button, select, input, a):focus-visible { outline: 2px solid var(--ot-color-accent-primary); outline-offset: 2px; }
+.ot-agent-panel button:disabled { cursor: not-allowed; opacity: 0.55; }
 .ot-agent-panel--closed {
   transform: translateX(100%);
   pointer-events: none;

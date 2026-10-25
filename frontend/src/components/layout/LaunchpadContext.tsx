@@ -7,8 +7,13 @@ import {
   useEffect,
   useMemo,
   useState,
+  useReducer,
   type ReactNode,
 } from "react";
+
+import { validateGroupContext, type WorkspaceGroupContext } from "../../workspace/groupContext";
+import { readPendingArtifacts, clearPendingArtifacts } from "../../workspace/pinnedArtifacts";
+import { parseWorkspace, serializeWorkspace } from "../../workspace/portableLayout";
 
 import type { LinkGroup } from "../../contexts/SymbolLinkContext";
 import { getWorkspacePresetConfig, readWorkspacePreset } from "../../workspace/presets";
@@ -42,7 +47,9 @@ export type LaunchpadPanelType =
   | "watchlist-heatmap"
   | "sector-rotation"
   | "hotkeys"
-  | "research-notes";
+  | "research-notes"
+  | "research-artifact"
+  | `plugin:${string}`;
 
 export type LaunchpadPanelConfig = {
   id: string;
@@ -63,6 +70,7 @@ export type LaunchpadLayoutPreset = {
   id: string;
   name: string;
   panels: LaunchpadPanelConfig[];
+  groups?: Partial<Record<Exclude<LinkGroup, "none">, WorkspaceGroupContext>>;
 };
 
 type LaunchpadContextValue = {
@@ -85,6 +93,11 @@ type LaunchpadContextValue = {
   symbolEventVersion: number;
   lastBroadcastSymbol: string | null;
   loadingLayouts: boolean;
+  updateGroupContext: (group: Exclude<LinkGroup, "none">, context: WorkspaceGroupContext) => void;
+  canUndo: boolean;
+  undo: () => void;
+  exportWorkspace: () => string;
+  importWorkspace: (raw: string) => void;
 };
 
 const LaunchpadContext = createContext<LaunchpadContextValue | null>(null);
@@ -121,6 +134,7 @@ export const SUPPORTED_LAUNCHPAD_PANEL_TYPES: LaunchpadPanelType[] = [
   "sector-rotation",
   "hotkeys",
   "research-notes",
+  "research-artifact",
 ];
 
 export function isLaunchpadPanelType(value: string): value is LaunchpadPanelType {
@@ -240,7 +254,8 @@ function writeLocalLayouts(layouts: LaunchpadLayoutPreset[]) {
   }
 }
 
-const PANEL_REGISTRY: Record<LaunchpadPanelType, ComponentType<{ panel: LaunchpadPanelConfig }>> = {
+export const PANEL_REGISTRY: Record<LaunchpadPanelType, ComponentType<{ panel: LaunchpadPanelConfig }>> = {
+  "research-artifact": lazy(() => import("./ResearchPanels").then((m) => ({ default: m.ResearchArtifactPanel }))),
   chart: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadChartPanel }))),
   watchlist: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadWatchlistPanel }))),
   news: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadNewsFeedPanel }))),
@@ -253,17 +268,17 @@ const PANEL_REGISTRY: Record<LaunchpadPanelType, ComponentType<{ panel: Launchpa
   alerts: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadAlertsPanel }))),
   financials: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadFundamentalsPanel }))),
   "portfolio-summary": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadPortfolioSummaryPanel }))),
-  "portfolio-allocation": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
-  "portfolio-performance": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
-  "risk-metrics": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
+  "portfolio-allocation": lazy(() => import("./ResearchPanels").then((m) => ({ default: m.AllocationPanel }))),
+  "portfolio-performance": lazy(() => import("./ResearchPanels").then((m) => ({ default: m.PerformancePanel }))),
+  "risk-metrics": lazy(() => import("./ResearchPanels").then((m) => ({ default: m.RiskMetricsPanel }))),
   heatmap: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadHeatmapPanel }))),
   "market-pulse": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadMarketPulsePanel }))),
   fundamentals: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadFundamentalsPanel }))),
   "yield-curve": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadYieldCurvePanel }))),
-  economics: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
-  greeks: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
-  "oi-chart": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
-  peers: lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadTemplatePlaceholderPanel }))),
+  economics: lazy(() => import("./ResearchPanels").then((m) => ({ default: m.EconomicsPanel }))),
+  greeks: lazy(() => import("./ResearchPanels").then((m) => ({ default: m.DerivativesPanel }))),
+  "oi-chart": lazy(() => import("./ResearchPanels").then((m) => ({ default: m.DerivativesPanel }))),
+  peers: lazy(() => import("./ResearchPanels").then((m) => ({ default: m.PeersPanel }))),
   "ai-research": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadAIResearchPanel }))),
   "option-chain": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadOptionChainPanel }))),
   "watchlist-heatmap": lazy(() => import("./LaunchpadPanels").then((m) => ({ default: m.LaunchpadWatchlistHeatmapPanel }))),
@@ -272,8 +287,35 @@ const PANEL_REGISTRY: Record<LaunchpadPanelType, ComponentType<{ panel: Launchpa
   "research-notes": lazy(() => import("./ResearchNotesPanel").then((m) => ({ default: m.LaunchpadResearchNotesPanel }))),
 };
 
+/** Register trusted, bundled extensions before mounting the application. */
+export function registerWorkspaceWidget(definition: {
+  id: `plugin:${string}`;
+  title: string;
+  version: 1;
+  component: ComponentType<{ panel: LaunchpadPanelConfig }>;
+}): void {
+  if (definition.version !== 1 || !/^plugin:[a-z0-9][a-z0-9-]{1,63}$/.test(definition.id) || !definition.title.trim()) throw new Error("Invalid widget definition.");
+  if (SUPPORTED_LAUNCHPAD_PANEL_TYPES.includes(definition.id)) throw new Error(`Widget already registered: ${definition.id}`);
+  PANEL_REGISTRY[definition.id] = definition.component;
+  SUPPORTED_LAUNCHPAD_PANEL_TYPES.push(definition.id);
+}
+
 export function LaunchpadProvider({ children }: { children: ReactNode }) {
-  const [savedLayouts, setSavedLayouts] = useState<LaunchpadLayoutPreset[]>(() => readLocalLayouts());
+  type LayoutUpdate = LaunchpadLayoutPreset[] | ((prev: LaunchpadLayoutPreset[]) => LaunchpadLayoutPreset[]);
+  type LayoutState = { layouts: LaunchpadLayoutPreset[]; history: LaunchpadLayoutPreset[][] };
+  const [layoutState, dispatchLayouts] = useReducer((state: LayoutState, action: { type: "update" | "hydrate" | "undo"; update?: LayoutUpdate }): LayoutState => {
+    if (action.type === "undo") {
+      const previous = state.history[state.history.length - 1];
+      return previous ? { layouts: previous, history: state.history.slice(0, -1) } : state;
+    }
+    const next = typeof action.update === "function" ? action.update(state.layouts) : action.update!;
+    if (JSON.stringify(state.layouts) === JSON.stringify(next)) return state;
+    return { layouts: next, history: action.type === "hydrate" ? [] : [...state.history.slice(-29), state.layouts] };
+  }, undefined, () => ({ layouts: readLocalLayouts(), history: [] }));
+  const savedLayouts = layoutState.layouts;
+  const historySize = layoutState.history.length;
+  const setSavedLayouts = (update: LayoutUpdate) => dispatchLayouts({ type: "update", update });
+  const setLayouts = (update: LayoutUpdate) => dispatchLayouts({ type: "hydrate", update });
   const [activeLayoutId, setActiveLayoutId] = useState<string>(() => {
     if (typeof window === "undefined") return defaultPresets()[0].id;
     return localStorage.getItem(ACTIVE_KEY) || readLocalLayouts()[0]?.id || defaultPresets()[0].id;
@@ -307,7 +349,7 @@ export function LaunchpadProvider({ children }: { children: ReactNode }) {
         if (Array.isArray(payload?.items) && payload.items.length) {
           const serverItems = migrateLegacyBuiltInLayouts(payload.items.map((layout) => normalizeLayoutPreset(layout)));
           startTransition(() => {
-            setSavedLayouts(serverItems);
+            setLayouts(serverItems);
             setActiveLayoutId((current) => (serverItems.some((l) => l.id === current) ? current : serverItems[0].id));
           });
         }
@@ -357,12 +399,45 @@ export function LaunchpadProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  useEffect(() => {
+    if (!serverHydrated) return;
+    const receive = () => {
+      const pending = readPendingArtifacts();
+      if (!pending.length) return;
+      mutateActiveLayout((layout) => ({ ...layout, panels: [...layout.panels, ...pending.filter((item) => !layout.panels.some((panel) => panel.id === `artifact-${item.artifact.id}`)).map((item, index) => ({
+        ...makePanel(`artifact-${item.artifact.id}`, "research-artifact", item.artifact.name || "Research result", 0, Math.max(0, ...layout.panels.map((panel) => panel.y + panel.h)) + index * 6, 6, 6),
+        linkGroup: "none" as const, linked: false, props: item,
+      }))] }));
+      clearPendingArtifacts();
+    };
+    receive();
+    window.addEventListener("ot:pin-artifact", receive);
+    return () => window.removeEventListener("ot:pin-artifact", receive);
+  }, [activeLayoutId, serverHydrated]);
+
   const value = useMemo<LaunchpadContextValue>(
     () => ({
       activeLayoutId,
       activeLayout,
       savedLayouts,
       panelRegistry: PANEL_REGISTRY,
+      updateGroupContext: (group, raw) => {
+        const context = validateGroupContext(raw);
+        mutateActiveLayout((layout) => ({ ...layout, groups: { ...layout.groups, [group]: context }, panels: layout.panels.map((panel) => normalizePanelLinkGroup(panel) !== group ? panel : { ...panel, symbol: context.symbol || panel.symbol, props: { ...panel.props, dateRange: context.dateRange, reportingCurrency: context.currency, contextName: context.name } }) }));
+      },
+      canUndo: historySize > 0,
+      undo: () => {
+        const previous = layoutState.history[layoutState.history.length - 1];
+        if (!previous) return;
+        dispatchLayouts({ type: "undo" });
+        if (!previous.some((layout) => layout.id === activeLayoutId)) setActiveLayoutId(previous[0]?.id || "");
+      },
+      exportWorkspace: () => { if (!activeLayout) throw new Error("No active workspace."); return serializeWorkspace(activeLayout); },
+      importWorkspace: (raw) => {
+        const imported = parseWorkspace(raw, SUPPORTED_LAUNCHPAD_PANEL_TYPES);
+        setSavedLayouts((prev) => [...prev, imported]);
+        setActiveLayoutId(imported.id);
+      },
       setActiveLayoutId,
       createLayout: () => {
         const id = `layout-${Date.now()}`;
@@ -389,7 +464,10 @@ export function LaunchpadProvider({ children }: { children: ReactNode }) {
         mutateActiveLayout((layout) => ({
           ...layout,
           panels: layout.panels.map((panel) =>
-            panel.id === panelId ? normalizePanelConfig({ ...panel, ...patch } as LaunchpadPanelConfig) : panel,
+            panel.id === panelId ? (() => {
+              const context = patch.linkGroup && patch.linkGroup !== "none" ? layout.groups?.[patch.linkGroup] : undefined;
+              return normalizePanelConfig({ ...panel, ...patch, ...(context ? { symbol: context.symbol || patch.symbol || panel.symbol, props: { ...panel.props, ...patch.props, dateRange: context.dateRange, reportingCurrency: context.currency, contextName: context.name } } : {}) } as LaunchpadPanelConfig);
+            })() : panel,
           ),
         }));
       },
@@ -437,11 +515,14 @@ export function LaunchpadProvider({ children }: { children: ReactNode }) {
       addPanel: (type) => {
         mutateActiveLayout((layout) => {
           const n = layout.panels.length;
+          const context = layout.groups?.red;
+          const nextPanel = makePanel(`panel-${crypto.randomUUID()}`, type, type.toUpperCase(), (n % 3) * 4, Math.floor(n / 3) * 4, 4, 4, context?.symbol);
+          if (context) nextPanel.props = { dateRange: context.dateRange, reportingCurrency: context.currency, contextName: context.name };
           return {
             ...layout,
             panels: [
               ...layout.panels,
-              makePanel(`panel-${Date.now()}`, type, type.toUpperCase(), (n % 3) * 4, Math.floor(n / 3) * 4, 4, 4),
+              nextPanel,
             ],
           };
         });
@@ -462,6 +543,11 @@ export function LaunchpadProvider({ children }: { children: ReactNode }) {
         if (!normalized) return;
         mutateActiveLayout((layout) => ({
           ...layout,
+          groups: Object.fromEntries(Object.entries(layout.groups || {}).map(([group, context]) => {
+            const source = layout.panels.find((candidate) => candidate.id === sourcePanelId);
+            const target = linkGroupOverride ?? (source ? normalizePanelLinkGroup(source) : null);
+            return [group, context && (target == null || target === group) ? { ...context, symbol: normalized } : context];
+          })),
           panels: layout.panels.map((panel) => {
             const sourcePanel = sourcePanelId
               ? layout.panels.find((candidate) => candidate.id === sourcePanelId) ?? null
@@ -492,7 +578,7 @@ export function LaunchpadProvider({ children }: { children: ReactNode }) {
       lastBroadcastSymbol,
       loadingLayouts,
     }),
-    [activeLayout, activeLayoutId, lastBroadcastSymbol, loadingLayouts, savedLayouts, symbolEventVersion],
+    [activeLayout, activeLayoutId, lastBroadcastSymbol, loadingLayouts, savedLayouts, symbolEventVersion, historySize],
   );
 
   return <LaunchpadContext.Provider value={value}>{children}</LaunchpadContext.Provider>;

@@ -23,6 +23,12 @@ export function SettingsPage() {
   const realtimeMode = useSettingsStore((s) => s.realtimeMode);
   const newsAutoRefresh = useSettingsStore((s) => s.newsAutoRefresh);
   const newsRefreshSec = useSettingsStore((s) => s.newsRefreshSec);
+  const density = useSettingsStore((s) => s.density);
+  const textScale = useSettingsStore((s) => s.textScale);
+  const terminalEffects = useSettingsStore((s) => s.terminalEffects);
+  const setDensity = useSettingsStore((s) => s.setDensity);
+  const setTextScale = useSettingsStore((s) => s.setTextScale);
+  const setTerminalEffects = useSettingsStore((s) => s.setTerminalEffects);
   const themeVariant = useSettingsStore((s) => s.themeVariant);
   const customAccentColor = useSettingsStore((s) => s.customAccentColor);
   const setCustomAccentColor = useSettingsStore((s) => s.setCustomAccentColor);
@@ -120,7 +126,12 @@ export function SettingsPage() {
         </div>
       </TerminalPanel>
 
-      <TerminalPanel title="Theme">
+      <TerminalPanel title="Appearance">
+        <div className="mb-4 flex flex-wrap items-center gap-4 text-sm">
+          <label>Density <select aria-label="Density" className="bg-terminal-bg p-2" value={density} onChange={(e) => setDensity(e.target.value as "compact" | "comfortable")}><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
+          <label>Text size <select aria-label="Text size" className="bg-terminal-bg p-2" value={textScale} onChange={(e) => setTextScale(Number(e.target.value))}>{[0.9, 1, 1.15, 1.25, 1.4].map((scale) => <option key={scale} value={scale}>{Math.round(scale * 100)}%</option>)}</select></label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={terminalEffects} onChange={(e) => setTerminalEffects(e.target.checked)} />Decorative scanlines and vignette</label>
+        </div>
         <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
           <TerminalInput as="select" value={themeVariant} onChange={(e) => setThemeVariant(e.target.value as ThemeVariant)}>
             <option value="terminal-noir">Terminal Noir</option>

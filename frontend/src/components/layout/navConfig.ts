@@ -19,6 +19,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: "home", label: "Home", to: "/home", glyph: "HM" },
       { id: "market", label: "Market", to: "/equity/stocks", glyph: "MK" },
+      { id: "monitoring", label: "Monitoring", to: "/equity/monitoring", glyph: "MO" },
       { id: "watchlist", label: "Watchlist", to: "/equity/watchlist", glyph: "WL" },
       { id: "hotlists", label: "Hotlists", to: "/equity/hotlists", glyph: "HOT" },
       { id: "equity-heatmap", label: "Heatmap", to: "/equity/heatmap", glyph: "HM2" },
@@ -44,6 +45,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { id: "dividends", label: "Dividends", to: "/equity/dividends", glyph: "DV" },
       { id: "earnings", label: "Earnings", to: "/equity/earnings", glyph: "ER" },
       { id: "intelligence", label: "Intelligence", to: "/equity/intelligence-timeline", glyph: "IT" },
+      { id: "research-dossiers", label: "Research dossiers", to: "/equity/research-dossiers", glyph: "RD" },
       { id: "research-library", label: "Research Library", to: "/equity/research", glyph: "RL" },
       { id: "sector-rotation", label: "Sector Rotation", to: "/equity/sector-rotation", glyph: "RO" },
       { id: "relative-strength", label: "Relative Strength", to: "/equity/rs", glyph: "RS" },

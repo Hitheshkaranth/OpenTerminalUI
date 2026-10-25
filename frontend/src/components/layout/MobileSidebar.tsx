@@ -9,6 +9,8 @@ type Props = {
 
 const navItems: Array<{ label: string; path: string; exact?: boolean }> = [
   { label: "Home", path: "/home", exact: true },
+  { label: "Monitoring", path: "/equity/monitoring" },
+  { label: "Research dossiers", path: "/equity/research-dossiers" },
   { label: "Watchlist", path: "/equity/watchlist" },
   { label: "Chart Workstation", path: "/equity/chart-workstation" },
   { label: "Screener", path: "/equity/screener" },

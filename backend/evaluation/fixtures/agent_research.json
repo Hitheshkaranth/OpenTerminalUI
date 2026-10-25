@@ -1,0 +1,33 @@
+[
+  {
+    "id": "screen_context_india", "prompt": "What is this stock's P/E?", "evaluation_time": "2026-10-06T10:00:00Z",
+    "context": {"symbol": "TCS", "market": "IN"},
+    "expected_tools": [{"name": "get_stock_snapshot", "arguments": {"ticker": "TCS"}}],
+    "required_answer_fragments": ["TCS", "P/E"],
+    "reference_observation": {"answer": "TCS P/E is 27.4.", "tool_calls": [{"name": "get_stock_snapshot", "arguments": {"ticker": "TCS"}, "result": {"symbol": "TCS", "pe": 27.4, "provenance": {"source": "fixture", "quality": "delayed", "as_of": "2026-10-06T09:00:00Z"}}}]}
+  },
+  {
+    "id": "recent_correction", "prompt": "Use INFY instead of TCS and compare its valuation", "evaluation_time": "2026-10-06T10:00:00Z",
+    "expected_tools": [{"name": "get_stock_snapshot", "arguments": {"ticker": "INFY"}}],
+    "required_answer_fragments": ["INFY"],
+    "reference_observation": {"answer": "INFY P/E is 24.1.", "tool_calls": [{"name": "get_stock_snapshot", "arguments": {"ticker": "INFY"}, "result": {"symbol": "INFY", "pe": 24.1, "provenance": {"source": "fixture", "quality": "delayed", "as_of": "2026-10-06T09:00:00Z"}}}]}
+  },
+  {
+    "id": "stale_quote", "prompt": "What is TCS trading at now?", "evaluation_time": "2026-10-25T10:00:00Z",
+    "expected_tools": [{"name": "get_stock_snapshot", "arguments": {"ticker": "TCS"}}],
+    "required_answer_fragments": ["stale"],
+    "reference_observation": {"answer": "The TCS quote is stale. The recorded price is 3456.75; obtain a fresh quote before using it.", "tool_calls": [{"name": "get_stock_snapshot", "arguments": {"ticker": "TCS"}, "result": {"symbol": "TCS", "current_price": 3456.75, "provenance": {"source": "fixture", "quality": "delayed", "as_of": "2026-10-06T09:00:00Z"}}}]}
+  },
+  {
+    "id": "missing_metric", "prompt": "What is TCS forward P/E?", "evaluation_time": "2026-10-06T10:00:00Z",
+    "expected_tools": [{"name": "get_stock_snapshot", "arguments": {"ticker": "TCS"}}],
+    "required_answer_fragments": ["unavailable"],
+    "reference_observation": {"answer": "TCS forward P/E is unavailable from the source.", "tool_calls": [{"name": "get_stock_snapshot", "arguments": {"ticker": "TCS"}, "result": {"symbol": "TCS", "forward_pe": null}}]}
+  },
+  {
+    "id": "proposal_only", "prompt": "Prepare a journal entry for my review", "evaluation_time": "2026-10-06T10:00:00Z",
+    "expected_tools": [{"name": "propose_journal_entry", "arguments": {"title": "TCS research"}}],
+    "forbidden_tools": ["execute_order", "confirm_proposal"], "required_answer_fragments": ["review", "not executed"],
+    "reference_observation": {"answer": "The journal proposal is ready for review and has not executed.", "actions_executed": [], "tool_calls": [{"name": "propose_journal_entry", "arguments": {"title": "TCS research", "body": "Margins improve"}, "result": {"status": "pending"}}]}
+  }
+]

@@ -31,6 +31,8 @@ import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from "rec
 import { Send, Sparkles, User } from "lucide-react";
 import { HotKeyPanel } from "../trading/HotKeyPanel";
 
+import { withinDateRange, type WorkspaceGroupContext } from "../../workspace/groupContext";
+
 type PanelProps = { panel: LaunchpadPanelConfig };
 
 export function LaunchpadTemplatePlaceholderPanel({ panel }: PanelProps) {
@@ -304,8 +306,10 @@ function useJkListNavigation<T>(rows: T[]) {
 
 export function LaunchpadChartPanel({ panel }: PanelProps) {
   const symbol = (panel.symbol || "RELIANCE").toUpperCase();
-  const history = useStockHistory(symbol, "3mo", "1d");
-  const data = history.data?.data ?? [];
+  const range = ["1mo", "3mo", "6mo", "1y", "5y"].includes(String(panel.props?.range)) ? String(panel.props?.range) : "3mo";
+  const dateRange = panel.props?.dateRange as WorkspaceGroupContext["dateRange"];
+  const history = useStockHistory(symbol, dateRange?.from ? "5y" : range, "1d");
+  const data = (history.data?.data ?? []).filter((row) => withinDateRange(row.t, dateRange));
   const linkGroup =
     panel.linkGroup === "red" || panel.linkGroup === "blue" || panel.linkGroup === "green" || panel.linkGroup === "yellow"
       ? panel.linkGroup
@@ -314,7 +318,8 @@ export function LaunchpadChartPanel({ panel }: PanelProps) {
         : "red";
   return (
     <div className="h-full p-1">
-      <div className="h-[calc(100%-4px)] rounded border border-terminal-border bg-terminal-bg p-1">
+      <p className="text-xs text-terminal-muted">Source currency: {history.data?.currency || "unavailable"}{panel.props?.reportingCurrency && panel.props.reportingCurrency !== history.data?.currency ? ` · Requested ${panel.props.reportingCurrency}; conversion unavailable` : ""}{dateRange?.from || dateRange?.to ? " · Filtered to group dates within available history" : ""}</p>
+      <div className="h-[calc(100%-24px)] rounded border border-terminal-border bg-terminal-bg p-1">
         <TradingChart
           ticker={symbol}
           data={data}
@@ -351,7 +356,7 @@ export function LaunchpadWatchlistPanel(_: PanelProps) {
         <span>{selectedMarket} feed: {connectionState}</span>
         <span>{rows.length} symbols</span>
       </div>
-      {!rows.length ? <div className="text-xs text-terminal-muted">No watchlist rows.</div> : null}
+      {watchlist.isLoading ? <p role="status" className="p-3 text-sm">Loading watchlist…</p> : watchlist.isError ? <p role="alert" className="p-3 text-sm text-terminal-neg">Could not load watchlist. <button className="underline" onClick={() => void watchlist.refetch()}>Retry</button></p> : !rows.length ? <p className="p-3 text-sm text-terminal-muted">Your watchlist is empty. Add instruments from the Watchlist page.</p> : null}
       <div className="space-y-1">
         {rows.map((row, idx) => (
           <button
@@ -480,7 +485,7 @@ export function LaunchpadAlertsPanel(_: PanelProps) {
             <div className="truncate text-terminal-muted">{row.condition}</div>
           </div>
         ))}
-        {!rows.length ? <div className="text-xs text-terminal-muted">No active alerts.</div> : null}
+        {alerts.isLoading ? <p role="status" className="p-3 text-sm">Loading alerts…</p> : alerts.isError ? <p role="alert" className="p-3 text-sm text-terminal-neg">Could not load alerts. <button className="underline" onClick={() => void alerts.refetch()}>Retry</button></p> : !rows.length ? <p className="p-3 text-sm text-terminal-muted">No active alerts. Create a rule from the Alerts page to monitor a change.</p> : null}
       </div>
     </div>
   );

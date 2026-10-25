@@ -47,6 +47,9 @@ const SettingsPage = lazyWithRetry(() => import("./pages/Settings").then((m) => 
 const PluginsPage = lazyWithRetry(() => import("./pages/Plugins/Plugins").then((m) => ({ default: m.PluginsPage })));
 const ChartWorkstationPage = lazyWithRetry(() => import("./pages/ChartWorkstationPage").then((m) => ({ default: m.ChartWorkstationPage })));
 const ResearchPage = lazyWithRetry(() => import("./pages/ResearchPage").then((m) => ({ default: m.ResearchPage })));
+const ResearchDossiersPage = lazyWithRetry(() => import("./pages/ResearchDossiers").then((m) => ({ default: m.ResearchDossiersPage })));
+const SharedResearchPage = lazyWithRetry(() => import("./pages/ResearchDossiers").then((m) => ({ default: m.SharedResearchPage })));
+const MonitoringPage = lazyWithRetry(() => import("./pages/Monitoring").then((m) => ({ default: m.MonitoringPage })));
 const MultiTimeframePage = lazyWithRetry(() => import("./pages/MultiTimeframePage").then((m) => ({ default: m.MultiTimeframePage })));
 const LaunchpadPage = lazyWithRetry(() => import("./pages/Launchpad").then((m) => ({ default: m.LaunchpadPage })));
 const LaunchpadPopoutPage = lazyWithRetry(() => import("./pages/LaunchpadPopout").then((m) => ({ default: m.LaunchpadPopoutPage })));
@@ -134,6 +137,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-access" element={<ForgotAccessPage />} />
+          <Route path="/research/shared/:token" element={<SharedResearchPage />} />
 
           <Route path="/equity" element={<ProtectedRoute><EquityLayout /></ProtectedRoute>}>
             <Route index element={<Navigate to="/equity/stocks" replace />} />
@@ -180,6 +184,8 @@ function App() {
             <Route path="settings" element={<SettingsPage />} />
             <Route path="chart-workstation" element={<ChartWorkstationPage />} />
             <Route path="research" element={<ResearchPage />} />
+            <Route path="research-dossiers" element={<ResearchDossiersPage />} />
+            <Route path="monitoring" element={<MonitoringPage />} />
             <Route path="mta" element={<MultiTimeframePage />} />
             <Route path="dom" element={<DOMPage />} />
             <Route path="tape" element={<TimeAndSalesPage />} />

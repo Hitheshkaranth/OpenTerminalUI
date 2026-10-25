@@ -60,7 +60,7 @@ def test_thread_create_append_history():
     db.commit()
     history2 = memory_service.thread_history(db, uid, tid)
     assert len(history2) == 3  # limit=8, so all fit
-    assert len(history2[2]["content"]) == 1500  # truncated
+    assert len(history2[2]["content"]) == 2000  # full history is retained
 
     db.close()
 
@@ -100,9 +100,9 @@ def test_thread_history_limit():
 
     history = memory_service.thread_history(db, uid, tid, limit=8)
     assert len(history) == 8
-    # Oldest 8 messages: user0, assistant0, user1, assistant1, user2, assistant2, user3, assistant3
-    assert history[0]["content"] == "msg 0"
-    assert history[7]["content"] == "reply 3"
+    # Most recent eight messages, in chronological order.
+    assert history[0]["content"] == "msg 8"
+    assert history[7]["content"] == "reply 11"
 
     db.close()
 
@@ -588,7 +588,7 @@ def test_routes_notes_422_bad_kind():
     test_db.close()
 
 
-def test_routes_thread_create_and_stream():
+def test_routes_thread_create_and_stream(monkeypatch):
     """Full create + stream flow, no tool calls."""
     from backend.auth.deps import get_current_user
     from backend.api.deps import get_db as _get_db
@@ -599,6 +599,8 @@ def test_routes_thread_create_and_stream():
         async def complete(self, messages, **kw):
             return AssistantMessage(content="final answer")
 
+    monkeypatch.setattr(agent_routes.execution, "SessionLocal", SessionFactory)
+    monkeypatch.setattr(agent_routes, "SessionLocal", SessionFactory)
     orig_get_provider = agent_routes.get_llm_provider
 
     def fake_build(user_id=None):
@@ -633,6 +635,7 @@ def test_routes_thread_create_and_stream():
             assert final_event.get("content") == "final answer"
     finally:
         agent_routes.get_llm_provider = orig_get_provider
+        agent_routes.build_default_registry = orig_build
 
 
 def test_note_list_and_delete_route():
@@ -808,16 +811,17 @@ def test_stream_run_passes_history_and_memory_to_orchestrator(monkeypatch):
             yield {"type": "final", "content": "done"}
 
     monkeypatch.setattr(route, "Orchestrator", FakeOrchestrator)
+    from backend.agent.tools.registry import ToolRegistry
+    monkeypatch.setattr(route, "build_default_registry", lambda **kw: ToolRegistry())
     monkeypatch.setattr(route, "get_llm_provider", lambda **kw: object())
     monkeypatch.setattr(route.memory_service, "thread_history", lambda db, u, t: [{"role": "user", "content": "earlier"}])
     monkeypatch.setattr(route.memory_service, "memory_directive", lambda db, u, s: "Memory for TCS (newest first):\\n- [thesis] cheap below 3000")
     monkeypatch.setattr(route.memory_service, "append_message", lambda *a, **k: None)
     monkeypatch.setattr(route.memory_service, "finish_run", lambda *a, **k: None)
-    route._PENDING["r1"] = {"prompt": "hi", "mode": "standard", "ticker": "TCS", "context": {}, "provider": None, "model": None, "user_id": "u1", "thread_id": "t1"}
+    spec = {"prompt": "hi", "mode": "standard", "ticker": None, "context": {"symbol": "TCS"}, "provider": None, "model": None, "user_id": "u1", "thread_id": "t1"}
 
     async def drive():
-        resp = await route.stream_run("r1", user=SimpleNamespace(id="u1"))
-        chunks = [c async for c in resp.body_iterator]
+        chunks = [c async for c in route._generate_run("r1", spec)]
         return chunks
 
     asyncio.run(drive())

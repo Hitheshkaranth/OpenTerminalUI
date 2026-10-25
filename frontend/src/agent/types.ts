@@ -1,3 +1,5 @@
+import type { WorkspaceSelection } from "./workspaceContextStore";
+
 export type AgentEvent =
   | { type: "token"; text: string }
   | { type: "tool_call"; id: string; name: string; arguments: Record<string, unknown> }
@@ -123,7 +125,7 @@ export interface GroundingReport {
   repair?: GroundingRepair;
 }
 
-export interface RunContext {
+export interface RunContext extends WorkspaceSelection {
   route?: string;
   symbol?: string;
   market?: string;

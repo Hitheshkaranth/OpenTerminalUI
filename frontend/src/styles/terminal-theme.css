@@ -2268,3 +2268,15 @@ button.ot-home-widget-strip-chip:hover {
     display: none;
   }
 }
+
+/* Readability preferences are applied before the first workspace renders. */
+:root:not([data-ot-effects="true"]) .ot-scanline-overlay,
+:root:not([data-ot-effects="true"]) .ot-vignette-overlay { display: none; }
+:root[data-ot-density="comfortable"] .ot-type-table-cell { padding-block: .65rem; }
+:root[data-ot-density="comfortable"] .ot-type-panel-title { font-size: .8125rem; }
+:root[data-ot-density="comfortable"] .ot-type-panel-subtitle { font-size: .75rem; }
+:root[data-ot-density="comfortable"] .launchpad-grid button { min-height: 2rem; }
+@media (max-width: 767px) {
+  .launchpad-mobile-stack { display: flex; flex-direction: column; gap: 1rem; }
+  .launchpad-mobile-stack > div { min-height: 20rem; max-height: 38rem; overflow: auto; }
+}

@@ -45,3 +45,28 @@ describe("buildScreenContext", () => {
     expect(typeof ctx.route).toBe("string");
   });
 });
+
+it("replays each event ID once and advances the cursor per delivered frame", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => sseResponse([
+    'id: 3\ndata: {"type":"token","text":"old"}\n\nid: 4\ndata: {"type":"token","text":"new"}\n\n',
+    'id: 4\ndata: {"type":"token","text":"duplicate"}\n\nid: 5\ndata: {"type":"final","content":"answer"}\n\n',
+  ])));
+  const seen: AgentEvent[] = []; const cursors: number[] = [];
+  await streamRun("r", (event) => seen.push(event), undefined, 3, (cursor) => cursors.push(cursor));
+  expect(seen).toEqual([{ type: "token", text: "new" }, { type: "final", content: "answer" }]);
+  expect(cursors).toEqual([4, 5]);
+});
+
+it("reports transport failures separately from persisted model errors", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("offline", { status: 503 })));
+  const events = vi.fn(); const transport = vi.fn();
+  await streamRun("r", events, undefined, 0, undefined, transport);
+  expect(events).not.toHaveBeenCalled(); expect(transport).toHaveBeenCalledOnce();
+});
+
+it("reports a truncated final event as a transport interruption", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => sseResponse(['id: 4\ndata: {"type":"final","content":'])));
+  const events = vi.fn(); const transport = vi.fn();
+  await streamRun("r", events, undefined, 0, undefined, transport);
+  expect(events).not.toHaveBeenCalled(); expect(transport).toHaveBeenCalledOnce();
+});

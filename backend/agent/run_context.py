@@ -7,3 +7,7 @@ from contextvars import ContextVar
 # "CCL" is CCL Products on NSE but Carnival on NYSE, and the news tool returned Carnival's headlines
 # for a user on the CCL Products page.
 active_market: ContextVar[str | None] = ContextVar("agent_active_market", default=None)
+
+active_run_id: ContextVar[str | None] = ContextVar("agent_run_id", default=None)
+
+active_lease_id: ContextVar[str | None] = ContextVar("agent_lease_id", default=None)

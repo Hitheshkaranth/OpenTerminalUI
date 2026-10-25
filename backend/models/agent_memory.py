@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.shared.db import Base
@@ -58,3 +58,31 @@ class AgentNote(Base):
     content: Mapped[str] = mapped_column(Text, default="")
     source: Mapped[str] = mapped_column(String(32), default="user")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class AgentRunExecution(Base):
+    """Durable request and lease; separate table upgrades existing databases additively."""
+    __tablename__ = "agent_run_executions"
+    run_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(36), index=True)
+    spec_json: Mapped[str] = mapped_column(Text)
+    state: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    lease_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
+
+class AgentRunEvent(Base):
+    __tablename__ = "agent_run_events"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(36), index=True)
+    payload_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class AgentToolCheckpoint(Base):
+    __tablename__ = "agent_tool_checkpoints"
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(36), index=True)
+    tool_name: Mapped[str] = mapped_column(String(128))
+    args_json: Mapped[str] = mapped_column(Text)
+    state: Mapped[str] = mapped_column(String(16), default="started")
+    result_json: Mapped[str | None] = mapped_column(Text, nullable=True)

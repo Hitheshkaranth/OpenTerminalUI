@@ -232,6 +232,7 @@ export function TerminalShell({
               return executeParsedCommand(parsed, navigate);
             }}
           />
+          <div className={location.pathname === "/equity/monitoring" ? "hidden md:block" : undefined}>
           {tickerTapeVisible ? <TickerTape /> : null}
           <TopBar hideTickerLoader={hideTickerLoader} />
           {showWorkspaceControls ? (
@@ -243,6 +244,7 @@ export function TerminalShell({
               toggleRightRail={() => setRightRailOpen(!rightRailOpen)}
             />
           ) : null}
+          </div>
           <div className="min-h-0 flex flex-1 overflow-hidden">
             <ErrorBoundary>
               <div className={`relative z-0 min-h-0 min-w-0 flex-1 overflow-auto ${contentClassName}`.trim()}>

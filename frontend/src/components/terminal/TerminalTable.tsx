@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { useSettingsStore } from "../../store/settingsStore";
 import { SymbolContextMenu, type SymbolContextMenuAction } from "../common/SymbolContextMenu";
 
 export type TerminalTableAlign = "left" | "right" | "center";
@@ -102,7 +103,7 @@ export function TerminalTable<T>({
   className = "",
   tableClassName = "",
   emptyText = "No rows",
-  density = "normal",
+  density,
   stickyHeader = true,
   keyboardNavigation = true,
   rowActions,
@@ -169,9 +170,11 @@ export function TerminalTable<T>({
     openContextMenuForIndex(row, originalIndex, { x: rect.left + Math.min(rect.width / 2, 200), y: rect.bottom + 4 });
   };
 
-  const headerPadding = cellPaddingClass(density);
-  const rowHeight = rowDensityClass(density);
-  const dataCellPadding = cellPaddingClass(density);
+  const preferredDensity = useSettingsStore((state) => state.density);
+  const effectiveDensity = density ?? preferredDensity;
+  const headerPadding = cellPaddingClass(effectiveDensity);
+  const rowHeight = rowDensityClass(effectiveDensity);
+  const dataCellPadding = cellPaddingClass(effectiveDensity);
 
   return (
     <div

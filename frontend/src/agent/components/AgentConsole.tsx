@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { X } from "lucide-react";
 
 import "../agentConsole.css";
+import { AuthContextRef } from "../../contexts/AuthContext";
 import { useStockStore } from "../../store/stockStore";
 import { useAgentStore } from "../agentStore";
 import { buildScreenContext } from "../screenContext";
@@ -10,6 +11,11 @@ import { AgentAvatar, AiWorkingBeam } from "../../components/ai/AiVisuals";
 import { ArtifactCanvas } from "./ArtifactCanvas";
 import { ChatThread } from "./ChatThread";
 import { MemoryPanel } from "./MemoryPanel";
+import { exportRun } from "../agentApi";
+import { downloadJson } from "../../lib/downloadJson";
+import { createDossier, emptyDossier, dossierMarket } from "../../api/researchDossiers";
+import { extractApiErrorMessage } from "../../api/base";
+import { useWorkspaceContextStore } from "../workspaceContextStore";
 
 function ModeToggle({ active, label, onToggle, title }: { active: boolean; label: string; onToggle: () => void; title: string }) {
   return (
@@ -81,8 +87,15 @@ function ThreadsPanel({ onSelect, onClose }: { onSelect: (t: ThreadItem) => void
 }
 
 export function AgentConsole() {
+  const auth = useContext(AuthContextRef);
+  useEffect(() => { if (auth && !auth.isInitializing) void useAgentStore.getState().setAuthenticatedUser(auth.user?.id ?? null); }, [auth?.user?.id, auth?.isInitializing]);
   const open = useAgentStore((s) => s.open);
   const running = useAgentStore((s) => s.running);
+  const transportBusy = useAgentStore((s) => s.transportBusy);
+  const activeRunId = useAgentStore((s) => s.activeRunId);
+  const runNotice = useAgentStore((s) => s.runNotice);
+  const cancelActiveRun = useAgentStore((s) => s.cancelActiveRun);
+  const reconnectRun = useAgentStore((s) => s.reconnectRun);
   const debate = useAgentStore((s) => s.debate);
   const strategy = useAgentStore((s) => s.strategy);
   const screener = useAgentStore((s) => s.screener);
@@ -105,8 +118,23 @@ export function AgentConsole() {
   const [draft, setDraft] = useState("");
   const [showThreads, setShowThreads] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
+  const [view, setView] = useState<"overlay" | "docked" | "expanded">("overlay");
+  const [saveResearch, setSaveResearch] = useState(false);
+  const [researchSymbol, setResearchSymbol] = useState("");
+  const [researchTitle, setResearchTitle] = useState("");
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [actionNotice, setActionNotice] = useState("");
+  const [savedDossierId, setSavedDossierId] = useState<string | null>(null);
+  useWorkspaceContextStore((s) => s.selection);
+  const context = buildScreenContext();
+  const latestAnswer = [...messages].reverse().find((message) => message.role === "assistant" && message.content && !message.pending);
   const activeModel = [...messages].reverse().find((message) => message.role === "assistant")?.model;
   const modelLabel = activeModel?.replace(/^.*\//, "").replace(/:free$/, "");
+
+  useEffect(() => {
+    document.body.classList.toggle("ot-agent-docked", open && view === "docked");
+    return () => document.body.classList.remove("ot-agent-docked");
+  }, [open, view]);
 
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
@@ -130,10 +158,11 @@ export function AgentConsole() {
 
   return (
     <aside
-      className={`ot-agent-panel${open ? "" : " ot-agent-panel--closed"}`}
+      className={`ot-agent-panel ot-agent-panel--${view}${open ? "" : " ot-agent-panel--closed"}`}
       role="dialog"
       aria-label="Agent Console"
       aria-hidden={!open}
+      {...(!open ? { inert: "" } as Record<string, string> : {})}
     >
       <header
         style={{
@@ -149,6 +178,9 @@ export function AgentConsole() {
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--ot-space-2)", rowGap: 6, flex: 1, minWidth: 0 }}>
           <AgentAvatar busy={running} size={24} />
           <span>Agent</span>
+          <select aria-label="Agent panel layout" value={view} onChange={(e) => setView(e.target.value as typeof view)} className="rounded border border-terminal-border bg-terminal-panel px-2 py-1 text-xs">
+            <option value="overlay">Side panel</option><option value="docked">Dock beside research</option><option value="expanded">Expanded research</option>
+          </select>
           <ModeToggle active={debate} label="Debate" onToggle={toggleDebate} title="Multi-agent debate: analyst team → bull vs bear → portfolio-manager decision" />
           <ModeToggle active={strategy} label="Strategy Lab" onToggle={toggleStrategy} title="Strategy Lab: bounded, read-only backtest iteration with out-of-sample validation" />
           <ModeToggle active={screener} label="Screener" onToggle={toggleScreener} title="Screen membership: which built-in screens this stock qualifies under" />
@@ -157,6 +189,7 @@ export function AgentConsole() {
             <button
               type="button"
               onClick={newThread}
+              disabled={transportBusy}
               title="Start a new thread"
               className="rounded border border-terminal-border px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-terminal-muted hover:text-terminal-text transition-colors"
             >
@@ -165,6 +198,7 @@ export function AgentConsole() {
             <button
               type="button"
               onClick={() => setShowThreads((v) => !v)}
+              disabled={transportBusy}
               title="View threads"
               className="rounded border border-terminal-border px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-terminal-muted hover:text-terminal-text transition-colors"
             >
@@ -208,19 +242,51 @@ export function AgentConsole() {
         </button>
       </header>
 
+      {(context.selected_symbols?.length || context.portfolio_id || context.dossier_id) && <div className="border-b border-terminal-border px-3 py-2 text-xs text-terminal-muted">
+        Context: {context.selected_symbols?.join(", ")}{context.portfolio_id ? " · Selected portfolio" : ""}{context.dossier_id ? " · Research dossier" : ""}{context.universe ? ` · ${context.universe}` : ""}
+      </div>}
+      {activeRunId && <div className="flex flex-wrap gap-2 border-b border-terminal-border p-2 text-xs">
+        {transportBusy ? <button className="rounded border border-terminal-border px-2 py-1" onClick={() => void cancelActiveRun()}>Stop run</button> : <>
+          <button className="rounded border border-terminal-border px-2 py-1" onClick={() => void reconnectRun()}>Reconnect / replay</button>
+          <button className="rounded border border-terminal-border px-2 py-1" onClick={() => void reconnectRun(true)}>Resume interrupted run</button>
+        </>}
+        <button className="rounded border border-terminal-border px-2 py-1" onClick={async () => { try { downloadJson(await exportRun(activeRunId), `research-run-${activeRunId}.json`); } catch (e) { setActionNotice(extractApiErrorMessage(e, "Export failed.")); } }}>Export run evidence</button>
+      </div>}
+      {(runNotice || actionNotice) && <p role="status" className="border-b border-terminal-border p-3 text-sm">{runNotice || actionNotice}</p>}
+
       <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
         {showMemory && <MemoryPanel symbol={contextSymbol ?? null} />}
         <ChatThread messages={messages} proposalReplacements={(m) => {
           return m.steps
             .filter((s) => s.name.startsWith("propose_") && s.result && typeof s.result === "object")
             .map((s) => {
-              const r = s.result as { proposal_id?: string; type?: string; summary?: string; payload?: unknown; status?: string; expires_at?: string };
+              const wrapped = s.result as { ok?: boolean; data?: unknown };
+              const r = (wrapped.ok === true ? wrapped.data : s.result) as { proposal_id?: string; type?: string; summary?: string; payload?: unknown; status?: string; expires_at?: string };
               if (!r.proposal_id) return null as unknown as { step: typeof s; proposal: { proposal_id: string; type: string; summary: string; payload: unknown; status: string; expires_at: string } };
-              return { step: s, proposal: r } as { step: typeof s; proposal: { proposal_id: string; type: string; summary: string; payload: unknown; status: string; expires_at: string } };
+              return { step: s, proposal: { ...r, type: r.type || s.name.replace(/^propose_/, ""), payload: r.payload || {}, status: r.status || "pending", expires_at: r.expires_at || "" } } as { step: typeof s; proposal: { proposal_id: string; type: string; summary: string; payload: unknown; status: string; expires_at: string } };
             })
             .filter(Boolean) as { step: typeof m.steps[number]; proposal: { proposal_id: string; type: string; summary: string; payload: unknown; status: string; expires_at: string } }[];
         }} />
         <ArtifactCanvas artifacts={artifacts} />
+        {latestAnswer && !transportBusy && <div className="border-t border-terminal-border p-3">
+          <button className="rounded border border-terminal-border px-3 py-2 text-sm" onClick={() => { setSaveResearch(!saveResearch); setResearchSymbol(contextSymbol || context.selected_symbols?.[0] || ""); setResearchTitle(`Research: ${contextSymbol || "company"}`); }}>Save answer to research dossier</button>
+          {savedDossierId && <a className="ml-3 text-sm text-terminal-accent underline" href={`/equity/research-dossiers?id=${encodeURIComponent(savedDossierId)}`}>Open saved dossier</a>}
+          {saveResearch && <form className="mt-3 space-y-3" onSubmit={async (event) => {
+            event.preventDefault(); setSaveBusy(true);
+            try {
+              const dossier = await createDossier({ ...emptyDossier(), title: researchTitle, symbol: researchSymbol, market: dossierMarket(context.market), thesis: latestAnswer.content,
+                linked_run_ids: activeRunId ? [activeRunId] : [],
+                evidence: (latestAnswer.grounding?.sources || []).map((source) => ({ id: source.id, claim: `Evidence returned by ${source.tool}`, stance: "neutral", source_title: `${source.provider} · ${source.quality}`, observed_at: source.as_of || undefined })),
+              });
+              setSavedDossierId(dossier.id); setSaveResearch(false); setActionNotice("Answer saved as a draft thesis. Review its assumptions and evidence.");
+            } catch (e) { setActionNotice(extractApiErrorMessage(e, "Unable to save research.")); }
+            finally { setSaveBusy(false); }
+          }}>
+            <label className="block text-xs">Research title<input required className="mt-1 w-full rounded border border-terminal-border bg-terminal-bg p-2 text-sm" value={researchTitle} onChange={(e) => setResearchTitle(e.target.value)} /></label>
+            <label className="block text-xs">Symbol<input required className="mt-1 w-full rounded border border-terminal-border bg-terminal-bg p-2 text-sm" value={researchSymbol} onChange={(e) => setResearchSymbol(e.target.value.toUpperCase())} /></label>
+            <button disabled={saveBusy} className="rounded border border-terminal-border px-3 py-2 text-sm">{saveBusy ? "Saving…" : "Save draft thesis"}</button>
+          </form>}
+        </div>}
       </div>
 
       <div style={{ display: "flex", gap: "var(--ot-space-2)", padding: "var(--ot-space-2)", borderTop: "1px solid var(--ot-color-border-default)" }}>
@@ -264,7 +330,7 @@ export function AgentConsole() {
         <button
           type="button"
           onClick={submit}
-          disabled={running}
+          disabled={running || transportBusy}
           style={{
             background: "var(--ot-color-accent-primary)", color: "var(--ot-color-text-inverse)",
             border: "none", borderRadius: "var(--ot-radius-sm)", padding: "0 var(--ot-space-3)",

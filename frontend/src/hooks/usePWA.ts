@@ -22,6 +22,25 @@ function useSWRegistration() {
       return;
     }
 
+    if (import.meta.env.DEV) {
+      // Previous production previews may have left our worker on this origin.
+      // Unregister only this app's script; other apps may share the origin.
+      void navigator.serviceWorker.getRegistrations().then(async (registrations) => {
+        await Promise.all(registrations.filter((registration) =>
+          [registration.active, registration.waiting, registration.installing].some((worker) => {
+            if (!worker) return false;
+            const script = new URL(worker.scriptURL);
+            return script.origin === window.location.origin && script.pathname === "/sw.js";
+          }),
+        ).map((registration) => registration.unregister()));
+        if ("caches" in window) {
+          const keys = await window.caches.keys();
+          await Promise.all(keys.filter((key) => key.startsWith("otui-static-")).map((key) => window.caches.delete(key)));
+        }
+      }).catch(() => {}).finally(() => setIsReady(true));
+      return;
+    }
+
     navigator.serviceWorker
       .register("/sw.js")
       .then((registration) => {

@@ -68,6 +68,9 @@ export function TerminalModal({
     const raf = window.requestAnimationFrame(() => {
       const root = dialogRef.current;
       if (!root) return;
+      // A user may have already focused a field before this deferred frame runs.
+      // Keep that focus instead of moving it back to the close button mid-typing.
+      if (root.contains(document.activeElement)) return;
       const firstFocusable = root.querySelector<HTMLElement>(
         'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex=\"-1\"])',
       );

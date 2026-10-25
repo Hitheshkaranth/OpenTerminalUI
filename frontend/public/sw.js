@@ -1,4 +1,4 @@
-const CACHE_NAME = "otui-static-v5";
+const CACHE_NAME = "otui-static-v6";
 const ASSETS = ["/manifest.json", "/favicon.png", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -7,7 +7,7 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))).then(() => self.clients.claim())
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith("otui-static-") && k !== CACHE_NAME).map((k) => caches.delete(k)))).then(() => self.clients.claim())
   );
 });
 
@@ -15,6 +15,10 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const request = event.request;
   const url = new URL(request.url);
+
+  // A worker left over from preview must never intercept Vite's source modules
+  // or hot-reload runtime while it is being unregistered by the development app.
+  if (/^\/(?:src\/|@vite\/|@react-refresh(?:\/|$)|@id\/|@fs\/|node_modules\/)/.test(url.pathname)) return;
 
   // Never intercept/cache API or health calls — data must always be fresh.
   // Caching these would serve stale data after mutations (e.g. adding a holding).

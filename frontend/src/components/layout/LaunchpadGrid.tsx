@@ -42,7 +42,7 @@ export function LaunchpadGrid({ panels, renderPanel, onLayoutChange }: Launchpad
 
   return (
     <div ref={hostRef} className="min-w-0">
-      <GridLayout
+      {width < 768 ? <div className="launchpad-mobile-stack">{panels.map((panel) => <div key={panel.id}>{renderPanel(panel)}</div>)}</div> : <GridLayout
         className="launchpad-grid"
         width={width}
         gridConfig={{ cols: 12, rowHeight: 42, margin: [8, 8], containerPadding: [0, 0], maxRows: Infinity }}
@@ -68,7 +68,7 @@ export function LaunchpadGrid({ panels, renderPanel, onLayoutChange }: Launchpad
             {renderPanel(panel)}
           </div>
         ))}
-      </GridLayout>
+      </GridLayout>}
     </div>
   );
 }

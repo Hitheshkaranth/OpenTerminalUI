@@ -2,6 +2,7 @@ import { parseInstrument } from "../lib/instrument";
 import { useSettingsStore } from "../store/settingsStore";
 import { useStockStore } from "../store/stockStore";
 import type { RunContext } from "./types";
+import { useWorkspaceContextStore } from "./workspaceContextStore";
 
 // Routes where the active equity symbol (from the stock store) is the subject
 // the user is looking at, even though the ticker isn't in the URL path.
@@ -24,7 +25,8 @@ const URL_SYMBOL_RE = /\/(?:stock|equity\/security|crypto|forex|commodities)\/([
  *  defaults to the stock currently open (no need to re-type the ticker). */
 export function buildScreenContext(): RunContext {
   const path = typeof window !== "undefined" ? window.location.pathname : "/";
-  const ctx: RunContext = { route: path };
+  const selected = useWorkspaceContextStore.getState();
+  const ctx: RunContext = { ...(selected.route === path ? selected.selection : {}), route: path };
 
   // 1) Prefer a ticker explicitly present in the URL.
   const match = path.match(URL_SYMBOL_RE);

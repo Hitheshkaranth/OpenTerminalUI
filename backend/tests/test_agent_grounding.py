@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 import asyncio
 import json
 
@@ -273,3 +275,14 @@ def test_a_period_before_closing_markup_ends_the_sentence():
 
 def test_oscillator_thresholds_in_a_definition_are_not_figures():
     assert [f.text for f in extract_figures("Overbought is conventionally RSI > 70; oversold is RSI < 30.")] == []
+
+
+@pytest.fixture(autouse=True)
+def stable_grounding_clock(monkeypatch):
+    from datetime import datetime, timezone
+    import backend.agent.reconcile as reconcile
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 6, 9, 1, tzinfo=timezone.utc)
+    monkeypatch.setattr(reconcile, "datetime", Clock)

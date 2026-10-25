@@ -84,7 +84,10 @@ def _specs(user_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_propose_rebalance_happy_path(monkeypatch_session_local, test_user_id, test_portfolio_with_position, test_db):
+async def test_propose_rebalance_happy_path(monkeypatch, monkeypatch_session_local, test_user_id, test_portfolio_with_position, test_db):
+    async def marks(symbols):
+        return {"RELIANCE": 1000.0, "TCS": 2000.0}, {"RELIANCE": {"quality": "delayed"}, "TCS": {"quality": "delayed"}}
+    monkeypatch.setattr("backend.agent.tools.action_tools._mark_prices", marks)
     handler = _specs(test_user_id)["propose_rebalance"].handler
 
     result = await handler({
@@ -96,9 +99,12 @@ async def test_propose_rebalance_happy_path(monkeypatch_session_local, test_user
     assert result["data"]["status"] == "pending"
     assert "pending human confirmation" in result["data"]["note"].lower()
     deltas = {d["symbol"]: d for d in result["data"]["deltas"]}
-    assert deltas["RELIANCE"]["current_weight"] == pytest.approx(0.5)
+    assert deltas["RELIANCE"]["current_weight"] == pytest.approx(0.6667)
     assert deltas["RELIANCE"]["target_weight"] == pytest.approx(0.3)
     assert deltas["TCS"]["current_weight"] == pytest.approx(0.0)
+    assert deltas["RELIANCE"]["price_used"] == 1000.0
+    assert deltas["TCS"]["implied_delta_qty"] == 52.395
+    assert deltas["TCS"]["valued_at"]
 
     from backend.agent.proposals import list_proposals
     rows = list_proposals(test_db, test_user_id)
@@ -222,9 +228,9 @@ async def test_propose_screener_alert_happy_path(monkeypatch_session_local, test
     handler = _specs(test_user_id)["propose_screener_alert"].handler
 
     result = await handler({
-        "name": "Cheap quality compounders",
-        "criteria": "pe_ratio < 20 and roe > 15",
-        "frequency": "weekly",
+        "name": "Screen results above price threshold",
+        "criteria": {"symbols": ["NSE:TCS"], "conditions": [{"field": "price", "operator": "above", "value": 100}]},
+        "frequency": "on_match",
     })
 
     assert result["ok"] is True
@@ -232,7 +238,7 @@ async def test_propose_screener_alert_happy_path(monkeypatch_session_local, test
     rows = list_proposals(test_db, test_user_id)
     assert len(rows) == 1
     assert rows[0]["type"] == "screener_alert"
-    assert rows[0]["payload"]["frequency"] == "weekly"
+    assert rows[0]["payload"]["frequency"] == "on_match"
 
 
 @pytest.mark.asyncio
@@ -296,3 +302,160 @@ async def test_proposals_isolated_by_user(monkeypatch_session_local, test_db):
 
     assert len(rows_a) == 1 and rows_a[0]["user_id"] == "user-a"
     assert len(rows_b) == 1 and rows_b[0]["user_id"] == "user-b"
+
+
+@pytest.mark.asyncio
+async def test_rebalance_missing_marks_never_uses_entry_price(monkeypatch, monkeypatch_session_local, test_user_id, test_portfolio_with_position, test_db):
+    async def missing(symbols):
+        return {}, {}
+    monkeypatch.setattr("backend.agent.tools.action_tools._mark_prices", missing)
+    result = await _specs(test_user_id)["propose_rebalance"].handler({"target_weights": {"RELIANCE": 1}, "rationale": "review"})
+    assert result["ok"] is False
+    assert result["error"]["code"] == "missing_prices"
+    from backend.agent.proposals import list_proposals
+    assert list_proposals(test_db, test_user_id) == []
+
+
+@pytest.mark.asyncio
+async def test_confirm_journal_saves_research_note_once(monkeypatch_session_local, test_user_id, test_db):
+    from backend.agent.proposals import confirm_proposal
+    from backend.models.agent_memory import AgentNote
+    result = await _specs(test_user_id)["propose_journal_entry"].handler({"title": "Review margins", "body": "Read the filing", "ticker": "TCS"})
+    proposal_id = result["data"]["proposal_id"]
+    confirmed = await confirm_proposal(test_db, test_user_id, proposal_id)
+    assert confirmed["status"] == "confirmed"
+    note = test_db.get(AgentNote, confirmed["result"]["note_id"])
+    assert note.content == "Review margins\n\nRead the filing"
+    with pytest.raises(ValueError, match="not_pending"):
+        await confirm_proposal(test_db, test_user_id, proposal_id)
+    assert test_db.query(AgentNote).count() == 1
+
+
+@pytest.mark.asyncio
+async def test_confirm_watchlist_remove_scopes_owner(monkeypatch_session_local, test_user_id, test_db):
+    from backend.models import WatchlistORM
+    from backend.agent.proposals import create_proposal, confirm_proposal
+    own = WatchlistORM(id="own", user_id=test_user_id, name="Own", symbols_json=["TCS", "INFY"])
+    other = WatchlistORM(id="other", user_id="someone", name="Other", symbols_json=["TCS"])
+    test_db.add_all([own, other]); test_db.commit()
+    p = create_proposal(test_db, test_user_id, None, "watchlist_remove", {"watchlist_id": "own", "symbols": ["TCS"]}, "Remove", "review")
+    assert (await confirm_proposal(test_db, test_user_id, p["proposal_id"]))["status"] == "confirmed"
+    assert own.symbols_json == ["INFY"]
+    p = create_proposal(test_db, test_user_id, None, "watchlist_remove", {"watchlist_id": "other", "symbols": ["TCS"]}, "Remove", "review")
+    assert (await confirm_proposal(test_db, test_user_id, p["proposal_id"]))["status"] == "failed"
+    assert other.symbols_json == ["TCS"]
+
+
+@pytest.mark.asyncio
+async def test_mark_prices_awaits_fetcher_dependency(monkeypatch):
+    from backend.agent.tools.action_tools import _mark_prices
+    class Fetcher:
+        async def fetch_stock_snapshot(self, symbol):
+            return {"current_price": 125, "provenance": {"quality": "delayed", "source": "test"}}
+    async def dependency():
+        return Fetcher()
+    monkeypatch.setattr("backend.api.deps.get_unified_fetcher", dependency)
+    prices, sources = await _mark_prices(["NSE:TCS"])
+    assert prices == {"NSE:TCS": 125}
+    assert sources["NSE:TCS"]["source"] == "test"
+
+
+@pytest.mark.asyncio
+async def test_confirm_rebalance_paper_atomic_and_idempotent(monkeypatch, monkeypatch_session_local, test_user_id, test_portfolio_with_position, test_db):
+    from backend.agent.proposals import confirm_proposal
+    from backend.models import VirtualPosition, VirtualTrade, VirtualPortfolio
+    async def marks(symbols):
+        return {"RELIANCE": 1000.0, "TCS": 2000.0}, {}
+    monkeypatch.setattr("backend.agent.tools.action_tools._mark_prices", marks)
+    response = await _specs(test_user_id)["propose_rebalance"].handler({"target_weights": {"RELIANCE": 0.3, "TCS": 0.7}, "rationale": "diversify"})
+    proposal_id = response["data"]["proposal_id"]
+    result = await confirm_proposal(test_db, test_user_id, proposal_id)
+    assert result["status"] == "confirmed", result
+    assert result["result"]["paper_only"] is True
+    assert len(result["result"]["orders"]) == 2
+    positions = {p.symbol: p for p in test_db.query(VirtualPosition).all()}
+    assert positions["TCS"].quantity == 52.395
+    assert test_db.get(VirtualPortfolio, test_portfolio_with_position).current_cash > 0
+    assert test_db.query(VirtualTrade).count() == 2
+    with pytest.raises(ValueError, match="not_pending"):
+        await confirm_proposal(test_db, test_user_id, proposal_id)
+    assert test_db.query(VirtualTrade).count() == 2
+
+
+@pytest.mark.asyncio
+async def test_rebalance_failed_second_leg_rolls_back_every_fill(monkeypatch, monkeypatch_session_local, test_user_id, test_portfolio_with_position, test_db):
+    from backend.agent.proposals import confirm_proposal
+    from backend.models import VirtualPosition, VirtualTrade, VirtualPortfolio, VirtualOrder
+    from backend.paper_trading.service import PaperTradingEngine
+    async def marks(symbols):
+        return {"RELIANCE": 1000.0, "TCS": 2000.0}, {}
+    monkeypatch.setattr("backend.agent.tools.action_tools._mark_prices", marks)
+    response = await _specs(test_user_id)["propose_rebalance"].handler({"target_weights": {"RELIANCE": 0.3, "TCS": 0.7}, "rationale": "diversify"})
+    class RejectBuy(PaperTradingEngine):
+        def _fill_order(self, db, order, price):
+            if order.side == "buy":
+                order.status = "rejected"
+            else:
+                super()._fill_order(db, order, price)
+    monkeypatch.setattr("backend.agent.proposals.get_paper_engine", lambda: RejectBuy())
+    result = await confirm_proposal(test_db, test_user_id, response["data"]["proposal_id"])
+    assert result["status"] == "failed"
+    assert test_db.query(VirtualTrade).count() == 0
+    assert test_db.query(VirtualOrder).count() == 0
+    assert test_db.query(VirtualPosition).one().quantity == 100
+    assert test_db.get(VirtualPortfolio, test_portfolio_with_position).current_cash == 50000
+
+
+@pytest.mark.asyncio
+async def test_rebalance_changed_holdings_or_quotes_requires_new_review(monkeypatch, monkeypatch_session_local, test_user_id, test_portfolio_with_position, test_db):
+    from backend.agent.proposals import confirm_proposal
+    from backend.models import VirtualTrade
+    async def marks(symbols):
+        return {"RELIANCE": 1000.0}, {}
+    monkeypatch.setattr("backend.agent.tools.action_tools._mark_prices", marks)
+    response = await _specs(test_user_id)["propose_rebalance"].handler({"target_weights": {"RELIANCE": 1}, "rationale": "review"})
+    async def moved(symbols):
+        return {"RELIANCE": 1100.0}, {}
+    monkeypatch.setattr("backend.agent.tools.action_tools._mark_prices", moved)
+    result = await confirm_proposal(test_db, test_user_id, response["data"]["proposal_id"])
+    assert result["status"] == "failed"
+    assert "moved" in result["result"]["error"]
+    assert test_db.query(VirtualTrade).count() == 0
+
+
+@pytest.mark.asyncio
+async def test_screen_alert_confirmation_creates_evaluable_conditions(monkeypatch_session_local, test_user_id, test_db):
+    from backend.agent.proposals import confirm_proposal
+    from backend.models import AlertORM
+    from backend.alerts.service import AlertEvaluatorService
+    response = await _specs(test_user_id)["propose_screener_alert"].handler({"name": "Momentum", "frequency": "on_match",
+        "criteria": {"symbols": ["NSE:TCS", "NSE:INFY"], "conditions": [{"field": "price", "operator": "above", "value": 100}]}})
+    assert response["ok"]
+    result = await confirm_proposal(test_db, test_user_id, response["data"]["proposal_id"])
+    assert result["status"] == "confirmed"
+    assert len(result["result"]["alert_ids"]) == 2
+    for alert in test_db.query(AlertORM).all():
+        assert alert.user_id == test_user_id
+        assert AlertEvaluatorService()._evaluate(alert, {"ltp": 125})[0] is True
+        assert AlertEvaluatorService()._evaluate(alert, {"ltp": 75})[0] is False
+
+
+@pytest.mark.asyncio
+async def test_screen_alert_rejects_unimplemented_fundamental_expression(monkeypatch_session_local, test_user_id, test_db):
+    response = await _specs(test_user_id)["propose_screener_alert"].handler({"name": "Value", "frequency": "on_match", "criteria": "pe < 20 and roe > 15"})
+    assert response["ok"] is False
+    assert response["error"]["code"] == "unsupported_criteria"
+
+
+@pytest.mark.asyncio
+async def test_mark_prices_rejects_legacy_synthetic_snapshot(monkeypatch):
+    from backend.agent.tools.action_tools import _mark_prices
+    class Fetcher:
+        async def fetch_stock_snapshot(self, symbol):
+            return {"current_price": 125, "details": {"price_source": "mock"}}
+    async def dependency():
+        return Fetcher()
+    monkeypatch.setattr("backend.api.deps.get_unified_fetcher", dependency)
+    prices, sources = await _mark_prices(["NSE:TCS"])
+    assert prices == {}
+    assert sources["NSE:TCS"]["quality"] == "synthetic"

@@ -29,7 +29,7 @@ describe("ProposalCard", () => {
     render(<ProposalCard proposal={makeFixture()} />);
     const buttons = screen.queryAllByRole("button");
     expect(buttons.length).toBe(2);
-    expect(buttons[0].textContent).toBe("Confirm");
+    expect(buttons[0].textContent).toBe("Confirm paper order");
     expect(buttons[1].textContent).toBe("Reject");
   });
 
@@ -63,5 +63,34 @@ describe("ProposalCard", () => {
     const buttons = screen.queryAllByRole("button");
     fireEvent.click(buttons[1]);
     await waitFor(() => expect(rejectSpy).toHaveBeenCalledWith("p-1"));
+  });
+
+  it("shows rebalance quantities, marks and costs before paper confirmation", () => {
+    render(<ProposalCard proposal={makeFixture({ type: "rebalance", payload: {
+      deltas: [{ symbol: "AAPL", current_weight: 0.4, target_weight: 0.6, implied_delta_qty: 12.5, price_used: 200 }],
+      cash_reserve: 100, valued_at: "2026-10-25T12:00:00Z", execution_profile: { slippage_bps: 5, commission_bps: 5, max_price_drift_pct: 1 },
+    } })} />);
+    expect(screen.getByText("Paper portfolio only. No live broker orders.")).toBeInTheDocument();
+    expect(screen.getByText("12.5")).toBeInTheDocument(); expect(screen.getByText("200")).toBeInTheDocument();
+    expect(screen.getByText(/Cash reserve: 100/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm paper rebalance" })).toBeEnabled();
+  });
+
+  it("hydrates incomplete tool proposals before enabling confirmation", async () => {
+    const fixture = makeFixture({ type: "journal_entry", payload: { body: "Review the source evidence" } });
+    const get = vi.spyOn(agentExtras, "getProposal").mockResolvedValue(fixture);
+    render(<ProposalCard proposal={{ ...fixture, expires_at: "", payload: {} }} />);
+    expect(screen.queryByRole("button", { name: "Save research note" })).toBeNull();
+    await waitFor(() => expect(get).toHaveBeenCalledWith("p-1"));
+    expect(await screen.findByRole("button", { name: "Save research note" })).toBeEnabled();
+    expect(screen.getByText("Review the source evidence")).toBeInTheDocument();
+  });
+
+  it("shows backend failure reason without a success result", async () => {
+    vi.spyOn(agentExtras, "confirmProposal").mockResolvedValue({ id: "p-1", status: "failed", result: { error: "Quote moved beyond the reviewed price" } });
+    render(<ProposalCard proposal={makeFixture()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm paper order" }));
+    expect(await screen.findByText(/Quote moved beyond the reviewed price/)).toBeInTheDocument();
+    expect(screen.queryByText(/completed/)).toBeNull();
   });
 });

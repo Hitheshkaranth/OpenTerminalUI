@@ -9,6 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from backend.agent.proposals import _proposal_to_dict
 from backend.agent.proposals import confirm_proposal as _confirm_proposal
 from backend.agent.proposals import expire_stale, list_proposals, reject_proposal as _reject_proposal
 from backend.api.deps import get_db
@@ -28,6 +29,20 @@ def list_agent_proposals(
     """Return proposals for the current user, optionally filtered by status."""
     items = list_proposals(db, current_user.id, status=status)
     return {"items": items}
+
+
+@router.get("/proposals/{proposal_id}")
+def get_agent_proposal(
+    proposal_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    proposal = db.query(AgentProposal).filter(
+        AgentProposal.id == proposal_id, AgentProposal.user_id == current_user.id,
+    ).first()
+    if proposal is None:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    return _proposal_to_dict(proposal)
 
 
 @router.post("/proposals/{proposal_id}/confirm")

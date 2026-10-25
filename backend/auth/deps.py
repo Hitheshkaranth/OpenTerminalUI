@@ -156,6 +156,12 @@ def auth_exempt_path(path: str) -> bool:
     }:
         return True
 
+    # An unguessable token grants read-only access to one frozen research snapshot.
+    # Exact shape only: never exempt the dossier collection, mutations, or nested paths.
+    import re
+    if re.fullmatch(r"/api/research/dossiers/shared/[A-Za-z0-9_-]{43}", path):
+        return True
+
     # Public API v1 routes - explicit allowlist of public endpoints only
     _PUBLIC_V1_PATHS = {
         "/api/v1/public/health",

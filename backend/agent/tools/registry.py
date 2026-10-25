@@ -63,8 +63,26 @@ class ToolRegistry:
         spec = self.get(name)
         if spec.handler is None:
             raise KeyError(f"Tool has no handler: {name}")
-        # Handlers may be plain functions (DB-only tools) or coroutines.
+        from backend.agent.run_context import active_run_id, active_lease_id
+        from backend.agent.context_budget import tool_failed
+        from backend.agent import execution
+        run_id = active_run_id.get()
+        key = None
+        if run_id:
+            lease_id = active_lease_id.get()
+            if lease_id:
+                current = execution.get_execution(run_id)
+                if not current or current["state"] != "running" or current["lease_id"] != lease_id:
+                    raise RuntimeError("Run cancelled or worker lease replaced; no tools will execute.")
+            key, cached, found = execution.checkpoint_start(
+                run_id, name, args, read_only=spec.read_only and spec.write_class == "none")
+            if found:
+                return cached
+        # A raised/cancelled write deliberately remains 'started': recovery must
+        # not repeat an operation whose commit may already have happened.
         result = spec.handler(args)
         if inspect.isawaitable(result):
             result = await result
+        if key:
+            execution.checkpoint_finish(key, result, failed=tool_failed(result))
         return result

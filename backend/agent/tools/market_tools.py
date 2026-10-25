@@ -747,6 +747,7 @@ def build_default_registry(user_id: str | None = None) -> ToolRegistry:
     from backend.agent.tools.filings_tools import filings_tool_specs
 
     if user_id:
+        from backend.agent.tools.dossier_tools import dossier_tool_specs
         from backend.agent.tools.portfolio_tools import portfolio_tool_specs
         from backend.agent.proposals import proposal_tool_specs
         from backend.agent.tools.news_tools import news_tool_specs
@@ -754,6 +755,7 @@ def build_default_registry(user_id: str | None = None) -> ToolRegistry:
         from backend.agent.tools.risk_tools import risk_tool_specs
         reg.register_many([
             *portfolio_tool_specs(user_id),
+            *dossier_tool_specs(user_id),
             *proposal_tool_specs(user_id),
             *news_tool_specs(user_id),
             *action_tool_specs(user_id),

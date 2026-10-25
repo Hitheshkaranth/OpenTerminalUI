@@ -86,6 +86,8 @@ async def lifespan(app: FastAPI):
     if _scanner_alert_scheduler:
         await _scanner_alert_scheduler.start(hub, interval_seconds=900)
 
+    from backend.research_dossiers.scheduler import start_dossier_monitor, stop_dossier_monitor
+    await start_dossier_monitor()
     from backend.filings_watch.scheduler import start_filings_watch, stop_filings_watch
     try:
         await start_filings_watch()
@@ -105,6 +107,7 @@ async def lifespan(app: FastAPI):
     if _scanner_alert_scheduler:
         await _scanner_alert_scheduler.stop()
     try:
+        await stop_dossier_monitor()
         await stop_filings_watch()
     except Exception:
         logging.getLogger(__name__).exception("filings watch failed to stop")
@@ -226,6 +229,7 @@ _frontend_app_entry_paths = {
     "backtesting",
     "account",
     "reports",  # /reports served the marketing page instead of the SPA
+    "research",  # Public, revocable research snapshot links use the application shell.
 }
 
 

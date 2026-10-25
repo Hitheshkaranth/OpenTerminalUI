@@ -94,12 +94,18 @@ class DebateOrchestrator:
         """Yield a complete debate stream, containing one and only one final event."""
         try:
             yield events.phase("analysts", "Analyst team")
-            results = []
-            for role, prompt in roles.ANALYSTS:
-                res = await self._collect_analyst(role, prompt, subject, screen_context)
-                results.append(res)
-                # Larger delay to prevent bursting the API rate limits (Gemini free tier allows ~15-20 RPM)
-                await asyncio.sleep(5.0)
+            # Local servers and free tiers generally need serialized requests.
+            # Provider retry/backoff handles actual 429s instead of unconditional sleeps.
+            model = str(getattr(self.provider, "model", ""))
+            base_url = str(getattr(self.provider, "base_url", ""))
+            constrained = (getattr(self.provider, "honor_model_chain", True) is False
+                           or ":free" in model or "generativelanguage" in base_url)
+            concurrency = 1 if constrained else 3
+            semaphore = asyncio.Semaphore(concurrency)
+            async def collect(role, prompt):
+                async with semaphore:
+                    return await self._collect_analyst(role, prompt, subject, screen_context)
+            results = await asyncio.gather(*(collect(role, prompt) for role, prompt in roles.ANALYSTS))
             notes: dict[str, str] = {}
             for (role, _), (passthrough, note) in zip(roles.ANALYSTS, results):
                 for event in passthrough:
@@ -124,7 +130,6 @@ class DebateOrchestrator:
             if bull_model:
                 yield events.model(bull_model, "synthesis")
             yield events.role_message("bull", bull)
-            await asyncio.sleep(10.0)  # Rate limit backoff for free tiers
             bear = bear_model = ""
             try:
                 async for ev in self._complete(roles.BEAR_RESEARCHER, analyst_context, "bear"):
@@ -143,7 +148,6 @@ class DebateOrchestrator:
 
             yield events.phase("decision", "Portfolio manager")
             decision_context = f"{analyst_context}\n\nBULL CASE:\n{bull}\n\nBEAR CASE:\n{bear}"
-            await asyncio.sleep(10.0)  # Rate limit backoff for free tiers
             decision = decision_model = ""
             try:
                 async for ev in self._complete(

@@ -742,3 +742,16 @@ def test_proposals_isolated_by_user(test_db):
         assert row["user_id"] == user_a
     for row in b_rows:
         assert row["user_id"] == user_b
+
+def test_get_proposal_requires_owner(test_db, test_user_id):
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from backend.agent.proposals import create_proposal
+    from backend.api.routes.agent_proposals import get_agent_proposal
+
+    proposal = create_proposal(test_db, test_user_id, None, "research_note", {"body": "full evidence"}, "review", "rationale")
+    result = get_agent_proposal(proposal["proposal_id"], test_db, SimpleNamespace(id=test_user_id))
+    assert result["payload"]["body"] == "full evidence"
+    with pytest.raises(HTTPException) as exc:
+        get_agent_proposal(proposal["proposal_id"], test_db, SimpleNamespace(id="other-owner"))
+    assert exc.value.status_code == 404

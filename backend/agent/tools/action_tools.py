@@ -12,6 +12,9 @@ from creating proposal rows at all.
 from __future__ import annotations
 
 from typing import Any
+import asyncio
+import math
+from datetime import datetime, timezone
 
 from backend.agent.proposals import create_proposal
 from backend.agent.tools.envelope import err, ok
@@ -25,6 +28,26 @@ _PENDING_NOTE = "This is a PROPOSAL ONLY — nothing has been executed. It is pe
 # 1. propose_rebalance
 # ---------------------------------------------------------------------------
 
+async def _mark_prices(symbols: list[str]) -> tuple[dict[str, float], dict[str, Any]]:
+    from backend.api.deps import get_unified_fetcher
+    fetcher = await get_unified_fetcher()
+    semaphore = asyncio.Semaphore(4)
+    async def fetch(symbol):
+        async with semaphore:
+            try:
+                snap = await asyncio.wait_for(fetcher.fetch_stock_snapshot(symbol), timeout=20)
+                price = float(snap.get("current_price") or snap.get("price") or 0)
+                from backend.core.provenance import provenance_from_snapshot
+                provenance = snap.get("provenance") or provenance_from_snapshot(snap)
+                if not math.isfinite(price) or price <= 0 or (provenance.get("quality") not in {"live", "delayed", "cached"} or provenance.get("source") in {"mock", "synthetic"}):
+                    return symbol, None, provenance
+                return symbol, price, provenance
+            except Exception:
+                return symbol, None, {}
+    rows = await asyncio.gather(*(fetch(s) for s in symbols))
+    return ({s: p for s, p, _ in rows if p is not None}, {s: source for s, _, source in rows})
+
+
 async def propose_rebalance(args: dict[str, Any], user_id: str) -> dict[str, Any]:
     from backend.models import VirtualPortfolio, VirtualPosition
 
@@ -35,10 +58,10 @@ async def propose_rebalance(args: dict[str, Any], user_id: str) -> dict[str, Any
         weights = {str(k).strip().upper(): float(v) for k, v in raw_weights.items()}
     except (TypeError, ValueError):
         return err("target_weights values must be numeric", code="invalid_args")
-    if any(w < 0 for w in weights.values()):
+    if any(not math.isfinite(w) or w < 0 for w in weights.values()):
         return err("target_weights values must be non-negative", code="invalid_args")
     total_weight = sum(weights.values())
-    if abs(total_weight - 1.0) > 0.02:
+    if abs(total_weight - 1.0) > 1e-6:
         return err(f"target_weights must sum to ~1.0 (got {total_weight:.4f})", code="invalid_args")
     rationale = str(args.get("rationale") or "").strip()
     if not rationale:
@@ -64,20 +87,27 @@ async def propose_rebalance(args: dict[str, Any], user_id: str) -> dict[str, Any
             return err("No paper portfolio found for this user — create one before proposing a rebalance", code="not_found")
 
         positions = db.query(VirtualPosition).filter(VirtualPosition.portfolio_id == portfolio.id).all()
-        # No live mark price is available in agent context; use avg_entry_price like
-        # portfolio_tools._paper_positions does, for consistent (if approximate) sizing.
-        position_value = {p.symbol: float(p.quantity) * float(p.avg_entry_price) for p in positions}
-        price_map = {p.symbol: float(p.avg_entry_price) for p in positions if float(p.avg_entry_price) > 0}
+        symbols = sorted(set(weights) | {p.symbol for p in positions})
+        price_map, price_sources = await _mark_prices(symbols)
+        missing = [symbol for symbol in symbols if symbol not in price_map]
+        if missing:
+            return err("Usable marked prices unavailable for: " + ", ".join(missing),
+                       code="missing_prices", hint="Connect a data provider and retry. Entry prices are not used as current valuations.")
+        valued_at = datetime.now(timezone.utc).isoformat()
+        position_value = {p.symbol: float(p.quantity) * price_map[p.symbol] for p in positions}
         total_equity = float(portfolio.current_cash) + sum(position_value.values())
         if total_equity <= 0:
             return err("Portfolio has no equity to rebalance against", code="invalid_state")
 
+        # Reserve twenty basis points for the paper engine's slippage and fees.
+        cash_reserve = total_equity * 0.002
+        investable_equity = total_equity - cash_reserve
         deltas: list[dict[str, Any]] = []
         for symbol in sorted(set(weights) | set(position_value)):
             current_value = position_value.get(symbol, 0.0)
             current_weight = current_value / total_equity
             target_weight = weights.get(symbol, 0.0)
-            target_value = target_weight * total_equity
+            target_value = target_weight * investable_equity
             delta_value = target_value - current_value
             price = price_map.get(symbol)
             deltas.append({
@@ -89,13 +119,20 @@ async def propose_rebalance(args: dict[str, Any], user_id: str) -> dict[str, Any
                 "target_value": round(target_value, 2),
                 "delta_value": round(delta_value, 2),
                 "price_used": price,
-                "implied_delta_qty": round(delta_value / price, 4) if price else None,
+                "price_provenance": price_sources.get(symbol),
+                "valued_at": valued_at,
+                "implied_delta_qty": math.trunc(delta_value / price * 1_000_000) / 1_000_000 if price else None,
             })
 
         payload = {
             "portfolio_id": portfolio.id,
             "target_weights": weights,
             "total_equity": round(total_equity, 2),
+            "valued_at": valued_at,
+            "valuation_basis": "marked_prices",
+            "cash_reserve": round(cash_reserve, 2),
+            "execution_profile": {"slippage_bps": 5.0, "commission_bps": 5.0, "max_price_drift_pct": 1.0},
+            "portfolio_snapshot": {"cash": float(portfolio.current_cash), "positions": {p.symbol: float(p.quantity) for p in positions}},
             "deltas": deltas,
         }
         summary = f"Rebalance '{portfolio.name}' to {len(weights)} target weight(s)"
@@ -108,7 +145,9 @@ async def propose_rebalance(args: dict[str, Any], user_id: str) -> dict[str, Any
         "status": result["status"],
         "summary": result["summary"],
         "deltas": deltas,
-        "note": _PENDING_NOTE,
+        "cash_reserve": round(cash_reserve, 2),
+        "execution_profile": payload["execution_profile"],
+        "note": _PENDING_NOTE + " Paper portfolio only. A 0.2% cash reserve covers simulated slippage and fees; changed holdings or >1% quote drift require a new proposal.",
     })
 
 
@@ -129,7 +168,7 @@ async def propose_journal_entry(args: dict[str, Any], user_id: str) -> dict[str,
     tags = [str(t).strip() for t in raw_tags if str(t).strip()]
 
     payload = {"ticker": ticker, "title": title, "body": body, "tags": tags}
-    summary = f"Journal entry: {title}" + (f" ({ticker})" if ticker else "")
+    summary = f"Research note: {title}" + (f" ({ticker})" if ticker else "")
     db = SessionLocal()
     try:
         # No standalone rationale field for a note — the note body IS the rationale.
@@ -197,9 +236,14 @@ async def propose_screener_alert(args: dict[str, Any], user_id: str) -> dict[str
             return err("criteria is required", code="invalid_args")
     else:
         return err("criteria must be a non-empty filter expression string or object", code="invalid_args")
-    frequency = str(args.get("frequency") or "daily").strip().lower()
+    frequency = str(args.get("frequency") or "on_match").strip().lower()
     if frequency not in ("daily", "weekly", "on_match"):
         return err("frequency must be one of: daily, weekly, on_match", code="invalid_args")
+    from backend.agent.screen_alerts import validate_criteria
+    try:
+        criteria = validate_criteria(criteria, frequency)
+    except ValueError as exc:
+        return err(str(exc), code="unsupported_criteria")
     rationale = str(args.get("rationale") or "").strip() or f"Saved screen: {name}"
 
     payload = {"name": name, "criteria": criteria, "frequency": frequency}
@@ -269,7 +313,7 @@ def action_tool_specs(user_id: str) -> list[ToolSpec]:
         ),
         ToolSpec(
             name="propose_journal_entry",
-            description="Propose a research journal note (optionally tied to a ticker) for the user's "
+            description="Propose a research memory note (optionally tied to a ticker) for the user's "
             "record. This tool ONLY PROPOSES — it requires user confirmation and does not save anything "
             "until confirmed.",
             parameters={
@@ -306,18 +350,17 @@ def action_tool_specs(user_id: str) -> list[ToolSpec]:
         ),
         ToolSpec(
             name="propose_screener_alert",
-            description="Propose a saved screen that notifies the user when new stocks match the given "
-            "criteria. This tool ONLY PROPOSES — it requires user confirmation and does not create the "
-            "saved screen until confirmed.",
+            description="Propose tick-based alerts for explicit screen-result symbols using price/change_pct/volume/oi_change/iv conditions. Fundamental query expressions and scheduled universe scans are unsupported. This tool ONLY PROPOSES — it requires user confirmation and does not create the "
+            "alerts until confirmed.",
             parameters={
                 "type": "object",
                 "properties": {
                     "name": {"type": "string"},
                     "criteria": {
-                        "description": "Filter expression string (e.g. 'pe_ratio < 20 and roe > 15') or a criteria object.",
-                        "oneOf": [{"type": "string"}, {"type": "object"}],
+                        "description": "Object: symbols (exchange-qualified strings), conditions [{field, operator, value}], logic AND/OR. Supported fields: price, change_pct, volume, oi_change, iv.",
+                        "type": "object",
                     },
-                    "frequency": {"type": "string", "enum": ["daily", "weekly", "on_match"], "default": "daily"},
+                    "frequency": {"type": "string", "enum": ["on_match"], "default": "on_match"},
                     "rationale": {"type": "string"},
                 },
                 "required": ["name", "criteria"],

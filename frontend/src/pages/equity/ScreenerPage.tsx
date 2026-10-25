@@ -17,6 +17,7 @@ import {
   Trees,
 } from "lucide-react";
 
+import { useWorkspaceContextStore } from "../../agent/workspaceContextStore";
 import { MobileSidebar } from "../../components/layout/MobileSidebar";
 import { TerminalBadge } from "../../components/terminal/TerminalBadge";
 import { TerminalButton } from "../../components/terminal/TerminalButton";
@@ -79,7 +80,7 @@ function ScreenerWorkspace() {
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [queryOpen, setQueryOpen] = useState(true);
+  const [queryOpen, setQueryOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const {
@@ -102,6 +103,14 @@ function ScreenerWorkspace() {
     setUniverse,
     setView,
   } = useScreenerContext();
+
+  useEffect(() => {
+    useWorkspaceContextStore.getState().setContext({
+      selected_symbols: selectedRow?.ticker ? [String(selectedRow.ticker)] : (result?.results || []).slice(0, 20).map((row) => String(row.ticker || row.symbol || "")).filter(Boolean),
+      filters: { query, preset_id: selectedPresetId }, universe,
+    }, window.location.pathname);
+    return () => useWorkspaceContextStore.getState().clearContext();
+  }, [selectedRow, result, query, selectedPresetId, universe]);
 
   const activePreset = presets.find((preset) => preset.id === selectedPresetId) ?? null;
   const activeSavedScreen = savedScreens.find((screen) => screen.id === activeSavedScreenId) ?? null;
@@ -160,38 +169,10 @@ function ScreenerWorkspace() {
       </button>
       <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(255,107,0,0.08),transparent_34rem)] p-3 md:p-5">
       <main className="mx-auto flex w-full max-w-[1680px] flex-col gap-4">
-        <section className="rounded-md border border-terminal-border/70 bg-terminal-panel/95 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.18)] md:p-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0">
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <TerminalBadge variant="accent">Equity Screener</TerminalBadge>
-                <TerminalBadge variant="neutral">{universe}</TerminalBadge>
-                {activePreset?.category ? <TerminalBadge variant="info">{categoryLabels[activePreset.category] ?? activePreset.category}</TerminalBadge> : null}
-              </div>
-              <h1 className="max-w-4xl font-sans text-2xl font-semibold tracking-normal text-terminal-text md:text-3xl">
-                Find stocks that match your investing style.
-              </h1>
-              <p className="mt-2 max-w-3xl font-sans text-sm leading-6 text-terminal-muted">
-                Start from a proven screen, adjust the rules only when needed, then inspect why each result ranked.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 text-xs md:min-w-[420px]">
-              <div className="rounded-md border border-terminal-border bg-terminal-bg/70 p-3">
-                <div className="font-sans text-[11px] text-terminal-muted">Matches</div>
-                <div className="mt-1 text-xl font-semibold text-terminal-text">{resultCount.toLocaleString("en-IN")}</div>
-              </div>
-              <div className="rounded-md border border-terminal-border bg-terminal-bg/70 p-3">
-                <div className="font-sans text-[11px] text-terminal-muted">Active screen</div>
-                <div className="mt-1 truncate text-sm font-semibold text-terminal-text" title={activeLabel}>{activeLabel}</div>
-              </div>
-              <div className="rounded-md border border-terminal-border bg-terminal-bg/70 p-3">
-                <div className="font-sans text-[11px] text-terminal-muted">Runtime</div>
-                <div className="mt-1 text-xl font-semibold text-terminal-text">{typeof executionMs === "number" && Number.isFinite(executionMs)
-                    ? `${executionMs < 1 ? "<1" : executionMs < 10 ? executionMs.toFixed(1) : Math.round(executionMs)} ms`
-                    : "--"}</div>
-              </div>
-            </div>
+        <section className="rounded-md border border-terminal-border/70 bg-terminal-panel p-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h1 className="font-sans text-xl font-semibold text-terminal-text">Equity screener</h1>
+            <p className="text-sm text-terminal-muted">{resultCount.toLocaleString("en-IN")} matches · {activeLabel} · {universe}{typeof executionMs === "number" ? ` · ${Math.round(executionMs)} ms` : ""}</p>
           </div>
 
           <div className="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
@@ -247,7 +228,7 @@ function ScreenerWorkspace() {
                 key={preset.id}
                 type="button"
                 className={[
-                  "min-w-[180px] rounded-md border p-3 text-left transition-colors",
+                  "min-w-[150px] rounded border px-3 py-2 text-left transition-colors",
                   selectedPresetId === preset.id
                     ? "border-terminal-accent bg-terminal-accent/15 text-terminal-text"
                     : "border-terminal-border bg-terminal-bg/60 text-terminal-muted hover:border-terminal-border-hover hover:text-terminal-text",

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
+import math
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -92,6 +93,10 @@ async def confirm_proposal(
 
     now = _now()
 
+    # A decided action keeps its audit status even after its original expiry.
+    if p.status != "pending":
+        raise ValueError("not_pending")
+
     # Expired check
     if p.expires_at < now:
         p.status = "expired"
@@ -99,16 +104,12 @@ async def confirm_proposal(
         db.commit()
         raise ValueError("expired")
 
-    # Only pending can be confirmed
-    if p.status != "pending":
-        raise ValueError("not_pending")
-
     # Claim atomically: the executors await (market fill), so a second confirm
     # of the same proposal could otherwise pass the pending check and run twice.
     claimed = (
         db.query(AgentProposal)
         .filter(AgentProposal.id == p.id, AgentProposal.status == "pending")
-        .update({"status": "confirmed", "decided_at": now}, synchronize_session=False)
+        .update({"status": "executing", "decided_at": now}, synchronize_session=False)
     )
     db.commit()
     if not claimed:
@@ -123,17 +124,24 @@ async def confirm_proposal(
             result = _confirm_alert(db, p)
         elif p.type == "watchlist_add":
             result = _confirm_watchlist_add(db, p)
+        elif p.type == "watchlist_remove":
+            result = _confirm_watchlist_remove(db, p)
+        elif p.type == "journal_entry":
+            result = _confirm_journal_note(db, p)
+        elif p.type == "rebalance":
+            result = await _confirm_rebalance(db, p)
+        elif p.type == "screener_alert":
+            result = _confirm_screen_alert(db, p)
         else:
-            # No executor for this type yet (rebalance, journal_entry,
-            # watchlist_remove and screener_alert are proposal-only for now).
-            # Leaving status as "confirmed" would tell the user the action ran,
-            # so fail loudly instead.
+            # Unknown extension actions must not be represented as executed.
             result = {"error": f"no executor for proposal type: {p.type}"}
             p.status = "failed"
     except Exception as exc:  # noqa: BLE001
         result = {"error": str(exc)}
         p.status = "failed"
 
+    if p.status == "executing":
+        p.status = "confirmed"
     p.result = result
     db.commit()
     db.refresh(p)
@@ -149,6 +157,8 @@ def reject_proposal(db: Session, user_id: str, proposal_id: str) -> dict:
     )
     if p is None:
         raise ValueError("not_found")
+    if p.status != "pending":
+        raise ValueError("not_pending")
     p.status = "rejected"
     p.decided_at = _now()
     db.commit()
@@ -267,7 +277,7 @@ def _confirm_watchlist_add(db: Session, p: AgentProposal) -> dict:
     if payload.get("watchlist_id"):
         wl = (
             db.query(WatchlistORM)
-            .filter(WatchlistORM.id == payload["watchlist_id"])
+            .filter(WatchlistORM.id == payload["watchlist_id"], WatchlistORM.user_id == p.user_id)
             .first()
         )
     else:
@@ -288,6 +298,128 @@ def _confirm_watchlist_add(db: Session, p: AgentProposal) -> dict:
     db.commit()
     db.refresh(wl)
     return {"watchlist_id": wl.id, "symbol": symbol, "total_symbols": len(symbols)}
+
+
+async def _confirm_rebalance(db: Session, p: AgentProposal) -> dict:
+    """Fill all reviewed legs in one paper-only database transaction."""
+    from sqlalchemy import update
+    from backend.models import VirtualPortfolio, VirtualPosition, VirtualOrder, VirtualTrade
+    from backend.agent.tools.action_tools import _mark_prices
+    payload = p.payload
+    baseline = payload.get("portfolio_snapshot")
+    legs = payload.get("deltas")
+    if not isinstance(baseline, dict) or not isinstance(legs, list):
+        raise ValueError("This preview lacks a portfolio snapshot; generate a new proposal")
+    if not legs or len(legs) > 100:
+        raise ValueError("Rebalance must contain between one and 100 legs")
+    symbols = [str(leg.get("symbol", "")) for leg in legs]
+    if len(set(symbols)) != len(symbols):
+        raise ValueError("Duplicate rebalance symbols")
+    prices, provenance = await _mark_prices(symbols)
+    for leg in legs:
+        symbol = str(leg.get("symbol", ""))
+        price = prices.get(symbol)
+        preview_price = float(leg.get("price_used") or 0)
+        qty = float(leg.get("implied_delta_qty") or 0)
+        if price is None or not math.isfinite(price) or price <= 0 or preview_price <= 0 or not math.isfinite(qty):
+            raise ValueError("Missing usable price or quantity; generate a new proposal")
+        if abs(price / preview_price - 1) > 0.01:
+            raise ValueError("Quote moved more than 1% since review; generate a new proposal")
+    portfolio_id = str(payload.get("portfolio_id") or "")
+    expected_cash = float(baseline.get("cash", -1))
+    if not math.isfinite(expected_cash) or expected_cash < 0:
+        raise ValueError("Invalid portfolio snapshot")
+    orders = []
+    with db.begin_nested():
+        # Conditional write locks the paper portfolio in SQLite and PostgreSQL.
+        locked = db.execute(update(VirtualPortfolio).where(
+            VirtualPortfolio.id == portfolio_id, VirtualPortfolio.user_id == p.user_id,
+            VirtualPortfolio.current_cash == expected_cash,
+        ).values(current_cash=expected_cash)).rowcount
+        if not locked:
+            raise ValueError("Paper portfolio changed or is unavailable; generate a new proposal")
+        portfolio = db.query(VirtualPortfolio).filter_by(id=portfolio_id, user_id=p.user_id).populate_existing().one()
+        positions = db.query(VirtualPosition).filter_by(portfolio_id=portfolio_id).populate_existing().all()
+        actual = {pos.symbol: float(pos.quantity) for pos in positions}
+        expected = {str(k): float(v) for k, v in baseline.get("positions", {}).items()}
+        if set(actual) != set(expected) or any(abs(actual[k] - expected[k]) > 1e-8 for k in actual):
+            raise ValueError("Paper positions changed; generate a new proposal")
+        # Sell first, then buy. Quantities are exactly those shown in the proposal.
+        for leg in sorted(legs, key=lambda row: float(row.get("implied_delta_qty") or 0)):
+            delta = float(leg.get("implied_delta_qty") or 0)
+            if abs(delta) < 1e-8:
+                continue
+            symbol = leg["symbol"]
+            side = "buy" if delta > 0 else "sell"
+            qty = abs(delta)
+            if side == "sell" and qty > actual.get(symbol, 0) + 1e-8:
+                raise ValueError("Rebalance would sell more than the paper holding")
+            old_cost = next((float(pos.avg_entry_price) for pos in positions if pos.symbol == symbol), 0)
+            fill_price = prices[symbol] * (1.0005 if side == "buy" else 0.9995)
+            commission = qty * fill_price * 0.0005
+            order = VirtualOrder(portfolio_id=portfolio_id, symbol=symbol, side=side, order_type="market",
+                quantity=qty, status="pending", slippage_bps=5.0, commission=commission,
+                signal_metadata={"agent_proposal_id": p.id, "valuation_provenance": provenance.get(symbol), "paper_only": True})
+            db.add(order); db.flush()
+            get_paper_engine()._fill_order(db, order, prices[symbol])
+            db.flush()
+            if order.status != "filled":
+                raise ValueError("Paper rebalance cannot be fully funded after fees; no legs were executed")
+            if side == "sell":
+                trade = db.query(VirtualTrade).filter_by(order_id=order.id).one()
+                trade.pnl_realized = (float(order.fill_price) - old_cost) * qty - commission
+            orders.append({"order_id": order.id, "symbol": symbol, "side": side, "quantity": qty,
+                           "fill_price": order.fill_price, "commission": commission})
+        db.flush()
+        if portfolio.current_cash < -1e-8:
+            raise ValueError("Paper rebalance would overdraw cash")
+        cash = float(portfolio.current_cash)
+    return {"portfolio_id": portfolio_id, "paper_only": True, "orders": orders, "remaining_cash": cash}
+
+
+def _confirm_screen_alert(db: Session, p: AgentProposal) -> dict:
+    from backend.agent.screen_alerts import validate_criteria
+    from backend.models import AlertORM
+    criteria = validate_criteria(p.payload.get("criteria"), p.payload.get("frequency", "on_match"))
+    alert_ids = []
+    with db.begin_nested():
+        for symbol in criteria["symbols"]:
+            alert = AlertORM(user_id=p.user_id, symbol=symbol, condition_type="multi_condition", status="active",
+                parameters={"name": p.payload.get("name"), "source": "agent_screen_results", "proposal_id": p.id},
+                conditions=criteria["conditions"], logic=criteria["logic"], delivery_channels=["in_app"],
+                cooldown_minutes=15)
+            db.add(alert); db.flush()
+            alert_ids.append(alert.id)
+    return {"alert_ids": alert_ids, "status": "created", "evaluation": "on market ticks", "symbols": criteria["symbols"]}
+
+
+def _confirm_watchlist_remove(db: Session, p: AgentProposal) -> dict:
+    from backend.models import WatchlistORM
+    wl = db.query(WatchlistORM).filter_by(id=p.payload.get("watchlist_id"), user_id=p.user_id).first()
+    if wl is None:
+        raise ValueError("Watchlist unavailable")
+    remove = {str(s).strip().upper() for s in p.payload.get("symbols", [])}
+    previous = list(wl.symbols_json or [])
+    wl.symbols_json = [s for s in previous if str(s).upper() not in remove]
+    db.flush()
+    return {"watchlist_id": wl.id, "removed": [s for s in previous if str(s).upper() in remove],
+            "total_symbols": len(wl.symbols_json)}
+
+
+def _confirm_journal_note(db: Session, p: AgentProposal) -> dict:
+    # The proposal contains research prose, not trade fills. Preserve it as a
+    # research note instead of inventing entry prices/quantities for a trade journal.
+    from backend.agent.memory import add_note
+    title = str(p.payload.get("title", "")).strip()
+    body = str(p.payload.get("body", "")).strip()
+    if not title or not body:
+        raise ValueError("Research note title and body are required")
+    content = title + "\n\n" + body
+    tags = p.payload.get("tags") or []
+    if tags:
+        content += "\n\nTags: " + ", ".join(str(t) for t in tags)
+    note = add_note(db, p.user_id, p.payload.get("ticker") or "", "note", content, "agent_proposal")
+    return {"note_id": note["id"], "status": "saved", "destination": "research_memory"}
 
 
 # ---------------------------------------------------------------------------

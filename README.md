@@ -37,7 +37,9 @@ Most retail tools stop at price charts and ratios. OpenTerminalUI is built for t
 
 - **One terminal, many markets.** NSE / BSE, NYSE / NASDAQ, F&O, commodities, forex, crypto, ETFs, bonds and mutual funds, behind a keyboard-first shell (`Ctrl+G` GO bar, `Ctrl+K` palette, `Ctrl+J` agent).
 - **Evidence, not vibes.** Filings Intelligence reads 10-Ks, 10-Qs, earnings releases, annual reports and concall transcripts, and every growth engine or headwind it reports carries a verbatim, verified quote with document and page.
-- **An analyst that uses tools.** The AI agent calls 40+ read-only tools (snapshots, technicals, filings search, screens, backtests, risk) and answers with the numbers it fetched, not ones it imagined.
+- **An analyst that uses tools.** The AI agent combines market and research tools with reviewable action proposals. Runs retain evidence, support cancellation and reconnect/resume, and export their recorded tool results. Portfolio actions operate on paper portfolios and require confirmation.
+- **Research that persists.** Private dossiers connect theses, evidence, revision history, filing-change monitoring and frozen-data experiments. Share revocable read-only snapshots or export evidence for review.
+- **A workspace you can adapt.** Import/export layouts, undo changes, link symbol/date/currency context, pin agent artifacts, and adjust density and text size. See the [research workspace upgrade guide](docs/RESEARCH_WORKSPACE_UPGRADE.md) for capabilities and limits.
 - **Honest data.** Every quote carries provenance (`live / delayed / cached / synthetic`), blank metrics say why they are blank, and synthetic fallbacks are labelled, never passed off as real.
 - **Yours.** MIT-licensed, self-hosted, works offline-first with free data sources, and runs AI on a local model if you prefer.
 

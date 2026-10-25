@@ -160,3 +160,9 @@ for _r in (filings_rag_router, business_metrics_router, value_chain_router, valu
 
 
 __all__ = ["api_router"]
+
+from backend.research_dossiers.routes import router as research_dossiers_router
+api_router.include_router(research_dossiers_router)
+
+from backend.research_dossiers.experiments import router as research_experiments_router
+api_router.include_router(research_experiments_router)

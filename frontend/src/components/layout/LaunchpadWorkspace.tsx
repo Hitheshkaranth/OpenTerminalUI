@@ -16,29 +16,12 @@ import {
   type LinkGroup,
 } from "../../contexts/SymbolLinkContext";
 import { PanelBody, PanelFrame, PanelHeader } from "./PanelChrome";
-import { type LaunchpadPanelType, useLaunchpad } from "./LaunchpadContext";
+import { SUPPORTED_LAUNCHPAD_PANEL_TYPES, type LaunchpadPanelType, useLaunchpad } from "./LaunchpadContext";
+import { WorkspaceGroupEditor } from "./WorkspaceGroupEditor";
+import { useWorkspaceContextStore } from "../../agent/workspaceContextStore";
 import { LaunchpadGrid } from "./LaunchpadGrid";
 import { useStockStore } from "../../store/stockStore";
 
-const PANEL_TYPES: LaunchpadPanelType[] = [
-  "chart",
-  "watchlist",
-  "news-feed",
-  "order-book",
-  "ticker-detail",
-  "screener-results",
-  "alerts",
-  "portfolio-summary",
-  "heatmap",
-  "market-pulse",
-  "yield-curve",
-  "ai-research",
-  "option-chain",
-  "watchlist-heatmap",
-  "sector-rotation",
-  "hotkeys",
-  "research-notes",
-];
 
 function typeIconLabel(type: LaunchpadPanelType) {
   switch (type) {
@@ -142,6 +125,7 @@ function VisibilityMount({
 
 export function LaunchpadWorkspace({ toolbarActions }: { toolbarActions?: ReactNode }) {
   const {
+    undo, canUndo, exportWorkspace, importWorkspace,
     activeLayout,
     activeLayoutId,
     savedLayouts,
@@ -161,6 +145,8 @@ export function LaunchpadWorkspace({ toolbarActions }: { toolbarActions?: ReactN
     symbolEventVersion,
     loadingLayouts,
   } = useLaunchpad();
+  const importInput = useRef<HTMLInputElement>(null);
+  const [transferError, setTransferError] = useState("");
   const globalTicker = useStockStore((s) => s.ticker);
   const setTicker = useStockStore((s) => s.setTicker);
   const loadTicker = useStockStore((s) => s.load);
@@ -169,12 +155,19 @@ export function LaunchpadWorkspace({ toolbarActions }: { toolbarActions?: ReactN
   const [layoutNameDraft, setLayoutNameDraft] = useState("");
   const [panelTypeOpen, setPanelTypeOpen] = useState(false);
   const [focusedPanelId, setFocusedPanelId] = useState<string | null>(null);
+  const [settingsPanelId, setSettingsPanelId] = useState<string | null>(null);
   const [panelSearch, setPanelSearch] = useState("");
   
   const panels = activeLayout?.panels ?? [];
+  useEffect(() => {
+    const focused = panels.find((panel) => panel.id === focusedPanelId);
+    const group = focused ? activeLayout?.groups?.[resolvePanelLinkGroup(focused) as "red" | "blue" | "green" | "yellow"] : undefined;
+    useWorkspaceContextStore.getState().setContext({ workspace_id: activeLayoutId, selected_symbols: focused?.symbol ? [focused.symbol] : panels.map((panel) => panel.symbol || "").filter(Boolean), date_range: group?.dateRange, filters: group ? { context_name: group.name, reporting_currency: group.currency } : undefined }, window.location.pathname);
+    return () => useWorkspaceContextStore.getState().clearContext();
+  }, [activeLayout, activeLayoutId, focusedPanelId]);
 
   const filteredPanelTypes = useMemo(() => 
-    PANEL_TYPES.filter(t => t.toLowerCase().includes(panelSearch.toLowerCase())),
+    SUPPORTED_LAUNCHPAD_PANEL_TYPES.filter(t => t.toLowerCase().includes(panelSearch.toLowerCase())),
     [panelSearch]
   );
 
@@ -276,8 +269,19 @@ export function LaunchpadWorkspace({ toolbarActions }: { toolbarActions?: ReactN
             </div>
           ))}
         </div>
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex flex-wrap items-center gap-1">
           {toolbarActions}
+          <button type="button" disabled={!canUndo} onClick={undo} className="rounded border border-terminal-border px-2 py-1 text-xs disabled:opacity-40">Undo layout</button>
+          <button type="button" onClick={() => {
+            const url = URL.createObjectURL(new Blob([exportWorkspace()], { type: "application/json" }));
+            const link = document.createElement("a"); link.href = url; link.download = "workspace.json"; link.click(); URL.revokeObjectURL(url);
+          }} className="rounded border border-terminal-border px-2 py-1 text-xs">Export workspace</button>
+          <button type="button" onClick={() => importInput.current?.click()} className="rounded border border-terminal-border px-2 py-1 text-xs">Import workspace</button>
+          <input ref={importInput} type="file" accept="application/json,.json" className="hidden" aria-label="Import workspace file" onChange={async (event) => {
+            const file = event.target.files?.[0]; if (!file) return;
+            try { if (file.size > 2_000_000) throw new Error("Workspace file exceeds 2 MB."); importWorkspace(await file.text()); setTransferError(""); } catch (error) { setTransferError(error instanceof Error ? error.message : "Import failed."); }
+            event.target.value = "";
+          }} />
           <div className="relative">
             <button
               type="button"
@@ -326,10 +330,12 @@ export function LaunchpadWorkspace({ toolbarActions }: { toolbarActions?: ReactN
         </div>
       </div>
 
+      <WorkspaceGroupEditor />
+      {transferError && <p role="alert" className="text-sm text-terminal-neg">{transferError}</p>}
       <div className="rounded-sm border border-terminal-border bg-[#0B1018] px-2 py-1 text-[11px] text-terminal-muted">
         Linked symbol broadcast: <span className="ot-type-data text-terminal-text">{lastBroadcastSymbol || globalTicker || "NONE"}</span>
-        <span className="ml-2">event #{symbolEventVersion}</span>
-        <span className="ml-4">Tip: drag panel headers to reorder; resize with CSS resize handle at panel bottom-right.</span>
+
+        <span className="ml-4">Linked panels follow the same symbol. Drag headers to move panels; drag the lower-right corner to resize.</span>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto rounded-sm border border-terminal-border bg-terminal-bg p-2">
@@ -430,7 +436,7 @@ export function LaunchpadWorkspace({ toolbarActions }: { toolbarActions?: ReactN
                       >
                         {panelLinkGroup !== "none" ? <Link2 className="h-3.5 w-3.5" /> : <Unlink2 className="h-3.5 w-3.5" />}
                       </button>
-                      <button type="button" className="rounded p-1 text-terminal-muted hover:text-terminal-text" aria-label="Panel settings">
+                      <button type="button" onClick={() => setSettingsPanelId(settingsPanelId === panel.id ? null : panel.id)} aria-expanded={settingsPanelId === panel.id} className="rounded p-1 text-terminal-muted hover:text-terminal-text" aria-label="Panel settings">
                         <Settings className="h-3.5 w-3.5" />
                       </button>
                       <button type="button" onClick={() => closePanel(panel.id)} className="rounded p-1 text-terminal-muted hover:text-rose-400" aria-label="Close panel">
@@ -439,6 +445,14 @@ export function LaunchpadWorkspace({ toolbarActions }: { toolbarActions?: ReactN
                     </div>
                   }
                 />
+                {settingsPanelId === panel.id && <div className="flex flex-wrap gap-3 border-b border-terminal-border p-3 text-xs" role="group" aria-label={`${panel.title} settings`}>
+                  <label>Title <input aria-label="Widget title" className="block w-36 bg-terminal-bg p-2" value={panel.title} onChange={(event) => updatePanel(panel.id, { title: event.target.value })} /></label>
+                  <label>Instrument <input aria-label="Widget instrument" className="block w-28 bg-terminal-bg p-2" value={panel.symbol || ""} onChange={(event) => updatePanel(panel.id, { symbol: event.target.value.trim().toUpperCase() })} /></label>
+                  {panel.type === "chart" && <label>History range <select className="block bg-terminal-bg p-2" value={String(panel.props?.range || "3mo")} onChange={(event) => updatePanel(panel.id, { props: { ...panel.props, range: event.target.value } })}>{["1mo", "3mo", "6mo", "1y", "5y"].map((range) => <option key={range}>{range}</option>)}</select></label>}
+                  {(panel.type === "greeks" || panel.type === "oi-chart") && <label>Expiry (blank = nearest)<input type="date" className="block bg-terminal-bg p-2" value={String(panel.props?.expiry || "")} onChange={(event) => updatePanel(panel.id, { props: { ...panel.props, expiry: event.target.value } })} /></label>}
+                  {panel.type === "portfolio-performance" && <label>Benchmark <input className="block w-28 bg-terminal-bg p-2" value={String(panel.props?.benchmark || "")} placeholder="Default" onChange={(event) => updatePanel(panel.id, { props: { ...panel.props, benchmark: event.target.value.trim().toUpperCase() } })} /></label>}
+                  <button type="button" onClick={() => setSettingsPanelId(null)} className="underline">Close settings</button>
+                </div>}
                 {panel.poppedOut ? (
                   <PanelBody className="flex min-h-[160px] flex-col items-center justify-center gap-3 text-center">
                     <div>

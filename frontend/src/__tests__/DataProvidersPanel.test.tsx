@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DataProvidersPanel } from "../components/settings/DataProvidersPanel";
@@ -70,7 +70,8 @@ describe("DataProvidersPanel", () => {
 
     expect(screen.getByText("NOT CONFIGURED")).toBeInTheDocument();
     expect(screen.getByText("Set FMP_API_KEY in .env, then restart")).toBeInTheDocument();
-    expect(screen.getByText("Zerodha Kite")).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByText("Zerodha Kite")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Provider setup checklist" })).getByText("Setup required")).toBeInTheDocument();
   });
 
   it('shows "Checking providers…" while loading', () => {

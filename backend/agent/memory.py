@@ -62,11 +62,17 @@ def append_message(db: Session, user_id: str, thread_id: str, role: str, content
     thread = get_or_create_thread(db, user_id, thread_id)
     if role == "user" and not (thread.title or "").strip():
         thread.title = (content or "")[:60]
+    if run_id:
+        existing = db.query(AgentMessage).filter_by(user_id=user_id, thread_id=thread_id, run_id=run_id, role=role).first()
+        if existing:
+            existing.content = content or ""
+            db.flush()
+            return existing
     msg = AgentMessage(
         thread_id=thread_id,
         user_id=user_id,
         role=role,
-        content=(content or "")[:_TRUNC],
+        content=content or "",
         run_id=run_id,
     )
     db.add(msg)
@@ -82,11 +88,11 @@ def thread_history(db: Session, user_id: str, thread_id: str, limit: int = 8) ->
             AgentMessage.user_id == user_id,
             AgentMessage.role.in_(["user", "assistant"]),
         )
-        .order_by(AgentMessage.created_at.asc())
-        .limit(limit)
+        .order_by(AgentMessage.created_at.desc())
+        .limit(max(1, min(limit, 100)))
         .all()
     )
-    return [{"role": r.role, "content": (r.content or "")[:_TRUNC]} for r in rows]
+    return [{"role": r.role, "content": r.content or ""} for r in reversed(rows)]
 
 
 def list_threads(db: Session, user_id: str, limit: int = 50) -> list[dict[str, Any]]:
@@ -151,7 +157,7 @@ def get_thread(db: Session, user_id: str, thread_id: str) -> dict[str, Any] | No
             {
                 "id": m.id,
                 "role": m.role,
-                "content": m.content[:_TRUNC] if m.content else "",
+                "content": m.content or "",
                 "run_id": m.run_id,
                 "created_at": m.created_at,
                 **({"grounding": grounding.get(m.run_id)} if m.role == "assistant" and m.run_id else {}),

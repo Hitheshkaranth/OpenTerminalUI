@@ -44,9 +44,12 @@ def _ensure_agent_run_columns() -> None:
     if not inspector.has_table("agent_runs"):
         return
     existing = {str(column["name"]) for column in inspector.get_columns("agent_runs")}
-    if "grounding_json" not in existing:
-        with engine.begin() as conn:
+    with engine.begin() as conn:
+        if "grounding_json" not in existing:
             conn.execute(text("ALTER TABLE agent_runs ADD COLUMN grounding_json TEXT"))
+        if "finished_at" not in existing:
+            # TIMESTAMP is accepted by both SQLite and PostgreSQL.
+            conn.execute(text("ALTER TABLE agent_runs ADD COLUMN finished_at TIMESTAMP"))
 
 
 def _ensure_news_sentiment_columns() -> None:
