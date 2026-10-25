@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { createDossier, deleteDossier, dossierDraft, dossierRevisions, emptyDossier, exportDossier, listDossiers, monitorDossier, readSharedDossier, revokeDossierShare, shareDossier, updateDossier, type DossierDraft, type DossierEvidence, type ResearchDossier } from "../api/researchDossiers";
 import { extractApiErrorMessage } from "../api/base";
-import { downloadJson } from "../lib/downloadJson";
+import { downloadBlob } from "../lib/downloadJson";
 import { useWorkspaceContextStore } from "../agent/workspaceContextStore";
 import { ResearchExperiments } from "../components/research/ResearchExperiments";
 import { DossierEvidenceSearch } from "../components/research/DossierEvidenceSearch";
@@ -107,7 +107,7 @@ export function ResearchDossiersPage() {
           <ResearchExperiments key={`experiment-${selected.id}`} dossierId={selected.id} symbol={selected.symbol} />
           <DossierEvidenceSearch key={selected.id} dossier={selected} onSaved={() => { void refresh(); }} />
           <div className="dossier-secondary-actions">
-            <button className={button} onClick={() => run(async () => downloadJson(await exportDossier(selected.id), `${selected.symbol}-research.json`))}>Export evidence snapshot</button>
+            <button className={button} onClick={() => run(async () => downloadBlob(await exportDossier(selected.id), `${selected.symbol}-research.json`))}>Export evidence snapshot</button>
             <button className={button} onClick={() => setShowHistory(!showHistory)}>Revision history</button>
             <button className={button} onClick={() => run(async () => { const shared = await shareDossier(selected.id); setShareUrl(`${window.location.origin}/research/shared/${encodeURIComponent(shared.token)}`); setNotice("Anyone with this link can read the shared research snapshot. Private portfolio and run details are excluded."); })}>Create read-only link</button>
             <button className={button} onClick={() => run(async () => { await revokeDossierShare(selected.id); setShareUrl(""); setNotice("Shared access revoked."); })}>Revoke shared link</button>

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, extractApiErrorMessage } from "../../api/base";
-import { downloadJson } from "../../lib/downloadJson";
+import { downloadBlob } from "../../lib/downloadJson";
 
 type Experiment = { id: string; title: string; symbol: string; sha256: string; created_at: string };
 type FrozenBar = { date: string; available_at: string; open: number; high: number; low: number; close: number; volume: number };
@@ -127,7 +127,7 @@ export function ResearchExperiments({ dossierId, symbol }: { dossierId: string; 
     <ul className="divide-y divide-terminal-border">{query.data?.map((item) => <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"><div><strong>{item.title}</strong><p className="text-xs text-terminal-muted">Saved {new Date(item.created_at).toLocaleDateString()}</p></div><div className="flex flex-wrap gap-2">
       <button disabled={busy} aria-label={`View results for ${item.title}`} aria-pressed={selectedId === item.id} className="rounded border border-terminal-border p-2 hover:bg-terminal-panel focus-visible:outline focus-visible:outline-2 focus-visible:outline-terminal-accent" onClick={() => { setSelectedId(item.id); setReplay(undefined); }}>View results</button>
       <button disabled={busy} className="rounded border border-terminal-border p-2" onClick={() => void act(async () => { setSelectedId(item.id); setReplay(undefined); const { data } = await api.post<Replay>(`/research/experiments/${item.id}/replay`); const saved = (await api.get<ExperimentSnapshot>(`/research/experiments/${item.id}`)).data; selectSnapshot(saved); setReplay(data); })}>Replay experiment</button>
-      <button disabled={busy} className="rounded border border-terminal-border p-2" onClick={() => void act(async () => downloadJson((await api.get(`/research/experiments/${item.id}`)).data, `${symbol}-experiment.json`))}>Export experiment</button>
+      <button disabled={busy} className="rounded border border-terminal-border p-2" onClick={() => void act(async () => downloadBlob((await api.get<Blob>(`/research/experiments/${item.id}`, { responseType: "blob" })).data, `${symbol}-experiment.json`))}>Export experiment</button>
     </div></li>)}</ul>
     {selectedId && snapshot.isPending && <div role="status" className="mt-4 border-t border-terminal-border py-4 text-sm">Loading saved results and source details…</div>}
     {selectedId && snapshot.isError && <div role="alert" className="mt-4 py-3 text-sm"><p>Unable to load this experiment’s saved results.</p><button className="mt-2 rounded border border-terminal-border px-3 py-2" onClick={() => void snapshot.refetch()}>Retry results</button></div>}

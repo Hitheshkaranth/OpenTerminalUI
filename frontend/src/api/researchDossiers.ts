@@ -68,7 +68,7 @@ export const createDossier = async (draft: DossierDraft): Promise<ResearchDossie
 export const updateDossier = async (id: string, draft: Partial<DossierDraft> & { expected_revision?: number }): Promise<ResearchDossier> => (await api.patch(`${base}/${encodeURIComponent(id)}`, draft)).data;
 export const deleteDossier = async (id: string): Promise<void> => { await api.delete(`${base}/${encodeURIComponent(id)}`); };
 export const monitorDossier = async (id: string, evidence?: DossierEvidence[]): Promise<{ dossier: ResearchDossier; changes: unknown[]; revision: number }> => (await api.post(`${base}/${encodeURIComponent(id)}/monitor`, evidence ? { evidence } : {})).data;
-export const exportDossier = async (id: string): Promise<unknown> => (await api.get(`${base}/${encodeURIComponent(id)}/export`)).data;
+export const exportDossier = async (id: string): Promise<Blob> => (await api.get<Blob>(`${base}/${encodeURIComponent(id)}/export`, { responseType: "blob" })).data;
 export const dossierRevisions = async (id: string): Promise<DossierRevision[]> => (await api.get(`${base}/${encodeURIComponent(id)}/revisions`)).data.items;
 export const searchDossierEvidence = async (id: string, q: string, as_of?: string): Promise<FilingPassage[]> => (await api.get(`${base}/${encodeURIComponent(id)}/search`, { params: { q, as_of: as_of || undefined, hybrid: true } })).data.items;
 export const shareDossier = async (id: string): Promise<{ token: string; url?: string }> => (await api.post(`${base}/${encodeURIComponent(id)}/share`)).data;
