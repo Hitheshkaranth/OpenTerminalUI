@@ -45,6 +45,21 @@ describe("research workflows", () => {
     expect(vi.mocked(api.patch).mock.calls[0][1]).not.toHaveProperty("id");
   });
 
+  it("retains the publication date when saving sourced evidence", async () => {
+    vi.mocked(api.get).mockImplementation(async (url) => ({ data: { items: url === "/research/dossiers" ? [dossier] : [] } }));
+    vi.mocked(api.patch).mockResolvedValue({ data: dossier });
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter initialEntries={["/equity/research-dossiers?id=d1"]}><ResearchDossiersPage /></MemoryRouter></QueryClientProvider>);
+    fireEvent.click(await screen.findByText("Add sourced evidence"));
+    fireEvent.change(screen.getByLabelText("Claim"), { target: { value: "Revenue increased" } });
+    fireEvent.change(screen.getByLabelText("Source URL"), { target: { value: "https://www.apple.com/newsroom/" } });
+    fireEvent.change(screen.getByLabelText("Published date"), { target: { value: "2025-01-30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save evidence" }));
+    await waitFor(() => expect(api.patch).toHaveBeenCalledWith("/research/dossiers/d1", expect.objectContaining({
+      expected_revision: 2,
+      evidence: [expect.objectContaining({ claim: "Revenue increased", published_at: "2025-01-30T00:00:00.000Z" })],
+    })));
+  });
+
   it("only includes selections belonging to the current route", () => {
     useWorkspaceContextStore.getState().setContext({ selected_symbols: ["AAPL"], dossier_id: "d1" }, window.location.pathname);
     expect(buildScreenContext().selected_symbols).toEqual(["AAPL"]);
