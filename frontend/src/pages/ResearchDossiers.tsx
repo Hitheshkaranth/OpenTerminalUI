@@ -8,6 +8,7 @@ import { downloadJson } from "../lib/downloadJson";
 import { useWorkspaceContextStore } from "../agent/workspaceContextStore";
 import { ResearchExperiments } from "../components/research/ResearchExperiments";
 import { DossierEvidenceSearch } from "../components/research/DossierEvidenceSearch";
+import { CompanyIdentity } from "../components/research/CompanyIdentity";
 import { useAgentStore } from "../agent/agentStore";
 
 const field = "dossier-field";
@@ -73,7 +74,7 @@ export function ResearchDossiersPage() {
     <div className="dossier-layout">
       <nav aria-label="Saved research" className="dossier-navigation"><div className="dossier-navigation-heading"><h2>Saved research</h2><span>{query.data?.length ?? 0}</span></div><div className="dossier-navigation-items">
         {query.data?.map((d) => <button key={d.id} aria-current={selectedId === d.id ? "page" : undefined} onClick={() => { setParams({ id: d.id }); setEditing(false); }} className="dossier-navigation-item">
-          <span className="dossier-navigation-meta"><span className="dossier-symbol">{d.symbol}</span><span>Rev {d.revision}</span></span><strong>{d.title}</strong>{d.monitoring_enabled && <span className="dossier-monitoring"><span aria-hidden="true" />Monitoring filings</span>}
+          <span className="dossier-navigation-meta"><CompanyIdentity symbol={d.symbol} market={d.market} compact /><span>Rev {d.revision}</span></span><strong>{d.title}</strong>{d.monitoring_enabled && <span className="dossier-monitoring"><span aria-hidden="true" />Monitoring filings</span>}
         </button>)}
         {query.data?.length === 0 && <p className="text-sm text-terminal-muted">Create a dossier or save an agent answer to begin.</p>}
       </div></nav>
@@ -88,7 +89,7 @@ export function ResearchDossiersPage() {
           <label className="block text-sm">Material metric change (%)<input type="number" min={0} max={100} step={1} className={field} value={draft.materiality_threshold} onChange={(e) => patch("materiality_threshold", Number(e.target.value))} /></label>
           <div className="dossier-editor-actions"><button disabled={perform.isPending} className={`${button} dossier-button--primary`} type="submit">{perform.isPending ? "Saving…" : "Save research"}</button><button type="button" className={button} onClick={() => setEditing(false)}>Cancel editing</button></div>
         </form> : selected ? <>
-          <div className="dossier-document-header"><div><div className="dossier-document-meta"><span className="dossier-symbol">{selected.symbol}</span><span>{selected.market}</span><span>Revision {selected.revision}</span></div><h2>{selected.title}</h2><p className="dossier-updated">Updated {new Date(selected.updated_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</p></div>
+          <div className="dossier-document-header"><CompanyIdentity symbol={selected.symbol} market={selected.market} /><div><div className="dossier-document-meta"><span>Research thesis</span><span>Revision {selected.revision}</span></div><h2>{selected.title}</h2><p className="dossier-updated">Updated {new Date(selected.updated_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</p></div>
           <div className="dossier-document-actions"><button className={button} onClick={() => setEditing(true)}>Edit thesis</button><button className={button} disabled={perform.isPending} onClick={() => run(async () => { const result = await monitorDossier(selected.id); await refresh(); setNotice(`${result.changes.length} evidence changes found. Review them before changing your thesis.`); })}>Check changes</button>
           <button className={button} onClick={() => { useAgentStore.getState().setOpen(true); void useAgentStore.getState().startRun(`Review my research dossier ${selected.id} for ${selected.symbol}. Thesis: ${selected.thesis}. Identify supporting and opposing evidence; distinguish facts from assumptions.`); }}>Ask agent</button></div></div>
           <section className="dossier-thesis"><h3>Investment thesis</h3><p>{selected.thesis}</p></section><div className="dossier-thesis-notes">

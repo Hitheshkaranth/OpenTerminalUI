@@ -244,6 +244,8 @@ async def get_stock(ticker: str) -> StockSnapshot:
         ticker=ticker.upper(),
         symbol=yf_symbol,
         company_name=snap.get("company_name"),
+        logo_url=snap.get("logo_url"),
+        website=snap.get("website"),
         sector=snap.get("sector"),
         industry=snap.get("industry") or snap.get("sector"),
         current_price=snap.get("current_price"),

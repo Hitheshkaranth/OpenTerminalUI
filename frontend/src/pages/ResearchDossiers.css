@@ -39,6 +39,23 @@
 .dossier-monitoring > span { width: 5px; height: 5px; border-radius: 50%; background: var(--ot-color-market-up); }
 .dossier-content { min-width: 0; border-left: 1px solid var(--dossier-line); padding-left: 36px; }
 .dossier-document-header { padding-bottom: 24px; border-bottom: 1px solid var(--dossier-line); }
+.company-identity { display: flex; align-items: center; gap: 16px; min-width: 0; margin-bottom: 26px; }
+.company-mark { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 64px; width: 64px; height: 64px; border-radius: 12px; background: var(--ot-color-surface-2); color: var(--dossier-ink); font: 600 1rem var(--ot-font-data); }
+.company-mark--image { background: #fff; }
+.company-mark img { display: block; width: 40px; height: 40px; object-fit: contain; }
+.company-identity-copy { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.company-identity-name { font-size: 1.25rem; font-weight: 650; line-height: 1.3; overflow-wrap: anywhere; }
+.company-identity-details { display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--dossier-secondary); font-size: .75rem; }
+.company-identity-details > span:first-child { font-family: var(--ot-font-data); color: var(--dossier-ink); }
+.company-identity-links { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 3px; font-size: .75rem; }
+.company-identity-links a { text-decoration: underline; text-underline-offset: 3px; }
+.company-identity-links a:hover { color: var(--ot-color-accent-primary); }
+.company-identity--compact { margin-bottom: 0; gap: 9px; }
+.company-mark--small { flex-basis: 32px; width: 32px; height: 32px; border-radius: 6px; font-size: .625rem; }
+.company-mark--small img { width: 22px; height: 22px; }
+.company-identity--compact .company-identity-name { font-size: .75rem; }
+.company-identity--compact .company-identity-details { font-size: .625rem; }
+.company-identity--compact .company-identity-copy { gap: 2px; }
 .dossier-document-meta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; color: var(--dossier-secondary); font-size: .75rem; }
 .dossier-document-meta .dossier-symbol { color: var(--ot-color-accent-primary); }
 .dossier-document-header h2 { font-size: 1.75rem; line-height: 1.25; font-weight: 600; letter-spacing: -.025em; margin-top: 12px; overflow-wrap: anywhere; max-width: 36ch; }

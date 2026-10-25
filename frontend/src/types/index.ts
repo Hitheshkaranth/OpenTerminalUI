@@ -56,6 +56,8 @@ export type StockSnapshot = {
   ticker: string;
   symbol: string;
   company_name?: string;
+  logo_url?: string;
+  website?: string;
   sector?: string;
   industry?: string;
   current_price?: number;

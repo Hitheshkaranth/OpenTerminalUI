@@ -14,6 +14,7 @@ from backend.core.kite_client import KiteClient
 from backend.core.nse_client import NSEClient
 from backend.core.yahoo_client import YahooClient
 from backend.shared.market_classifier import market_classifier
+from backend.shared.company_identity import first_company_url
 from backend.services.orderbook_service import service as orderbook_service
 from backend.api.schemas.market_data import MarketDepth, DepthLevel
 
@@ -354,6 +355,9 @@ class UnifiedFetcher:
         return {
             "ticker": symbol,
             "company_name": company_name,
+            # Reuse fetched provider metadata; branding never adds network requests.
+            "logo_url": first_company_url(fp.get("logo"), fq.get("image"), yq.get("logo_url"), ap.get("logo_url")),
+            "website": first_company_url(ap.get("website"), fp.get("weburl"), fq.get("website"), yq.get("website")),
             "current_price": price,
             "change_pct": change_pct,
             "market_cap": market_cap,

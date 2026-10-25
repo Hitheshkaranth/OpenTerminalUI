@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from backend.shared.company_identity import company_url
 
 
 class APIWarning(BaseModel):
@@ -83,6 +85,8 @@ class StockSnapshot(BaseModel):
     ticker: str
     symbol: str
     company_name: str | None = None
+    logo_url: str | None = None
+    website: str | None = None
     sector: str | None = None
     industry: str | None = None
     current_price: float | None = None
@@ -118,6 +122,11 @@ class StockSnapshot(BaseModel):
     indices: list[str] = Field(default_factory=list)
     raw: dict[str, Any] = Field(default_factory=dict)
     provenance: dict[str, Any] | None = None
+
+    @field_validator("logo_url", "website", mode="before")
+    @classmethod
+    def validate_company_link(cls, value: object) -> str | None:
+        return company_url(value)
 
 
 class PriceRange(BaseModel):
