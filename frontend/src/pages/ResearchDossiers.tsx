@@ -6,6 +6,8 @@ import { createDossier, deleteDossier, dossierDraft, dossierRevisions, emptyDoss
 import { extractApiErrorMessage } from "../api/base";
 import { downloadBlob } from "../lib/downloadJson";
 import { useWorkspaceContextStore } from "../agent/workspaceContextStore";
+import { ThesisConditions } from "../components/research/ThesisConditions";
+import { EarningsReview } from "../components/research/EarningsReview";
 import { ResearchExperiments } from "../components/research/ResearchExperiments";
 import { DossierEvidenceSearch } from "../components/research/DossierEvidenceSearch";
 import { CompanyIdentity } from "../components/research/CompanyIdentity";
@@ -86,12 +88,14 @@ export function ResearchDossiersPage() {
           <label className="block text-sm">Thesis<textarea aria-label="Thesis" required rows={5} className={field} value={draft.thesis} onChange={(e) => patch("thesis", e.target.value)} /></label>
           {([['assumptions', 'Assumptions'], ['catalysts', 'Catalysts'], ['invalidation_conditions', 'What would invalidate this thesis?']] as const).map(([key, label]) => <label key={key} className="block text-sm">{label} <span className="text-terminal-muted">(one per line)</span><textarea rows={3} className={field} value={draft[key].join("\n")} onChange={(e) => patch(key, e.target.value.split("\n"))} onBlur={() => patch(key, lines(draft[key].join("\n")))} /></label>)}
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.monitoring_enabled} onChange={(e) => patch("monitoring_enabled", e.target.checked)} />Monitor changes in ingested filings</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.source_fetch_enabled ?? false} onChange={(e) => patch("source_fetch_enabled", e.target.checked)} />Fetch SEC / NSE filings daily for this dossier</label><p className="text-sm text-terminal-muted">Enable monitoring above for daily source checks. Check changes also fetches on demand when selected. Downloads use your selected market and the shared filing index; no model is called.</p>
           <label className="block text-sm">Material metric change (%)<input type="number" min={0} max={100} step={1} className={field} value={draft.materiality_threshold} onChange={(e) => patch("materiality_threshold", Number(e.target.value))} /></label>
           <div className="dossier-editor-actions"><button disabled={perform.isPending} className={`${button} dossier-button--primary`} type="submit">{perform.isPending ? "Saving…" : "Save research"}</button><button type="button" className={button} onClick={() => setEditing(false)}>Cancel editing</button></div>
         </form> : selected ? <>
           <div className="dossier-document-header"><CompanyIdentity symbol={selected.symbol} market={selected.market} /><div><div className="dossier-document-meta"><span>Research thesis</span><span>Revision {selected.revision}</span></div><h2>{selected.title}</h2><p className="dossier-updated">Updated {new Date(selected.updated_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</p></div>
-          <div className="dossier-document-actions"><button className={button} onClick={() => setEditing(true)}>Edit thesis</button><button className={button} disabled={perform.isPending} onClick={() => run(async () => { const result = await monitorDossier(selected.id); await refresh(); setNotice(`${result.changes.length} evidence changes found. Review them before changing your thesis.`); })}>Check changes</button>
+          <div className="dossier-document-actions"><button className={button} onClick={() => setEditing(true)}>Edit thesis</button><button className={button} disabled={perform.isPending} onClick={() => run(async () => { const result = await monitorDossier(selected.id); await refresh(); setNotice(`${result.changes.length} evidence changes found. Review them before changing your thesis.`); })}>{perform.isPending ? "Checking…" : "Check changes"}</button>
           <button className={button} onClick={() => { useAgentStore.getState().setOpen(true); void useAgentStore.getState().startRun(`Review my research dossier ${selected.id} for ${selected.symbol}. Thesis: ${selected.thesis}. Identify supporting and opposing evidence; distinguish facts from assumptions.`); }}>Ask agent</button></div></div>
+          {selected.source_fetch && <p role="status" className="dossier-notice">Source check ({selected.source_fetch.status}): {selected.source_fetch.message} Last attempted {new Date(selected.source_fetch.attempted_at).toLocaleString()}.</p>}
           <section className="dossier-thesis"><h3>Investment thesis</h3><p>{selected.thesis}</p></section><div className="dossier-thesis-notes">
           {([['assumptions', 'Assumptions'], ['catalysts', 'Catalysts'], ['invalidation_conditions', 'Invalidation conditions']] as const).map(([key, label]) => <div key={key} className="dossier-thesis-note"><h3>{label}</h3>{selected[key].length ? <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">{selected[key].map((v, i) => <li key={i}>{v}</li>)}</ul> : <p className="text-sm text-terminal-muted">None recorded.</p>}</div>)}
           </div><div className="dossier-evidence-section"><div className="dossier-section-heading"><h3>Evidence ({selected.evidence.length})</h3><span>Sources behind the thesis</span></div><EvidenceList evidence={selected.evidence} /></div>
@@ -104,6 +108,8 @@ export function ResearchDossiersPage() {
             <label className="block text-sm">Relationship to thesis<select className={field} value={newEvidence.stance} onChange={(e) => setNewEvidence({ ...newEvidence, stance: e.target.value as DossierEvidence["stance"] })}><option value="neutral">Neutral / needs review</option><option value="supporting">Supporting</option><option value="opposing">Opposing</option></select></label>
             <button disabled={perform.isPending} className={button}>Save evidence</button>
           </form></details>
+          <ThesisConditions key={`conditions-${selected.id}`} dossier={selected} onSaved={refresh} />
+          <EarningsReview key={`earnings-${selected.id}`} dossier={selected} onSaved={refresh} />
           <ResearchExperiments key={`experiment-${selected.id}`} dossierId={selected.id} symbol={selected.symbol} />
           <DossierEvidenceSearch key={selected.id} dossier={selected} onSaved={() => { void refresh(); }} />
           <div className="dossier-secondary-actions">

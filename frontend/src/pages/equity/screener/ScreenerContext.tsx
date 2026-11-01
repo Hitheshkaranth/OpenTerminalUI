@@ -91,7 +91,7 @@ export function ScreenerProvider({ children }: { children: React.ReactNode }) {
     }
     // Default to the first preset only on the initial load; later refreshes (and loading a
     // saved screen, which clears the preset) must not clobber the user's current query.
-    if (!defaultPresetAppliedRef.current && presetItems.length > 0) {
+    if (!defaultPresetAppliedRef.current && presetItems.length > 0 && !new URLSearchParams(window.location.search).has("screen")) {
       defaultPresetAppliedRef.current = true;
       setSelectedPresetId((current) => current ?? presetItems[0].id);
     }

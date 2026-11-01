@@ -1,0 +1,41 @@
+.thesis-review { margin-block: 32px; min-width: 0; }
+.thesis-review-help, .thesis-review-empty { color: var(--ot-color-text-secondary); font-size: .875rem; line-height: 1.6; max-width: 72ch; margin-block: 10px 16px; }
+.thesis-review-notice { padding-block: 10px; font-size: .875rem; }
+.thesis-table-scroll { overflow-x: auto; max-width: 100%; }
+.thesis-table { width: 100%; border-collapse: collapse; font-size: .8125rem; }
+.thesis-table th, .thesis-table td { padding: 14px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--ot-color-border-default); }
+.thesis-table thead th { font-weight: 500; color: var(--ot-color-text-secondary); white-space: nowrap; }
+.thesis-table tbody th { font-weight: 550; min-width: 150px; }
+.thesis-cell-detail { display: block; margin-top: 6px; color: var(--ot-color-text-secondary); font-size: .75rem; line-height: 1.5; }
+.thesis-number { font-variant-numeric: tabular-nums; }
+.thesis-status { display: inline-block; white-space: nowrap; padding: 3px 6px; background: var(--ot-color-surface-2); border-radius: 4px; }
+.thesis-status--breached { color: var(--ot-color-system-stale); }
+.thesis-status--within_threshold { color: var(--ot-color-market-up); }
+.thesis-source { margin-top: 10px; min-width: 140px; }
+.thesis-source summary { cursor: pointer; text-decoration: underline; }
+.thesis-source blockquote { line-height: 1.65; margin-block: 10px; max-width: 60ch; }
+.thesis-source a { text-decoration: underline; }
+.thesis-row-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.thesis-inline-form { margin-top: 18px; padding-block: 20px; border-block: 1px solid var(--ot-color-border-default); display: grid; gap: 16px; }
+.thesis-inline-form label { font-size: .8125rem; font-weight: 500; }
+.thesis-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.thesis-earnings-entry { margin-block: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--ot-color-border-default); }
+.thesis-earnings-entry h4 { font-size: 1rem; font-weight: 600; }
+.thesis-metric-editor { display: grid; gap: 12px; margin-bottom: 12px; }
+.thesis-reference { padding-block: 14px; }
+.thesis-reference summary { cursor: pointer; }
+.thesis-review button:focus-visible, .thesis-table-scroll:focus-visible, .thesis-review summary:focus-visible { outline: 2px solid var(--ot-color-accent-primary); outline-offset: 3px; }
+@media (max-width: 600px) {
+  .thesis-row-actions .dossier-button { min-height: 44px; }
+  .thesis-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .thesis-table th, .thesis-table td { padding-inline: 8px; }
+}
+
+@media (max-width: 600px) {
+  .thesis-condition-table, .thesis-condition-table tbody { display: block; width: 100%; }
+  .thesis-condition-table thead { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  .thesis-condition-table tbody tr { display: grid; grid-template-columns: minmax(0, 1fr); padding: 14px 0; border-bottom: 1px solid var(--ot-color-border-default); }
+  .thesis-condition-table tbody th, .thesis-condition-table tbody td { display: block; min-width: 0; border: 0; padding: 8px 0; }
+  .thesis-condition-table tbody td:nth-child(2)::before { content: "Latest observation"; display: block; margin-bottom: 5px; color: var(--ot-color-text-secondary); }
+  .thesis-condition-table .thesis-row-actions { margin-top: 8px; }
+}

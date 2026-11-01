@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import StaleDataError
 from backend.research_dossiers.models import ResearchDossier, DossierRevision, now
 from backend.research_dossiers.schemas import DossierCreate, Evidence
+from backend.research_dossiers.conditions import evaluate_conditions, filing_metric_observations
 
 
 def canonical(value: Any) -> str:
@@ -32,6 +33,8 @@ def owned(db: Session, user_id: str, dossier_id: str) -> ResearchDossier:
 def output(row: ResearchDossier) -> dict:
     return {**deepcopy(row.payload), "id": row.id, "revision": row.revision,
             "created_at": row.created_at.isoformat(), "updated_at": row.updated_at.isoformat(),
+            "condition_status": evaluate_conditions(row.payload, (row.monitor_state or {}).get("observed")),
+            "source_fetch": deepcopy((row.monitor_state or {}).get("source_fetch")),
             "is_shared": bool(row.share_hash)}
 
 
@@ -64,6 +67,9 @@ def record_revision(db: Session, row: ResearchDossier, changes: list):
 def create(db: Session, user_id: str, payload: DossierCreate) -> dict:
     data = payload.model_dump(mode="json")
     data["symbol"] = data["symbol"].upper()
+    for review in data.get("earnings_reviews", []):
+        review["recorded_at"] = now().isoformat()
+        review["reviewed_at"] = now().isoformat() if any(metric.get("actual") is not None for metric in review["metrics"]) else None
     validate_links(db, user_id, data)
     row = ResearchDossier(user_id=user_id, symbol=data["symbol"], payload=data, revision=1,
                           created_at=now(), updated_at=now())
@@ -84,13 +90,46 @@ def update(db: Session, row: ResearchDossier, patch: dict) -> dict:
     changes = [{"kind": "field_changed", "field": key, "before": row.payload.get(key), "after": value}
                for key, value in data.items() if row.payload.get(key) != value]
     if changes:
+        prior_payload = row.payload
         row.payload = data
+        if "evidence" in patch or "thesis_conditions" in patch:
+            condition_changes = refresh_conditions(row, prior_payload)
+            changes.extend(condition_changes)
+            notify_changes(db, row, condition_changes)
         row.symbol = data["symbol"]
         row.revision += 1
         row.updated_at = now()
         record_revision(db, row, changes)
         commit(db)
     return output(row)
+
+
+def refresh_conditions(row: ResearchDossier, prior_payload: dict | None = None) -> list[dict]:
+    state = deepcopy(row.monitor_state or {})
+    previous = state.get("conditions")
+    if previous is None:
+        previous = {item["condition_id"]: item for item in evaluate_conditions(prior_payload or {}, state.get("observed"))}
+    evaluations = evaluate_conditions(row.payload, state.get("observed"))
+    signature = lambda e: digest({**{k: e.get(k) for k in ("condition", "status", "value")},
+        "evidence": evidence_fingerprint(e["evidence"]) if e.get("evidence") else None})
+    changes = []
+    for evaluation in evaluations:
+        before = previous.get(evaluation["condition_id"])
+        if (before is None and evaluation["status"] != "unknown") or (before is not None and signature(before) != signature(evaluation)):
+            changes.append({"kind": "condition_changed", "condition_id": evaluation["condition_id"], "before": before,
+                "after": evaluation, "material": True, "reason": evaluation["reason"]})
+    state["conditions"] = {item["condition_id"]: item for item in evaluations}
+    row.monitor_state = state
+    return changes
+
+
+def notify_changes(db: Session, row: ResearchDossier, changes: list):
+    from backend.models.notification import Notification
+    material = [item for item in changes if item.get("material")]
+    if material:
+        db.add(Notification(user_id=row.user_id, type="research", priority="medium", ticker=row.symbol,
+            title=f"{row.symbol}: {len(material)} research change(s) to review"[:200],
+            body="; ".join(item["reason"] for item in material)[:4000], action_url=f"/equity/research-dossiers?id={row.id}"))
 
 
 def evidence_fingerprint(e: dict) -> str:
@@ -137,6 +176,12 @@ def filing_candidates(db: Session, row: ResearchDossier) -> list[dict]:
         if doc.created_at and doc.created_at.replace(tzinfo=None) < row.created_at.replace(tzinfo=None, microsecond=0):
             continue
         chunks = db.query(FilingChunkORM).filter_by(document_id=doc.id).order_by(FilingChunkORM.ordinal).all()
+        for condition in data.get("thesis_conditions", []):
+            if condition.get("enabled", True):
+                for source_chunk in chunks:
+                    items.extend(filing_metric_observations(condition,
+                        {"id": source_chunk.id, "text": source_chunk.text, "page_start": source_chunk.page_start},
+                        {"id": doc.id, "title": doc.title, "period": doc.period, "filed_at": doc.filed_at, "source_url": doc.source_url}))
         ranked = sorted(chunks, key=lambda c: sum(t in c.text.lower() for t in terms), reverse=True)
         if not ranked:
             continue
@@ -171,6 +216,17 @@ def monitor(db: Session, row: ResearchDossier, evidence: list[dict] | None = Non
             changes.append(change)
             observed[item["id"]] = item
     state["observed"] = observed
+    evaluations = evaluate_conditions(row.payload, observed)
+    previous_conditions = state.get("conditions", {})
+    for evaluation in evaluations:
+        previous = previous_conditions.get(evaluation["condition_id"])
+        # A new unknown condition is coverage information, not a material alert.
+        signature = lambda e: digest({**{k: e.get(k) for k in ("condition", "status", "value")},
+            "evidence": evidence_fingerprint(e["evidence"]) if e.get("evidence") else None})
+        if (previous is None and evaluation["status"] != "unknown") or (previous is not None and signature(previous) != signature(evaluation)):
+            changes.append({"kind": "condition_changed", "condition_id": evaluation["condition_id"],
+                "before": previous, "after": evaluation, "material": True, "reason": evaluation["reason"]})
+    state["conditions"] = {e["condition_id"]: e for e in evaluations}
     state["last_checked_at"] = now().isoformat()
     row.monitor_state = state
     material = [c for c in changes if c["material"]]
@@ -184,6 +240,54 @@ def monitor(db: Session, row: ResearchDossier, evidence: list[dict] | None = Non
             body="; ".join(c["reason"] for c in material)[:4000], action_url=f"/equity/research-dossiers?id={row.id}"))
     commit(db)
     return {"changes": changes, "revision": row.revision, "dossier": output(row), "checked_at": state["last_checked_at"]}
+
+
+def save_earnings_review(db: Session, row: ResearchDossier, review: dict, expected_revision: int) -> dict:
+    if expected_revision != row.revision:
+        raise HTTPException(409, "Dossier changed. Reload before saving.")
+    data = deepcopy(row.payload)
+    reviews = data.setdefault("earnings_reviews", [])
+    existing = next((item for item in reviews if item["id"] == review["id"]), None)
+    if existing:
+        frozen_fields = ("metric", "label", "unit", "expected", "guidance_low", "guidance_high", "guidance_source_url", "guidance_quote")
+        baseline = lambda item: {key: item.get(key) for key in frozen_fields}
+        if existing["period"] != review["period"] or [baseline(m) for m in existing["metrics"]] != [baseline(m) for m in review["metrics"]]:
+            raise HTTPException(422, "Saved expectations and guidance are frozen. Create a new review to record a revised forecast.")
+        if any(old.get("actual") is not None and new.get("actual") is None for old, new in zip(existing["metrics"], review["metrics"])):
+            raise HTTPException(422, "A reported actual cannot be cleared. Save a sourced correction instead.")
+        review["recorded_at"] = existing["recorded_at"]
+        reviews[reviews.index(existing)] = review
+    else:
+        if len(reviews) >= 100:
+            raise HTTPException(422, "A dossier supports at most 100 earnings reviews")
+        review["recorded_at"] = now().isoformat()
+        reviews.append(review)
+    review["reviewed_at"] = now().isoformat() if any(m.get("actual") is not None for m in review["metrics"]) else None
+    # Actuals become comparable observations while the original expectations stay frozen.
+    evidence = {e["id"]: e for e in data.get("evidence", [])}
+    for metric in review["metrics"]:
+        if metric.get("actual") is None:
+            continue
+        evidence_id = f"earnings:{review['id']}:{metric['metric']}"
+        if len(evidence_id) > 120:
+            evidence_id = "earnings:" + digest(evidence_id)
+        evidence[evidence_id] = Evidence(id=evidence_id, claim=f"{review['period']}: {metric['label']}",
+            metric=metric["metric"], value=metric["actual"], unit=metric["unit"], period=review["period"],
+            source_url=metric["source_url"], source_title=f"{row.symbol} {review['period']} results", quote=metric["quote"],
+            published_at=metric["published_at"], observed_at=now()).model_dump(mode="json")
+    data["evidence"] = list(evidence.values())
+    data = DossierCreate.model_validate(data).model_dump(mode="json")
+    prior_payload = row.payload
+    row.payload = data
+    row.revision += 1
+    row.updated_at = now()
+    changes = [{"kind": "earnings_review", "before": deepcopy(existing), "after": review,
+        "material": bool(review["reviewed_at"]), "reason": f"{review['period']} earnings {'reviewed' if review['reviewed_at'] else 'expectations saved'}"}]
+    changes.extend(refresh_conditions(row, prior_payload))
+    record_revision(db, row, changes)
+    notify_changes(db, row, changes)
+    commit(db)
+    return output(row)
 
 
 def export_snapshot(db: Session, row: ResearchDossier) -> dict:

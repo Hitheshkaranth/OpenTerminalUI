@@ -79,14 +79,13 @@ test("screener run and scanner alert flow renders", async ({ page }) => {
 
   await page.goto("/equity/screener", { waitUntil: "domcontentloaded" });
 
-  const queryPanel = page
-    .locator("section")
-    .filter({ has: page.locator(".ot-type-panel-title", { hasText: "Query" }) })
-    .first();
-  const queryRunButton = queryPanel.getByRole("button", { name: /^Run$/ });
-  await expect(queryPanel).toBeVisible({ timeout: 90_000 });
-  await queryRunButton.scrollIntoViewIfNeeded();
-  await queryRunButton.click();
+  await expect(page.getByRole("heading", { name: "Equity screener" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "20D High Breakout + RVOL Technical", exact: true })).toBeVisible();
+  const runButton = page.getByRole("button", { name: "Run screen", exact: true });
+  await expect(runButton).toBeEnabled();
+  const request = page.waitForRequest(request => request.url().includes("/screener/run-revamped") && request.method() === "POST");
+  await runButton.click();
+  expect((await request).postDataJSON()).toMatchObject({ preset_id: "p1" });
 
   await expect(page.getByText("Results", { exact: true })).toBeVisible();
   await expect(page.getByText("RELIANCE").first()).toBeVisible();

@@ -88,6 +88,8 @@ async def lifespan(app: FastAPI):
 
     from backend.research_dossiers.scheduler import start_dossier_monitor, stop_dossier_monitor
     await start_dossier_monitor()
+    from backend.screen_monitoring.scheduler import start_screen_monitor, stop_screen_monitor
+    await start_screen_monitor()
     from backend.filings_watch.scheduler import start_filings_watch, stop_filings_watch
     try:
         await start_filings_watch()
@@ -107,6 +109,7 @@ async def lifespan(app: FastAPI):
     if _scanner_alert_scheduler:
         await _scanner_alert_scheduler.stop()
     try:
+        await stop_screen_monitor()
         await stop_dossier_monitor()
         await stop_filings_watch()
     except Exception:

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ResearchExperiments, experimentError } from "../components/research/ResearchExperiments";
+import { ResearchExperiments, experimentError, parseFrozenBars } from "../components/research/ResearchExperiments";
 import { api } from "../api/base";
 
 vi.mock("../api/base", () => ({ api: { get: vi.fn(), post: vi.fn() }, extractApiErrorMessage: (e: Error) => e.message }));
@@ -13,6 +13,7 @@ const snapshot = {
   limitations: ["Caller supplies provenance."]
 };
 const summary = { id: snapshot.id, title: snapshot.request.title, symbol: "TCS", created_at: snapshot.created_at, sha256: snapshot.sha256 };
+const ready = { bars: 10, first_date: bars[0].date, last_date: bars[9].date, missing_availability: 0, late_availability: 0, exploratory_eligible: true, point_in_time_eligible: true, point_in_time_blockers: [], data_sha256: "data-hash" };
 function mount() {
   return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ResearchExperiments dossierId="d1" symbol="TCS" /></QueryClientProvider>);
 }
@@ -77,7 +78,7 @@ describe("saved experiment comparison", () => {
     expect(await screen.findByRole("table")).toBeInTheDocument();
   });
   it("shows the full result returned by experiment creation without another detail request", async () => {
-    vi.mocked(api.post).mockResolvedValue({ data: snapshot });
+    vi.mocked(api.post).mockImplementation(async (url) => ({ data: url === "/research/experiments/preflight" ? ready : snapshot }));
     mount();
     const csv = "date,available_at,open,high,low,close,volume\n" + bars.map((bar) => Object.values(bar).join(",")).join("\n");
     const file = new File([csv], "prices.csv", { type: "text/csv" });
@@ -92,6 +93,40 @@ describe("saved experiment comparison", () => {
     expect(api.post).toHaveBeenCalledWith("/research/experiments", expect.objectContaining({ dossier_id: "d1", bars: expect.any(Array) }));
     expect(vi.mocked(api.get).mock.calls.filter(([url]) => url === "/research/experiments/e1")).toHaveLength(0);
   });
+});
+
+it("checks a dataset before configuration and requires choosing exploratory for unknown availability", async () => {
+  vi.mocked(api.post).mockResolvedValue({ data: { ...ready, missing_availability: 10, point_in_time_eligible: false, point_in_time_blockers: ["10 bars have no historical availability timestamp."] } });
+  mount();
+  fireEvent.click(screen.getByText("Create frozen-data experiment"));
+  expect(screen.getByLabelText("Data source")).toBeDisabled();
+  const csv = "date,open,high,low,close,volume\n" + bars.map(({ date, open, high, low, close, volume }) => [date, open, high, low, close, volume].join(",")).join("\n");
+  const file = new File([csv], "prices.csv");
+  Object.defineProperty(file, "text", { value: async () => csv });
+  fireEvent.change(screen.getByLabelText("Price bars CSV"), { target: { files: [file] } });
+  expect(await screen.findByRole("region", { name: "Dataset readiness" })).toHaveTextContent("10 unknown");
+  expect(screen.getByRole("radio", { name: /Point-in-time checked/ })).toBeDisabled();
+  expect(screen.getByLabelText("Data source")).toBeDisabled();
+  fireEvent.click(screen.getByRole("radio", { name: /Exploratory/ }));
+  expect(screen.getByLabelText("Data source")).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Freeze and test 10 bars" })).toBeEnabled();
+  fireEvent.change(screen.getByLabelText("Strategy"), { target: { value: "buy_hold" } });
+  expect(screen.queryByLabelText("Short moving average")).not.toBeInTheDocument();
+  expect(api.post).toHaveBeenCalledWith("/research/experiments/preflight", { bars: expect.arrayContaining([expect.objectContaining({ available_at: null })]) });
+});
+
+it("preserves missing availability rather than inventing timestamps in exploratory CSV parsing", () => {
+  const csv = "date,open,high,low,close,volume\n" + bars.map(({ date, open, high, low, close, volume }) => [date, open, high, low, close, volume].join(",")).join("\n");
+  expect(() => parseFrozenBars(csv)).toThrow("available_at");
+  expect(parseFrozenBars(csv, true)[0].available_at).toBeNull();
+});
+
+it("keeps exploratory status visible in saved results", async () => {
+  vi.mocked(api.get).mockImplementation(async (url) => ({ data: url === "/research/experiments" ? { items: [{ ...summary, mode: "exploratory" }] } : { ...snapshot, request: { ...snapshot.request, mode: "exploratory", strategy: "buy_hold" } } }));
+  mount();
+  fireEvent.click(await screen.findByRole("button", { name: /View results/ }));
+  expect(await screen.findByText("Exploratory: historical availability is not established.")).toBeInTheDocument();
+  expect(screen.getByText(/TCS · Buy and hold/)).toBeInTheDocument();
 });
 
 

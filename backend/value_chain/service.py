@@ -462,10 +462,10 @@ async def node_from_llm(
     if not name:
         return None
 
-    if is_generic_party(name):
+    if relation != "raw_material" and is_generic_party(name):
         return None
     # The model's own ticker guesses were wrong (MKTX for McKesson, CNCA for Cencora); resolve by name.
-    symbol = await resolve_ticker(name, market=market)
+    symbol = None if relation == "raw_material" else await resolve_ticker(name, market=market)
 
     share_pct = parse_share_pct(
         node.get("share_pct")
@@ -604,6 +604,7 @@ async def extract_raw_materials_from_filings(
                     "commodity_symbol": symbol_name,
                     "share_pct": extracted.get("share_pct"),
                     "origin": "filings",
+                    "citation": extracted.get("citation"),
                 }
             )
     return results
@@ -774,12 +775,16 @@ async def build_value_chain(db: Any, symbol: str, *, use_llm: bool) -> dict[str,
         if key in merged:
             if item.get("share_pct") is not None:
                 merged[key]["cost_share_pct"] = item["share_pct"]
+            if item.get("citation"):
+                merged[key]["citation"] = item["citation"]
+                merged[key]["origin"] = "filings"
         else:
             merged[key] = {
                 "name": item["name"],
                 "commodity_symbol": item.get("commodity_symbol"),
                 "cost_share_pct": item.get("share_pct"),
                 "origin": "filings",
+                "citation": item.get("citation"),
             }
 
     history_cache: dict[str, dict[str, Any]] = {}
@@ -796,7 +801,7 @@ async def build_value_chain(db: Any, symbol: str, *, use_llm: bool) -> dict[str,
                 "change_1y_pct": pricing["change_1y_pct"],
                 "cost_share_pct": item.get("cost_share_pct"),
                 "origin": item.get("origin", "curated"),
-                "citation": None,
+                "citation": item.get("citation"),
             }
         )
 

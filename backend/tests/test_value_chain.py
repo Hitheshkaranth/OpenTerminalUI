@@ -246,3 +246,39 @@ def test_extract_persists_then_get_returns_stored(vc_client):
     stored = vc_client.get("/api/value-chain/ABC.PWR")
     assert stored.status_code == 200
     assert stored.json() == post_body
+
+def test_filing_material_citation_survives_curated_merge(monkeypatch):
+    citation = {"quote": "Copper is 20% of our material costs.", "source_url": "https://example.com/report", "doc_id": 7}
+    async def sector(symbol):
+        return "Cables", "Cables"
+    async def peers(symbol):
+        return []
+    async def nodes(*args, **kwargs):
+        return []
+    async def materials(*args, **kwargs):
+        return [{"name": "Copper", "commodity_symbol": "HG=F", "share_pct": .2, "origin": "filings", "citation": citation}]
+    async def price(*args, **kwargs):
+        return {"price": None, "currency": None, "change_1m_pct": None, "change_1y_pct": None}
+    monkeypatch.setattr(svc, "_sector_industry", sector)
+    monkeypatch.setattr(svc, "peer_symbols", peers)
+    monkeypatch.setattr(svc, "extract_filings_nodes", nodes)
+    monkeypatch.setattr(svc, "extract_raw_materials_from_filings", materials)
+    monkeypatch.setattr(svc, "raw_materials_for_industry", lambda *args: [{"name": "Copper", "commodity_symbol": "HG=F", "origin": "curated"}])
+    monkeypatch.setattr(svc, "price_material", price)
+    result = asyncio.run(svc.build_value_chain(object(), "A", use_llm=True))
+    material = result["raw_materials"][0]
+    assert material["citation"] == citation
+    assert material["origin"] == "filings"
+    assert material["cost_share_pct"] == .2
+
+
+def test_raw_material_extraction_preserves_verified_citation_and_lowercase_names(monkeypatch):
+    chunk = {"text": "We use copper for 20% of inputs.", "document_id": 7, "source_url": "https://example.com/report"}
+    monkeypatch.setattr(svc, "retrieve_search", lambda *args, **kwargs: [chunk])
+    async def complete(*args, **kwargs):
+        return {"raw_materials": [{"name": "copper", "share_pct": .2, "quote": chunk["text"]}, {"name": "fake", "quote": "Not in document"}]}
+    monkeypatch.setattr(svc, "complete_json", complete)
+    result = asyncio.run(svc.extract_raw_materials_from_filings(object(), "A", use_llm=True, market="US"))
+    assert len(result) == 1
+    assert result[0]["citation"]["doc_id"] == 7
+    assert result[0]["citation"]["quote"] == chunk["text"]

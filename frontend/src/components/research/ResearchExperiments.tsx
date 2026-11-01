@@ -2,16 +2,22 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, extractApiErrorMessage } from "../../api/base";
 import { downloadBlob } from "../../lib/downloadJson";
+import { ExperimentCharts, type ExperimentResults } from "./ExperimentCharts";
 
-type Experiment = { id: string; title: string; symbol: string; sha256: string; created_at: string };
-type FrozenBar = { date: string; available_at: string; open: number; high: number; low: number; close: number; volume: number };
-type PeriodResult = { total_return?: number; max_drawdown?: number; trades?: unknown[]; bars?: number };
-type Results = { training?: PeriodResult; validation?: PeriodResult };
+type Experiment = { id: string; title: string; symbol: string; sha256: string; created_at: string; mode?: string; strategy?: string };
+type FrozenBar = { date: string; available_at: string | null; open: number; high: number; low: number; close: number; volume: number };
+type Readiness = { bars: number; first_date: string; last_date: string; missing_availability: number; late_availability: number;
+  exploratory_eligible: boolean; point_in_time_eligible: boolean; point_in_time_blockers: string[]; data_sha256: string };
+type Results = ExperimentResults;
+type Membership = { universe_name: string; effective_from: string; effective_until?: string | null; available_at: string; source_url: string };
+type Delisting = { effective_at: string; available_at: string; source_url: string };
 type ExperimentSnapshot = {
   id: string; sha256: string; data_sha256: string; created_at: string;
   request: { title: string; symbol: string; provider: string; data_version: string; adjustment_policy: string;
     as_of: string; train_end: string; validation_start: string; short_window: number; long_window: number;
-    fee_bps: number; slippage_bps: number; bars: FrozenBar[] };
+    fee_bps: number; slippage_bps: number; bars: FrozenBar[]; mode?: string; strategy?: string; raw_source_sha256?: string;
+    historical_memberships?: Membership[]; delisting?: Delisting | null };
+  instrument_history?: { membership_evidence: { universe_name: string; bars_effectively_in_universe: number; bars_with_membership_known_at_decision: number }[] };
   results: Results; limitations?: string[];
 };
 type Replay = { id: string; matches: boolean; results: Results; provider_requests: number };
@@ -46,7 +52,9 @@ function SavedResults({ snapshot, replay }: { snapshot: ExperimentSnapshot; repl
   const last = request.bars?.[request.bars.length - 1]?.date;
   return <div className="mt-4 border-t border-terminal-border pt-4">
     <h4 className="text-base font-semibold">{request.title}</h4>
-    <p className="mt-1 text-sm text-terminal-muted">{request.symbol} · Moving-average crossover ({request.short_window} / {request.long_window})</p>
+    <p className="mt-1 text-sm text-terminal-muted">{request.symbol} · {request.strategy === "buy_hold" ? "Buy and hold" : `${request.strategy === "ema_crossover" ? "Exponential" : "Simple"} moving-average crossover (${request.short_window} / ${request.long_window})`}</p>
+    <p className="mt-2 text-sm font-medium">{request.mode === "exploratory" ? "Exploratory: historical availability is not established." : "Point-in-time checked against supplied availability timestamps."}</p>
+    <ExperimentCharts key={snapshot.id} results={snapshot.results} />
     <ResultTable results={snapshot.results} caption="Saved training and validation results" />
     <p className="mt-2 max-w-prose text-xs text-terminal-muted">Returns include the saved fees and slippage. Executed trades count individual buys and sells, not completed round trips. Validation uses fixed parameters and a separate starting portfolio.</p>
     {replay && <p role="status" className="mt-3 text-sm">{replay.matches ? "Replay matched the saved results." : "Replay differs from the saved results. Compare the recomputed values below."} Provider requests: {replay.provider_requests}.</p>}
@@ -62,6 +70,9 @@ function SavedResults({ snapshot, replay }: { snapshot: ExperimentSnapshot; repl
     </dl>
     <details className="mt-4 text-sm"><summary className="cursor-pointer rounded py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-terminal-accent">Snapshot provenance and limitations</summary>
       <dl className="space-y-2 py-2 text-xs"><div><dt>Experiment SHA-256</dt><dd className="break-all">{snapshot.sha256}</dd></div><div><dt>Price data SHA-256</dt><dd className="break-all">{snapshot.data_sha256}</dd></div></dl>
+      {request.raw_source_sha256 && <p className="break-all text-xs">Uploaded CSV SHA-256: {request.raw_source_sha256}</p>}
+      {snapshot.instrument_history?.membership_evidence.map((membership, index) => <p className="mt-2 text-sm" key={`${membership.universe_name}-${index}`}>{membership.universe_name}: {membership.bars_effectively_in_universe} bars within the supplied membership dates; membership was known at {membership.bars_with_membership_known_at_decision} decision timestamps. Membership is retained as evidence and does not select the strategy universe.</p>)}
+      {request.delisting && <p className="mt-2 text-sm">Delisted: {timestamp(request.delisting.effective_at)} · Source known {timestamp(request.delisting.available_at)}. <a className="underline" href={request.delisting.source_url} target="_blank" rel="noreferrer">Delisting source</a></p>}
       <ul className="list-disc space-y-1 pl-5 text-sm">{snapshot.limitations?.map((text) => <li key={text}>{text}</li>)}</ul>
     </details>
   </div>;
@@ -85,19 +96,21 @@ export function experimentError(error: unknown): string {
   return `${rows.size ? `${rows.size} price-bar ${rows.size === 1 ? "row needs" : "rows need"} attention. ` : "Check experiment inputs. "}${summary || "Some fields are invalid."}${messages.size > 3 ? ` (${messages.size - 3} more validation issues.)` : ""}${availability ? " Each available_at must be at or before date, the completed bar’s decision time. Verify both timestamps with your source; do not guess missing publication times." : ""}`;
 }
 
-export function parseFrozenBars(csv: string): FrozenBar[] {
+export function parseFrozenBars(csv: string, allowUnknownAvailability = false): FrozenBar[] {
   const rows = csv.trim().split(/\r?\n/).filter((line) => line.trim());
   const headers = rows.shift()?.split(",").map((s) => s.trim().toLowerCase()) || [];
-  const required = ["date", "available_at", "open", "high", "low", "close", "volume"];
+  const all = ["date", "available_at", "open", "high", "low", "close", "volume"];
+  const required = allowUnknownAvailability ? all.filter((key) => key !== "available_at") : all;
   if (!required.every((h) => headers.includes(h))) throw new Error(`CSV columns required: ${required.join(", ")}`);
   if (rows.length < 10 || rows.length > 20000) throw new Error("Provide between 10 and 20,000 price bars.");
   return rows.map((line, index) => {
     const values = line.split(",").map((s) => s.trim());
-    const row = Object.fromEntries(required.map((key) => [key, values[headers.indexOf(key)]]));
-    if (!row.date || !row.available_at || !/[zZ]|[+-]\d{2}:\d{2}$/.test(row.date) || !/[zZ]|[+-]\d{2}:\d{2}$/.test(row.available_at)) throw new Error(`Row ${index + 2}: timestamps must include a timezone.`);
-    const numbers = Object.fromEntries(required.slice(2).map((key) => [key, row[key] === "" || row[key] === undefined ? NaN : Number(row[key])]));
+    const row = Object.fromEntries(all.map((key) => [key, values[headers.indexOf(key)]]));
+    const validTime = (value: string) => /(?:[zZ]|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value));
+    if (!row.date || !validTime(row.date) || ((!allowUnknownAvailability || row.available_at) && (!row.available_at || !validTime(row.available_at)))) throw new Error(`Row ${index + 2}: timestamps must include a timezone.`);
+    const numbers = Object.fromEntries(all.slice(2).map((key) => [key, row[key] === "" || row[key] === undefined ? NaN : Number(row[key])]));
     if (Object.values(numbers).some((n) => !Number.isFinite(n))) throw new Error(`Row ${index + 2}: price or volume is missing or invalid.`);
-    return { date: row.date, available_at: row.available_at, ...numbers } as FrozenBar;
+    return { date: row.date, available_at: row.available_at || null, ...numbers } as FrozenBar;
   });
 }
 
@@ -113,18 +126,23 @@ export function ResearchExperiments({ dossierId, symbol }: { dossierId: string; 
     setSelectedId(data.id);
   };
   const [bars, setBars] = useState<FrozenBar[]>([]);
-  const [form, setForm] = useState({ title: `${symbol} moving-average experiment`, provider: "", data_version: "", adjustment_policy: "raw", as_of: "", train_end: "", validation_start: "", short_window: 20, long_window: 50, fee_bps: 5, slippage_bps: 5 });
+  const [readiness, setReadiness] = useState<Readiness>();
+  const [checking, setChecking] = useState(false);
+  const [rawHash, setRawHash] = useState<string>();
+  const [history, setHistory] = useState({ universe_name: "", member_from: "", member_until: "", membership_available: "", membership_source: "", delisted_at: "", delisting_available: "", delisting_source: "" });
+  const [form, setForm] = useState({ title: `${symbol} moving-average experiment`, provider: "", data_version: "", adjustment_policy: "raw", as_of: "", train_end: "", validation_start: "", short_window: 20, long_window: 50, fee_bps: 5, slippage_bps: 5, mode: "point_in_time", strategy: "sma_crossover" });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const act = async (fn: () => Promise<void>) => { setBusy(true); setNotice(""); try { await fn(); } catch (e) { setNotice(experimentError(e)); } finally { setBusy(false); } };
   const input = "block w-full rounded border border-terminal-border bg-terminal-bg p-2 text-sm";
   const utcEnd = (date: string) => `${date}T23:59:59Z`;
-  return <section className="mt-6 border-t border-terminal-border pt-5" style={{ fontFamily: "var(--ot-font-ui)" }}><h3 className="font-semibold">Reproducible experiments</h3><p className="mt-1 text-sm text-terminal-muted">Freeze price bars and costs, test a fixed moving-average strategy, then replay without fetching new data.</p>
+  const eligible = readiness && (form.mode === "exploratory" ? readiness.exploratory_eligible : readiness.point_in_time_eligible);
+  return <section className="mt-6 border-t border-terminal-border pt-5" style={{ fontFamily: "var(--ot-font-ui)" }}><h3 className="font-semibold">Reproducible experiments</h3><p className="mt-1 text-sm text-terminal-muted">Check your dataset, freeze a strategy and its costs, then replay without fetching new data.</p>
     {notice && <p role="status" className="my-3 text-sm">{notice}</p>}
     {query.isError && <p role="alert" className="text-sm">Unable to load experiments.</p>}
     {query.isPending && <p role="status" className="py-3 text-sm text-terminal-muted">Loading saved experiments…</p>}
     {query.data?.length === 0 && <p className="py-3 text-sm text-terminal-muted">Create an experiment to compare training and validation on frozen price data.</p>}
-    <ul className="divide-y divide-terminal-border">{query.data?.map((item) => <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"><div><strong>{item.title}</strong><p className="text-xs text-terminal-muted">Saved {new Date(item.created_at).toLocaleDateString()}</p></div><div className="flex flex-wrap gap-2">
+    <ul className="divide-y divide-terminal-border">{query.data?.map((item) => <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"><div><strong>{item.title}</strong><p className="text-xs text-terminal-muted">Saved {new Date(item.created_at).toLocaleDateString()} · {item.mode === "exploratory" ? "Exploratory" : "Point-in-time checked"}</p></div><div className="flex flex-wrap gap-2">
       <button disabled={busy} aria-label={`View results for ${item.title}`} aria-pressed={selectedId === item.id} className="rounded border border-terminal-border p-2 hover:bg-terminal-panel focus-visible:outline focus-visible:outline-2 focus-visible:outline-terminal-accent" onClick={() => { setSelectedId(item.id); setReplay(undefined); }}>View results</button>
       <button disabled={busy} className="rounded border border-terminal-border p-2" onClick={() => void act(async () => { setSelectedId(item.id); setReplay(undefined); const { data } = await api.post<Replay>(`/research/experiments/${item.id}/replay`); const saved = (await api.get<ExperimentSnapshot>(`/research/experiments/${item.id}`)).data; selectSnapshot(saved); setReplay(data); })}>Replay experiment</button>
       <button disabled={busy} className="rounded border border-terminal-border p-2" onClick={() => void act(async () => downloadBlob((await api.get<Blob>(`/research/experiments/${item.id}`, { responseType: "blob" })).data, `${symbol}-experiment.json`))}>Export experiment</button>
@@ -133,20 +151,59 @@ export function ResearchExperiments({ dossierId, symbol }: { dossierId: string; 
     {selectedId && snapshot.isError && <div role="alert" className="mt-4 py-3 text-sm"><p>Unable to load this experiment’s saved results.</p><button className="mt-2 rounded border border-terminal-border px-3 py-2" onClick={() => void snapshot.refetch()}>Retry results</button></div>}
     {snapshot.data && <SavedResults snapshot={snapshot.data} replay={replay?.id === snapshot.data.id ? replay : undefined} />}
     <details className="mt-3 rounded border border-terminal-border p-3"><summary className="cursor-pointer text-sm">Create frozen-data experiment</summary><form className="mt-3 space-y-3" onSubmit={(event) => { event.preventDefault(); void act(async () => {
+      if (!eligible || checking) throw new Error("Check the dataset and select an eligible experiment mode first.");
       const asOf = new Date(Math.min(new Date(utcEnd(form.as_of)).getTime(), Date.now())).toISOString();
-      const { data } = await api.post<ExperimentSnapshot>("/research/experiments", { ...form, dossier_id: dossierId, symbol, bars, as_of: asOf, train_end: utcEnd(form.train_end), validation_start: `${form.validation_start}T00:00:00Z` });
+      const memberships = history.universe_name ? [{ universe_name: history.universe_name, effective_from: `${history.member_from}T00:00:00Z`, effective_until: history.member_until ? `${history.member_until}T00:00:00Z` : null, available_at: utcEnd(history.membership_available), source_url: history.membership_source }] : [];
+      const delisting = history.delisted_at ? { effective_at: `${history.delisted_at}T00:00:00Z`, available_at: utcEnd(history.delisting_available), source_url: history.delisting_source } : null;
+      const { data } = await api.post<ExperimentSnapshot>("/research/experiments", { ...form, historical_memberships: memberships, delisting, raw_source_sha256: rawHash, dossier_id: dossierId, symbol, bars, as_of: asOf, train_end: utcEnd(form.train_end), validation_start: `${form.validation_start}T00:00:00Z` });
       selectSnapshot(data); setReplay(undefined);
       await client.invalidateQueries({ queryKey: ["research-experiments", dossierId] }); setNotice("Experiment saved with separate training and validation results.");
     }); }}>
-      <label className="block text-sm">Price bars CSV<input required type="file" accept=".csv,text/csv" className={input} onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; try { if (file.size > 8_000_000) throw new Error("CSV must be smaller than 8 MB."); setBars(parseFrozenBars(await file.text())); setNotice(""); } catch (error) { setBars([]); setNotice((error as Error).message); } }} /></label>
-      <p className="text-xs text-terminal-muted">Columns: date, available_at, open, high, low, close, volume. Use timezone-qualified timestamps at the completed bar’s decision time. Publication times and adjustment policy must come from your source; they are not inferred.</p>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <label className="block text-sm">Price bars CSV<input required disabled={checking || busy} type="file" accept=".csv,text/csv" className={input} onChange={async (event) => {
+        const file = event.target.files?.[0]; setBars([]); setReadiness(undefined); setRawHash(undefined); if (!file) return;
+        setChecking(true); setNotice("");
+        try {
+          if (file.size > 8_000_000) throw new Error("CSV must be smaller than 8 MB.");
+          const csv = await file.text(); const parsed = parseFrozenBars(csv, true);
+          if (globalThis.crypto?.subtle && file.arrayBuffer) { const hash = await crypto.subtle.digest("SHA-256", await file.arrayBuffer()); setRawHash(Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("")); }
+          const { data } = await api.post<Readiness>("/research/experiments/preflight", { bars: parsed });
+          setBars(parsed); setReadiness(data);
+        } catch (error) { setNotice(experimentError(error)); } finally { setChecking(false); }
+      }} /></label>
+      <p className="text-xs text-terminal-muted">Columns: date, open, high, low, close, volume, plus available_at when your source provides it. Timestamps require a timezone. Missing publication times remain unknown.</p>
+      {checking && <p role="status" className="py-3 text-sm">Checking dataset readiness…</p>}
+      {readiness && <section aria-label="Dataset readiness" className="space-y-2 border-y border-terminal-border py-4 text-sm">
+        <h4 className="font-semibold">Dataset readiness</h4>
+        <p>{readiness.bars} bars · {timestamp(readiness.first_date)} to {timestamp(readiness.last_date)}</p>
+        <p>Availability: {readiness.missing_availability} unknown, {readiness.late_availability} after the decision time.</p>
+        <p>Missing trading sessions: not checked without an exchange calendar. Price adjustments are declared below, not independently verified.</p>
+        <p>Historical universe membership and delisted-security coverage: not verified for this single-instrument dataset.</p>
+        {readiness.point_in_time_blockers.length > 0 && <ul className="list-disc pl-5">{readiness.point_in_time_blockers.map((reason) => <li key={reason}>{reason}</li>)}</ul>}
+        <fieldset className="space-y-2 pt-2"><legend className="font-medium">Experiment mode</legend>
+          <label className="flex items-start gap-2"><input type="radio" name={`experiment-mode-${dossierId}`} value="point_in_time" checked={form.mode === "point_in_time"} disabled={!readiness.point_in_time_eligible} onChange={() => setForm({ ...form, mode: "point_in_time" })} /><span>Point-in-time checked<span className="block text-xs text-terminal-muted">Requires availability at or before every decision time. Source timestamps remain caller supplied.</span></span></label>
+          <label className="flex items-start gap-2"><input type="radio" name={`experiment-mode-${dossierId}`} value="exploratory" checked={form.mode === "exploratory"} disabled={!readiness.exploratory_eligible} onChange={() => setForm({ ...form, mode: "exploratory" })} /><span>Exploratory<span className="block text-xs text-terminal-muted">Uses available historical prices; does not establish historical availability.</span></span></label>
+        </fieldset>
+      </section>}
+      <fieldset disabled={!eligible || checking || busy} className="grid gap-3 sm:grid-cols-2 disabled:opacity-60">
+        <legend className="pb-3 text-sm font-medium">Strategy and provenance</legend>
+        <label className="text-sm">Strategy<select className={input} value={form.strategy} onChange={(e) => setForm({ ...form, strategy: e.target.value })}><option value="sma_crossover">Simple moving-average crossover</option><option value="ema_crossover">Exponential moving-average crossover</option><option value="buy_hold">Buy and hold</option></select></label>
         {([['title', 'Experiment title'], ['provider', 'Data source'], ['data_version', 'Source version or snapshot ID']] as const).map(([key, label]) => <label key={key} className="text-sm">{label}<input required className={input} value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} /></label>)}
         <label className="text-sm">Price adjustment<select aria-label="Price adjustment" className={input} value={form.adjustment_policy} onChange={(e) => setForm({ ...form, adjustment_policy: e.target.value })}><option value="raw">Raw prices</option><option value="split_adjusted">Split adjusted</option><option value="total_return_adjusted">Total return adjusted</option></select></label>
         {([['as_of', 'Data known by (UTC)'], ['train_end', 'Training ends (UTC)'], ['validation_start', 'Validation starts (UTC)']] as const).map(([key, label]) => <label key={key} className="text-sm">{label}<input required type="date" className={input} value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} /></label>)}
-        {([['short_window', 'Short moving average'], ['long_window', 'Long moving average'], ['fee_bps', 'Fees (basis points)'], ['slippage_bps', 'Slippage (basis points)']] as const).map(([key, label]) => <label key={key} className="text-sm">{label}<input required type="number" min={key.includes("window") ? 1 : 0} max={1000} className={input} value={form[key]} onChange={(e) => setForm({ ...form, [key]: Number(e.target.value) })} /></label>)}
-      </div>
-      <button disabled={busy || !bars.length} className="rounded border border-terminal-border px-3 py-2 text-sm">{busy ? "Running…" : `Freeze and test ${bars.length} bars`}</button>
+        {([['short_window', 'Short moving average'], ['long_window', 'Long moving average'], ['fee_bps', 'Fees (basis points)'], ['slippage_bps', 'Slippage (basis points)']] as const).filter(([key]) => form.strategy !== "buy_hold" || !key.includes("window")).map(([key, label]) => <label key={key} className="text-sm">{label}<input required type="number" min={key.includes("window") ? 1 : 0} max={key === "short_window" ? 500 : 1000} className={input} value={form[key]} onChange={(e) => setForm({ ...form, [key]: Number(e.target.value) })} /></label>)}
+        <details className="sm:col-span-2"><summary className="cursor-pointer py-2 text-sm">Add historical membership or delisting evidence</summary>
+          <p className="my-2 text-xs text-terminal-muted">Optional source evidence for this instrument. Membership does not filter trades or establish complete historical universe coverage. Dates use UTC; source availability is conservatively recorded at day end.</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-sm">Historical universe name<input className={input} value={history.universe_name} onChange={(e) => setHistory({ ...history, universe_name: e.target.value })} placeholder="For example, an index name" /></label>
+            {([['member_from', 'Member from (inclusive)'], ['member_until', 'Member until (exclusive)'], ['membership_available', 'Membership source known on']] as const).map(([key, label]) => <label key={key} className="text-sm">{label}<input type="date" required={Boolean(history.universe_name) && key !== 'member_until'} className={input} value={history[key]} onChange={(e) => setHistory({ ...history, [key]: e.target.value })} /></label>)}
+            <label className="text-sm">Membership source URL<input type="url" required={Boolean(history.universe_name)} className={input} value={history.membership_source} onChange={(e) => setHistory({ ...history, membership_source: e.target.value })} /></label>
+            <label className="text-sm">Delisted from (UTC)<input type="date" className={input} value={history.delisted_at} onChange={(e) => setHistory({ ...history, delisted_at: e.target.value })} /></label>
+            <label className="text-sm">Delisting source known on<input type="date" required={Boolean(history.delisted_at)} className={input} value={history.delisting_available} onChange={(e) => setHistory({ ...history, delisting_available: e.target.value })} /></label>
+            <label className="text-sm">Delisting source URL<input type="url" required={Boolean(history.delisted_at)} className={input} value={history.delisting_source} onChange={(e) => setHistory({ ...history, delisting_source: e.target.value })} /></label>
+          </div>
+        </details>
+      </fieldset>
+      <button disabled={busy || checking || !eligible} className="rounded border border-terminal-border px-3 py-2 text-sm">{busy ? "Running…" : `Freeze and test ${bars.length} bars`}</button>
     </form></details>
   </section>;
 }

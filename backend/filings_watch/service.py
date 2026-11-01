@@ -98,50 +98,19 @@ def collect_symbols(db: Session, user_id: str, settings: dict[str, Any]) -> list
 # Import (agent A's fetch route path) + store
 # --------------------------------------------------------------------------- #
 async def _load_import_candidates(db: Session, symbol: str, sources: list[str], limit: int) -> list[dict]:
-    """Return the import candidates the POST /documents/fetch route uses.
-
-    Prefers a unified ``sources.fetch_documents`` helper; otherwise falls back to
-    the per-source collectors (``sec_documents`` / ``nse_documents``) the route
-    itself dispatches on.
-    """
-    from backend.filings_rag import sources
-
-    fetch = getattr(sources, "fetch_documents", None)
-    if callable(fetch):
-        try:
-            result = fetch(db, symbol=symbol, sources=sources, limit=limit)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("filings-watch: fetch_documents failed for %s: %s", symbol, exc)
-            return []
-        if isinstance(result, dict):
-            result = result.get("imported", [])
-        return result or []
+    """Collect and await the same SEC/NSE source adapters used by manual imports."""
+    from backend.filings_rag import sources as sources_module
 
     candidates: list[dict] = []
-    selected = [s for s in sources if s in ("sec", "nse")] or ["sec", "nse"]
+    selected = [source for source in sources if source in ("sec", "nse")] or ["sec", "nse"]
     for kind in selected:
-        fn = getattr(sources, f"{kind}_documents", None)
+        fn = getattr(sources_module, f"{kind}_documents", None)
         if not callable(fn):
             continue
-        try:
-            items = fn(db, symbol, limit=limit) or []
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("filings-watch: %s_documents failed for %s: %s", kind, symbol, exc)
-            continue
-        candidates.extend(items or [])
+        items = await fn(symbol, limit=limit)
+        for item in items or []:
+            candidates.append({**item, "market": item.get("market") or ("IN" if kind == "nse" else "US")})
     return candidates
-
-
-def _decode_candidate(data: bytes, content_type: str | None) -> str:
-    ct = str(content_type or "").lower()
-    if ct.startswith("text/") or {"json", "html", "xml"} & {c.strip() for c in ct.split("/")}:
-        return bytes(data).decode("utf-8", errors="replace")
-    try:
-        from backend.filings_rag import parse
-
-        return parse.extract_text(bytes(data), content_type=ct)
-    except Exception:  # noqa: BLE001
-        return ""
 
 
 def _candidate_to_pages(candidate: dict) -> list[str] | None:
@@ -150,15 +119,19 @@ def _candidate_to_pages(candidate: dict) -> list[str] | None:
         return [str(p) for p in pages if str(p).strip()]
     data = candidate.get("data")
     if isinstance(data, (bytes, bytearray)) and data:
-        text = _decode_candidate(data, candidate.get("content_type"))
-        if text.strip():
-            return [text]
+        from backend.filings_rag.routes_documents import _pages_from_bytes
+        return _pages_from_bytes(bytes(data), candidate.get("content_type"))
     return None
+
 
 
 async def _import_symbol(db: Session, symbol: str, sources: list[str], limit: int) -> list[dict]:
     async with _event_semaphore:
-        candidates = await _load_import_candidates(db, symbol, sources, limit)
+        try:
+            candidates = await _load_import_candidates(db, symbol, sources, limit)
+        except Exception:
+            logger.warning("filings-watch: source collection failed for %s", symbol, exc_info=True)
+            return []
 
     stored: list[dict] = []
     seen_ids: set[int] = set()

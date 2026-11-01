@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import ast
-import io
-import queue
-import threading
-import traceback
+import asyncio
+import json
+import subprocess
+import sys
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
-from contextlib import redirect_stdout
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException
@@ -105,31 +105,29 @@ def _validate_code(code: str) -> None:
             raise HTTPException(status_code=400, detail=f"Name access blocked: {node.id}")
 
 
-def _run_user_code(code: str) -> PythonExecuteResponse:
-    """Execute user Python code in a restricted sandbox.
-
-    The execution environment has:
-    - No access to dangerous builtins (open, eval, exec, compile, __import__, etc.)
-    - No imports (validated by _validate_code above)
-    - Only whitelisted simple builtin functions
-    - No access to dunder attributes (validated by _validate_code above)
-    - Execution timeout via the existing threading mechanism
-    - stdout/stderr capture
-    """
-    # Completely empty globals - no module-level references at all.
-    globals_env: dict[str, object] = {"__builtins__": dict(_SAFE_BUILTINS)}
-    locals_env: dict[str, object] = {}
-    stdout_buf = io.StringIO()
+def _run_user_code(code: str, timeout: float) -> PythonExecuteResponse:
+    """Run validated code in a child process that is killed and reaped on timeout."""
+    worker = Path(__file__).resolve().parents[2] / "core" / "python_execution_worker.py"
+    # Packaged launchers dispatch this flag before starting the app or browser.
+    command = [sys.executable, "--ot-python-execution-worker"] if getattr(sys, "frozen", False) else [sys.executable, "-I", str(worker)]
     try:
-        with redirect_stdout(stdout_buf):
-            exec(code, globals_env, locals_env)  # security: sandboxed by validate_code + restricted builtins
-        return PythonExecuteResponse(stdout=stdout_buf.getvalue(), stderr="", result=locals_env.get("result"), timed_out=False)
-    except Exception:
-        return PythonExecuteResponse(stdout=stdout_buf.getvalue(), stderr=traceback.format_exc(limit=1), result=None, timed_out=False)
-
-
-def _run_user_code_worker(code: str, out_queue: "queue.Queue[dict]") -> None:
-    out_queue.put(_run_user_code(code).model_dump())
+        completed = subprocess.run(
+            command,
+            input=json.dumps({"code": code, "builtins": list(_SAFE_BUILTINS)}),
+            capture_output=True, text=True, timeout=timeout, check=False,
+        )
+    except subprocess.TimeoutExpired:
+        # subprocess.run kills and waits for the child before raising. No executing
+        # user thread or process survives this response.
+        return PythonExecuteResponse(stdout="", stderr="Execution timed out", result=None, timed_out=True)
+    except OSError:
+        return PythonExecuteResponse(stdout="", stderr="Execution worker could not be started", result=None, timed_out=False)
+    if completed.returncode:
+        return PythonExecuteResponse(stdout="", stderr="Execution worker failed", result=None, timed_out=False)
+    try:
+        return PythonExecuteResponse(**json.loads(completed.stdout))
+    except (ValueError, TypeError):
+        return PythonExecuteResponse(stdout="", stderr="Execution worker returned an invalid result", result=None, timed_out=False)
 
 
 def _compile_or_raise(source: str) -> CompileResult:
@@ -178,15 +176,7 @@ def _normalize_ohlcv_frame(rows: list[dict[str, Any]]) -> pd.DataFrame:
 async def execute_python(payload: PythonExecuteRequest) -> PythonExecuteResponse:
     _validate_code(payload.code)
     timeout = max(0.1, min(float(payload.timeout_seconds), 10.0))
-    out_queue: "queue.Queue[dict]" = queue.Queue(maxsize=1)
-    worker = threading.Thread(target=_run_user_code_worker, args=(payload.code, out_queue), daemon=True)
-    worker.start()
-    worker.join(timeout=timeout)
-    if worker.is_alive():
-        return PythonExecuteResponse(stdout="", stderr="Execution timed out", result=None, timed_out=True)
-    if out_queue.empty():
-        return PythonExecuteResponse(stdout="", stderr="Execution failed", result=None, timed_out=False)
-    return PythonExecuteResponse(**out_queue.get())
+    return await asyncio.to_thread(_run_user_code, payload.code, timeout)
 
 
 @router.post("/scripting/compile", response_model=CompileResult)

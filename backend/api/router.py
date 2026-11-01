@@ -166,3 +166,8 @@ api_router.include_router(research_dossiers_router)
 
 from backend.research_dossiers.experiments import router as research_experiments_router
 api_router.include_router(research_experiments_router)
+
+from backend.research_inbox.routes import router as research_inbox_router
+from backend.screen_monitoring.routes import router as screen_monitoring_router
+api_router.include_router(research_inbox_router)
+api_router.include_router(screen_monitoring_router)

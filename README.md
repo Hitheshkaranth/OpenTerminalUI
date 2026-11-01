@@ -7,7 +7,7 @@
 Bloomberg-style workflows, primary-document intelligence and a tool-using AI analyst, self-hosted on your own hardware.
 
 <p>
-  <img src="https://img.shields.io/badge/version-0.8.0-0f172a" alt="Version 0.8.0" />
+  <img src="https://img.shields.io/badge/version-0.9.0-0f172a" alt="Version 0.9.0" />
   <img src="https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white" alt="Python 3.11" />
   <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI" />
   <img src="https://img.shields.io/badge/React_18-TypeScript-61DAFB?logo=react&logoColor=black" alt="React 18 + TypeScript" />
@@ -47,7 +47,15 @@ Most retail tools stop at price charts and ratios. OpenTerminalUI is built for t
 
 ## 🧭 Feature tour
 
-> Screenshots are captured from the running app using `scripts/capture_readme.mjs` and browser verification. The research dossier screenshots below use Apple's published FY2025 Q1 statements; they show historical research, not a current investment recommendation.
+> Screenshots are captured from the running app using `scripts/capture_readme.mjs` and browser verification. The Apple and MTAR research examples below use published historical data; they are not current investment recommendations.
+
+### Daily research review
+
+Open **Today** to review thesis changes and scheduled screen entries/exits, inspect cited evidence, acknowledge or snooze events, and explore shared portfolio relationships. Dossiers now support measurable assumptions, frozen earnings expectations, optional daily SEC/NSE ingestion and dataset preflight for exploratory or point-in-time experiments. See the [research review workflow guide](docs/RESEARCH_REVIEW_WORKFLOWS.md) for setup, supported behavior and data-coverage limits.
+
+<img src="assets/readme/mtar-threshold-chart.png" alt="Live MTAR thesis chart comparing a 20 percent illustrative EBITDA margin threshold with the previous 12.5 percent and latest recorded 23 percent observations" width="100%" />
+
+**MTAR thesis comparison:** sourced Q2/Q3 FY2026 EBITDA margins from [MTAR's January 2026 investor presentation](https://mtar.in/wp-content/uploads/2026/01/Investors-Presentation-31.12.2025.pdf), page 10. The 20% threshold is an illustrative research rule, not management guidance. Each metric retains its own labelled scale and units.
 
 ### Company research dossiers
 
@@ -69,6 +77,10 @@ Supporting, opposing and neutral evidence retain source links and publication da
 </table>
 
 Frozen-data experiments display training and validation results, simulation costs and source provenance, with deterministic replay for supported SMA inputs. Historical availability is validated rather than guessed. See the [real-data validation report](docs/REAL_DATA_VALIDATION.md) and [research workspace guide](docs/RESEARCH_WORKSPACE_UPGRADE.md) for tested behavior and current limits.
+
+<img src="assets/readme/mtar-experiment-charts.png" alt="Live MTAR experiment showing training and validation return and drawdown comparisons, a validation return curve, period and measure controls, and an observation slider" width="100%" />
+
+**MTAR experiment charts:** an exploratory SMA 20/50 simulation using 248 historical MTARTECH.NS daily price rows from Yahoo Finance (October 2025–October 2026). Switch between return and drawdown, compare training with validation, and inspect individual saved observations. Historical data availability is unknown, so this example is not labelled point-in-time verified; results are simulated, not actual portfolio returns.
 
 ### Security Hub
 

@@ -19,7 +19,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: "home", label: "Home", to: "/home", glyph: "HM" },
       { id: "market", label: "Market", to: "/equity/stocks", glyph: "MK" },
-      { id: "monitoring", label: "Monitoring", to: "/equity/monitoring", glyph: "MO" },
+      { id: "monitoring", label: "Today", to: "/equity/monitoring", glyph: "MO" },
       { id: "watchlist", label: "Watchlist", to: "/equity/watchlist", glyph: "WL" },
       { id: "hotlists", label: "Hotlists", to: "/equity/hotlists", glyph: "HOT" },
       { id: "equity-heatmap", label: "Heatmap", to: "/equity/heatmap", glyph: "HM2" },
@@ -136,6 +136,7 @@ export const NAV_SECTIONS: NavSection[] = [
 
 export const PINNED_DEFAULT: string[] = [
   "home",
+  "monitoring",
   "market",
   "security-hub",
   "screener",

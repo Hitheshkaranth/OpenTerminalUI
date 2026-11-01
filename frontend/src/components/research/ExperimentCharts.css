@@ -1,0 +1,41 @@
+.experiment-charts { margin-block: 24px; min-width: 0; color: var(--ot-color-text-primary); }
+.experiment-charts h5 { margin-bottom: 16px; font-size: .9375rem; font-weight: 600; }
+.experiment-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--ot-color-border-default); }
+.experiment-comparison figcaption, .experiment-series figcaption { font-size: .8125rem; font-weight: 600; margin-bottom: 12px; }
+.experiment-comparison-row { display: grid; grid-template-columns: 70px minmax(45px, 1fr) 74px; gap: 10px; align-items: center; margin-block: 10px; font-size: .75rem; }
+.experiment-comparison-row strong { text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+.experiment-bar-track { height: 18px; position: relative; }
+.experiment-zero { position: absolute; left: 50%; height: 100%; width: 1px; background: var(--ot-color-border-strong); }
+.experiment-bar { position: absolute; top: 3px; height: 12px; border-radius: 2px; }
+.experiment-bar--training { background: var(--ot-color-text-secondary); }
+.experiment-bar--validation { background: var(--ot-color-accent-primary); }
+.experiment-chart-note { color: var(--ot-color-text-secondary); font-size: .75rem; line-height: 1.6; margin-top: 10px; }
+.experiment-comparison-metric > .experiment-chart-note { display: flex; justify-content: space-between; padding-left: 80px; padding-right: 84px; font-variant-numeric: tabular-nums; font-size: .6875rem; }
+.experiment-chart-controls { display: flex; flex-wrap: wrap; gap: 12px 28px; margin-block: 20px; }
+.experiment-chart-controls legend { color: var(--ot-color-text-secondary); font-size: .75rem; margin-bottom: 6px; }
+.experiment-chart-controls button { padding: 7px 10px; min-height: 36px; font-size: .75rem; border: 1px solid var(--ot-color-border-default); background: var(--ot-color-surface-1); }
+.experiment-chart-controls button:first-of-type { border-radius: 4px 0 0 4px; }
+.experiment-chart-controls button:last-of-type { border-radius: 0 4px 4px 0; }
+.experiment-chart-controls button[aria-pressed="true"] { color: var(--ot-color-accent-primary); border-color: var(--ot-color-accent-primary); }
+.experiment-chart-controls button:focus-visible, .experiment-observation:focus-visible { outline: 2px solid var(--ot-color-accent-primary); outline-offset: 3px; }
+.experiment-series { min-width: 0; }
+.experiment-series svg { display: block; width: 100%; height: 250px; }
+.experiment-series svg text { fill: var(--ot-color-text-secondary); font: 12px var(--ot-font-ui); }
+.experiment-gridline { stroke: var(--ot-color-border-default); stroke-width: 1; }
+.experiment-baseline { stroke: var(--ot-color-text-secondary); stroke-width: 1; stroke-dasharray: 3 4; }
+.experiment-line { stroke-width: 2; vector-effect: non-scaling-stroke; }
+.experiment-line--training { stroke: var(--ot-color-text-secondary); }
+.experiment-line--validation { stroke: var(--ot-color-accent-primary); }
+.experiment-point--training { fill: var(--ot-color-text-secondary); }
+.experiment-point--validation { fill: var(--ot-color-accent-primary); }
+.experiment-cursor { stroke: var(--ot-color-text-secondary); stroke-dasharray: 2 4; opacity: .6; }
+.experiment-inspection { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: .75rem; }
+.experiment-inspection output { font-variant-numeric: tabular-nums; }
+.experiment-observation { display: block; width: 100%; margin-block: 10px; accent-color: var(--ot-color-accent-primary); min-height: 24px; }
+.experiment-chart-unavailable { padding: 16px 0; font-size: .8125rem; color: var(--ot-color-text-secondary); line-height: 1.6; }
+@media (max-width: 640px) {
+  .experiment-comparison { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .experiment-chart-controls { gap: 12px; }
+  .experiment-chart-controls button { min-height: 44px; }
+
+}

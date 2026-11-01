@@ -1,0 +1,21 @@
+.research-metric-chart { --metric-label-width: 80px; --metric-value-width: 120px; margin: 16px 0; padding: 14px 0; border-block: 1px solid var(--ot-color-border-default); font-size: 12px; }
+.research-metric-chart figcaption { font-weight: 600; margin-bottom: 10px; overflow-wrap: anywhere; }
+.research-metric-chart figcaption span { display: block; margin-top: 3px; color: var(--ot-color-text-secondary); font-weight: 400; font-size: 11px; }
+.research-metric-chart dl { margin: 0; }
+.research-metric-chart__row { display: grid; grid-template-columns: var(--metric-label-width) minmax(0, 1fr); gap: 8px; align-items: center; }
+.research-metric-chart__row dt { color: var(--ot-color-text-secondary); }
+.research-metric-chart__row dd { display: grid; grid-template-columns: minmax(0, 1fr) var(--metric-value-width); gap: 12px; align-items: center; margin: 0; }
+.research-metric-chart__lane { width: 100%; overflow: visible; }
+.research-metric-chart__baseline { stroke: var(--ot-color-border-default); }
+.research-metric-chart__threshold { stroke: var(--ot-color-text-secondary); stroke-width: 1; stroke-dasharray: 3 3; }
+.research-metric-chart__band { fill: var(--ot-color-accent-primary); fill-opacity: .15; }
+.research-metric-chart__point { fill: var(--ot-color-accent-primary); stroke: var(--ot-color-accent-primary); stroke-width: 2; }
+.research-metric-chart__point--outline { fill: var(--ot-color-surface-2); }
+.research-metric-chart__value { font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+.research-metric-chart__axis { display: flex; justify-content: space-between; margin: 2px calc(var(--metric-value-width) + 12px) 0 calc(var(--metric-label-width) + 8px); font-size: 10px; color: var(--ot-color-text-secondary); font-variant-numeric: tabular-nums; gap: 8px; }
+.research-metric-chart__note { margin: 10px 0 0; font-size: 11px; color: var(--ot-color-text-secondary); line-height: 1.5; }
+@media (max-width: 600px) {
+  .research-metric-chart { --metric-label-width: 64px; --metric-value-width: 88px; }
+  .research-metric-chart__row dd { gap: 8px; }
+  .research-metric-chart__axis { margin-right: calc(var(--metric-value-width) + 8px); }
+}

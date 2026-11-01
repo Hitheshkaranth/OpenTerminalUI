@@ -1,5 +1,7 @@
 # Research workspace upgrade
 
+For the subsequent Today inbox, structured thesis checks, optional source ingestion, scheduled fundamental screens and expanded experiment modes, see [Research review workflows](RESEARCH_REVIEW_WORKFLOWS.md). The boundaries below describe the earlier workspace release.
+
 This implementation connects research, agent execution, and configurable workspaces. It does not require live model credentials to exercise the deterministic tests.
 
 ## Delivered

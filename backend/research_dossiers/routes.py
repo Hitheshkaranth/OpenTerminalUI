@@ -8,7 +8,7 @@ from backend.api.deps import get_db
 from backend.auth.deps import get_current_user
 from backend.research_dossiers import service
 from backend.research_dossiers.models import ResearchDossier, DossierRevision
-from backend.research_dossiers.schemas import DossierCreate, DossierUpdate, MonitorRequest
+from backend.research_dossiers.schemas import DossierCreate, DossierUpdate, MonitorRequest, EarningsReviewRequest
 
 router = APIRouter(prefix="/api/research/dossiers", tags=["research-dossiers"])
 
@@ -67,9 +67,12 @@ def list_revisions(dossier_id: str, limit: int = Query(100, ge=1, le=500), db: S
 
 
 @router.post("/{dossier_id}/monitor")
-def check_dossier(dossier_id: str, payload: MonitorRequest | None = None,
+async def check_dossier(dossier_id: str, payload: MonitorRequest | None = None,
                   db: Session = Depends(get_db), user=Depends(get_current_user)):
     row = service.owned(db, user.id, dossier_id)
+    if row.payload.get("source_fetch_enabled") and not (payload and payload.evidence is not None):
+        from backend.research_dossiers.source_fetch import fetch_sources
+        await fetch_sources(db, row, force=True)
     evidence = [e.model_dump(mode="json") for e in payload.evidence] if payload and payload.evidence is not None else None
     return service.monitor(db, row, evidence)
 
@@ -77,6 +80,41 @@ def check_dossier(dossier_id: str, payload: MonitorRequest | None = None,
 @router.get("/{dossier_id}/export")
 def export_dossier(dossier_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
     return service.export_snapshot(db, service.owned(db, user.id, dossier_id))
+
+
+@router.get("/{dossier_id}/conditions")
+def get_conditions(dossier_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    row = service.owned(db, user.id, dossier_id)
+    return {"items": service.output(row)["condition_status"], "checked_at": (row.monitor_state or {}).get("last_checked_at")}
+
+
+@router.post("/{dossier_id}/earnings-reviews")
+def save_earnings(dossier_id: str, payload: EarningsReviewRequest, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    try:
+        return service.save_earnings_review(db, service.owned(db, user.id, dossier_id),
+            payload.review.model_dump(mode="json"), payload.expected_revision)
+    except ValidationError as exc:
+        raise HTTPException(422, str(exc))
+
+
+@router.get("/{dossier_id}/earnings-context")
+async def earnings_context(dossier_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    from backend.results_tracker.service import build_history
+    from backend.filings_rag.knowledge import build_knowledge
+    row = service.owned(db, user.id, dossier_id)
+    history = await build_history(row.symbol, quarters=8)
+    warnings = []
+    try:
+        knowledge = await build_knowledge(db, row.symbol, use_llm=False)
+        guidance = [{"metric": item.get("metric"), "status": item.get("status"), "period": item.get("period"),
+                     "quote": item.get("citation", {}).get("quote") or item.get("statement"),
+                     "source_url": item.get("citation", {}).get("source_url"),
+                     "citation": item.get("citation")} for item in knowledge.get("guidance", [])]
+    except Exception:
+        guidance = []
+        warnings.append("Management guidance could not be loaded from the filing index. Retry before treating coverage as complete.")
+    return {"results": history, "guidance": guidance, "warnings": warnings,
+        "note": "Provider figures are reference data. Confirm fiscal period, units and source before saving actuals."}
 
 
 @router.post("/{dossier_id}/share")

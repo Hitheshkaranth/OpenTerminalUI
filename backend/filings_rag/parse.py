@@ -88,6 +88,11 @@ def _looks_like_heading(line: str) -> bool:
         return False
     if len(stripped) > 120:
         return False
+    # Short reported facts often begin with a known heading ("Operating margin was
+    # 17.4%."). Preserve their numbers in the passage instead of discarding the
+    # entire sentence as section metadata.
+    if re.search(r"\d.*(?:%|\bpercent\b)", stripped, re.I) or re.search(r"\b(?:was|were|reported|grew|declined|increased|decreased|stood)\b", stripped, re.I):
+        return False
     low = _known_heading_lower(stripped)
     if low:
         return len(stripped) <= 100

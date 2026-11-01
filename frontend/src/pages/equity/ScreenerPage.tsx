@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
   Bookmark,
@@ -24,6 +24,7 @@ import { TerminalButton } from "../../components/terminal/TerminalButton";
 import { TerminalInput } from "../../components/terminal/TerminalInput";
 import { TerminalPanel } from "../../components/terminal/TerminalPanel";
 import { AiInsightCard } from "../../components/terminal/AiInsightCard";
+import { ScreenMonitoring } from "../../components/screener/ScreenMonitoring";
 import { SavedViewsControl } from "../../components/savedViews/SavedViewsControl";
 
 import { fetchCollectionBriefing } from "../../api/client";
@@ -96,12 +97,14 @@ function ScreenerWorkspace() {
     presets,
     setSelectedPresetId,
     activeSavedScreenId,
+    setActiveSavedScreenId,
     savedScreens,
     run,
     selectedRow,
     universes,
     setUniverse,
     setView,
+    loadSavedScreen,
   } = useScreenerContext();
 
   useEffect(() => {
@@ -111,6 +114,14 @@ function ScreenerWorkspace() {
     }, window.location.pathname);
     return () => useWorkspaceContextStore.getState().clearContext();
   }, [selectedRow, result, query, selectedPresetId, universe]);
+
+  const restoredScreen = useRef<string | null>(null);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("screen");
+    if (!id || restoredScreen.current === id) return;
+    const saved = savedScreens.find((item) => item.id === id);
+    if (saved) { restoredScreen.current = id; loadSavedScreen(saved); setTab("saved"); }
+  }, [savedScreens, loadSavedScreen, setTab]);
 
   const activePreset = presets.find((preset) => preset.id === selectedPresetId) ?? null;
   const activeSavedScreen = savedScreens.find((screen) => screen.id === activeSavedScreenId) ?? null;
@@ -152,6 +163,7 @@ function ScreenerWorkspace() {
 
   const runPreset = (presetId: string) => {
     setTab("library");
+    setActiveSavedScreenId(null);
     setSelectedPresetId(presetId);
     void run({ preset_id: presetId });
   };
@@ -311,6 +323,7 @@ function ScreenerWorkspace() {
 
             {tab === "formula" ? <CustomFormulaScreener /> : null}
             {tab === "saved" ? <SavedScreens /> : null}
+            {activeSavedScreen ? <ScreenMonitoring key={activeSavedScreen.id} screen={activeSavedScreen} universe={universe} onRestoreUniverse={setUniverse} /> : null}
             {tab === "public" ? <PublicScreens /> : null}
 
             {aiOpen && tab !== "saved" && tab !== "public" && result && result.results.length > 0 ? (

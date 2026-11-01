@@ -1,4 +1,4 @@
-"""Monitor locally ingested filings; never calls a provider or model implicitly."""
+"""Monitor saved filings; fetch SEC/NSE sources daily only for opted-in dossiers."""
 from __future__ import annotations
 
 import asyncio
@@ -22,6 +22,9 @@ def check_enabled_dossiers() -> dict:
             if row is None or not row.payload.get("monitoring_enabled"):
                 continue
             try:
+                if row.payload.get("source_fetch_enabled"):
+                    from backend.research_dossiers.source_fetch import fetch_sources
+                    asyncio.run(fetch_sources(db, row))
                 monitor(db, row)
                 checked += 1
             except Exception:

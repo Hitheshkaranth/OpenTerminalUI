@@ -2,12 +2,9 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../../api/base";
+import { companyIdentities } from "./companyIdentities";
 
 type CompanyProfile = { company_name?: string; exchange?: string; sector?: string; industry?: string; logo_url?: string; website?: string; provenance?: { quality?: string } };
-// A verified local identity keeps the featured company recognizable offline.
-const identities: Record<string, CompanyProfile> = {
-  "US:AAPL": { company_name: "Apple Inc.", exchange: "NASDAQ", logo_url: "/company-logos/apple.ico", website: "https://www.apple.com" },
-};
 export function companyAssetUrl(value?: string): string | undefined {
   if (!value) return undefined;
   if (value.startsWith("/company-logos/") && !value.includes("..")) return value;
@@ -25,7 +22,7 @@ function CompanyMark({ symbol, name, src, compact }: { symbol: string; name: str
 export function CompanyIdentity({ symbol, market, compact = false }: { symbol: string; market: string; compact?: boolean }) {
   const ticker = symbol.trim().toUpperCase();
   const country = ["US", "NASDAQ", "NYSE", "AMEX"].includes(market.toUpperCase()) ? "US" : ["IN", "NSE", "BSE"].includes(market.toUpperCase()) ? "IN" : market.toUpperCase();
-  const local = identities[`${country}:${ticker}`];
+  const local = companyIdentities[`${country}:${ticker}`];
   const profile = useQuery({
     queryKey: ["company-identity", country, ticker],
     queryFn: async () => (await api.get<CompanyProfile>(`/stocks/${encodeURIComponent(ticker)}`, { params: { market: country }, timeout: 12000 })).data,

@@ -182,8 +182,8 @@ describe("navConfig", () => {
   });
 
   describe("PINNED_DEFAULT", () => {
-    it("has 9 items", () => {
-      expect(PINNED_DEFAULT).toHaveLength(9);
+    it("has 10 items including Today", () => {
+      expect(PINNED_DEFAULT).toHaveLength(10);
     });
 
     it("all pinned ids exist in NAV_SECTIONS", () => {
@@ -196,6 +196,7 @@ describe("navConfig", () => {
     it("contains expected ids", () => {
       const expected = [
         "home",
+        "monitoring",
         "market",
         "security-hub",
         "screener",

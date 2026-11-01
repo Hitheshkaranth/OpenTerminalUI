@@ -40,3 +40,20 @@ it("rejects unsafe logos and synthetic company metadata", async () => {
   expect(screen.queryByText("Invented Company")).not.toBeInTheDocument();
   expect(screen.getByLabelText("UNKNOWN company initials")).toBeInTheDocument();
 });
+it.each(["IN", "NSE", "BSE"])("renders the verified MTAR identity for Indian market %s without depending on provider logos", async (market) => {
+  vi.mocked(api.get).mockRejectedValue(new Error("Provider unavailable"));
+  view("mtartech", market);
+  expect(screen.getByRole("img", { name: "MTAR Technologies Limited logo" })).toHaveAttribute("src", "/company-logos/mtar.png");
+  expect(screen.getByRole("link", { name: /Company website/ })).toHaveAttribute("href", "https://mtar.in/");
+  await waitFor(() => expect(api.get).toHaveBeenCalledWith("/stocks/MTARTECH", expect.objectContaining({ params: { market: "IN" } })));
+});
+it("provides MTAR identity in compact navigation without extra requests", () => {
+  view("MTARTECH", "NSE", true);
+  expect(screen.getByRole("img", { name: "MTAR Technologies Limited logo" })).toBeInTheDocument();
+  expect(api.get).not.toHaveBeenCalled();
+});
+it("does not leak MTAR's Indian identity to an unrelated market", () => {
+  view("MTARTECH", "US", true);
+  expect(screen.queryByText("MTAR Technologies Limited")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("MTARTECH company initials")).toBeInTheDocument();
+});
