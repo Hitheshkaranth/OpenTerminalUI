@@ -16,6 +16,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check version sync
+        run: python3 scripts/check_version_sync.py
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:

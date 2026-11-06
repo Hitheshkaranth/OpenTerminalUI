@@ -34,6 +34,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.TAG }}
+      # Skipped for manual rebuilds: older tags predate this script.
+      - name: Check version sync
+        if: github.event_name == 'release'
+        run: python3 scripts/check_version_sync.py --tag "$TAG"
       - name: Lowercase image name
         run: echo "IMAGE=${IMAGE,,}" >> "$GITHUB_ENV"
       - uses: docker/setup-buildx-action@v3
@@ -113,3 +117,15 @@ jobs:
           Multi-arch (linux/amd64, linux/arm64). Also tagged \`${v%.*}\`. Package: https://github.com/${{ github.repository }}/pkgs/container/openterminalui
           EOF
           gh release edit "$TAG" -R "${{ github.repository }}" --notes-file notes.md
+
+  # A published release must have a package of the same version. If it could not
+  # be built, take the release back to draft; publishing it again re-runs this.
+  draft-on-failure:
+    needs: [build, publish]
+    if: failure() && github.event_name == 'release'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Return release to draft
+        run: gh release edit "$TAG" -R "${{ github.repository }}" --draft=true
