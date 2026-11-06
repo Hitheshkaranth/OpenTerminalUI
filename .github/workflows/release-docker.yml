@@ -34,6 +34,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.TAG }}
+      - name: Check release is on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=$(gh api "repos/${{ github.repository }}/compare/main...$TAG" --jq .status)
+          case "$status" in
+            identical|behind) ;;
+            *) echo "$TAG is not on main (status: $status)" >&2; exit 1 ;;
+          esac
       # Skipped for manual rebuilds: older tags predate this script.
       - name: Check version sync
         if: github.event_name == 'release'
