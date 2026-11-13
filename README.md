@@ -51,6 +51,8 @@ Most retail tools stop at price charts and ratios. OpenTerminalUI is built for t
 
 ### Daily research review
 
+Open **Workflows** from quick access, Home, or the `FLOW` / `WORKFLOWS` command for eight guided paths and 36 searchable tools. Filter by purpose, bookmark workflows, and carry symbol context into compatible tools. Current-tool favorites are shared with the sidebar and saved in this browser. See the [competitive research and feature roadmap](docs/TERMINAL_COMPETITIVE_ANALYSIS.md) and [validation report](docs/TERMINAL_UPGRADE_QC.md).
+
 Open **Today** to review thesis changes and scheduled screen entries/exits, inspect cited evidence, acknowledge or snooze events, and explore shared portfolio relationships. Dossiers now support measurable assumptions, frozen earnings expectations, optional daily SEC/NSE ingestion and dataset preflight for exploratory or point-in-time experiments. See the [research review workflow guide](docs/RESEARCH_REVIEW_WORKFLOWS.md) for setup, supported behavior and data-coverage limits.
 
 <img src="assets/readme/mtar-threshold-chart.png" alt="Live MTAR thesis chart comparing a 20 percent illustrative EBITDA margin threshold with the previous 12.5 percent and latest recorded 23 percent observations" width="100%" />

@@ -47,3 +47,5 @@ async def promote_to_paper(experiment_id: int, db: Session = Depends(get_db)):
         return PromoteResponse(receipt_id=receipt, status="promoted")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except NotImplementedError as e:
+        raise HTTPException(status_code=501, detail=str(e))

@@ -1,6 +1,4 @@
 import subprocess
-import hashlib
-import uuid
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from backend.experiments.models import Experiment
@@ -16,22 +14,17 @@ def get_git_revision_hash() -> str:
 
 
 def create_experiment(db: Session, request: ExperimentCreate) -> Experiment:
-    # Deterministic simple hash of the config
-    config_str = str(sorted(request.config.items()))
-    data_hash = hashlib.md5(config_str.encode("utf-8")).hexdigest()
-
+    # This legacy registry saves configuration; no execution engine or dataset
+    # is attached. A configuration hash must not masquerade as data provenance.
     code_hash = get_git_revision_hash()
-
-    # Generic dummy metrics for the purpose of the scaffold
-    dummy_metrics = {"cagr": 0.15, "sharpe": 1.2, "max_drawdown": 0.05}
 
     exp = Experiment(
         name=request.name,
         config_json=request.config,
-        data_hash=data_hash,
+        data_hash=None,
         code_hash=code_hash,
-        metrics_json=dummy_metrics,
-        tags=[]
+        metrics_json={},
+        tags=["unexecuted", "execution_engine_unavailable"]
     )
     db.add(exp)
     db.commit()
@@ -79,7 +72,7 @@ def promote_experiment_to_paper(db: Session, experiment_id: int) -> str:
     if not exp:
         raise ValueError("Experiment not found")
 
-    # Logic to map experiment config to a paper trading strategy would go here
-    # For now, generate a receipt
-    receipt_id = f"promoted_{uuid.uuid4().hex[:8]}"
-    return receipt_id
+    raise NotImplementedError(
+        "Paper promotion is unavailable for the legacy experiment registry: "
+        "no execution engine is connected and no paper strategy was created."
+    )

@@ -5,6 +5,7 @@ import { inferRecentSecurityAssetClass } from "../../hooks/useRecentSecurities";
 import { useStockStore } from "../../store/stockStore";
 
 export type CommandFunctionCode =
+  | "FLOW"
   | "DESK"
   | "DES"
   | "GP"
@@ -100,6 +101,7 @@ export type CommandFunctionSpec = {
 };
 
 export const COMMAND_FUNCTIONS: CommandFunctionSpec[] = [
+  { code: "FLOW", label: "Workflow Hub", description: "Find a guided workflow for research, trading, portfolio or quant work", aliases: ["WORKFLOWS", "WORKFLOW", "START"] },
   { code: "DESK", label: "Analyst Desk", description: "Open the cockpit analyst workspace", aliases: ["COCKPIT", "MONITOR"] },
   { code: "DES", label: "Description / Security Hub", description: "Open security hub overview", securityScoped: true, aliases: ["SECURITY", "HUB"] },
   { code: "GP", label: "Graph Price", description: "Open chart tab", securityScoped: true, aliases: ["CHART"] },
@@ -202,6 +204,9 @@ export function parseCommand(input: string): ParsedCommand {
   }
 
   if (tokens.length === 1) {
+    if (["WORKFLOW", "WORKFLOWS", "START"].includes(tokens[0])) {
+      return { kind: "function", raw, func: "FLOW", modifiers: [] };
+    }
     if (COMMAND_FUNCTIONS.some((fn) => fn.code === tokens[0])) {
       return { kind: "function", raw, func: tokens[0] as CommandFunctionCode, modifiers: [] };
     }
@@ -357,6 +362,10 @@ export function executeParsedCommand(parsed: ParsedCommand, navigate: NavigateFu
 
   if (parsed.kind === "ticker-function") {
     applyTicker(parsed.ticker);
+    if (parsed.func === "FLOW") {
+      navigate(`/equity/workflows?ticker=${encodeURIComponent(parsed.ticker)}`);
+      return { ok: true, target: "/equity/workflows" };
+    }
     if (parsed.func === "DESK") {
       navigate(`/equity/cockpit?ticker=${encodeURIComponent(parsed.ticker)}`);
       return { ok: true, target: "/equity/cockpit" };
@@ -385,6 +394,10 @@ export function executeParsedCommand(parsed: ParsedCommand, navigate: NavigateFu
   if (parsed.kind === "function") {
     const mod0 = parsed.modifiers[0];
     switch (parsed.func) {
+      case "FLOW":
+        if (mod0 && looksLikeTicker(mod0)) applyTicker(mod0);
+        navigate(mod0 && looksLikeTicker(mod0) ? `/equity/workflows?ticker=${encodeURIComponent(mod0)}` : "/equity/workflows");
+        return { ok: true, target: "/equity/workflows" };
       case "DESK":
         if (mod0 && looksLikeTicker(mod0)) {
           applyTicker(mod0);

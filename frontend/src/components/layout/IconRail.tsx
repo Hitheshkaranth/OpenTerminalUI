@@ -3,8 +3,9 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ChevronDown, Star, StarOff } from "lucide-react";
 
 import { AuthContextRef } from "../../contexts/AuthContext";
-import { NAV_SECTIONS, PINNED_DEFAULT, findNavItem, type NavItem, type NavSection } from "./navConfig";
+import { NAV_SECTIONS, findNavItem, type NavItem, type NavSection } from "./navConfig";
 import { useNavigationStore } from "../../store/navigationStore";
+import { useQuickAccessStore } from "../../store/quickAccessStore";
 
 const BRAND_ICON_SRC = "/favicon.png";
 
@@ -63,16 +64,8 @@ export function IconRail() {
   }, [sectionsOpen]);
 
   /* ---- pinned state ---- */
-  const [pinned, setPinned] = useState<string[]>(() => {
-    const stored = safeLocalStorageGet("ot:nav:pinned");
-    const parsed = safeJsonParse<string[]>(stored, []);
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    return [...PINNED_DEFAULT];
-  });
-
-  useEffect(() => {
-    safeLocalStorageSet("ot:nav:pinned", JSON.stringify(pinned));
-  }, [pinned]);
+  const pinned = useQuickAccessStore((state) => state.pinnedIds);
+  const togglePin = useQuickAccessStore((state) => state.togglePin);
 
   /* ---- recent items ---- */
   const navHistory = useNavigationStore((s) => s.history);
@@ -120,12 +113,7 @@ export function IconRail() {
   };
 
   const handlePinToggle = (itemId: string) => {
-    setPinned((prev) => {
-      if (prev.includes(itemId)) {
-        return prev.filter((id) => id !== itemId);
-      }
-      return [...prev, itemId];
-    });
+    togglePin(itemId);
   };
 
   const isPinned = (itemId: string) => pinned.includes(itemId);

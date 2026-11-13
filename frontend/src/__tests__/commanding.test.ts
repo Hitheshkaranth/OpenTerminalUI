@@ -51,6 +51,19 @@ describe("GO commanding", () => {
     expect(navigate).toHaveBeenCalledWith("/equity/watchlist");
   });
 
+  it.each(["FLOW", "WORKFLOWS", "START"])("opens workflow discovery with %s", (command) => {
+    const navigate = vi.fn();
+    expect(executeParsedCommand(parseCommand(command), navigate as any).ok).toBe(true);
+    expect(navigate).toHaveBeenCalledWith("/equity/workflows");
+  });
+
+  it.each(["AAPL FLOW", "FLOW AAPL"])("preserves symbol context with %s", (command) => {
+    const navigate = vi.fn();
+    expect(executeParsedCommand(parseCommand(command), navigate as any).ok).toBe(true);
+    expect(navigate).toHaveBeenCalledWith("/equity/workflows?ticker=AAPL");
+    expect(useStockStore.getState().ticker).toBe("AAPL");
+  });
+
   it("routes ticker-only commands to the market stock page", () => {
     const navigate = vi.fn();
     const result = executeParsedCommand(parseCommand("AAPL"), navigate as any);

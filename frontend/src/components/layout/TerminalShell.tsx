@@ -15,6 +15,7 @@ import { StatusBar } from "./StatusBar";
 import { TopBar } from "./TopBar";
 import { CommandBar } from "./CommandBar";
 import { CommandPalette } from "./CommandPalette";
+import { QuickAccessBar } from "./QuickAccessBar";
 import { TickerTape } from "./TickerTape";
 import { executeParsedCommand, parseCommand } from "./commanding";
 import { useSettingsStore } from "../../store/settingsStore";
@@ -245,6 +246,7 @@ export function TerminalShell({
             />
           ) : null}
           </div>
+          <QuickAccessBar />
           <div className="min-h-0 flex flex-1 overflow-hidden">
             <ErrorBoundary>
               <div className={`relative z-0 min-h-0 min-w-0 flex-1 overflow-auto ${contentClassName}`.trim()}>

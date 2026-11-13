@@ -145,6 +145,7 @@ const NAV_CARD_SECTIONS: Array<{ title: string; cards: NavCard[] }> = [
   {
     title: "WORKSPACE",
     cards: [
+      { label: "Workflows", to: "/equity/workflows", badge: "WF" },
       { label: "Launchpad", to: "/equity/launchpad", badge: "LP" },
       { label: "Workstation", to: "/equity/chart-workstation", badge: "WS" },
       { label: "Cockpit", to: "/equity/cockpit", badge: "CP" },
@@ -660,6 +661,13 @@ export function HomePage() {
                 <div className="flex flex-col gap-3 xl:items-end">
                   <LiveClockStrip />
                   <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="rounded-sm border border-terminal-accent px-3 py-1.5 text-xs font-medium text-terminal-accent hover:bg-terminal-accent/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-terminal-accent"
+                      onClick={() => navigate("/equity/workflows")}
+                    >
+                      Explore workflows
+                    </button>
                     <button
                       type="button"
                       className="rounded-sm border border-terminal-border px-3 py-1.5 text-[11px] uppercase tracking-[0.12em] text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"

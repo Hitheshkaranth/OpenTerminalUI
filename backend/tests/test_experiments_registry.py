@@ -39,8 +39,10 @@ def test_experiments_registry_flow(client):
     assert r1.status_code == 200
     e1 = r1.json()
     assert e1["id"] == 1
-    assert e1["data_hash"] is not None
+    assert e1["data_hash"] is None
     assert e1["code_hash"] is not None
+    assert e1["metrics_json"] == {}
+    assert "unexecuted" in e1["tags"]
 
     r2 = client.post("/api/experiments", json={"name": "Exp 2", "config": {"momentum": 20}})
     assert r2.status_code == 200
@@ -69,6 +71,6 @@ def test_experiments_registry_flow(client):
 
     # 5. Promote to paper
     r_promo = client.post("/api/experiments/1/promote-to-paper")
-    assert r_promo.status_code == 200
-    assert "receipt_id" in r_promo.json()
-    assert r_promo.json()["status"] == "promoted"
+    assert r_promo.status_code == 501
+    assert "no paper strategy was created" in r_promo.json()["detail"]
+    assert "receipt_id" not in r_promo.json()
