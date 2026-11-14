@@ -121,8 +121,13 @@ async def ownership_adapter(ticker: str, limit: int = 25) -> dict[str, Any]:
         pattern = await _shareholding_service.get_shareholding(symbol)
         shareholding = pattern.model_dump() if hasattr(pattern, "model_dump") else pattern.dict()
     except Exception as exc:
-        shareholding = {"symbol": symbol, "warning": f"Shareholding adapter unavailable: {exc}"}
+        shareholding = {"symbol": symbol, "warning": "Shareholding provider is unavailable"}
 
+    if shareholding.get("source") in {"fallback", "fmp"}:
+        # FMP supplies holder rows here, not the NSE ownership breakdown.
+        shareholding = {**shareholding, "percentages_available": False,
+                        "categories": [], "historical": [],
+                        **{key: None for key in ("promoter_holding", "fii_holding", "dii_holding", "public_holding", "government_holding")}}
     institutional_holders: list[dict[str, Any]] = []
     if isinstance(shareholding, dict):
         institutional_holders = [

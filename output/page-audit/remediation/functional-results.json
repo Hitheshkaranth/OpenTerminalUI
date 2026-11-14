@@ -1,0 +1,40 @@
+[
+  {
+    "check": "NIFTY expiry change, Greeks toggle and strike range",
+    "expiry": "2026-11-23",
+    "spot": 25144.3,
+    "strikes": 21,
+    "market": "NSE"
+  },
+  {
+    "check": "BANKNIFTY contract prices agree with API after credential reload",
+    "source": "nse_snapshot",
+    "asOf": "2026-11-13T10:10:00+00:00",
+    "contracts": [
+      {
+        "expiry": "2026-11-23",
+        "ltp": 60942,
+        "source": "nse_snapshot"
+      },
+      {
+        "expiry": "2026-12-29",
+        "ltp": 61361,
+        "source": "nse_snapshot"
+      },
+      {
+        "expiry": "2027-01-25",
+        "ltp": 61598,
+        "source": "nse_snapshot"
+      }
+    ]
+  },
+  {
+    "check": "Populated futures on mobile",
+    "width": 390,
+    "overflow": false
+  },
+  {
+    "check": "Router upgrade public login, protected redirect and invalid share",
+    "passed": true
+  }
+]

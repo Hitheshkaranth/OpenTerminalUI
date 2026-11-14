@@ -35,22 +35,12 @@ def run_factor_decomposition(
     factors: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     strategy = pd.Series(daily_returns, dtype=float).replace([np.inf, -np.inf], np.nan).dropna()
-    if strategy.empty:
-        return {"model": "fama_french_carhart", "coefficients": {}, "r2": 0.0}
+    if strategy.empty or not factors:
+        return {"model": "fama_french_carhart", "coefficients": {}, "r2": None,
+                "status": "unavailable", "reason": "Observed strategy and factor return series are required; no synthetic factors were substituted."}
 
     if factors:
         factor_df = pd.DataFrame(factors).copy()
-    else:
-        n = len(strategy)
-        idx = np.arange(n, dtype=float)
-        factor_df = pd.DataFrame(
-            {
-                "mkt_rf": np.sin(idx / 13.0) * 0.002 + 0.0004,
-                "smb": np.cos(idx / 17.0) * 0.0012,
-                "hml": np.sin(idx / 19.0) * 0.001,
-                "mom": np.cos(idx / 11.0) * 0.0014,
-            }
-        )
     factor_df = factor_df.apply(pd.to_numeric, errors="coerce").dropna()
     min_len = min(len(strategy), len(factor_df))
     if min_len < 10:
@@ -190,13 +180,13 @@ def _load_price_features(db: Session, symbols: list[str], as_of_day: date) -> di
         if closes.empty:
             continue
         latest = float(closes.iloc[-1])
-        ret_6m = (latest / float(closes.iloc[-126]) - 1.0) if len(closes) > 126 and closes.iloc[-126] > 0 else 0.0
-        ret_12m = (latest / float(closes.iloc[-252]) - 1.0) if len(closes) > 252 and closes.iloc[-252] > 0 else ret_6m
+        ret_6m = (latest / float(closes.iloc[-126]) - 1.0) if len(closes) > 126 and closes.iloc[-126] > 0 else None
+        ret_12m = (latest / float(closes.iloc[-252]) - 1.0) if len(closes) > 252 and closes.iloc[-252] > 0 else None
         daily_returns = closes.pct_change().replace([np.inf, -np.inf], np.nan).dropna()
-        volatility = float(daily_returns.tail(252).std(ddof=0) * np.sqrt(252)) if not daily_returns.empty else 0.0
+        volatility = float(daily_returns.tail(252).std(ddof=0) * np.sqrt(252)) if len(daily_returns) >= 20 else None
         out[symbol] = {
-            "price_return_6m": float(ret_6m),
-            "price_return_12m": float(ret_12m),
+            "price_return_6m": ret_6m,
+            "price_return_12m": ret_12m,
             "realized_volatility": volatility,
         }
     return out
@@ -320,14 +310,20 @@ def compute_factor_scores(
                 "rev_growth": _first_float(base.get("rev_growth_pct")),
                 "eps_growth": _first_float(base.get("eps_growth_pct")),
                 "beta": _first_float(base.get("beta")),
-                "price_return_6m": prices.get("price_return_6m", 0.0),
-                "price_return_12m": prices.get("price_return_12m", 0.0),
-                "realized_volatility": prices.get("realized_volatility", 0.0),
+                "price_return_6m": prices.get("price_return_6m"),
+                "price_return_12m": prices.get("price_return_12m"),
+                "realized_volatility": prices.get("realized_volatility"),
                 "as_of": as_of_day.isoformat(),
             }
         )
 
     df = pd.DataFrame(rows)
+    if df.empty:
+        return []
+    metric_columns = ["pe", "pb", "ps", "ev_ebitda", "roe", "roa", "op_margin", "net_margin", "fcf_yield", "debt_equity", "eps_growth", "beta", "price_return_6m", "price_return_12m", "realized_volatility"]
+    # An instrument in the universe is not evidence that factor data exists.
+    # Missing-only records must not receive alphabetically fabricated ranks.
+    df = df.loc[df[metric_columns].notna().any(axis=1)].copy()
     if df.empty:
         return []
     sectors = df["sector"].astype(str).replace("", "UNKNOWN")
@@ -360,8 +356,8 @@ def compute_factor_scores(
     df["composite"] = sum(df[key] * weight for key, weight in normalized_weights.items())
     df = df.sort_values(["composite", "symbol"], ascending=[False, True]).reset_index(drop=True)
     total = len(df)
-    df["rank"] = df.index + 1
-    df["percentile"] = ((total - df.index) / total * 100.0) if total else 0.0
+    df["rank"] = df["composite"].rank(method="min", ascending=False).astype(int)
+    df["percentile"] = df["composite"].rank(method="average", pct=True) * 100.0 if total > 1 else 50.0
     out = []
     for row in df.to_dict("records"):
         out.append(
@@ -382,7 +378,7 @@ def compute_factor_scores(
                     "rank": int(row["rank"]),
                 },
                 "raw_metrics": {
-                    key: row.get(key)
+                    key: _to_float(row.get(key))
                     for key in [
                         "pe",
                         "pb",

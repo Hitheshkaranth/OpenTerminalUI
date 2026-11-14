@@ -44,6 +44,7 @@ EXCHANGE_COUNTRY_MAP = {
 }
 
 _US_EXCHANGES = {"NYSE", "NASDAQ", "AMEX"}
+_NSE_DERIVATIVE_INDICES = {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"}
 _NSE_SYMBOLS: set[str] | None = None
 _NSE_LOCK = asyncio.Lock()
 
@@ -202,7 +203,9 @@ class MarketClassifier:
         exchange = ""
         profile: dict[str, Any] = {}
 
-        if input_symbol.endswith(".NS"):
+        if input_symbol in _NSE_DERIVATIVE_INDICES:
+            exchange = "NSE"
+        elif input_symbol.endswith(".NS"):
             base_symbol = input_symbol[:-3]
             exchange = "NSE"
         elif input_symbol.endswith(".BO"):
@@ -234,7 +237,7 @@ class MarketClassifier:
         ).strip() or base_symbol
 
         if ex_meta["country_code"] == "IN":
-            has_futures = await self._has_indian_fo(base_symbol)
+            has_futures = base_symbol in _NSE_DERIVATIVE_INDICES or await self._has_indian_fo(base_symbol)
             has_options = has_futures
         elif exchange in _US_EXCHANGES:
             has_futures = False

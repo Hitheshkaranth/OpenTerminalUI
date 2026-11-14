@@ -85,7 +85,7 @@ export function FlowTracker({ ticker }: Props) {
         columns={columns}
         rows={data.flows}
         rowKey={(f) => f.date}
-        emptyText="No flow data available"
+        emptyText="Fund flow provider is not configured. No observed flow data is available."
         density="compact"
       />
     </div>

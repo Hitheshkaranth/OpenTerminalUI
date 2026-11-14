@@ -32,11 +32,14 @@ function TickerRow() {
 
 export function MarketTicker() {
   return (
+    <>
+    <p className="px-3 py-1 text-[10px] text-terminal-muted">Illustrative ticker · sample prices, not live market data</p>
     <div className="ot-market-ticker" aria-hidden>
       <div className="ot-market-ticker-track">
         <TickerRow />
         <TickerRow />
       </div>
     </div>
+    </>
   );
 }

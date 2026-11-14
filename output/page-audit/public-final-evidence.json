@@ -1,0 +1,42 @@
+[
+  {
+    "path": "/login",
+    "title": "OpenTerminalUI",
+    "url": "/login",
+    "headings": [
+      "OPENTERMINALUI",
+      "AUTHENTICATE"
+    ],
+    "text": "OPENTERMINALUI\nACCESS PORTAL\n11:26:19 IST | 14 NOV 2026\n\nIllustrative ticker · sample prices, not live market data\n\nNIFTY 24,856.50 ▲124.30|\nSENSEX 81,234.10 ▼89.40|\nBANKNIFTY 52,120.00 ▲310.55|\nRELIANCE 2,891.50 ▲12.30|\nTCS 4,120.80 ▼18.90|\nINFY 1,890.20 ▲8.45|\nUSDINR 83.42 ▼0.08|\nNIFTY 24,856.50 ▲124.30|\nSENSEX 81,234.10 ▼89.40|\nBANKNIFTY 52,120.00 ▲310.55|\nRELIANCE 2,891.50 ▲12.30|\nTCS 4,120.80 ▼18.90|\nINFY 1,890.20 ▲8.45|\nUSDINR 83.42 ▼0.08|\nUPTIME 99.97%\n|\nLATENCY 2MS\n|\nSESSIONS 1,247\nOPEN-SOURCE TRADING TERMINAL\nOPENTERMINALUI\n\nAnalyze. Trade. Optimize.\n\nSECURE ACCESS\n\nAUTHENTICATE\n\nEnter credentials to access terminal\n\nUSER ID\n>\nPASSWORD\n>\n?\nRemember terminal\nForgot access?\nACCESS TERMINAL ?\n\nOR\n\n> DEMO ACCESS\n\nNew to OpenTerminal? Request access\n\nv0.9.0 | MIT LICENSE | github.com/Hitheshkaranth/OpenTerminalUI",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 3107,
+    "failure": null
+  },
+  {
+    "path": "/register",
+    "title": "OpenTerminalUI",
+    "url": "/register",
+    "headings": [
+      "OPENTERMINALUI",
+      "REQUEST ACCESS"
+    ],
+    "text": "OPENTERMINALUI\nACCESS PORTAL\n11:26:23 IST | 14 NOV 2026\n\nIllustrative ticker · sample prices, not live market data\n\nNIFTY 24,856.50 ▲124.30|\nSENSEX 81,234.10 ▼89.40|\nBANKNIFTY 52,120.00 ▲310.55|\nRELIANCE 2,891.50 ▲12.30|\nTCS 4,120.80 ▼18.90|\nINFY 1,890.20 ▲8.45|\nUSDINR 83.42 ▼0.08|\nNIFTY 24,856.50 ▲124.30|\nSENSEX 81,234.10 ▼89.40|\nBANKNIFTY 52,120.00 ▲310.55|\nRELIANCE 2,891.50 ▲12.30|\nTCS 4,120.80 ▼18.90|\nINFY 1,890.20 ▲8.45|\nUSDINR 83.42 ▼0.08|\nUPTIME 99.97%\n|\nLATENCY 2MS\n|\nSESSIONS 1,247\nOPEN-SOURCE TRADING TERMINAL\nOPENTERMINALUI\n\nCreate secure terminal access.\n\nNEW OPERATOR\n\nREQUEST ACCESS\n\nProvision your terminal credentials\n\nEMAIL\n>\nPASSWORD\n>\nCONFIRM PASSWORD\n>\nROLE\n>\nVIEWER\nTRADER\nADMIN\nCREATE ACCOUNT\n\nAlready registered? Access terminal",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 3178,
+    "failure": null
+  }
+]

@@ -49,19 +49,9 @@ async def etf_holdings(ticker: str):
                 weight=h.get("holdingPercent", {}).get("raw", 0.0) * 100 if isinstance(h.get("holdingPercent"), dict) else (h.get("holdingPercent", 0.0) * 100)
             ))
 
-        if not result_holdings:
-            # Fallback mock data if Yahoo fails or returns empty
-            result_holdings = [
-                ETFHolding(symbol="AAPL", name="Apple Inc.", weight=7.5),
-                ETFHolding(symbol="MSFT", name="Microsoft Corp.", weight=6.8),
-                ETFHolding(symbol="AMZN", name="Amazon.com Inc.", weight=3.5),
-                ETFHolding(symbol="NVDA", name="NVIDIA Corp.", weight=3.2),
-                ETFHolding(symbol="GOOGL", name="Alphabet Inc. Class A", weight=2.8),
-            ]
-
         return ETFHoldingsResponse(ticker=ticker.upper(), holdings=result_holdings)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch holdings: {str(e)}")
+        raise HTTPException(status_code=500, detail="Holdings provider is unavailable")
 
 @router.get("/overlap", response_model=ETFOverlapResponse)
 async def etf_overlap(tickers: str = Query(...)):
@@ -89,6 +79,9 @@ async def etf_overlap(tickers: str = Query(...)):
             all_holdings[ticker] = ticker_holdings
         except Exception:
             all_holdings[ticker] = {}
+
+    if any(not all_holdings.get(ticker) for ticker in ticker_list[:2]):
+        raise HTTPException(status_code=503, detail="Holdings are unavailable; overlap cannot be calculated")
 
     # Calculate overlap between the first two for now
     t1, t2 = ticker_list[0], ticker_list[1]
@@ -121,16 +114,6 @@ async def etf_overlap(tickers: str = Query(...)):
 
 @router.get("/flows", response_model=ETFFlowResponse)
 async def etf_flows(ticker: str):
-    # Mock data for flows
-    import datetime
-    today = datetime.date.today()
-    flows = []
-    for i in range(30):
-        date = today - datetime.timedelta(days=i)
-        import random
-        flows.append(ETFFlowPoint(
-            date=date.isoformat(),
-            net_flow=random.uniform(-100, 200) # Millions
-        ))
-
-    return ETFFlowResponse(ticker=ticker.upper(), flows=flows)
+    # There is no flow provider wired here. Missing observations must not be
+    # replaced with randomly generated institutional activity.
+    return ETFFlowResponse(ticker=ticker.upper(), flows=[])

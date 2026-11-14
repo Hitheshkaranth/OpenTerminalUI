@@ -27,6 +27,7 @@ import { TradingChart } from "../components/chart/TradingChart";
 import { TimeAndSales } from "../components/market/TimeAndSales";
 import { InsiderStockDetail } from "../components/security/InsiderStockDetail";
 import { DenseTable } from "../components/terminal/DenseTable";
+import { normalizeNewsSentiment } from "../utils/newsSentiment";
 import { SentimentBadge } from "../components/terminal/SentimentBadge";
 import { SentimentChart } from "../components/terminal/SentimentChart";
 import { TerminalBadge } from "../components/terminal/TerminalBadge";
@@ -301,7 +302,9 @@ export function SecurityHubPage() {
   const peerPayload = (peersQuery.data ?? {}) as { peers?: Array<Record<string, unknown>>; items?: Array<Record<string, unknown>> };
   const peerRows = (peerPayload.peers || peerPayload.items || []) as Array<Record<string, unknown>>;
   const ownershipPayload = (ownershipQuery.data ?? {}) as Record<string, unknown>;
-  const ownershipShareholding = (ownershipPayload.shareholding ?? {}) as Record<string, unknown>;
+  const rawShareholding = (ownershipPayload.shareholding ?? {}) as Record<string, unknown>;
+  const ownershipUnavailable = rawShareholding.percentages_available === false || !rawShareholding.source || ["fallback", "fmp"].includes(String(rawShareholding.source));
+  const ownershipShareholding = ownershipUnavailable ? {} : rawShareholding;
   const institutionalHolders = ((ownershipPayload.institutional_holders ?? []) as Array<Record<string, unknown>>).slice(0, 25);
   const insiderRows = ((ownershipPayload.insider_transactions ?? []) as Array<Record<string, unknown>>).slice(0, 25);
   const estimatesPayload = (estimatesQuery.data ?? {}) as Record<string, unknown>;
@@ -598,7 +601,7 @@ export function SecurityHubPage() {
                 <div className="grid gap-1">
                   {(tickerNewsQuery.data ?? []).map((item, idx) => (
                     (() => {
-                      const sentimentLabel = String((item as Record<string, unknown>).sentiment_label || (item as Record<string, unknown>).sentiment || "");
+                      const sentiment = normalizeNewsSentiment(item as Record<string, unknown>);
                       const publishedAt = typeof item.published_at === "string" ? item.published_at : "";
                       return (
                     <a
@@ -610,11 +613,11 @@ export function SecurityHubPage() {
                     >
                       <div className="flex items-center gap-2">
                         <TerminalBadge variant="neutral">{String(item.source || "NEWS")}</TerminalBadge>
-                        {sentimentLabel ? (
+                        {sentiment ? (
                           <SentimentBadge
-                            label={sentimentLabel}
-                            score={Number((item as Record<string, unknown>).sentiment_score ?? 0)}
-                            confidence={Number((item as Record<string, unknown>).sentiment_confidence ?? 0)}
+                            label={sentiment.label}
+                            score={sentiment.score}
+                            confidence={sentiment.confidence}
                           />
                         ) : null}
                         <span className="text-[11px] text-terminal-muted">{publishedAt ? new Date(publishedAt).toLocaleString() : "N/A"}</span>
@@ -648,6 +651,7 @@ export function SecurityHubPage() {
               <div className="rounded border border-rose-500/50 bg-rose-500/10 px-2 py-3 text-xs text-rose-300">Ownership data unavailable: {ownershipError}</div>
             ) : (
             <div className="grid gap-2">
+              {ownershipUnavailable ? <p role="status" className="text-xs text-terminal-muted">Shareholding percentages are unavailable from the current provider. Holder records below are shown separately.</p> : null}
               <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
                 <MetricCell label="Promoter %" value={fmtNum(ownershipShareholding.promoter_holding)} />
                 <MetricCell label="FII %" value={fmtNum(ownershipShareholding.fii_holding)} />

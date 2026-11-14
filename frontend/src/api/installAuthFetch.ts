@@ -7,9 +7,9 @@
  */
 const ACCESS_TOKEN_KEY = "ot-access-token";
 
-function apiPrefix(): string {
+function configuredApi(): URL {
   const base = String(import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/+$/, "");
-  return base.startsWith("http") ? base : `${window.location.origin}${base}`;
+  return new URL(base, window.location.origin);
 }
 
 function readToken(): string | null {
@@ -30,8 +30,12 @@ export function installAuthFetch(): void {
   window.fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     try {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-      const absolute = new URL(url, window.location.origin).href;
-      if (absolute.startsWith(apiPrefix())) {
+      const absolute = new URL(url, window.location.origin);
+      const base = configuredApi();
+      const prefix = base.pathname.replace(/\/+$/, "");
+      // String-prefix matching can include lookalike hosts when a configured
+      // API has no path. Compare parsed origins and an actual path boundary.
+      if (absolute.origin === base.origin && (absolute.pathname === prefix || absolute.pathname.startsWith(`${prefix}/`))) {
         const token = readToken();
         if (token) {
           const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));

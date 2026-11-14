@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 from pypdf import PdfReader
 
 from backend.core.research.clean import clean_text, html_to_text
+from backend.core.research.network import fetch_public_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -62,24 +63,19 @@ def _html_title(html: str, url: str) -> str:
 async def fetch_url(url: str, *, timeout: float = 25.0, max_chars: int = 200_000) -> dict:
     """Fetch a URL and normalize its useful textual content."""
     try:
-        async with httpx.AsyncClient(
-            trust_env=False, follow_redirects=True, timeout=timeout, headers=_REQUEST_HEADERS
-        ) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-
-        content_type = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
-        is_pdf = content_type.startswith("application/pdf") or urlparse(str(response.url)).path.lower().endswith(".pdf")
+        content, raw_content_type, final_url = await fetch_public_bytes(url, timeout=timeout, headers=_REQUEST_HEADERS)
+        content_type = raw_content_type.split(";", 1)[0].strip().lower()
+        is_pdf = content_type.startswith("application/pdf") or urlparse(final_url).path.lower().endswith(".pdf")
         if is_pdf:
-            text = pdf_to_text(response.content, max_chars=max_chars)
+            text = pdf_to_text(content, max_chars=max_chars)
             title = url
         elif not content_type or content_type == "text/html" or content_type.endswith("+html"):
-            raw_html = response.text
+            raw_html = httpx.Response(200, content=content, headers={"content-type": raw_content_type}).text
             text = html_to_text(raw_html, max_chars=max_chars)
             title = _html_title(raw_html, url)
             content_type = content_type or "text/html"
         else:
-            text = clean_text(response.text, max_chars=max_chars)
+            text = clean_text(content.decode("utf-8", errors="replace"), max_chars=max_chars)
             title = url
 
         return {
@@ -93,7 +89,7 @@ async def fetch_url(url: str, *, timeout: float = 25.0, max_chars: int = 200_000
             "published_at": "",
         }
     except Exception as exc:
-        logger.warning("Failed to fetch URL %s: %s", url, exc)
+        logger.warning("Research document fetch rejected or failed (%s)", type(exc).__name__)
         return {}
 
 
@@ -103,12 +99,8 @@ async def fetch_arxiv_fulltext(pdf_url: str, *, timeout: float = 30.0, max_chars
     if not target:
         return ""
     try:
-        async with httpx.AsyncClient(
-            trust_env=False, follow_redirects=True, timeout=timeout, headers=_REQUEST_HEADERS
-        ) as client:
-            response = await client.get(target)
-            response.raise_for_status()
-        return pdf_to_text(response.content, max_chars=max_chars)
+        content, _, _ = await fetch_public_bytes(target, timeout=timeout, headers=_REQUEST_HEADERS)
+        return pdf_to_text(content, max_chars=max_chars)
     except Exception as exc:
         logger.warning("Failed to fetch arXiv full text %s: %s", target, exc)
         return ""

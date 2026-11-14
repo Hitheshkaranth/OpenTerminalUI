@@ -4,6 +4,13 @@ from fastapi import APIRouter, HTTPException, Body, Response
 from fastapi.responses import StreamingResponse
 from typing import Any, Dict, List, Optional
 import io
+import re
+
+
+def _download_filename(value: str, extension: str) -> str:
+    # A filename is a header value, not a caller-controlled header fragment.
+    clean = re.sub(r"[^A-Za-z0-9._-]", "_", value)[:120].strip(".") or "export"
+    return clean if clean.lower().endswith(extension) else clean + extension
 
 from backend.core.export_engine import export_csv, export_excel
 
@@ -21,7 +28,7 @@ async def export_get_route(
         return StreamingResponse(
             io.BytesIO(csv_content.encode()),
             media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename=export_{source}.csv"}
+            headers={"Content-Disposition": f'attachment; filename="{_download_filename(f"export_{source}", ".csv")}"'}
         )
     return {"error": "format not supported in legacy route"}
 
@@ -32,11 +39,11 @@ async def export_csv_route(
     filename: Optional[str] = Body(None)
 ):
     csv_content = export_csv(data)
-    fname = filename or f"export_{source}.csv"
+    fname = _download_filename(filename or f"export_{source}", ".csv")
     return StreamingResponse(
         io.BytesIO(csv_content.encode()),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={fname}"}
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'}
     )
 
 @router.post("/export/excel")
@@ -46,9 +53,9 @@ async def export_excel_route(
     filename: Optional[str] = Body(None)
 ):
     excel_bytes = export_excel(sheets)
-    fname = filename or f"export_{source}.xlsx"
+    fname = _download_filename(filename or f"export_{source}", ".xlsx")
     return Response(
         content=excel_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={fname}"}
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'}
     )

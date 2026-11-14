@@ -86,6 +86,7 @@ export type GreeksChainResponse = {
 };
 
 export type FnoContextValue = {
+  market?: "NSE" | "US";
   symbol: string;
   setSymbol: (value: string) => void;
   expiry: string;

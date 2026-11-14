@@ -99,7 +99,7 @@ export function LoginPage() {
 
   return (
     <div className="ot-login-layout">
-      <StatusBar left="OPENTERMINALUI" center="SYSTEM STATUS: ONLINE" centerDotColor="green" />
+      <StatusBar left="OPENTERMINALUI" center="ACCESS PORTAL" centerDotColor="green" />
 
       <section className="ot-login-hero">
         <div className="ot-login-ticker-wrap">

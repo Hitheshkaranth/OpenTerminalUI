@@ -34,6 +34,7 @@ type Props = {
   ohlcv?: { open: number; high: number; low: number; close: number; volume?: number | null } | null;
   timeframe: ChartTimeframe;
   onTimeframeChange: (tf: ChartTimeframe) => void;
+  supportedTimeframes?: ChartTimeframe[];
   chartType: ChartKind;
   onChartTypeChange: (kind: ChartKind) => void;
   showIndicators: boolean;
@@ -51,6 +52,7 @@ export function SharedChartToolbar({
   ohlcv,
   timeframe,
   onTimeframeChange,
+  supportedTimeframes,
   chartType,
   onChartTypeChange,
   showIndicators,
@@ -138,7 +140,7 @@ export function SharedChartToolbar({
         <div className="flex flex-1 items-center justify-between">
           <div className="flex items-center gap-1">
             <span className="mr-2 text-[10px] font-bold text-terminal-muted uppercase tracking-wider">Timing</span>
-            {TIMEFRAMES.map((tf) => (
+            {TIMEFRAMES.filter((tf) => !supportedTimeframes || supportedTimeframes.includes(tf.value)).map((tf) => (
               <button
                 key={tf.value}
                 type="button"

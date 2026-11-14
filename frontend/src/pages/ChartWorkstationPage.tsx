@@ -1,3 +1,4 @@
+import { apiFetch } from "../api/base";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -196,7 +197,7 @@ function scriptApiUrl(path: string): string {
 }
 
 async function requestScriptJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(scriptApiUrl(path), {
+  const response = await apiFetch(scriptApiUrl(path), {
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers || {}),

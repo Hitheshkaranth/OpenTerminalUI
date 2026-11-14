@@ -45,7 +45,7 @@ export function OptionChainPage() {
         <StrikeSummaryBar
           symbol={symbol}
           expiry={chain?.expiry_date || expiry}
-          spotPrice={Number(chain?.spot_price || 0)}
+          spotPrice={chain?.spot_price != null ? Number(chain.spot_price) : Number.NaN}
           summary={summaryQuery.data}
         />
       </div>

@@ -24,7 +24,7 @@ export function StrikeSummaryBar({ symbol, expiry, spotPrice, summary }: Props) 
       </div>
       <div>
         <div className="text-[10px] uppercase text-terminal-muted">Spot</div>
-        <div className="text-sm font-semibold">{formatDisplayMoney(spotPrice)}</div>
+        <div className="text-sm font-semibold">{Number.isFinite(spotPrice) && spotPrice > 0 ? formatDisplayMoney(spotPrice) : "-"}</div>
       </div>
       <div>
         <div className="text-[10px] uppercase text-terminal-muted">ATM IV</div>

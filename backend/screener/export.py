@@ -7,18 +7,13 @@ from typing import Any
 from openpyxl import Workbook
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from backend.core.export_engine import export_csv, spreadsheet_literal
 
 
 def to_csv_bytes(rows: list[dict[str, Any]], columns: list[str] | None = None) -> bytes:
     if not rows:
         return b""
-    fieldnames = columns or list(rows[0].keys())
-    output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=fieldnames)
-    writer.writeheader()
-    for row in rows:
-        writer.writerow({k: row.get(k) for k in fieldnames})
-    return output.getvalue().encode("utf-8")
+    return export_csv(rows, columns).encode("utf-8")
 
 
 def to_xlsx_bytes(rows: list[dict[str, Any]], columns: list[str] | None = None) -> bytes:
@@ -30,9 +25,9 @@ def to_xlsx_bytes(rows: list[dict[str, Any]], columns: list[str] | None = None) 
         wb.save(out)
         return out.getvalue()
     fieldnames = columns or list(rows[0].keys())
-    ws.append(fieldnames)
+    ws.append([spreadsheet_literal(field) for field in fieldnames])
     for row in rows:
-        ws.append([row.get(key) for key in fieldnames])
+        ws.append([spreadsheet_literal(row.get(key)) for key in fieldnames])
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()

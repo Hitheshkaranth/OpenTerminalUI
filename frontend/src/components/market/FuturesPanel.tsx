@@ -20,20 +20,31 @@ function fmtNum(value: number | null, fractionDigits = 2): string {
   return value.toLocaleString("en-IN", { maximumFractionDigits: fractionDigits });
 }
 
-export function FuturesPanel() {
+export function FuturesPanel({ underlying, onUnderlyingChange, showUnderlyingChart = true }: { underlying?: string; onUnderlyingChange?: (symbol: string) => void; showUnderlyingChart?: boolean } = {}) {
   const { formatDisplayMoney } = useDisplayCurrency();
   const { subscribe, unsubscribe, isConnected } = useQuotesStream("NFO");
   const ticksByToken = useQuotesStore((s) => s.ticksByToken);
 
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(underlying || "");
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [selectedUnderlying, setSelectedUnderlying] = useState("");
+  const [selectedUnderlying, setSelectedUnderlying] = useState(underlying || "");
   const [chainContracts, setChainContracts] = useState<FuturesChainContract[]>([]);
   const [loading, setLoading] = useState(false);
+  const [provenance, setProvenance] = useState<{ source?: string; as_of?: string | null }>({});
   const [error, setError] = useState<string | null>(null);
   const [orderflow, setOrderflow] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
-  const { data: chart } = useStockHistory(selectedUnderlying, "3mo", "1d");
+  const selectUnderlying = (symbol: string) => {
+    setSelectedUnderlying(symbol); setQuery(symbol); setSuggestions([]); setSearchOpen(false);
+    onUnderlyingChange?.(symbol);
+  };
+
+  useEffect(() => {
+    if (underlying) { setSelectedUnderlying(underlying); setQuery(underlying); setSearchOpen(false); }
+  }, [underlying]);
+
+  const { data: chart } = useStockHistory(showUnderlyingChart ? ({ NIFTY: "^NSEI", BANKNIFTY: "^NSEBANK" } as Record<string, string>)[selectedUnderlying] || selectedUnderlying : "", "3mo", "1d");
   // Must be memoized: inline chartPointsToBars() creates a new array reference every
   // render, which feeds an unstable seedBars into useRealtimeChart → setBars loop.
   const historicalData = useMemo(() => (chart?.data ? chartPointsToBars(chart.data) : []), [chart?.data]);
@@ -70,11 +81,13 @@ export function FuturesPanel() {
     setLoading(true);
     setError(null);
     setChainContracts([]);
+    setProvenance({});
     void (async () => {
       try {
         const payload = await fetchFuturesChain(selectedUnderlying);
         if (!active) return;
         setChainContracts(Array.isArray(payload.contracts) ? payload.contracts : []);
+        setProvenance({ source: payload.contracts?.some((row) => row.source === "nse_snapshot") ? "nse_snapshot" : payload.source, as_of: payload.as_of });
       } catch (e) {
         if (!active) return;
         setError(e instanceof Error ? e.message : "Failed to load futures chain");
@@ -93,6 +106,7 @@ export function FuturesPanel() {
       Array.from(
         new Set(
           chainContracts
+            .filter((row) => row.instrument_token != null && row.instrument_token > 0 && row.ws_symbol?.startsWith("NFO:"))
             .map((row) => String(row.ws_symbol || `NFO:${row.tradingsymbol || ""}`).toUpperCase())
             .filter((token) => token.startsWith("NFO:") && token.length > 4)
             .map((token) => token.slice(4)),
@@ -114,10 +128,10 @@ export function FuturesPanel() {
         const live = ticksByToken[wsSymbol];
         return {
           ...row,
-          ltp: live?.ltp ?? (Number.isFinite(Number(row.ltp)) ? Number(row.ltp) : null),
-          changePct: live?.change_pct ?? (Number.isFinite(Number(row.change_pct)) ? Number(row.change_pct) : null),
-          oi: live?.oi ?? (Number.isFinite(Number(row.oi)) ? Number(row.oi) : null),
-          volume: live?.volume ?? (Number.isFinite(Number(row.volume)) ? Number(row.volume) : null),
+          ltp: live?.ltp ?? (row.ltp != null && Number.isFinite(Number(row.ltp)) ? Number(row.ltp) : null),
+          changePct: live?.change_pct ?? (row.change_pct != null && Number.isFinite(Number(row.change_pct)) ? Number(row.change_pct) : null),
+          oi: live?.oi ?? (row.oi != null && Number.isFinite(Number(row.oi)) ? Number(row.oi) : null),
+          volume: live?.volume ?? (row.volume != null && Number.isFinite(Number(row.volume)) ? Number(row.volume) : null),
         };
       }),
     [chainContracts, ticksByToken],
@@ -129,31 +143,40 @@ export function FuturesPanel() {
       subtitle={selectedUnderlying ? `NFO ${selectedUnderlying}` : "Select underlying"}
       actions={
         <span className={`rounded border px-2 py-0.5 text-[10px] ${isConnected ? "border-terminal-pos text-terminal-pos" : "border-terminal-border text-terminal-muted"}`}>
-          LIVE
+          {isConnected ? "Stream connected" : "Stream offline"}
         </span>
       }
     >
       <div className="space-y-2">
         <div className="relative">
           <input
+            aria-label="Futures underlying"
+            onFocus={() => setSearchOpen(true)}
+            onBlur={(event) => { if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node)) setSearchOpen(false); }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setSearchOpen(false);
+              if (event.key === "Enter" && suggestions.length) {
+                event.preventDefault();
+                selectUnderlying(suggestions.find((item) => item === query.trim().toUpperCase()) || suggestions[0]);
+              }
+            }}
             className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs uppercase outline-none focus:border-terminal-accent"
             placeholder="Search underlying (e.g. REL)"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value.toUpperCase());
+              setSearchOpen(true);
               setError(null);
             }}
           />
-          {suggestions.length > 0 && (
+          {searchOpen && suggestions.length > 0 && (
             <div className="absolute left-0 right-0 top-8 z-10 max-h-52 overflow-auto rounded border border-terminal-border bg-terminal-panel">
               {suggestions.map((item) => (
                 <button
                   key={item}
                   className="block w-full border-b border-terminal-border px-2 py-1 text-left text-xs hover:bg-terminal-bg"
                   onClick={() => {
-                    setSelectedUnderlying(item);
-                    setQuery(item);
-                    setSuggestions([]);
+                    selectUnderlying(item);
                   }}
                 >
                   {item}
@@ -163,11 +186,12 @@ export function FuturesPanel() {
           )}
         </div>
 
+        {provenance.source === "nse_snapshot" ? <p role="status" className="text-xs text-terminal-muted">NSE snapshot{provenance.as_of ? ` · As of ${new Date(provenance.as_of).toLocaleString()}` : " · timestamp unavailable"}. Streaming requires a connected broker feed. Volume is in contracts.</p> : null}
         {loading && <div className="text-xs text-terminal-muted">Loading chain...</div>}
-        {error && <div className="text-xs text-terminal-neg">{error}</div>}
+        {error && <div role="alert" className="text-xs text-terminal-neg">{error}</div>}
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          {selectedUnderlying && historicalData.length > 0 && (
+        <div className={`grid grid-cols-1 gap-4 ${showUnderlyingChart ? "xl:grid-cols-2" : ""}`}>
+          {showUnderlyingChart && selectedUnderlying && historicalData.length > 0 && (
             <div className="relative h-72 w-full max-h-72 rounded border border-terminal-border">
               <button
                 type="button"
@@ -208,7 +232,7 @@ export function FuturesPanel() {
                   const moveClass =
                     row.changePct === null ? "text-terminal-muted" : row.changePct >= 0 ? "text-terminal-pos" : "text-terminal-neg";
                   return (
-                    <tr key={`${row.instrument_token}`} className="border-b border-terminal-border/40">
+                    <tr key={row.ws_symbol || row.provider_identifier || row.tradingsymbol} className="border-b border-terminal-border/40">
                       <td className="px-2 py-1">{row.expiry_date || "-"}</td>
                       <td className="px-2 py-1 text-right tabular-nums">{row.ltp !== null ? formatDisplayMoney(row.ltp) : "-"}</td>
                       <td className={`px-2 py-1 text-right tabular-nums ${moveClass}`}>

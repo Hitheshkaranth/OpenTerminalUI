@@ -63,6 +63,8 @@ export async function fetchTapeRecent(symbol: string, limit = 500): Promise<Tape
     params: { limit },
   });
   return {
+    source: data?.source,
+    simulated: data?.simulated,
     trades: Array.isArray(data?.trades) ? data.trades : [],
   };
 }

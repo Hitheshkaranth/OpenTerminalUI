@@ -1,3 +1,4 @@
+import { apiFetch } from "../api/base";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -118,7 +119,7 @@ function signedPct(value: number): string {
 
 async function fetchCryptoAdvanced<T>(path: string): Promise<T> {
   const base = import.meta.env.VITE_API_BASE_URL || "/api";
-  const response = await fetch(`${base}${path}`);
+  const response = await apiFetch(`${base}${path}`);
   if (!response.ok) {
     throw new Error(`Crypto endpoint failed: ${response.status}`);
   }

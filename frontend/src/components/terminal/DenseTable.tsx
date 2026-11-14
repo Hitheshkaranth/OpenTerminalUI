@@ -1,3 +1,4 @@
+import { spreadsheetTextLiteral } from "../../utils/spreadsheetText";
 import {
   useEffect,
   useMemo,
@@ -328,12 +329,12 @@ export function DenseTable<T>({
   const exportCsv = () => {
     const cols = orderedColumns;
     const lines = [
-      cols.map((c) => `"${c.title.replace(/"/g, '""')}"`).join(","),
+      cols.map((c) => `"${spreadsheetTextLiteral(c.title).replace(/"/g, '""')}"`).join(","),
       ...sortedRows.map(({ row, index }) =>
         cols
           .map((c) => {
             const v = c.getValue ? c.getValue(row, index) : (row as Record<string, unknown>)[c.key];
-            return `"${String(v ?? "").replace(/"/g, '""')}"`;
+            return `"${spreadsheetTextLiteral(v).replace(/"/g, '""')}"`;
           })
           .join(","),
       ),

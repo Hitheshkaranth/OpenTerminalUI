@@ -1,3 +1,4 @@
+import { apiFetch } from "../api/base";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -96,7 +97,7 @@ export function HotlistsPage() {
           market,
           limit: "25",
         });
-        const response = await fetch(`${API_BASE}/hotlists?${params.toString()}`, {
+        const response = await apiFetch(`${API_BASE}/hotlists?${params.toString()}`, {
           headers: { Accept: "application/json" },
         });
         if (!response.ok) {
@@ -236,7 +237,7 @@ export function HotlistsPage() {
       ) : (
         <>
           <div className="mb-2 flex items-center justify-between text-[11px] text-terminal-muted">
-            <span>{loading ? "Refreshing..." : `Live ${HOTLIST_TABS.find((tab) => tab.id === listType)?.label ?? "Hotlist"} rankings`}</span>
+            <span>{loading ? "Refreshing..." : `${HOTLIST_TABS.find((tab) => tab.id === listType)?.label ?? "Hotlist"} rankings`}</span>
             <span>
               Updated:{" "}
               {updatedAt

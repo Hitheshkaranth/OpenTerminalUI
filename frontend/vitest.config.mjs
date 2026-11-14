@@ -9,8 +9,6 @@ export default defineConfig({
     setupFiles: ["./src/test-setup.ts"],
     exclude: ["tests/e2e/**", "node_modules/**"],
     pool: "threads",
-    poolOptions: {
-      threads: { maxThreads: 2 },
-    },
+    maxWorkers: 2,
   },
 });

@@ -17,6 +17,35 @@ export function getAccessToken(): string | null {
   return accessTokenGetter ? accessTokenGetter() : null;
 }
 
+/** Fetch transport for pages that need a native Response (downloads/streams).
+ * Keep the same auth and CSRF boundary as the Axios client, and never forward
+ * a bearer token to a caller-supplied external origin or outside the API path.
+ */
+export async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  const origin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+  const base = new URL(String(api.defaults.baseURL || "/api"), origin);
+  const requestUrl = input.startsWith("/api/") && base.origin !== origin
+    ? `${base.href.replace(/\/$/, "")}${input.slice(4)}` : input;
+  const target = new URL(requestUrl, origin);
+  const prefix = base.pathname.replace(/\/$/, "");
+  if (target.origin !== base.origin || (target.pathname !== prefix && !target.pathname.startsWith(`${prefix}/`))) {
+    throw new Error("Refusing an authenticated request outside the configured API.");
+  }
+  const headers = new Headers(init.headers);
+  const token = getAccessToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (["POST", "PUT", "PATCH", "DELETE"].includes((init.method || "GET").toUpperCase())) {
+    for (const [name, value] of Object.entries(getTokenHeader())) headers.set(name, value);
+  }
+  const response = await fetch(requestUrl, { ...init, headers });
+  if (response.status !== 401 || !refreshHandler) return response;
+  if (!refreshInFlight) refreshInFlight = refreshHandler().catch(() => null).finally(() => { refreshInFlight = null; });
+  const freshToken = await refreshInFlight;
+  if (!freshToken) return response;
+  headers.set("Authorization", `Bearer ${freshToken}`);
+  return fetch(requestUrl, { ...init, headers });
+}
+
 // Refresh handler registered by AuthContext: performs a token refresh and
 // resolves with the new access token (or null if refresh failed / unavailable).
 type RefreshHandler = () => Promise<string | null>;

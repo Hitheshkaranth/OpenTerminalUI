@@ -1,3 +1,4 @@
+import { apiFetch } from "../api/base";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -113,7 +114,7 @@ function normalizeSymbol(input: string | null): string {
 }
 
 async function requestJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${path.startsWith("/") ? path : `/${path}`}`);
+  const response = await apiFetch(`${API_BASE}${path.startsWith("/") ? path : `/${path}`}`);
   const raw = await response.text();
   const payload = raw ? JSON.parse(raw) : null;
   if (!response.ok) {
@@ -215,8 +216,8 @@ function curveShapeLabel(points: FuturesCurvePoint[]): string {
   return ` · ${spreadPct < 0 ? "Backwardation" : "Contango"} (${spreadPct >= 0 ? "+" : ""}${spreadPct.toFixed(1)}% front → back)${projected}`;
 }
 
-function normalizeCurve(payload: unknown, symbol: string): FuturesCurvePoint[] {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return buildFallbackCurve(symbol);
+function normalizeCurve(payload: unknown): FuturesCurvePoint[] {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return [];
   const raw = payload as Record<string, unknown>;
   const points = Array.isArray(raw.points)
     ? raw.points
@@ -243,7 +244,7 @@ function normalizeCurve(payload: unknown, symbol: string): FuturesCurvePoint[] {
       return normalizedPoint;
     })
     .filter((point): point is FuturesCurvePoint => point !== null);
-  return normalized.length ? normalized : buildFallbackCurve(symbol);
+  return normalized;
 }
 
 function buildFallbackSeasonal(symbol: string): SeasonalPoint[] {
@@ -255,9 +256,9 @@ function buildFallbackSeasonal(symbol: string): SeasonalPoint[] {
   }));
 }
 
-function normalizeSeasonal(payload: unknown, symbol: string): { years: number; monthly: SeasonalPoint[] } {
+function normalizeSeasonal(payload: unknown): { years: number; monthly: SeasonalPoint[] } {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return { years: 7, monthly: buildFallbackSeasonal(symbol) };
+    return { years: 0, monthly: [] };
   }
   const raw = payload as Record<string, unknown>;
   const monthly = Array.isArray(raw.monthly)
@@ -279,8 +280,8 @@ function normalizeSeasonal(payload: unknown, symbol: string): { years: number; m
         .filter((point): point is SeasonalPoint => point !== null)
     : [];
   return {
-    years: Math.max(5, Math.trunc(toFiniteNumber(raw.years, 7))),
-    monthly: monthly.length ? monthly : buildFallbackSeasonal(symbol),
+    years: Math.max(0, Math.trunc(toFiniteNumber(raw.years, 0))),
+    monthly,
   };
 }
 
@@ -324,7 +325,7 @@ export function CommoditiesPage() {
     monthly: buildFallbackSeasonal("CL=F"),
   });
   const requestedSymbol = normalizeSymbol(searchParams.get("symbol") || searchParams.get("ticker"));
-  const [activeTab, setActiveTab] = useState<CommodityCategoryId>("energy");
+  const [activeTab, setActiveTab] = useState<CommodityCategoryId>(() => FALLBACK_CATEGORIES.find((category) => category.items.some((item) => item.symbol === requestedSymbol))?.id || "energy");
   const [selectedSymbol, setSelectedSymbol] = useState<string>(requestedSymbol || "CL=F");
 
   useEffect(() => {
@@ -382,38 +383,36 @@ export function CommoditiesPage() {
   }, [activeTab, categories, selectedCommodity]);
 
   useEffect(() => {
-    if (!activeCategory.items.length) return;
-    const inTab = activeCategory.items.some((item) => item.symbol === selectedSymbol);
-    if (!inTab) {
-      setSelectedSymbol(activeCategory.items[0].symbol);
-    }
-  }, [activeCategory.items, selectedSymbol]);
-
-  useEffect(() => {
     if (!selectedCommodity) return;
+    if (requestedSymbol === selectedSymbol && !allItems.some((item) => item.symbol === requestedSymbol)) return;
     const next = new URLSearchParams(searchParams);
     if (next.get("symbol") !== selectedCommodity.symbol) {
       next.set("symbol", selectedCommodity.symbol);
       setSearchParams(next, { replace: true });
     }
-  }, [searchParams, selectedCommodity, setSearchParams]);
+  }, [allItems, requestedSymbol, searchParams, selectedCommodity, selectedSymbol, setSearchParams]);
 
   useEffect(() => {
     if (!selectedCommodity?.symbol) return;
     let cancelled = false;
     setDetailsLoading(true);
+    // Never display the previous commodity's curve while the new one loads.
+    setCurvePoints([]);
+    setSeasonalData({ years: 0, monthly: [] });
     void (async () => {
       const [curveResult, seasonalResult] = await Promise.allSettled([
         requestJson<unknown>(`/commodities/futures-chain/${encodeURIComponent(selectedCommodity.symbol)}`),
         requestJson<unknown>(`/commodities/seasonal/${encodeURIComponent(selectedCommodity.symbol)}`),
       ]);
       if (cancelled) return;
-      const curveOk = curveResult.status === "fulfilled";
-      const seasonalOk = seasonalResult.status === "fulfilled";
-      setCurvePoints(curveOk ? normalizeCurve(curveResult.value, selectedCommodity.symbol) : buildFallbackCurve(selectedCommodity.symbol));
+      const curve = curveResult.status === "fulfilled" ? normalizeCurve(curveResult.value) : [];
+      const seasonal = seasonalResult.status === "fulfilled" ? normalizeSeasonal(seasonalResult.value) : { years: 0, monthly: [] };
+      const curveOk = curve.length > 0;
+      const seasonalOk = seasonal.monthly.length > 0;
+      setCurvePoints(curveOk ? curve : buildFallbackCurve(selectedCommodity.symbol));
       setSeasonalData(
         seasonalOk
-          ? normalizeSeasonal(seasonalResult.value, selectedCommodity.symbol)
+          ? seasonal
           : { years: 7, monthly: buildFallbackSeasonal(selectedCommodity.symbol) },
       );
       setDetailsFallback(!(curveOk && seasonalOk));
@@ -426,13 +425,14 @@ export function CommoditiesPage() {
 
   return (
     <div className="space-y-4 px-3 py-3">
+      {!quotesLoading && requestedSymbol && !allItems.some((item) => item.symbol === requestedSymbol) && <p role="alert" className="rounded border border-terminal-warn p-3 text-sm text-terminal-warn">{requestedSymbol} is not available in this commodity universe. Showing {selectedCommodity.symbol} for comparison; select a supported contract below.</p>}
       <TerminalPanel
         title="Commodities Terminal"
         subtitle="Energy, metals, and agriculture futures with curve and seasonality context"
         actions={
           <div className="flex items-center gap-2">
-            <TerminalBadge variant={quotesLoading ? "info" : quotesFallback || detailsFallback ? "warn" : "live"} dot>
-              {quotesLoading ? "Loading" : quotesFallback || detailsFallback ? "Seeded fallback" : "Backend live"}
+            <TerminalBadge variant={quotesFallback || detailsFallback ? "warn" : "info"} dot>
+              {quotesLoading ? "Loading" : quotesFallback || detailsFallback ? "Synthetic examples · not market data" : "Provider response"}
             </TerminalBadge>
             <TerminalBadge variant="accent">CMDTY</TerminalBadge>
           </div>
@@ -451,7 +451,11 @@ export function CommoditiesPage() {
                       ? "border-terminal-accent bg-terminal-accent/15 text-terminal-accent"
                       : "border-terminal-border text-terminal-muted hover:text-terminal-text"
                   }`}
-                  onClick={() => setActiveTab(categoryId)}
+                  onClick={() => {
+                    const next = categories.find((category) => category.id === categoryId)?.items[0];
+                    setActiveTab(categoryId);
+                    if (next) setSelectedSymbol(next.symbol);
+                  }}
                 >
                   {CATEGORY_LABELS[categoryId]}
                 </button>

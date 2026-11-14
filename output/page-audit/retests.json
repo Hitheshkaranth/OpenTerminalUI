@@ -1,0 +1,261 @@
+[
+  {
+    "path": "/equity/commodities?symbol=GC%3DF",
+    "title": "OpenTerminalUI",
+    "url": "/equity/commodities?symbol=GC%3DF",
+    "headings": [],
+    "text": "none\nCOMMODITIES TERMINAL\nENERGY, METALS, AND AGRICULTURE FUTURES WITH CURVE AND SEASONALITY CONTEXT\nPROVIDER RESPONSE\nCMDTY\nENERGY\nMETALS\nAGRICULTURE\nCommand aliases:\nCOMMODITY\nGOLD\nOIL\nMETALS\nFront-month futures (Yahoo continuous contract) with daily move and liquidity\nCONTRACT\tLAST\tCHG\tCHG%\t1M\tVOLUME\t1M TREND\n\nGC=F\nGold Dec 26\n\t3,886.3\t+1.00\t+0.03%\t-6.81%\t151K\t\n\n\nSI=F\nSilver Dec 26\n\t49.12\t-0.94\t-1.89%\t-13.73%\t49.7K\t\n\n\nHG=F\nCopper Dec 26\n\t6.09\t-0.11\t-1.70%\t-6.63%\t53.7K\t\n\n\nPL=F\nPlatinum Jan 27\n\t1,489.7\t-30.70\t-2.02%\t-7.59%\t13K\t\nnone\nGOLD DEC 26 SNAPSHOT\nGC=F\nOPEN SECURITY\nLAST\n3,886.3\nDAY\n+1.00 (+0.03%)\nVOLUME\n151K\n3,886.30\n-799.00 (-17.05%)over 6M\n1M\n3M\n6M\n1Y\n5Y\n\t\n\t\n\n\t\n\t\nGC=F down 17.05 percent over 6M\nnone\nTERM STRUCTURE\nGC=F FUTURES CURVE · CONTANGO (+2.1% FRONT → BACK)\nFront\nJan 2027\nFeb 2027\nMar 2027\nApr 2027\nMay 2027\n3884.3\n3909.3\n3934.3\n3959.3\n3970.5\nnone\nLINKED COMPANIES\nWHO A GOLD PRICE RISE HURTS AND HELPS\nALL\nIN\nUS\n\nJewellers carry gold inventory and face demand elasticity; miners and royalty companies gain; gold-loan NBFCs benefit as collateral values rise.\n\nHURT BY A PRICE RISE (INPUT COST)\nKALYANKJILKalyan Jewellers\nJewellery\nIN\nMEDIUM\nSENCOSenco Gold\nJewellery\nIN\nMEDIUM\nTITANTitan Company\nJewellery\nIN\nMEDIUM\nSIGSignet Jewelers\nJewellery\nUS\nLOW\nHELPED BY A PRICE RISE (OUTPUT PRICE)\nMANAPPURAMManappuram Finance\nGold loans\nIN\nMEDIUM\nMUTHOOTFINMuthoot Finance\nGold loans\nIN\nMEDIUM\nAEMAgnico Eagle Mines\nGold mining\nUS\nHIGH\nBBarrick Mining\nGold mining\nUS\nHIGH\nFNVFranco-Nevada\nRoyalties\nUS\nMEDIUM\nKGCKinross Gold\nGold mining\nUS\nHIGH\nNEMNewmont\nGold mining\nUS\nHIGH\nnone\nSEASONALITY\nGC=F MONTHLY AVERAGE PROFILE OVER 11 YEARS\nJan\nFeb\nMar\nApr\nMay\nJun\nJul\nAug\nSep\nOct\nNov\nDec\n-4\n-2\n0\n2\n4",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 10588,
+    "failure": null
+  },
+  {
+    "path": "/equity/commodities?symbol=CL%3DF",
+    "title": "OpenTerminalUI",
+    "url": "/equity/commodities?symbol=CL%3DF",
+    "headings": [],
+    "text": "none\nCOMMODITIES TERMINAL\nENERGY, METALS, AND AGRICULTURE FUTURES WITH CURVE AND SEASONALITY CONTEXT\nPROVIDER RESPONSE\nCMDTY\nENERGY\nMETALS\nAGRICULTURE\nCommand aliases:\nCOMMODITY\nGOLD\nOIL\nENERGY\nFront-month futures (Yahoo continuous contract) with daily move and liquidity\nCONTRACT\tLAST\tCHG\tCHG%\t1M\tVOLUME\t1M TREND\n\nCL=F\nCrude Oil Dec 26\n\t88.56\t-0.18\t-0.20%\t-9.60%\t181.2K\t\n\n\nNG=F\nNatural Gas Dec 26\n\t3.23\t-0.11\t-3.29%\t-0.19%\t197K\t\n\n\nRB=F\nRBOB Gasoline Jan 27\n\t2.59\t-0.04\t-1.67%\t-17.57%\t40.2K\t\n\n\nBZ=F\nBrent Crude Oil Last Day Financ\n\t95.84\t+0.02\t+0.02%\t-9.52%\t22.1K\t\nnone\nCRUDE OIL DEC 26 SNAPSHOT\nCL=F\nOPEN SECURITY\nLAST\n88.56\nDAY\n-0.18 (-0.20%)\nVOLUME\n181.2K\n88.56\n-12.61 (-12.46%)over 6M\n1M\n3M\n6M\n1Y\n5Y\n\t\n\t\n\n\t\n\t\nCL=F down 12.46 percent over 6M\nnone\nTERM STRUCTURE\nCL=F FUTURES CURVE · BACKWARDATION (-7.9% FRONT → BACK)\nFront\nJan 2027\nFeb 2027\nMar 2027\nApr 2027\nMay 2027\n79.53\n82.53\n85.53\n88.53\n90.56\nnone\nLINKED COMPANIES\nWHO A WTI CRUDE OIL PRICE RISE HURTS AND HELPS\nALL\nIN\nUS\n\nRising crude lifts upstream producers; it raises input costs for paints, tyres, petrochemicals and airlines, and squeezes Indian oil marketing companies whose pump prices are held down.\n\nHURT BY A PRICE RISE (INPUT COST)\nAPOLLOTYREApollo Tyres\nTyres\nIN\nMEDIUM\nASIANPAINTAsian Paints\nPaints\nIN\nMEDIUM\nBERGEPAINTBerger Paints\nPaints\nIN\nMEDIUM\nBPCLBharat Petroleum\nOil marketing\nIN\nMEDIUM\nHINDPETROHindustan Petroleum\nOil marketing\nIN\nMEDIUM\nINDIGOInterGlobe Aviation\nAirlines\nIN\nHIGH\nIOCIndian Oil Corporation\nOil marketing\nIN\nMEDIUM\nMRFMRF\nTyres\nIN\nMEDIUM\nPIDILITINDPidilite Industries\nAdhesives\nIN\nMEDIUM\nDALDelta Air Lines\nAirlines\nUS\nHIGH\nLYBLyondellBasell\nPetrochemicals\nUS\nMEDIUM\nUALUnited Airlines\nAirlines\nUS\nHIGH\nHELPED BY A PRICE RISE (OUTPUT PRICE)\nOILOil India\nUpstream oil & gas\nIN\nHIGH\nONGCOil & Natural Gas Corp\nUpstream oil & gas\nIN\nHIGH\nCOPConocoPhillips\nUpstream oil & gas\nUS\nHIGH\nCVXChevron\nIntegrated oil\nUS\nHIGH\nEOGEOG Resources\nUpstream oil & gas\nUS\nHIGH\nOXYOccidental Petroleum\nUpstream oil & gas\nUS\nHIGH\nXOMExxon Mobil\nIntegrated oil\nUS\nHIGH\nnone\nSEASONALITY\nCL=F MONTHLY AVERAGE PROFILE OVER 11 YEARS\nJan\nFeb\nMar\nApr\nMay\nJun\nJul\nAug\nSep\nOct\nNov\nDec\n-10\n-5\n0\n5\n10",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 9531,
+    "failure": null
+  },
+  {
+    "path": "/equity/stocks?ticker=AAPL",
+    "title": "OpenTerminalUI",
+    "url": "/equity/stocks?ticker=AAPL",
+    "headings": [
+      "Fundamental Scorecard",
+      "Shareholding Pattern Trend",
+      "Financial Trend (Annual)"
+    ],
+    "text": "🇺🇸\nAAPL\nO\nNASDAQ\n-\nAAPL\n$356.27\n+0.39%\nDISCONNECTED\nO:357.96H:360.83L:355.75C:356.27V:39,985,300\nTIMING\n1m\n2m\n5m\n15m\n30m\n1H\n4H\n1D\n1W\n1M\nETH\nTYPE\nCandlestick\nLine\nArea\nBaseline\nRenko\nKagi\nPoint & Figure\nLine Break\nFootprint · Orderflow\nINDICATORS\nDRAW\n\t\n\t\n\n\n\n\t\n\t\n\n\t\n\t\nnone\nPERFORMANCE STRIP\n1D\n+0.39%\n1W\n+4.06%\n1M\n+3.88%\n3M\n+16.45%\n6M\n+18.67%\n1Y\n+30.53%\nDAY RANGE\n$355.75\nto\n$360.83\n52W RANGE\n$243.42\nto\n$360.83\nnone\nLATEST PRICE\n$356.27\n+1.39\n+0.39%\nDISCONNECTED\nCONNECTING\nVOLUME\nDELIVERY %\nSESSIONS\nFULLSCREEN\nINDICATORS\n0/8 active | 0 favorites | AAPL\nTemplates in chart:indicator-templates:equity\nReset params\nFAVORITES 0\nACTIVE 0\nALL 81\nCHANNELS & BANDS 5\nMOMENTUM 11\nMOVING AVERAGES 16\nOSCILLATORS 16\nTREND 16\nVOLATILITY 9\nVOLUME 8\nCHANNELS & BANDS\nStar\n[ ] Bollinger Bands (BB)\nOVERLAY\nbb\nStar\n[ ] Donchian Channels (DC)\nOVERLAY\ndonchian\nStar\n[ ] Envelope\nOVERLAY\nenvelope\nStar\n[ ] Keltner Channels (KC)\nOVERLAY\nkeltner\nStar\n[ ] Median\nOVERLAY\nmedian\nMOMENTUM\nStar\n[ ] Balance of Power (BOP)\nPANE\nbop\nStar\n[ ] Bull Bear Power\nPANE\nbull-bear-power\nStar\n[ ] Coppock Curve\nPANE\ncoppock-curve\nStar\n[ ] Elder Force Index\nPANE\nelder-force\nStar\n[ ] KDJ\nPANE\nkdj\nStar\n[ ] MACD\nPANE\nmacd\nStar\n[ ] Momentum\nPANE\nmomentum\nStar\n[ ] Price Oscillator (PPO)\nPANE\nprice-oscillator\nStar\n[ ] Rate of Change (ROC)\nPANE\nroc\nStar\n[ ] TRIX\nPANE\ntrix\nStar\n[ ] Ultimate Oscillator\nPANE\nultimate-oscillator\nMOVING AVERAGES\nStar\n[ ] Anchored VWAP\nOVERLAY\nanchored-vwap\nStar\n[ ] Arnaud Legoux Moving Average (ALMA)\nOVERLAY\nalma\nStar\n[ ] DEMA\nOVERLAY\ndema\nStar\n[ ] EMA\nOVERLAY\nema\nStar\n[ ] Hull MA\nOVERLAY\nhma\nStar\n[ ] Least Squares Moving Average (LSMA)\nOVERLAY\nlsma\nStar\n[ ] MA Cross\nOVERLAY\nma-cross\nStar\n[ ] McGinley Dynamic\nOVERLAY\nmc-ginley-dynamic\nStar\n[ ] Moving Average Ribbon\nOVERLAY\nma-ribbon\nStar\n[ ] Session VWAP\nOVERLAY\nsession-vwap\nStar\n[ ] SMA\nOVERLAY\nsma\nStar\n[ ] Smoothed Moving Average\nOVERLAY\nsmma\nStar\n[ ] Smoothed Moving Average (RMA)\nOVERLAY\nrma\nStar\n[ ] TEMA\nOVERLAY\ntema\nStar\n[ ] VWMA\nOVERLAY\nvwma\nStar\n[ ] WMA\nOVERLAY\nwma\nOSCILLATORS\nStar\n[ ] Awesome Oscillator\nPANE\nawesome-oscillator\nStar\n[ ] Bollinger Bands %B\nPANE\nbb-percent-b\nStar\n[ ] Chande Momentum Oscillator\nPANE\nchande-mo\nStar\n[ ] Commodity Channel Index (CCI)\nPANE\ncci\nStar\n[ ] Detrended Price Oscillator\nPANE\ndpo\nStar\n[ ] Fisher Transform\nPANE\nfisher-transform\nStar\n[ ] Relative Strength Index (RSI)\nPANE\nrsi\nStar\n[ ] Relative Vigor Index\nPANE\nrvi\nStar\n[ ] SMI Ergodic Indicator\nPANE\nsmi-ergodic\nStar\n[ ] SMI Ergodic Oscillator\nPANE\nsmi-ergodic-osc\nStar\n[ ] Stochastic\nPANE\nstoch\nStar\n[ ] Stochastic RSI\nPANE\nstoch-rsi\nStar\n[ ] True Strength Index\nPANE\ntsi\nStar\n[ ] Ultimate Oscillator\nPANE\nultimate-osc\nStar\n[ ] Williams %R\nPANE\nwilliams-r\nStar\n[ ] Woodies CCI\nPANE\nwoodies-cci\nTREND\nStar\n[ ] ADX\nPANE\nadx\nStar\n[ ] Aroon\nPANE\naroon\nStar\n[ ] BBTrend\nPANE\nbbtrend\nStar\n[ ] Chande Kroll Stop\nOVERLAY\nchande-kroll-stop\nStar\n[ ] Choppiness Index\nPANE\nchoppiness\nStar\n[ ] Directional Movement Index\nPANE\ndmi\nStar\n[ ] Ichimoku Cloud\nOVERLAY\nichimoku\nStar\n[ ] KAMA\nOVERLAY\nkama\nStar\n[ ] Linear Regression Channel\nOVERLAY\nlinear-regression-channel\nStar\n[ ] Mass Index\nPANE\nmass-index\nStar\n[ ] Parabolic SAR\nOVERLAY\nparabolic-sar\nStar\n[ ] Supertrend\nOVERLAY\nsupertrend\nStar\n[ ] Trend Strength Index\nPANE\ntrend-strength\nStar\n[ ] Vortex Indicator\nPANE\nvortex\nStar\n[ ] Williams Alligator\nOVERLAY\nwilliams-alligator\nStar\n[ ] Zig Zag\nOVERLAY\nzigzag\nVOLATILITY\nStar\n[ ] Average Day Range (ADR)\nPANE\nadr\nStar\n[ ] Average True Range (ATR)\nPANE\natr\nStar\n[ ] Bollinger BandWidth\nPANE\nbb-bandwidth\nStar\n[ ] Chaikin Volatility\nPANE\nchaikin-volatility\nStar\n[ ] Historical Volatility\nPANE\nhist-volatility\nStar\n[ ] Historical Volatility\nPANE\nhistorical-volatility\nStar\n[ ] Historical Volatility\nPANE\nhv\nStar\n[ ] Standard Deviation\nPANE\nstdev\nStar\n[ ] Standard Deviation\nPANE\nstddev\nVOLUME\nStar\n[ ] Chaikin Money Flow\nPANE\nchaikin-mf\nStar\n[ ] Chaikin Oscillator\nPANE\nchaikin-osc\nStar\n[ ] Ease of Movement\nPANE\neom\nStar\n[ ] Klinger Oscillator\nPANE\nklinger\nStar\n[ ] Money Flow Index\nPANE\nmfi\nStar\n[ ] On Balance Volume (OBV)\nPANE\nobv\nStar\n[ ] Price Volume Trend\nPANE\npvt\nStar\n[ ] Volume Oscillator\nPANE\nvolume-osc\nTEMPLATES\n0 saved\nSave\nSelect template\nLoad\nDel\nCUSTOM JS\nOverlay on main chart\nSave JS\nAAPL\nClear all\nnone\nFUTURES CHAIN\nSELECT UNDERLYING\nStream offline\nExpiry\tLTP\tChg%\tOI\tVol\tTradingsymbol\nNo contracts\nOverview\nMarket Depth\nFinancials\nAnalysis\nPeers\nValuation\nShareholding\nEvents\nEarnings\nAAPL | NASDAQ\nApple Inc.\nTechnology | Consumer Electronics\n🇺🇸 US\n$356.27\n+0.39%\nMoM Price Move\nIncrease +4.17%\nQoQ Price Move\nIncrease +16.58%\nYoY Price Move\nIncrease +30.28%\nMarket Cap\n$ 5,177,380.18 M\nP/E (TTM)\n39.50\nP/E (Fwd)\n33.78\nP/B\n46.19\nP/S\n10.81\nEV/EBITDA\n30.41\nROE\n142.26%\nROA\n25.87%\nOp Margin\n33.01%\nNet Margin\n27.60%\nRevenue Growth\n11.70%\nEPS Growth\n14.10%\nDividend Yield\n0.30%\nBeta\n1.09\nAI Investment Briefing\nAAPL · AI bull/bear thesis from fundamentals and news\nGenerate\nGenerated by the configured AI model — analysis can take a moment.\nCAPEX TRACKER\n2026-09-30\n$ 9,041 M\n-28.90% vs prev\nREPORTED\nFUNDAMENTAL SCORECARD\nPIOTROSKI F-SCORE\n8.00\nALTMAN Z-SCORE\n0.00\nGRAHAM NUMBER\n39.22\nPEG RATIO\n2.19\nDuPont Analysis\nNet Margin\n27.60%\nAsset Turnover\n1.18x\nEquity Multiplier\n3.61x\nROE: 117.92%\nValuation & Growth\nFCF Yield\n2.63%\nCash Conv. Cycle\n0 days\nSHAREHOLDING PATTERN TREND\nNSE shareholding unavailable: NSE circuit breaker open; skipping /quote-equity | Using default fallback distribution\nDIIFIIPromoterPublic\nLatest\n0%\n25%\n50%\n75%\n100%\nFINANCIAL TREND (ANNUAL)\nRevenue & ProfitMargins\nNet Profit (M)Revenue (M)\n2023-09-30\n2024-09-30\n2025-09-30\n2026-09-30\n0 M\n150000 M\n300000 M\n450000 M\n600000 M\nABOUT",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 8846,
+    "failure": null
+  },
+  {
+    "path": "/equity/security/RELIANCE?ticker=RELIANCE",
+    "title": "OpenTerminalUI",
+    "url": "/equity/security/RELIANCE?ticker=RELIANCE",
+    "headings": [],
+    "text": "RELIANCE\nNSE\nENERGY\nBullish 0.19\nRELIANCE INDUSTRIES LTD\nLAST\n1,339.7\nCHANGE %\n+0.00%\nVOLUME\n13.76M\nOVERVIEW\nFINANCIALS\nCHART\nNEWS\nOWNERSHIP\nESTIMATES\nPEERS\nESG\nTAPE\nINSIDER\nFILINGS\nEXPORT REPORT\nRESEARCH NOTE\nV\nnone\nOVERVIEW\nDES-STYLE SNAPSHOT\nLIVE · KITE\nMARKET CAP\n18.13T\nP/E\n22.08\nDIV YIELD\n0.45%\n52W RANGE\n1,152.2 - 1,611.8\n52-WEEK POSITION\nOPEN\n1,336.6\nHIGH\n1,350.7\nLOW\n1,324\nP/B\n1.92\nEV/EBITDA\n12\nROE\n8.8%\nNET MARGIN\n6.8%\nREV GROWTH\n29.8%\nEPS GROWTH\n40.7%\nANALYST CONSENSUS\nNo analyst ratings from the current data source.\nCLASSIFICATION\nSector: Energy\nIndustry: Oil & Gas Refining & Marketing\nCountry: IN\nCurrency: INR\nnone\nPRICE\nHOVER THE CHART FOR ANY DAY'S CLOSE\n1,339.70\n-12.85 (-0.95%)over 6M\n1M\n3M\n6M\n1Y\n5Y\n\t\n\t\n\n\t\n\t\nRELIANCE down 0.95 percent over 6M\nPREV CLOSE\n1,339.7\nAVG VOLUME (30D)\n19.53M\nBETA\n0.18\nnone\nGROWTH & HEADWINDS\nPRIMARY-DOCUMENT SIGNALS\nOPEN FILINGS\n\nNo growth / headwind read yet. Import documents into the Filings tab and run an analysis to surface cited drivers of return.\n\nGO TO FILINGS\nnone\nREVERSE DCF\nWHAT THE PRICE IMPLIES\nIMPLIED GROWTH\n15.5%\nHistorical 3y revenue CAGR\n6.4%\nHistorical 3y profit CAGR\n6.6%\nREAD\nDEMANDING\nAI CATALYST CONVICTIONNo catalyst notes ingested for RELIANCE yet.\nOpen screener",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [
+      {
+        "path": "/api/filings-rag/RELIANCE/analysis",
+        "status": 404
+      },
+      {
+        "path": "/api/filings-rag/RELIANCE/knowledge",
+        "status": 404
+      },
+      {
+        "path": "/api/stock-picking/conviction/RELIANCE",
+        "status": 404
+      },
+      {
+        "path": "/api/filings-rag/RELIANCE/analysis",
+        "status": 404
+      },
+      {
+        "path": "/api/filings-rag/RELIANCE/knowledge",
+        "status": 404
+      },
+      {
+        "path": "/api/stock-picking/conviction/RELIANCE",
+        "status": 404
+      },
+      {
+        "path": "/api/filings-rag/RELIANCE/analysis",
+        "status": 404
+      },
+      {
+        "path": "/api/filings-rag/RELIANCE/analysis",
+        "status": 404
+      },
+      {
+        "path": "/api/filings-rag/RELIANCE/analysis",
+        "status": 404
+      },
+      {
+        "path": "/api/filings-rag/RELIANCE/knowledge",
+        "status": 404
+      }
+    ],
+    "pending": [],
+    "waitMs": 9744,
+    "failure": null
+  },
+  {
+    "path": "/equity/factors?ticker=AAPL",
+    "title": "OpenTerminalUI",
+    "url": "/equity/factors?ticker=AAPL",
+    "headings": [],
+    "text": "none\nFACTOR DASHBOARD\nTOP-QUINTILE STOCK-PICKING IDEAS\nIndia\nUS\nAll\nTechnology\nFinancials\nConsumer\nIndustrials\nHealthcare\nEnergy\nMaterials\nMarket and sector filters are passed through to the stock-picking API.\nnone\nIDEA LIST\nINDIA / ALL / TOP QUINTILE\nRank\tSymbol\tName\tSector\tComposite\tFactors\nNo supported top-quintile ideas. Missing observations are excluded, and tied scores do not create an alphabetical ranking.\nnone\nFACTOR RADAR\nSELECT AN IDEA\n\nNo ranked factor observations are available for this selection.\n\nWHY RANKED\nNo ranking explanation is available without supported factor observations.",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 3159,
+    "failure": null
+  },
+  {
+    "path": "/equity/tape?ticker=AAPL",
+    "title": "OpenTerminalUI",
+    "url": "/equity/tape?ticker=AAPL",
+    "headings": [],
+    "text": "TAPE READER\nAAPL\n356.27\n+1.39 (+0.39%)\nnone\nTIME & SALES\nAAPL TAPE\n\nTrade provenance is unavailable. Do not treat this tape as verified executions.\n\nBUY / SELL FLOW\n48.1% / 48.6%\nTOTAL VOLUME\n7,832,130\nBUY VOL %\n48.1%\nSELL VOL %\n48.6%\nLARGE TRADES\n66\nTRADES / MIN\n10.02\nALL\nBUYS ONLY\nSELLS ONLY\nLARGE ONLY\nMIN SIZE\nTIME\nPRICE\nSIZE\nVALUE\n11:04:54\n242.40\n19,720\n4,780,128.00\n11:04:48\n242.42\n14,652\n3,551,937.84\n11:04:42\n242.84\n4,822\n1,170,974.48\n11:04:36\n242.40\n1,948\n472,195.20\n11:04:30\n242.39\n6,547\n1,586,927.33\n11:04:24\n242.57\n17,040\n4,133,392.80\n11:04:18\n242.32\n6,425\n1,556,906.00\n11:04:12\n242.54\n10,336\n2,506,893.44\n11:04:06\n242.28\n11,668\n2,826,923.04\n11:04:00\n242.29\n21,646\n5,244,609.34\n11:03:54\n242.46\n14,649\n3,551,796.54\n11:03:48\n242.07\n34,379\n8,322,124.53\n11:03:42\n242.43\n4,810\n1,166,088.30\n11:03:36\n242.36\n15,269\n3,700,594.84\n11:03:30\n241.88\n21,918\n5,301,525.84\n11:03:24\n242.18\n7,851\n1,901,355.18\n11:03:18\n242.27\n27,994\n6,782,106.38\n11:03:12\n242.16\n25,984\n6,292,285.44\n11:03:06\n242.09\n35,901\n8,691,273.09\n11:03:00\n241.68\n26,610\n6,431,104.80\n11:02:54\n241.85\n34,029\n8,229,913.65\n11:02:48\n241.64\n18,938\n4,576,178.32\n11:02:42\n241.61\n5,381\n1,300,103.41\n11:02:36\n241.65\n3,693\n892,413.45\n11:02:30\n241.83\n20,739\n5,015,312.37\n11:02:24\n241.78\n18,415\n4,452,378.70\n11:02:18\n241.70\n13,602\n3,287,603.40\n11:02:12\n241.71\n8,394\n2,028,913.74\n11:02:06\n241.60\n31,405\n7,587,448.00\n11:02:00\n241.54\n14,045\n3,392,429.30\n11:01:54\n241.63\n17,524\n4,234,324.12\n11:01:48\n241.62\n13,690\n3,307,777.80\n11:01:42\n241.68\n27,130\n6,556,778.40\n11:01:36\n241.68\n43,125\n10,422,450.00\nnone\nMICRO TREND\nAAPL PRICE SPARKLINE\nLAST\n356.27\nCHANGE\n+0.39%",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 6454,
+    "failure": null
+  },
+  {
+    "path": "/equity/etf-analytics?ticker=AAPL",
+    "title": "OpenTerminalUI",
+    "url": "/equity/etf-analytics?ticker=AAPL",
+    "headings": [
+      "ETF Analytics & Intelligence"
+    ],
+    "text": "ETF ANALYTICS & INTELLIGENCE\nACTIVE TICKER\nnone\nHOLDINGS ANALYSIS: AAPL\nTOP HOLDINGS: AAPL\nSYMBOL\n↕\n\t\nNAME\n↕\n\t\nWEIGHT (%)\n↕\n\nNo holdings data available\nnone\nFUND FLOWS: AAPL\nFUND FLOWS: AAPL (LAST 30 DAYS)\nDATE\n↕\n\t\nNET FLOW ($M)\n↕\n\nFund flow provider is not configured. No observed flow data is available.\nnone\nOVERLAP ANALYSIS\nCOMPARE\nOVERLAP: SPY VS VOO\n34.87% Overlap\nSYMBOL\n↕\n\t\nNAME\n↕\n\t\nOVERLAP WEIGHT (%)\n↕\n\n\nNVDA\n\t\nNVIDIA Corp\n\t\n7.58%\n\n\nAAPL\n\t\nApple Inc\n\t\n7.38%\n\n\nMSFT\n\t\nMicrosoft Corp\n\t\n5.78%\n\n\nAMZN\n\t\nAmazon.com Inc\n\t\n3.61%\n\n\nGOOGL\n\t\nAlphabet Inc Class A\n\t\n2.51%\n\n\nAVGO\n\t\nBroadcom Inc\n\t\n2.38%\n\n\nMETA\n\t\nMeta Platforms Inc Class A\n\t\n2.08%\n\n\nGOOG\n\t\nAlphabet Inc Class C\n\t\n2.02%\n\n\nTSLA\n\t\nTesla Inc\n\t\n1.52%\nnone\nETF MARKET INTELLIGENCE\nSelect ETFs to compare holdings overlap and analyze historical fund flows. The analysis helps in identifying concentration risks and tracking institutional sentiment.",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 4415,
+    "failure": null
+  },
+  {
+    "path": "/fno/futures?symbol=NIFTY",
+    "title": "OpenTerminalUI",
+    "url": "/fno/futures?symbol=NIFTY",
+    "headings": [
+      "Futures desk · NIFTY"
+    ],
+    "text": "SYMBOL\nNIFTY\nBANKNIFTY\nRELIANCE\nTCS\nINFY\nHDFCBANK\nICICIBANK\nSBIN\nLT\nAXISBANK\nKOTAKBANK\nITC\nBAJFINANCE\nMARUTI\nTATAMOTORS\nBHARTIARTL\nSUNPHARMA\nHCLTECH\nWIPRO\nADANIPORTS\nNTPC\nONGC\nEXPIRY\nNo expiry\nDATA\nNo expiry data\nUNIVERSE\nNSE F&O\nPOPULAR INDICES\nNIFTY\nBANKNIFTY\nFINNIFTY\nMIDCPNIFTY\nNIFTYNXT50\nFutures desk · NIFTY\n\nThe chart shows underlying price history, not a selected futures contract. Contract quotes are listed separately.\n\nNIFTY\n-\n-\nO:-H:-L:-C:-V:-\nTIMING\n1m\n2m\n5m\n15m\n30m\n1H\n1D\n1W\n1M\nETH\nTYPE\nCandlestick\nLine\nArea\nBaseline\nRenko\nKagi\nPoint & Figure\nLine Break\nFootprint · Orderflow\nINDICATORS\nDRAW\nNo valid chart bars for NIFTY\nUNDERLYING PRICE\n-\n-\nHISTORICAL CLOSE\nVOLUME\nINDICATORS\n0/8 active | 0 favorites | NIFTY\nTemplates in chart:indicator-templates:fno\nReset params\nFAVORITES 0\nACTIVE 0\nALL 81\nCHANNELS & BANDS 5\nMOMENTUM 11\nMOVING AVERAGES 16\nOSCILLATORS 16\nTREND 16\nVOLATILITY 9\nVOLUME 8\nCHANNELS & BANDS\nStar\n[ ] Bollinger Bands (BB)\nOVERLAY\nbb\nStar\n[ ] Donchian Channels (DC)\nOVERLAY\ndonchian\nStar\n[ ] Envelope\nOVERLAY\nenvelope\nStar\n[ ] Keltner Channels (KC)\nOVERLAY\nkeltner\nStar\n[ ] Median\nOVERLAY\nmedian\nMOMENTUM\nStar\n[ ] Balance of Power (BOP)\nPANE\nbop\nStar\n[ ] Bull Bear Power\nPANE\nbull-bear-power\nStar\n[ ] Coppock Curve\nPANE\ncoppock-curve\nStar\n[ ] Elder Force Index\nPANE\nelder-force\nStar\n[ ] KDJ\nPANE\nkdj\nStar\n[ ] MACD\nPANE\nmacd\nStar\n[ ] Momentum\nPANE\nmomentum\nStar\n[ ] Price Oscillator (PPO)\nPANE\nprice-oscillator\nStar\n[ ] Rate of Change (ROC)\nPANE\nroc\nStar\n[ ] TRIX\nPANE\ntrix\nStar\n[ ] Ultimate Oscillator\nPANE\nultimate-oscillator\nMOVING AVERAGES\nStar\n[ ] Anchored VWAP\nOVERLAY\nanchored-vwap\nStar\n[ ] Arnaud Legoux Moving Average (ALMA)\nOVERLAY\nalma\nStar\n[ ] DEMA\nOVERLAY\ndema\nStar\n[ ] EMA\nOVERLAY\nema\nStar\n[ ] Hull MA\nOVERLAY\nhma\nStar\n[ ] Least Squares Moving Average (LSMA)\nOVERLAY\nlsma\nStar\n[ ] MA Cross\nOVERLAY\nma-cross\nStar\n[ ] McGinley Dynamic\nOVERLAY\nmc-ginley-dynamic\nStar\n[ ] Moving Average Ribbon\nOVERLAY\nma-ribbon\nStar\n[ ] Session VWAP\nOVERLAY\nsession-vwap\nStar\n[ ] SMA\nOVERLAY\nsma\nStar\n[ ] Smoothed Moving Average\nOVERLAY\nsmma\nStar\n[ ] Smoothed Moving Average (RMA)\nOVERLAY\nrma\nStar\n[ ] TEMA\nOVERLAY\ntema\nStar\n[ ] VWMA\nOVERLAY\nvwma\nStar\n[ ] WMA\nOVERLAY\nwma\nOSCILLATORS\nStar\n[ ] Awesome Oscillator\nPANE\nawesome-oscillator\nStar\n[ ] Bollinger Bands %B\nPANE\nbb-percent-b\nStar\n[ ] Chande Momentum Oscillator\nPANE\nchande-mo\nStar\n[ ] Commodity Channel Index (CCI)\nPANE\ncci\nStar\n[ ] Detrended Price Oscillator\nPANE\ndpo\nStar\n[ ] Fisher Transform\nPANE\nfisher-transform\nStar\n[ ] Relative Strength Index (RSI)\nPANE\nrsi\nStar\n[ ] Relative Vigor Index\nPANE\nrvi\nStar\n[ ] SMI Ergodic Indicator\nPANE\nsmi-ergodic\nStar\n[ ] SMI Ergodic Oscillator\nPANE\nsmi-ergodic-osc\nStar\n[ ] Stochastic\nPANE\nstoch\nStar\n[ ] Stochastic RSI\nPANE\nstoch-rsi\nStar\n[ ] True Strength Index\nPANE\ntsi\nStar\n[ ] Ultimate Oscillator\nPANE\nultimate-osc\nStar\n[ ] Williams %R\nPANE\nwilliams-r\nStar\n[ ] Woodies CCI\nPANE\nwoodies-cci\nTREND\nStar\n[ ] ADX\nPANE\nadx\nStar\n[ ] Aroon\nPANE\naroon\nStar\n[ ] BBTrend\nPANE\nbbtrend\nStar\n[ ] Chande Kroll Stop\nOVERLAY\nchande-kroll-stop\nStar\n[ ] Choppiness Index\nPANE\nchoppiness\nStar\n[ ] Directional Movement Index\nPANE\ndmi\nStar\n[ ] Ichimoku Cloud\nOVERLAY\nichimoku\nStar\n[ ] KAMA\nOVERLAY\nkama\nStar\n[ ] Linear Regression Channel\nOVERLAY\nlinear-regression-channel\nStar\n[ ] Mass Index\nPANE\nmass-index\nStar\n[ ] Parabolic SAR\nOVERLAY\nparabolic-sar\nStar\n[ ] Supertrend\nOVERLAY\nsupertrend\nStar\n[ ] Trend Strength Index\nPANE\ntrend-strength\nStar\n[ ] Vortex Indicator\nPANE\nvortex\nStar\n[ ] Williams Alligator\nOVERLAY\nwilliams-alligator\nStar\n[ ] Zig Zag\nOVERLAY\nzigzag\nVOLATILITY\nStar\n[ ] Average Day Range (ADR)\nPANE\nadr\nStar\n[ ] Average True Range (ATR)\nPANE\natr\nStar\n[ ] Bollinger BandWidth\nPANE\nbb-bandwidth\nStar\n[ ] Chaikin Volatility\nPANE\nchaikin-volatility\nStar\n[ ] Historical Volatility\nPANE\nhist-volatility\nStar\n[ ] Historical Volatility\nPANE\nhistorical-volatility\nStar\n[ ] Historical Volatility\nPANE\nhv\nStar\n[ ] Standard Deviation\nPANE\nstdev\nStar\n[ ] Standard Deviation\nPANE\nstddev\nVOLUME\nStar\n[ ] Chaikin Money Flow\nPANE\nchaikin-mf\nStar\n[ ] Chaikin Oscillator\nPANE\nchaikin-osc\nStar\n[ ] Ease of Movement\nPANE\neom\nStar\n[ ] Klinger Oscillator\nPANE\nklinger\nStar\n[ ] Money Flow Index\nPANE\nmfi\nStar\n[ ] On Balance Volume (OBV)\nPANE\nobv\nStar\n[ ] Price Volume Trend\nPANE\npvt\nStar\n[ ] Volume Oscillator\nPANE\nvolume-osc\nTEMPLATES\n0 saved\nSave\nSelect template\nLoad\nDel\nCUSTOM JS\nOverlay on main chart\nSave JS\nNIFTY\nClear all\nnone\nFUTURES CHAIN\nNFO NIFTY\nStream offline\nExpiry\tLTP\tChg%\tOI\tVol\tTradingsymbol\n2026-11-23\t-\t-\t-\t-\tNIFTY26NOVFUT\n2026-12-29\t-\t-\t-\t-\tNIFTY26DECFUT\n2027-01-25\t-\t-\t-\t-\tNIFTY27JANFUT\nF&O MARKERS\nATM\n₹0.00\nPCR\n-\nMAX PAIN\n₹0.00\nSUPPORT\n-\nRESISTANCE\n-",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 8040,
+    "failure": null
+  },
+  {
+    "path": "/fno/futures?symbol=BANKNIFTY",
+    "title": "OpenTerminalUI",
+    "url": "/fno/futures?symbol=BANKNIFTY",
+    "headings": [
+      "Futures desk · BANKNIFTY"
+    ],
+    "text": "SYMBOL\nNIFTY\nBANKNIFTY\nRELIANCE\nTCS\nINFY\nHDFCBANK\nICICIBANK\nSBIN\nLT\nAXISBANK\nKOTAKBANK\nITC\nBAJFINANCE\nMARUTI\nTATAMOTORS\nBHARTIARTL\nSUNPHARMA\nHCLTECH\nWIPRO\nADANIPORTS\nNTPC\nONGC\nEXPIRY\nNo expiry\nDATA\nNo expiry data\nUNIVERSE\nNSE F&O\nPOPULAR INDICES\nNIFTY\nBANKNIFTY\nFINNIFTY\nMIDCPNIFTY\nNIFTYNXT50\nFutures desk · BANKNIFTY\n\nThe chart shows underlying price history, not a selected futures contract. Contract quotes are listed separately.\n\nBANKNIFTY\n-\n-\nO:-H:-L:-C:-V:-\nTIMING\n1m\n2m\n5m\n15m\n30m\n1H\n1D\n1W\n1M\nETH\nTYPE\nCandlestick\nLine\nArea\nBaseline\nRenko\nKagi\nPoint & Figure\nLine Break\nFootprint · Orderflow\nINDICATORS\nDRAW\nNo valid chart bars for BANKNIFTY\nUNDERLYING PRICE\n-\n-\nHISTORICAL CLOSE\nVOLUME\nINDICATORS\n0/8 active | 0 favorites | BANKNIFTY\nTemplates in chart:indicator-templates:fno\nReset params\nFAVORITES 0\nACTIVE 0\nALL 81\nCHANNELS & BANDS 5\nMOMENTUM 11\nMOVING AVERAGES 16\nOSCILLATORS 16\nTREND 16\nVOLATILITY 9\nVOLUME 8\nCHANNELS & BANDS\nStar\n[ ] Bollinger Bands (BB)\nOVERLAY\nbb\nStar\n[ ] Donchian Channels (DC)\nOVERLAY\ndonchian\nStar\n[ ] Envelope\nOVERLAY\nenvelope\nStar\n[ ] Keltner Channels (KC)\nOVERLAY\nkeltner\nStar\n[ ] Median\nOVERLAY\nmedian\nMOMENTUM\nStar\n[ ] Balance of Power (BOP)\nPANE\nbop\nStar\n[ ] Bull Bear Power\nPANE\nbull-bear-power\nStar\n[ ] Coppock Curve\nPANE\ncoppock-curve\nStar\n[ ] Elder Force Index\nPANE\nelder-force\nStar\n[ ] KDJ\nPANE\nkdj\nStar\n[ ] MACD\nPANE\nmacd\nStar\n[ ] Momentum\nPANE\nmomentum\nStar\n[ ] Price Oscillator (PPO)\nPANE\nprice-oscillator\nStar\n[ ] Rate of Change (ROC)\nPANE\nroc\nStar\n[ ] TRIX\nPANE\ntrix\nStar\n[ ] Ultimate Oscillator\nPANE\nultimate-oscillator\nMOVING AVERAGES\nStar\n[ ] Anchored VWAP\nOVERLAY\nanchored-vwap\nStar\n[ ] Arnaud Legoux Moving Average (ALMA)\nOVERLAY\nalma\nStar\n[ ] DEMA\nOVERLAY\ndema\nStar\n[ ] EMA\nOVERLAY\nema\nStar\n[ ] Hull MA\nOVERLAY\nhma\nStar\n[ ] Least Squares Moving Average (LSMA)\nOVERLAY\nlsma\nStar\n[ ] MA Cross\nOVERLAY\nma-cross\nStar\n[ ] McGinley Dynamic\nOVERLAY\nmc-ginley-dynamic\nStar\n[ ] Moving Average Ribbon\nOVERLAY\nma-ribbon\nStar\n[ ] Session VWAP\nOVERLAY\nsession-vwap\nStar\n[ ] SMA\nOVERLAY\nsma\nStar\n[ ] Smoothed Moving Average\nOVERLAY\nsmma\nStar\n[ ] Smoothed Moving Average (RMA)\nOVERLAY\nrma\nStar\n[ ] TEMA\nOVERLAY\ntema\nStar\n[ ] VWMA\nOVERLAY\nvwma\nStar\n[ ] WMA\nOVERLAY\nwma\nOSCILLATORS\nStar\n[ ] Awesome Oscillator\nPANE\nawesome-oscillator\nStar\n[ ] Bollinger Bands %B\nPANE\nbb-percent-b\nStar\n[ ] Chande Momentum Oscillator\nPANE\nchande-mo\nStar\n[ ] Commodity Channel Index (CCI)\nPANE\ncci\nStar\n[ ] Detrended Price Oscillator\nPANE\ndpo\nStar\n[ ] Fisher Transform\nPANE\nfisher-transform\nStar\n[ ] Relative Strength Index (RSI)\nPANE\nrsi\nStar\n[ ] Relative Vigor Index\nPANE\nrvi\nStar\n[ ] SMI Ergodic Indicator\nPANE\nsmi-ergodic\nStar\n[ ] SMI Ergodic Oscillator\nPANE\nsmi-ergodic-osc\nStar\n[ ] Stochastic\nPANE\nstoch\nStar\n[ ] Stochastic RSI\nPANE\nstoch-rsi\nStar\n[ ] True Strength Index\nPANE\ntsi\nStar\n[ ] Ultimate Oscillator\nPANE\nultimate-osc\nStar\n[ ] Williams %R\nPANE\nwilliams-r\nStar\n[ ] Woodies CCI\nPANE\nwoodies-cci\nTREND\nStar\n[ ] ADX\nPANE\nadx\nStar\n[ ] Aroon\nPANE\naroon\nStar\n[ ] BBTrend\nPANE\nbbtrend\nStar\n[ ] Chande Kroll Stop\nOVERLAY\nchande-kroll-stop\nStar\n[ ] Choppiness Index\nPANE\nchoppiness\nStar\n[ ] Directional Movement Index\nPANE\ndmi\nStar\n[ ] Ichimoku Cloud\nOVERLAY\nichimoku\nStar\n[ ] KAMA\nOVERLAY\nkama\nStar\n[ ] Linear Regression Channel\nOVERLAY\nlinear-regression-channel\nStar\n[ ] Mass Index\nPANE\nmass-index\nStar\n[ ] Parabolic SAR\nOVERLAY\nparabolic-sar\nStar\n[ ] Supertrend\nOVERLAY\nsupertrend\nStar\n[ ] Trend Strength Index\nPANE\ntrend-strength\nStar\n[ ] Vortex Indicator\nPANE\nvortex\nStar\n[ ] Williams Alligator\nOVERLAY\nwilliams-alligator\nStar\n[ ] Zig Zag\nOVERLAY\nzigzag\nVOLATILITY\nStar\n[ ] Average Day Range (ADR)\nPANE\nadr\nStar\n[ ] Average True Range (ATR)\nPANE\natr\nStar\n[ ] Bollinger BandWidth\nPANE\nbb-bandwidth\nStar\n[ ] Chaikin Volatility\nPANE\nchaikin-volatility\nStar\n[ ] Historical Volatility\nPANE\nhist-volatility\nStar\n[ ] Historical Volatility\nPANE\nhistorical-volatility\nStar\n[ ] Historical Volatility\nPANE\nhv\nStar\n[ ] Standard Deviation\nPANE\nstdev\nStar\n[ ] Standard Deviation\nPANE\nstddev\nVOLUME\nStar\n[ ] Chaikin Money Flow\nPANE\nchaikin-mf\nStar\n[ ] Chaikin Oscillator\nPANE\nchaikin-osc\nStar\n[ ] Ease of Movement\nPANE\neom\nStar\n[ ] Klinger Oscillator\nPANE\nklinger\nStar\n[ ] Money Flow Index\nPANE\nmfi\nStar\n[ ] On Balance Volume (OBV)\nPANE\nobv\nStar\n[ ] Price Volume Trend\nPANE\npvt\nStar\n[ ] Volume Oscillator\nPANE\nvolume-osc\nTEMPLATES\n0 saved\nSave\nSelect template\nLoad\nDel\nCUSTOM JS\nOverlay on main chart\nSave JS\nBANKNIFTY\nClear all\nnone\nFUTURES CHAIN\nNFO BANKNIFTY\nStream offline\nExpiry\tLTP\tChg%\tOI\tVol\tTradingsymbol\n2026-11-23\t-\t-\t-\t-\tBANKNIFTY26NOVFUT\n2026-12-29\t-\t-\t-\t-\tBANKNIFTY26DECFUT\n2027-01-25\t-\t-\t-\t-\tBANKNIFTY27JANFUT\nF&O MARKERS\nATM\n₹0.00\nPCR\n-\nMAX PAIN\n₹0.00\nSUPPORT\n-\nRESISTANCE\n-",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 8288,
+    "failure": null
+  },
+  {
+    "path": "/fno/futures?symbol=RELIANCE",
+    "title": "OpenTerminalUI",
+    "url": "/fno/futures?symbol=RELIANCE",
+    "headings": [
+      "Futures desk · RELIANCE"
+    ],
+    "text": "SYMBOL\nNIFTY\nBANKNIFTY\nRELIANCE\nTCS\nINFY\nHDFCBANK\nICICIBANK\nSBIN\nLT\nAXISBANK\nKOTAKBANK\nITC\nBAJFINANCE\nMARUTI\nTATAMOTORS\nBHARTIARTL\nSUNPHARMA\nHCLTECH\nWIPRO\nADANIPORTS\nNTPC\nONGC\nEXPIRY\nNo expiry\nDATA\nNo expiry data\nUNIVERSE\nNSE F&O\nPOPULAR INDICES\nNIFTY\nBANKNIFTY\nFINNIFTY\nMIDCPNIFTY\nNIFTYNXT50\nFutures desk · RELIANCE\n\nThe chart shows underlying price history, not a selected futures contract. Contract quotes are listed separately.\n\nRELIANCE\n₹1,339.70\n+0.00%\nO:-H:-L:-C:-V:-\nTIMING\n1m\n2m\n5m\n15m\n30m\n1H\n1D\n1W\n1M\nETH\nTYPE\nCandlestick\nLine\nArea\nBaseline\nRenko\nKagi\nPoint & Figure\nLine Break\nFootprint · Orderflow\nINDICATORS\nDRAW\n\t\n\t\n\n\n\n\t\n\t\n\n\t\n\t\nUNDERLYING PRICE\n₹1,339.70\n+0.00%\nHISTORICAL CLOSE\nVOLUME\nINDICATORS\n0/8 active | 0 favorites | RELIANCE\nTemplates in chart:indicator-templates:fno\nReset params\nFAVORITES 0\nACTIVE 0\nALL 81\nCHANNELS & BANDS 5\nMOMENTUM 11\nMOVING AVERAGES 16\nOSCILLATORS 16\nTREND 16\nVOLATILITY 9\nVOLUME 8\nCHANNELS & BANDS\nStar\n[ ] Bollinger Bands (BB)\nOVERLAY\nbb\nStar\n[ ] Donchian Channels (DC)\nOVERLAY\ndonchian\nStar\n[ ] Envelope\nOVERLAY\nenvelope\nStar\n[ ] Keltner Channels (KC)\nOVERLAY\nkeltner\nStar\n[ ] Median\nOVERLAY\nmedian\nMOMENTUM\nStar\n[ ] Balance of Power (BOP)\nPANE\nbop\nStar\n[ ] Bull Bear Power\nPANE\nbull-bear-power\nStar\n[ ] Coppock Curve\nPANE\ncoppock-curve\nStar\n[ ] Elder Force Index\nPANE\nelder-force\nStar\n[ ] KDJ\nPANE\nkdj\nStar\n[ ] MACD\nPANE\nmacd\nStar\n[ ] Momentum\nPANE\nmomentum\nStar\n[ ] Price Oscillator (PPO)\nPANE\nprice-oscillator\nStar\n[ ] Rate of Change (ROC)\nPANE\nroc\nStar\n[ ] TRIX\nPANE\ntrix\nStar\n[ ] Ultimate Oscillator\nPANE\nultimate-oscillator\nMOVING AVERAGES\nStar\n[ ] Anchored VWAP\nOVERLAY\nanchored-vwap\nStar\n[ ] Arnaud Legoux Moving Average (ALMA)\nOVERLAY\nalma\nStar\n[ ] DEMA\nOVERLAY\ndema\nStar\n[ ] EMA\nOVERLAY\nema\nStar\n[ ] Hull MA\nOVERLAY\nhma\nStar\n[ ] Least Squares Moving Average (LSMA)\nOVERLAY\nlsma\nStar\n[ ] MA Cross\nOVERLAY\nma-cross\nStar\n[ ] McGinley Dynamic\nOVERLAY\nmc-ginley-dynamic\nStar\n[ ] Moving Average Ribbon\nOVERLAY\nma-ribbon\nStar\n[ ] Session VWAP\nOVERLAY\nsession-vwap\nStar\n[ ] SMA\nOVERLAY\nsma\nStar\n[ ] Smoothed Moving Average\nOVERLAY\nsmma\nStar\n[ ] Smoothed Moving Average (RMA)\nOVERLAY\nrma\nStar\n[ ] TEMA\nOVERLAY\ntema\nStar\n[ ] VWMA\nOVERLAY\nvwma\nStar\n[ ] WMA\nOVERLAY\nwma\nOSCILLATORS\nStar\n[ ] Awesome Oscillator\nPANE\nawesome-oscillator\nStar\n[ ] Bollinger Bands %B\nPANE\nbb-percent-b\nStar\n[ ] Chande Momentum Oscillator\nPANE\nchande-mo\nStar\n[ ] Commodity Channel Index (CCI)\nPANE\ncci\nStar\n[ ] Detrended Price Oscillator\nPANE\ndpo\nStar\n[ ] Fisher Transform\nPANE\nfisher-transform\nStar\n[ ] Relative Strength Index (RSI)\nPANE\nrsi\nStar\n[ ] Relative Vigor Index\nPANE\nrvi\nStar\n[ ] SMI Ergodic Indicator\nPANE\nsmi-ergodic\nStar\n[ ] SMI Ergodic Oscillator\nPANE\nsmi-ergodic-osc\nStar\n[ ] Stochastic\nPANE\nstoch\nStar\n[ ] Stochastic RSI\nPANE\nstoch-rsi\nStar\n[ ] True Strength Index\nPANE\ntsi\nStar\n[ ] Ultimate Oscillator\nPANE\nultimate-osc\nStar\n[ ] Williams %R\nPANE\nwilliams-r\nStar\n[ ] Woodies CCI\nPANE\nwoodies-cci\nTREND\nStar\n[ ] ADX\nPANE\nadx\nStar\n[ ] Aroon\nPANE\naroon\nStar\n[ ] BBTrend\nPANE\nbbtrend\nStar\n[ ] Chande Kroll Stop\nOVERLAY\nchande-kroll-stop\nStar\n[ ] Choppiness Index\nPANE\nchoppiness\nStar\n[ ] Directional Movement Index\nPANE\ndmi\nStar\n[ ] Ichimoku Cloud\nOVERLAY\nichimoku\nStar\n[ ] KAMA\nOVERLAY\nkama\nStar\n[ ] Linear Regression Channel\nOVERLAY\nlinear-regression-channel\nStar\n[ ] Mass Index\nPANE\nmass-index\nStar\n[ ] Parabolic SAR\nOVERLAY\nparabolic-sar\nStar\n[ ] Supertrend\nOVERLAY\nsupertrend\nStar\n[ ] Trend Strength Index\nPANE\ntrend-strength\nStar\n[ ] Vortex Indicator\nPANE\nvortex\nStar\n[ ] Williams Alligator\nOVERLAY\nwilliams-alligator\nStar\n[ ] Zig Zag\nOVERLAY\nzigzag\nVOLATILITY\nStar\n[ ] Average Day Range (ADR)\nPANE\nadr\nStar\n[ ] Average True Range (ATR)\nPANE\natr\nStar\n[ ] Bollinger BandWidth\nPANE\nbb-bandwidth\nStar\n[ ] Chaikin Volatility\nPANE\nchaikin-volatility\nStar\n[ ] Historical Volatility\nPANE\nhist-volatility\nStar\n[ ] Historical Volatility\nPANE\nhistorical-volatility\nStar\n[ ] Historical Volatility\nPANE\nhv\nStar\n[ ] Standard Deviation\nPANE\nstdev\nStar\n[ ] Standard Deviation\nPANE\nstddev\nVOLUME\nStar\n[ ] Chaikin Money Flow\nPANE\nchaikin-mf\nStar\n[ ] Chaikin Oscillator\nPANE\nchaikin-osc\nStar\n[ ] Ease of Movement\nPANE\neom\nStar\n[ ] Klinger Oscillator\nPANE\nklinger\nStar\n[ ] Money Flow Index\nPANE\nmfi\nStar\n[ ] On Balance Volume (OBV)\nPANE\nobv\nStar\n[ ] Price Volume Trend\nPANE\npvt\nStar\n[ ] Volume Oscillator\nPANE\nvolume-osc\nTEMPLATES\n0 saved\nSave\nSelect template\nLoad\nDel\nCUSTOM JS\nOverlay on main chart\nSave JS\nRELIANCE\nClear all\nnone\nFUTURES CHAIN\nNFO RELIANCE\nStream offline\nORDERFLOW\n\t\n\t\n\n\n\n\t\n\t\n\n\t\n\t\nExpiry\tLTP\tChg%\tOI\tVol\tTradingsymbol\n2026-11-23\t-\t-\t-\t-\tRELIANCE26NOVFUT\n2026-12-29\t-\t-\t-\t-\tRELIANCE26DECFUT\n2027-01-25\t-\t-\t-\t-\tRELIANCE27JANFUT\nF&O MARKERS\nATM\n₹0.00\nPCR\n-\nMAX PAIN\n₹0.00\nSUPPORT\n-\nRESISTANCE\n-",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 7001,
+    "failure": null
+  },
+  {
+    "path": "/fno/futures?symbol=AAPL",
+    "title": "OpenTerminalUI",
+    "url": "/fno/futures?symbol=AAPL",
+    "headings": [
+      "Futures desk · AAPL"
+    ],
+    "text": "SYMBOL\nNIFTY\nBANKNIFTY\nRELIANCE\nTCS\nINFY\nHDFCBANK\nICICIBANK\nSBIN\nLT\nAXISBANK\nKOTAKBANK\nITC\nBAJFINANCE\nMARUTI\nTATAMOTORS\nBHARTIARTL\nSUNPHARMA\nHCLTECH\nWIPRO\nADANIPORTS\nNTPC\nONGC\nAAPL\nEXPIRY\n2026-11-16\n2026-11-18\n2026-11-20\n2026-11-23\n2026-11-25\n2026-11-27\n2026-12-04\n2026-12-11\n2026-12-18\n2026-12-24\n2026-12-31\n2027-01-15\n2027-02-19\n2027-03-19\n2027-04-16\n2027-06-17\n2027-09-17\n2027-12-17\n2028-01-21\n2028-03-17\n2028-06-16\n2028-12-15\n2029-01-19\nDATA\nRefresh every 60s\nUNIVERSE\nUS F&O\nPOPULAR INDICES\nNIFTY\nBANKNIFTY\nFINNIFTY\nMIDCPNIFTY\nNIFTYNXT50\nFutures desk · AAPL\n\nThe chart shows underlying price history, not a selected futures contract. Contract quotes are listed separately.\n\nAAPL\n$356.27\n+0.39%\nO:-H:-L:-C:-V:-\nTIMING\n1m\n2m\n5m\n15m\n30m\n1H\n1D\n1W\n1M\nETH\nTYPE\nCandlestick\nLine\nArea\nBaseline\nRenko\nKagi\nPoint & Figure\nLine Break\nFootprint · Orderflow\nINDICATORS\nDRAW\n\t\n\t\n\n\n\n\t\n\t\n\n\t\n\t\nUNDERLYING PRICE\n$356.27\n+0.39%\nHISTORICAL CLOSE\nVOLUME\nINDICATORS\n0/8 active | 0 favorites | AAPL\nTemplates in chart:indicator-templates:fno\nReset params\nFAVORITES 0\nACTIVE 0\nALL 81\nCHANNELS & BANDS 5\nMOMENTUM 11\nMOVING AVERAGES 16\nOSCILLATORS 16\nTREND 16\nVOLATILITY 9\nVOLUME 8\nCHANNELS & BANDS\nStar\n[ ] Bollinger Bands (BB)\nOVERLAY\nbb\nStar\n[ ] Donchian Channels (DC)\nOVERLAY\ndonchian\nStar\n[ ] Envelope\nOVERLAY\nenvelope\nStar\n[ ] Keltner Channels (KC)\nOVERLAY\nkeltner\nStar\n[ ] Median\nOVERLAY\nmedian\nMOMENTUM\nStar\n[ ] Balance of Power (BOP)\nPANE\nbop\nStar\n[ ] Bull Bear Power\nPANE\nbull-bear-power\nStar\n[ ] Coppock Curve\nPANE\ncoppock-curve\nStar\n[ ] Elder Force Index\nPANE\nelder-force\nStar\n[ ] KDJ\nPANE\nkdj\nStar\n[ ] MACD\nPANE\nmacd\nStar\n[ ] Momentum\nPANE\nmomentum\nStar\n[ ] Price Oscillator (PPO)\nPANE\nprice-oscillator\nStar\n[ ] Rate of Change (ROC)\nPANE\nroc\nStar\n[ ] TRIX\nPANE\ntrix\nStar\n[ ] Ultimate Oscillator\nPANE\nultimate-oscillator\nMOVING AVERAGES\nStar\n[ ] Anchored VWAP\nOVERLAY\nanchored-vwap\nStar\n[ ] Arnaud Legoux Moving Average (ALMA)\nOVERLAY\nalma\nStar\n[ ] DEMA\nOVERLAY\ndema\nStar\n[ ] EMA\nOVERLAY\nema\nStar\n[ ] Hull MA\nOVERLAY\nhma\nStar\n[ ] Least Squares Moving Average (LSMA)\nOVERLAY\nlsma\nStar\n[ ] MA Cross\nOVERLAY\nma-cross\nStar\n[ ] McGinley Dynamic\nOVERLAY\nmc-ginley-dynamic\nStar\n[ ] Moving Average Ribbon\nOVERLAY\nma-ribbon\nStar\n[ ] Session VWAP\nOVERLAY\nsession-vwap\nStar\n[ ] SMA\nOVERLAY\nsma\nStar\n[ ] Smoothed Moving Average\nOVERLAY\nsmma\nStar\n[ ] Smoothed Moving Average (RMA)\nOVERLAY\nrma\nStar\n[ ] TEMA\nOVERLAY\ntema\nStar\n[ ] VWMA\nOVERLAY\nvwma\nStar\n[ ] WMA\nOVERLAY\nwma\nOSCILLATORS\nStar\n[ ] Awesome Oscillator\nPANE\nawesome-oscillator\nStar\n[ ] Bollinger Bands %B\nPANE\nbb-percent-b\nStar\n[ ] Chande Momentum Oscillator\nPANE\nchande-mo\nStar\n[ ] Commodity Channel Index (CCI)\nPANE\ncci\nStar\n[ ] Detrended Price Oscillator\nPANE\ndpo\nStar\n[ ] Fisher Transform\nPANE\nfisher-transform\nStar\n[ ] Relative Strength Index (RSI)\nPANE\nrsi\nStar\n[ ] Relative Vigor Index\nPANE\nrvi\nStar\n[ ] SMI Ergodic Indicator\nPANE\nsmi-ergodic\nStar\n[ ] SMI Ergodic Oscillator\nPANE\nsmi-ergodic-osc\nStar\n[ ] Stochastic\nPANE\nstoch\nStar\n[ ] Stochastic RSI\nPANE\nstoch-rsi\nStar\n[ ] True Strength Index\nPANE\ntsi\nStar\n[ ] Ultimate Oscillator\nPANE\nultimate-osc\nStar\n[ ] Williams %R\nPANE\nwilliams-r\nStar\n[ ] Woodies CCI\nPANE\nwoodies-cci\nTREND\nStar\n[ ] ADX\nPANE\nadx\nStar\n[ ] Aroon\nPANE\naroon\nStar\n[ ] BBTrend\nPANE\nbbtrend\nStar\n[ ] Chande Kroll Stop\nOVERLAY\nchande-kroll-stop\nStar\n[ ] Choppiness Index\nPANE\nchoppiness\nStar\n[ ] Directional Movement Index\nPANE\ndmi\nStar\n[ ] Ichimoku Cloud\nOVERLAY\nichimoku\nStar\n[ ] KAMA\nOVERLAY\nkama\nStar\n[ ] Linear Regression Channel\nOVERLAY\nlinear-regression-channel\nStar\n[ ] Mass Index\nPANE\nmass-index\nStar\n[ ] Parabolic SAR\nOVERLAY\nparabolic-sar\nStar\n[ ] Supertrend\nOVERLAY\nsupertrend\nStar\n[ ] Trend Strength Index\nPANE\ntrend-strength\nStar\n[ ] Vortex Indicator\nPANE\nvortex\nStar\n[ ] Williams Alligator\nOVERLAY\nwilliams-alligator\nStar\n[ ] Zig Zag\nOVERLAY\nzigzag\nVOLATILITY\nStar\n[ ] Average Day Range (ADR)\nPANE\nadr\nStar\n[ ] Average True Range (ATR)\nPANE\natr\nStar\n[ ] Bollinger BandWidth\nPANE\nbb-bandwidth\nStar\n[ ] Chaikin Volatility\nPANE\nchaikin-volatility\nStar\n[ ] Historical Volatility\nPANE\nhist-volatility\nStar\n[ ] Historical Volatility\nPANE\nhistorical-volatility\nStar\n[ ] Historical Volatility\nPANE\nhv\nStar\n[ ] Standard Deviation\nPANE\nstdev\nStar\n[ ] Standard Deviation\nPANE\nstddev\nVOLUME\nStar\n[ ] Chaikin Money Flow\nPANE\nchaikin-mf\nStar\n[ ] Chaikin Oscillator\nPANE\nchaikin-osc\nStar\n[ ] Ease of Movement\nPANE\neom\nStar\n[ ] Klinger Oscillator\nPANE\nklinger\nStar\n[ ] Money Flow Index\nPANE\nmfi\nStar\n[ ] On Balance Volume (OBV)\nPANE\nobv\nStar\n[ ] Price Volume Trend\nPANE\npvt\nStar\n[ ] Volume Oscillator\nPANE\nvolume-osc\nTEMPLATES\n0 saved\nSave\nSelect template\nLoad\nDel\nCUSTOM JS\nOverlay on main chart\nSave JS\nAAPL\nClear all\n\nThe NFO futures chain supports Indian underlyings. US equity price history above is not a US futures contract.\n\nF&O MARKERS\nATM\n$357.50\nPCR\n1.06\nMAX PAIN\n$355.00\nSUPPORT\n$350.00, $355.00\nRESISTANCE\n$355.00, $365.00",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 7000,
+    "failure": null
+  },
+  {
+    "path": "/fno/flow?symbol=NIFTY",
+    "title": "OpenTerminalUI",
+    "url": "/fno/flow?symbol=NIFTY",
+    "headings": [],
+    "text": "SYMBOL\nNIFTY\nBANKNIFTY\nRELIANCE\nTCS\nINFY\nHDFCBANK\nICICIBANK\nSBIN\nLT\nAXISBANK\nKOTAKBANK\nITC\nBAJFINANCE\nMARUTI\nTATAMOTORS\nBHARTIARTL\nSUNPHARMA\nHCLTECH\nWIPRO\nADANIPORTS\nNTPC\nONGC\nEXPIRY\nNo expiry\nDATA\nNo expiry data\nUNIVERSE\nNSE F&O\nPOPULAR INDICES\nNIFTY\nBANKNIFTY\nFINNIFTY\nMIDCPNIFTY\nNIFTYNXT50\nnone\nOPTIONS FLOW\nUNUSUAL ACTIVITY TRACKER\nTOTAL PREMIUM\n0\nSENTIMENT SPLIT\n0.0 / 0.0\nMOST ACTIVE\nN/A\n-\nFLOW COUNT\n0\nnone\nFLOW TAPE\nLIVE EVERY 60S\nSYMBOL\nTYPE\nAll\nCalls\nPuts\nEXPIRY\nAll expiries\nMIN PREMIUM\nSORT\nTime\nHeat Score\nPremium\nTIME\tSYMBOL\tEXPIRY\tSTRIKE\tTYPE\tVOLUME\tOI CHG\tPREMIUM\tIV\tHEAT SCORE\tSENTIMENT\nNo unusual activity found for the current filters.\nnone\nPREMIUM FLOW\nBULLISH VS BEARISH PREMIUM OVER TIME\nToday\nLast 5 Days",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 9990,
+    "failure": null
+  }
+]

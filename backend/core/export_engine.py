@@ -3,15 +3,29 @@ import io
 from typing import Any, List, Dict, Optional
 from datetime import datetime
 
+
+def spreadsheet_literal(value: Any) -> Any:
+    """Keep untrusted strings as data when opened by spreadsheet software.
+
+    CSV quoting alone does not prevent formula execution. Preserve numeric
+    Python values, but neutralize formula/control prefixes in string cells.
+    """
+    if isinstance(value, str) and (
+        value.startswith(("\t", "\r", "\n"))
+        or value.lstrip(" \t\r\n").startswith(("=", "+", "-", "@"))
+    ):
+        return "'" + value
+    return value
+
 def export_csv(data: List[Dict[str, Any]], columns: Optional[List[str]] = None) -> str:
     """Export list of dicts to CSV string."""
     if not data:
         return ""
     columns = columns or list(data[0].keys())
     output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=columns, extrasaction="ignore")
-    writer.writeheader()
-    writer.writerows(data)
+    writer = csv.writer(output)
+    writer.writerow([spreadsheet_literal(column) for column in columns])
+    writer.writerows([[spreadsheet_literal(row.get(column)) for column in columns] for row in data])
     return output.getvalue()
 
 def export_excel(sheets: Dict[str, List[Dict[str, Any]]]) -> bytes:
@@ -37,7 +51,7 @@ def export_excel(sheets: Dict[str, List[Dict[str, Any]]]) -> bytes:
         header_font = Font(bold=True, color="FFFFFF")
         header_fill = PatternFill(start_color="1a1a2e", end_color="1a1a2e", fill_type="solid")
         for col, header in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col, value=header.replace("_", " ").title())
+            cell = ws.cell(row=1, column=col, value=spreadsheet_literal(header.replace("_", " ").title()))
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = Alignment(horizontal="center")
@@ -51,7 +65,7 @@ def export_excel(sheets: Dict[str, List[Dict[str, Any]]]) -> bytes:
                     import json
                     value = json.dumps(value)
                 
-                cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                cell = ws.cell(row=row_idx, column=col_idx, value=spreadsheet_literal(value))
                 # Format numbers
                 if isinstance(value, float):
                     cell.number_format = '#,##0.00'

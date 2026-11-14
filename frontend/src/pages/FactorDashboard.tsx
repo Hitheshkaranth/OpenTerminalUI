@@ -126,13 +126,13 @@ export function FactorDashboardPage() {
                 ))}
               </tbody>
             </table>
-            {!ideas.length && <div className="p-3 text-xs text-terminal-muted">{ideasQuery.isLoading ? "Loading ideas..." : "No ideas returned."}</div>}
+            {!ideas.length && <div className="p-3 text-xs text-terminal-muted" role={ideasQuery.isError ? "alert" : "status"}>{ideasQuery.isLoading ? "Loading ideas..." : ideasQuery.isError ? "Factor data could not be loaded. Check the provider and retry." : "No supported top-quintile ideas. Missing observations are excluded, and tied scores do not create an alphabetical ranking."}</div>}
           </div>
         </TerminalPanel>
 
         <TerminalPanel title={activeIdea?.symbol || "Factor Radar"} subtitle={activeIdea?.name || activeIdea?.company_name || "Select an idea"}>
           <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
+            {activeIdea ? <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={radarRows} outerRadius="72%">
                 <PolarGrid />
                 <PolarAngleAxis dataKey="factor" />
@@ -140,14 +140,14 @@ export function FactorDashboardPage() {
                 <Tooltip />
                 <Radar dataKey="score" stroke="#22c55e" fill="#22c55e" fillOpacity={0.22} />
               </RadarChart>
-            </ResponsiveContainer>
+            </ResponsiveContainer> : <p className="p-4 text-sm leading-6 text-terminal-muted">No ranked factor observations are available for this selection.</p>}
           </div>
           <div className="mt-2 flex flex-wrap gap-1">
             {factorChips(activeIdea, activeFactors).map((chip) => <span key={chip} className="rounded border border-terminal-accent/50 bg-terminal-accent/10 px-2 py-0.5 text-[10px] text-terminal-accent">{chip}</span>)}
           </div>
           <div className="mt-3 rounded border border-terminal-border bg-terminal-bg p-2 text-xs text-terminal-muted">
             <div className="mb-1 font-semibold uppercase tracking-wide text-terminal-text">Why Ranked</div>
-            {whyRanked.length ? whyRanked.map((item) => <div key={String(item)}>{String(item)}</div>) : <div>Composite factor score ranks in the top quintile for the selected market universe.</div>}
+            {whyRanked.length ? whyRanked.map((item) => <div key={String(item)}>{String(item)}</div>) : <div>{activeIdea ? "Composite factor score ranks in the top quintile for the selected market universe. Inspect available component metrics before relying on the comparison." : "No ranking explanation is available without supported factor observations."}</div>}
           </div>
         </TerminalPanel>
       </div>

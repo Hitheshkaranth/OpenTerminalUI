@@ -1,0 +1,88 @@
+[
+  {
+    "path": "/equity/security/AAPL?ticker=AAPL",
+    "title": "OpenTerminalUI",
+    "url": "/equity/security/AAPL?ticker=AAPL",
+    "headings": [],
+    "text": "AAPL\nNASDAQ\nTECHNOLOGY\nBullish 0.15\nApple Inc.\nLAST\n356.27\nCHANGE %\n+0.39%\nVOLUME\n39.99M\nOVERVIEW\nFINANCIALS\nCHART\nNEWS\nOWNERSHIP\nESTIMATES\nPEERS\nESG\nTAPE\nINSIDER\nFILINGS\nEXPORT REPORT\nRESEARCH NOTE\nV\nnone\nOVERVIEW\nDES-STYLE SNAPSHOT\nDELAYED · YAHOO\nMARKET CAP\n5.18T\nP/E\n39.5\nDIV YIELD\n0.30%\n52W RANGE\n243.42 - 360.83\n52-WEEK POSITION\nOPEN\n357.96\nHIGH\n360.83\nLOW\n355.75\nP/B\n46.19\nEV/EBITDA\n30.41\nROE\n142.3%\nNET MARGIN\n27.6%\nREV GROWTH\n11.7%\nEPS GROWTH\n14.1%\nANALYST CONSENSUS\nNo analyst ratings from the current data source.\nCLASSIFICATION\nSector: Technology\nIndustry: Consumer Electronics\nCountry: US\nCurrency: USD\nnone\nPRICE\nHOVER THE CHART FOR ANY DAY'S CLOSE\n356.27\n+58.54 (+19.66%)over 6M\n1M\n3M\n6M\n1Y\n5Y\n\t\n\t\n\n\t\n\t\nAAPL up 19.66 percent over 6M\nPREV CLOSE\n354.88\nAVG VOLUME (30D)\n44.14M\nBETA\n1.09\nnone\nGROWTH & HEADWINDS\nPRIMARY-DOCUMENT SIGNALS\nOPEN FILINGS\n\nNo growth / headwind read yet. Import documents into the Filings tab and run an analysis to surface cited drivers of return.\n\nGO TO FILINGS\nnone\nREVERSE DCF\nWHAT THE PRICE IMPLIES\nIMPLIED GROWTH\n19.1%\nHistorical 3y revenue CAGR\n7.7%\nHistorical 3y profit CAGR\n10.9%\nREAD\nPRICED FOR PERFECTION\nAI CATALYST CONVICTIONNo catalyst notes ingested for AAPL yet.\nOpen screener",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [
+      {
+        "path": "/api/filings-rag/AAPL/analysis",
+        "status": 404
+      },
+      {
+        "path": "/api/filings-rag/AAPL/knowledge",
+        "status": 404
+      },
+      {
+        "path": "/api/stock-picking/conviction/AAPL",
+        "status": 404
+      },
+      {
+        "path": "/api/filings-rag/AAPL/analysis",
+        "status": 404
+      },
+      {
+        "path": "/api/filings-rag/AAPL/knowledge",
+        "status": 404
+      },
+      {
+        "path": "/api/stock-picking/conviction/AAPL",
+        "status": 404
+      },
+      {
+        "path": "/api/filings-rag/AAPL/analysis",
+        "status": 404
+      },
+      {
+        "path": "/api/filings-rag/AAPL/analysis",
+        "status": 404
+      }
+    ],
+    "pending": [],
+    "waitMs": 9963,
+    "failure": null
+  },
+  {
+    "path": "/equity/commodities?symbol=GC%3DF",
+    "title": "OpenTerminalUI",
+    "url": "/equity/commodities?symbol=GC%3DF",
+    "headings": [],
+    "text": "none\nCOMMODITIES TERMINAL\nENERGY, METALS, AND AGRICULTURE FUTURES WITH CURVE AND SEASONALITY CONTEXT\nPROVIDER RESPONSE\nCMDTY\nENERGY\nMETALS\nAGRICULTURE\nCommand aliases:\nCOMMODITY\nGOLD\nOIL\nMETALS\nFront-month futures (Yahoo continuous contract) with daily move and liquidity\nCONTRACT\tLAST\tCHG\tCHG%\t1M\tVOLUME\t1M TREND\n\nGC=F\nGold Dec 26\n\t3,886.3\t+1.00\t+0.03%\t-6.81%\t151K\t\n\n\nSI=F\nSilver Dec 26\n\t49.12\t-0.94\t-1.89%\t-13.73%\t49.7K\t\n\n\nHG=F\nCopper Dec 26\n\t6.09\t-0.11\t-1.70%\t-6.63%\t53.7K\t\n\n\nPL=F\nPlatinum Jan 27\n\t1,489.7\t-30.70\t-2.02%\t-7.59%\t13K\t\nnone\nGOLD DEC 26 SNAPSHOT\nGC=F\nOPEN SECURITY\nLAST\n3,886.3\nDAY\n+1.00 (+0.03%)\nVOLUME\n151K\n3,886.30\n-799.00 (-17.05%)over 6M\n1M\n3M\n6M\n1Y\n5Y\n\t\n\t\n\n\t\n\t\nGC=F down 17.05 percent over 6M\nnone\nTERM STRUCTURE\nGC=F FUTURES CURVE · CONTANGO (+2.1% FRONT → BACK)\nFront\nJan 2027\nFeb 2027\nMar 2027\nApr 2027\nMay 2027\n3884.3\n3909.3\n3934.3\n3959.3\n3970.5\nnone\nLINKED COMPANIES\nWHO A GOLD PRICE RISE HURTS AND HELPS\nALL\nIN\nUS\n\nJewellers carry gold inventory and face demand elasticity; miners and royalty companies gain; gold-loan NBFCs benefit as collateral values rise.\n\nHURT BY A PRICE RISE (INPUT COST)\nKALYANKJILKalyan Jewellers\nJewellery\nIN\nMEDIUM\nSENCOSenco Gold\nJewellery\nIN\nMEDIUM\nTITANTitan Company\nJewellery\nIN\nMEDIUM\nSIGSignet Jewelers\nJewellery\nUS\nLOW\nHELPED BY A PRICE RISE (OUTPUT PRICE)\nMANAPPURAMManappuram Finance\nGold loans\nIN\nMEDIUM\nMUTHOOTFINMuthoot Finance\nGold loans\nIN\nMEDIUM\nAEMAgnico Eagle Mines\nGold mining\nUS\nHIGH\nBBarrick Mining\nGold mining\nUS\nHIGH\nFNVFranco-Nevada\nRoyalties\nUS\nMEDIUM\nKGCKinross Gold\nGold mining\nUS\nHIGH\nNEMNewmont\nGold mining\nUS\nHIGH\nnone\nSEASONALITY\nGC=F MONTHLY AVERAGE PROFILE OVER 11 YEARS\nJan\nFeb\nMar\nApr\nMay\nJun\nJul\nAug\nSep\nOct\nNov\nDec\n-4\n-2\n0\n2\n4",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 3134,
+    "failure": null
+  },
+  {
+    "path": "/fno/futures?symbol=RELIANCE",
+    "title": "OpenTerminalUI",
+    "url": "/fno/futures?symbol=RELIANCE",
+    "headings": [
+      "Futures desk · RELIANCE"
+    ],
+    "text": "SYMBOL\nNIFTY\nBANKNIFTY\nRELIANCE\nTCS\nINFY\nHDFCBANK\nICICIBANK\nSBIN\nLT\nAXISBANK\nKOTAKBANK\nITC\nBAJFINANCE\nMARUTI\nTATAMOTORS\nBHARTIARTL\nSUNPHARMA\nHCLTECH\nWIPRO\nADANIPORTS\nNTPC\nONGC\nEXPIRY\nNo expiry\nDATA\nNo expiry data\nUNIVERSE\nNSE F&O\nPOPULAR INDICES\nNIFTY\nBANKNIFTY\nFINNIFTY\nMIDCPNIFTY\nNIFTYNXT50\nFutures desk · RELIANCE\n\nThe chart shows underlying price history, not a selected futures contract. Contract quotes are listed separately.\n\nRELIANCE\n₹1,339.70\n+0.00%\nTIMING\n1m\n2m\n5m\n15m\n30m\n1H\n1D\n1W\n1M\nETH\nTYPE\nCandlestick\nLine\nArea\nBaseline\nRenko\nKagi\nPoint & Figure\nLine Break\nFootprint · Orderflow\nINDICATORS\nDRAW\n\t\n\t\n\n\n\n\t\n\t\n\n\t\n\t\nUNDERLYING PRICE\n₹1,339.70\n+0.00%\nHISTORICAL CLOSE\nVOLUME\nINDICATORS\n0/8 active | 0 favorites | RELIANCE\nTemplates in chart:indicator-templates:fno\nReset params\nFAVORITES 0\nACTIVE 0\nALL 81\nCHANNELS & BANDS 5\nMOMENTUM 11\nMOVING AVERAGES 16\nOSCILLATORS 16\nTREND 16\nVOLATILITY 9\nVOLUME 8\nCHANNELS & BANDS\nStar\n[ ] Bollinger Bands (BB)\nOVERLAY\nbb\nStar\n[ ] Donchian Channels (DC)\nOVERLAY\ndonchian\nStar\n[ ] Envelope\nOVERLAY\nenvelope\nStar\n[ ] Keltner Channels (KC)\nOVERLAY\nkeltner\nStar\n[ ] Median\nOVERLAY\nmedian\nMOMENTUM\nStar\n[ ] Balance of Power (BOP)\nPANE\nbop\nStar\n[ ] Bull Bear Power\nPANE\nbull-bear-power\nStar\n[ ] Coppock Curve\nPANE\ncoppock-curve\nStar\n[ ] Elder Force Index\nPANE\nelder-force\nStar\n[ ] KDJ\nPANE\nkdj\nStar\n[ ] MACD\nPANE\nmacd\nStar\n[ ] Momentum\nPANE\nmomentum\nStar\n[ ] Price Oscillator (PPO)\nPANE\nprice-oscillator\nStar\n[ ] Rate of Change (ROC)\nPANE\nroc\nStar\n[ ] TRIX\nPANE\ntrix\nStar\n[ ] Ultimate Oscillator\nPANE\nultimate-oscillator\nMOVING AVERAGES\nStar\n[ ] Anchored VWAP\nOVERLAY\nanchored-vwap\nStar\n[ ] Arnaud Legoux Moving Average (ALMA)\nOVERLAY\nalma\nStar\n[ ] DEMA\nOVERLAY\ndema\nStar\n[ ] EMA\nOVERLAY\nema\nStar\n[ ] Hull MA\nOVERLAY\nhma\nStar\n[ ] Least Squares Moving Average (LSMA)\nOVERLAY\nlsma\nStar\n[ ] MA Cross\nOVERLAY\nma-cross\nStar\n[ ] McGinley Dynamic\nOVERLAY\nmc-ginley-dynamic\nStar\n[ ] Moving Average Ribbon\nOVERLAY\nma-ribbon\nStar\n[ ] Session VWAP\nOVERLAY\nsession-vwap\nStar\n[ ] SMA\nOVERLAY\nsma\nStar\n[ ] Smoothed Moving Average\nOVERLAY\nsmma\nStar\n[ ] Smoothed Moving Average (RMA)\nOVERLAY\nrma\nStar\n[ ] TEMA\nOVERLAY\ntema\nStar\n[ ] VWMA\nOVERLAY\nvwma\nStar\n[ ] WMA\nOVERLAY\nwma\nOSCILLATORS\nStar\n[ ] Awesome Oscillator\nPANE\nawesome-oscillator\nStar\n[ ] Bollinger Bands %B\nPANE\nbb-percent-b\nStar\n[ ] Chande Momentum Oscillator\nPANE\nchande-mo\nStar\n[ ] Commodity Channel Index (CCI)\nPANE\ncci\nStar\n[ ] Detrended Price Oscillator\nPANE\ndpo\nStar\n[ ] Fisher Transform\nPANE\nfisher-transform\nStar\n[ ] Relative Strength Index (RSI)\nPANE\nrsi\nStar\n[ ] Relative Vigor Index\nPANE\nrvi\nStar\n[ ] SMI Ergodic Indicator\nPANE\nsmi-ergodic\nStar\n[ ] SMI Ergodic Oscillator\nPANE\nsmi-ergodic-osc\nStar\n[ ] Stochastic\nPANE\nstoch\nStar\n[ ] Stochastic RSI\nPANE\nstoch-rsi\nStar\n[ ] True Strength Index\nPANE\ntsi\nStar\n[ ] Ultimate Oscillator\nPANE\nultimate-osc\nStar\n[ ] Williams %R\nPANE\nwilliams-r\nStar\n[ ] Woodies CCI\nPANE\nwoodies-cci\nTREND\nStar\n[ ] ADX\nPANE\nadx\nStar\n[ ] Aroon\nPANE\naroon\nStar\n[ ] BBTrend\nPANE\nbbtrend\nStar\n[ ] Chande Kroll Stop\nOVERLAY\nchande-kroll-stop\nStar\n[ ] Choppiness Index\nPANE\nchoppiness\nStar\n[ ] Directional Movement Index\nPANE\ndmi\nStar\n[ ] Ichimoku Cloud\nOVERLAY\nichimoku\nStar\n[ ] KAMA\nOVERLAY\nkama\nStar\n[ ] Linear Regression Channel\nOVERLAY\nlinear-regression-channel\nStar\n[ ] Mass Index\nPANE\nmass-index\nStar\n[ ] Parabolic SAR\nOVERLAY\nparabolic-sar\nStar\n[ ] Supertrend\nOVERLAY\nsupertrend\nStar\n[ ] Trend Strength Index\nPANE\ntrend-strength\nStar\n[ ] Vortex Indicator\nPANE\nvortex\nStar\n[ ] Williams Alligator\nOVERLAY\nwilliams-alligator\nStar\n[ ] Zig Zag\nOVERLAY\nzigzag\nVOLATILITY\nStar\n[ ] Average Day Range (ADR)\nPANE\nadr\nStar\n[ ] Average True Range (ATR)\nPANE\natr\nStar\n[ ] Bollinger BandWidth\nPANE\nbb-bandwidth\nStar\n[ ] Chaikin Volatility\nPANE\nchaikin-volatility\nStar\n[ ] Historical Volatility\nPANE\nhist-volatility\nStar\n[ ] Historical Volatility\nPANE\nhistorical-volatility\nStar\n[ ] Historical Volatility\nPANE\nhv\nStar\n[ ] Standard Deviation\nPANE\nstdev\nStar\n[ ] Standard Deviation\nPANE\nstddev\nVOLUME\nStar\n[ ] Chaikin Money Flow\nPANE\nchaikin-mf\nStar\n[ ] Chaikin Oscillator\nPANE\nchaikin-osc\nStar\n[ ] Ease of Movement\nPANE\neom\nStar\n[ ] Klinger Oscillator\nPANE\nklinger\nStar\n[ ] Money Flow Index\nPANE\nmfi\nStar\n[ ] On Balance Volume (OBV)\nPANE\nobv\nStar\n[ ] Price Volume Trend\nPANE\npvt\nStar\n[ ] Volume Oscillator\nPANE\nvolume-osc\nTEMPLATES\n0 saved\nSave\nSelect template\nLoad\nDel\nCUSTOM JS\nOverlay on main chart\nSave JS\nRELIANCE\nClear all\nnone\nFUTURES CHAIN\nNFO RELIANCE\nStream offline\nORDERFLOW\n\t\n\t\n\n\n\n\t\n\t\n\n\t\n\t\nExpiry\tLTP\tChg%\tOI\tVol\tTradingsymbol\n2026-11-23\t-\t-\t-\t-\tRELIANCE26NOVFUT\n2026-12-29\t-\t-\t-\t-\tRELIANCE26DECFUT\n2027-01-25\t-\t-\t-\t-\tRELIANCE27JANFUT\nF&O MARKERS\nATM\n₹0.00\nPCR\n-\nMAX PAIN\n₹0.00\nSUPPORT\n-\nRESISTANCE\n-",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 7450,
+    "failure": null
+  }
+]

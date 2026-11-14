@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ArrowDownTrayIcon, ClipboardIcon, DocumentArrowDownIcon, TableCellsIcon } from "@heroicons/react/24/outline";
 import { TerminalButton } from "../terminal/TerminalButton";
 import { api } from "../../api/client";
+import { spreadsheetClipboardCell } from "../../utils/spreadsheetText";
 
 interface ExportButtonProps {
   source: string;
@@ -13,9 +14,13 @@ interface ExportButtonProps {
 export function ExportButton({ source, data, filename, disabled }: ExportButtonProps) {
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowModal] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const handleExport = async (format: "csv" | "excel") => {
     setLoading(true);
+    setMessage(null);
+    setFailed(false);
     try {
       const fname = filename || `${source}_export_${new Date().toISOString().split("T")[0]}.${format === "csv" ? "csv" : "xlsx"}`;
       
@@ -27,22 +32,27 @@ export function ExportButton({ source, data, filename, disabled }: ExportButtonP
         downloadBlob(res.data, fname);
       }
     } catch (e) {
-      console.error("Export failed", e);
+      setFailed(true);
+      setMessage("Export failed. Check your connection and try again.");
     } finally {
       setLoading(false);
       setShowModal(false);
     }
   };
 
-  const copyToClipboard = () => {
+  const copyToClipboard = async () => {
     if (!data.length) return;
     const headers = Object.keys(data[0]);
-    const rows = data.map(row => headers.map(h => row[h]).join("\t"));
-    const content = [headers.join("\t"), ...rows].join("\n");
-    navigator.clipboard.writeText(content).then(
-      () => alert("Copied to clipboard (Tab-separated)"),
-      () => alert("Copy to clipboard failed"),
-    );
+    const rows = data.map(row => headers.map(h => spreadsheetClipboardCell(row[h])).join("\t"));
+    const content = [headers.map(spreadsheetClipboardCell).join("\t"), ...rows].join("\n");
+    try {
+      await navigator.clipboard.writeText(content);
+      setFailed(false);
+      setMessage("Copied spreadsheet text to clipboard.");
+    } catch {
+      setFailed(true);
+      setMessage("Clipboard access is unavailable. Export to CSV instead.");
+    }
     setShowModal(false);
   };
 
@@ -69,6 +79,7 @@ export function ExportButton({ source, data, filename, disabled }: ExportButtonP
           <span>{loading ? "..." : "Export"}</span>
         </div>
       </TerminalButton>
+      {message && <p role={failed ? "alert" : "status"} className="mt-2 max-w-xs text-xs leading-5 text-terminal-text">{message}</p>}
 
       {showDropdown && (
         <>

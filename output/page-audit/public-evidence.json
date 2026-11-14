@@ -1,0 +1,105 @@
+[
+  {
+    "path": "/login",
+    "title": "OpenTerminalUI",
+    "url": "/login",
+    "headings": [
+      "OPENTERMINALUI",
+      "AUTHENTICATE"
+    ],
+    "text": "OPENTERMINALUI\nSYSTEM STATUS: ONLINE\n11:17:29 IST | 14 NOV 2026\nNIFTY 24,856.50 ▲124.30|\nSENSEX 81,234.10 ▼89.40|\nBANKNIFTY 52,120.00 ▲310.55|\nRELIANCE 2,891.50 ▲12.30|\nTCS 4,120.80 ▼18.90|\nINFY 1,890.20 ▲8.45|\nUSDINR 83.42 ▼0.08|\nNIFTY 24,856.50 ▲124.30|\nSENSEX 81,234.10 ▼89.40|\nBANKNIFTY 52,120.00 ▲310.55|\nRELIANCE 2,891.50 ▲12.30|\nTCS 4,120.80 ▼18.90|\nINFY 1,890.20 ▲8.45|\nUSDINR 83.42 ▼0.08|\nUPTIME 99.97%\n|\nLATENCY 2MS\n|\nSESSIONS 1,247\nOPEN-SOURCE TRADING TERMINAL\nOPENTERMINALUI\n\nAnalyze. Trade. Optimize.\n\nSECURE ACCESS\n\nAUTHENTICATE\n\nEnter credentials to access terminal\n\nUSER ID\n>\nPASSWORD\n>\n?\nRemember terminal\nForgot access?\nACCESS TERMINAL ?\n\nOR\n\n> DEMO ACCESS\n\nNew to OpenTerminal? Request access\n\nv0.9.0 | MIT LICENSE | github.com/Hitheshkaranth/OpenTerminalUI",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 3195,
+    "failure": null
+  },
+  {
+    "path": "/register",
+    "title": "OpenTerminalUI",
+    "url": "/register",
+    "headings": [
+      "OPENTERMINALUI",
+      "REQUEST ACCESS"
+    ],
+    "text": "OPENTERMINALUI\nSYSTEM STATUS: ONLINE\n11:17:33 IST | 14 NOV 2026\nNIFTY 24,856.50 ▲124.30|\nSENSEX 81,234.10 ▼89.40|\nBANKNIFTY 52,120.00 ▲310.55|\nRELIANCE 2,891.50 ▲12.30|\nTCS 4,120.80 ▼18.90|\nINFY 1,890.20 ▲8.45|\nUSDINR 83.42 ▼0.08|\nNIFTY 24,856.50 ▲124.30|\nSENSEX 81,234.10 ▼89.40|\nBANKNIFTY 52,120.00 ▲310.55|\nRELIANCE 2,891.50 ▲12.30|\nTCS 4,120.80 ▼18.90|\nINFY 1,890.20 ▲8.45|\nUSDINR 83.42 ▼0.08|\nUPTIME 99.97%\n|\nLATENCY 2MS\n|\nSESSIONS 1,247\nOPEN-SOURCE TRADING TERMINAL\nOPENTERMINALUI\n\nCreate secure terminal access.\n\nNEW OPERATOR\n\nREQUEST ACCESS\n\nProvision your terminal credentials\n\nEMAIL\n>\nPASSWORD\n>\nCONFIRM PASSWORD\n>\nROLE\n>\nVIEWER\nTRADER\nADMIN\nCREATE ACCOUNT\n\nAlready registered? Access terminal",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 3185,
+    "failure": null
+  },
+  {
+    "path": "/forgot-access",
+    "title": "OpenTerminalUI",
+    "url": "/forgot-access",
+    "headings": [
+      "Forgot access"
+    ],
+    "text": "Forgot access\nReset access\nBack to Login",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 3143,
+    "failure": null
+  },
+  {
+    "path": "/equity/stocks?ticker=AAPL",
+    "title": "OpenTerminalUI",
+    "url": "/login",
+    "headings": [
+      "OPENTERMINALUI",
+      "AUTHENTICATE"
+    ],
+    "text": "OPENTERMINALUI\nSYSTEM STATUS: ONLINE\n11:17:40 IST | 14 NOV 2026\nNIFTY 24,856.50 ▲124.30|\nSENSEX 81,234.10 ▼89.40|\nBANKNIFTY 52,120.00 ▲310.55|\nRELIANCE 2,891.50 ▲12.30|\nTCS 4,120.80 ▼18.90|\nINFY 1,890.20 ▲8.45|\nUSDINR 83.42 ▼0.08|\nNIFTY 24,856.50 ▲124.30|\nSENSEX 81,234.10 ▼89.40|\nBANKNIFTY 52,120.00 ▲310.55|\nRELIANCE 2,891.50 ▲12.30|\nTCS 4,120.80 ▼18.90|\nINFY 1,890.20 ▲8.45|\nUSDINR 83.42 ▼0.08|\nUPTIME 99.97%\n|\nLATENCY 2MS\n|\nSESSIONS 1,247\nOPEN-SOURCE TRADING TERMINAL\nOPENTERMINALUI\n\nAnalyze. Trade. Optimize.\n\nSECURE ACCESS\n\nAUTHENTICATE\n\nEnter credentials to access terminal\n\nUSER ID\n>\nPASSWORD\n>\n?\nRemember terminal\nForgot access?\nACCESS TERMINAL ?\n\nOR\n\n> DEMO ACCESS\n\nNew to OpenTerminal? Request access\n\nv0.9.0 | MIT LICENSE | github.com/Hitheshkaranth/OpenTerminalUI",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [],
+    "pending": [],
+    "waitMs": 3152,
+    "failure": null
+  },
+  {
+    "path": "/research/shared/qc-invalid-token",
+    "title": "OpenTerminalUI",
+    "url": "/research/shared/qc-invalid-token",
+    "headings": [
+      "Shared research"
+    ],
+    "text": "Shared research\n\nThis link is unavailable or has been revoked.",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [
+      {
+        "path": "/api/research/dossiers/shared/qc-invalid-token",
+        "status": 404
+      }
+    ],
+    "pending": [],
+    "waitMs": 3154,
+    "failure": null
+  }
+]

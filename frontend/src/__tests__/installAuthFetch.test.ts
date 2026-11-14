@@ -10,7 +10,7 @@ describe("installAuthFetch", () => {
     native.mockClear();
     localStorage.setItem("ot-access-token", "tok123");
   });
-  afterEach(() => localStorage.clear());
+  afterEach(() => { localStorage.clear(); vi.unstubAllEnvs(); });
 
   it("adds the bearer token to same-origin /api requests", async () => {
     installAuthFetch();
@@ -34,5 +34,20 @@ describe("installAuthFetch", () => {
       const init = call[1] as RequestInit | undefined;
       expect(init?.headers ? new Headers(init.headers).get("Authorization") : null).toBeNull();
     }
+  });
+
+  it("does not leak bearer tokens to lookalike hosts for a root-path API", async () => {
+    vi.stubEnv("VITE_API_BASE_URL", "https://api.example.test");
+    installAuthFetch();
+    await fetch("https://api.example.test.attacker.invalid/quotes");
+    expect(native.mock.calls[0][1]).toBeUndefined();
+    await fetch("https://api.example.test/quotes");
+    expect(new Headers((native.mock.calls[1][1] as RequestInit).headers).get("Authorization")).toBe("Bearer tok123");
+  });
+
+  it("requires an API path boundary instead of a string prefix", async () => {
+    installAuthFetch();
+    await fetch("/api-archive/untrusted");
+    expect(native.mock.calls[0][1]).toBeUndefined();
   });
 });

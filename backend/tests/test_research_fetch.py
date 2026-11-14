@@ -31,16 +31,9 @@ def test_pdf_to_text_extracts_a_known_string():
 
 @pytest.mark.asyncio
 async def test_fetch_url_routes_html_to_normalized_web_row(monkeypatch):
-    async def fake_get(self, url, **kwargs):
-        request = httpx.Request("GET", url)
-        return httpx.Response(
-            200,
-            headers={"content-type": "text/html; charset=utf-8"},
-            text="<html><head><title>Example title</title></head><body><script>bad()</script><h1>Heading</h1><p>Visible body</p></body></html>",
-            request=request,
-        )
-
-    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    async def fake_download(url, **kwargs):
+        return b"<html><head><title>Example title</title></head><body><script>bad()</script><h1>Heading</h1><p>Visible body</p></body></html>", "text/html; charset=utf-8", url
+    monkeypatch.setattr("backend.core.research.fetch.fetch_public_bytes", fake_download)
     result = await fetch_url("https://example.test/article")
 
     assert result["source"] == "web"

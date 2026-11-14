@@ -12,9 +12,9 @@ import { AiThinking } from "../ai/AiVisuals";
 
 export type ValueChainSectionProps = { symbol: string; market?: string };
 
-function fmtPct(value: number | null | undefined): string {
+function fmtPct(value: number | null | undefined, percentagePoints = false): string {
   if (value == null || !Number.isFinite(value)) return "—";
-  return `${(value * 100).toLocaleString("en-US", { maximumFractionDigits: 1 })}%`;
+  return `${(percentagePoints ? value : value * 100).toLocaleString("en-US", { maximumFractionDigits: 1 })}%`;
 }
 
 function pctColor(value: number | null): string {
@@ -138,13 +138,13 @@ function RawMaterialsTable({ materials }: { materials: ValueChain["raw_materials
           key: "change_1m",
           label: "1M %",
           align: "right",
-          render: (r) => <span className={pctColor(r.change_1m_pct)}>{fmtPct(r.change_1m_pct)}</span>,
+          render: (r) => <span className={pctColor(r.change_1m_pct)}>{fmtPct(r.change_1m_pct, true)}</span>,
         },
         {
           key: "change_1y",
           label: "1Y %",
           align: "right",
-          render: (r) => <span className={pctColor(r.change_1y_pct)}>{fmtPct(r.change_1y_pct)}</span>,
+          render: (r) => <span className={pctColor(r.change_1y_pct)}>{fmtPct(r.change_1y_pct, true)}</span>,
         },
         {
           key: "cost_share",

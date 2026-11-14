@@ -234,10 +234,10 @@ def _simulate_bar_trades(symbol: str, bars: list[Any], limit: int) -> list[Trade
     return trades[:limit]
 
 
-async def _load_recent_trades(symbol: str, limit: int) -> list[TradeRecord]:
+async def _load_recent_trades(symbol: str, limit: int) -> tuple[list[TradeRecord], str]:
     live_trades = await _fetch_live_trades(symbol, limit)
     if live_trades:
-        return live_trades[:limit]
+        return live_trades[:limit], "provider_trades"
 
     provider = await get_chart_provider()
     bar_count = max(12, math.ceil(limit / TRADES_PER_BAR) + 4)
@@ -250,26 +250,27 @@ async def _load_recent_trades(symbol: str, limit: int) -> list[TradeRecord]:
         )
     except Exception:
         bars = []
+    source = "simulated_from_bars" if bars else "synthetic_examples"
     if not bars:
         bars = _fallback_bars(symbol.strip().upper(), bar_count)
-    return _simulate_bar_trades(symbol.strip().upper(), bars[-bar_count:], limit)
+    return _simulate_bar_trades(symbol.strip().upper(), bars[-bar_count:], limit), source
 
 
 @router.get("/{symbol}/recent")
 async def get_recent_tape(
     symbol: str,
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
-) -> dict[str, list[dict[str, Any]]]:
-    trades = await _load_recent_trades(symbol, limit)
-    return {"trades": [trade.model_dump() for trade in trades]}
+) -> dict[str, Any]:
+    trades, source = await _load_recent_trades(symbol, limit)
+    return {"trades": [trade.model_dump() for trade in trades], "source": source, "simulated": source != "provider_trades"}
 
 
 @router.get("/{symbol}/summary")
 async def get_tape_summary(
     symbol: str,
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
-) -> dict[str, float | int]:
-    trades = await _load_recent_trades(symbol, limit)
+) -> dict[str, Any]:
+    trades, source = await _load_recent_trades(symbol, limit)
     if not trades:
         raise HTTPException(status_code=404, detail="No tape data available")
 
@@ -289,6 +290,8 @@ async def get_tape_summary(
     trades_per_min = len(trades) / duration_minutes
 
     return {
+        "source": source,
+        "simulated": source != "provider_trades",
         "total_volume": total_volume,
         "buy_volume": buy_volume,
         "sell_volume": sell_volume,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import date, datetime, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from backend.core.ttl_policy import market_open_now
 from backend.api.deps import get_unified_fetcher
@@ -55,10 +56,11 @@ class OptionChainFetcher:
         text = str(value or "").strip()
         if not text:
             return ""
-        try:
-            return datetime.strptime(text, "%d-%b-%Y").date().isoformat()
-        except Exception:
-            pass
+        for fmt in ("%d-%b-%Y", "%d-%m-%Y"):
+            try:
+                return datetime.strptime(text, fmt).date().isoformat()
+            except ValueError:
+                continue
         try:
             return datetime.fromisoformat(text.replace("Z", "+00:00")).date().isoformat()
         except Exception:
@@ -124,8 +126,8 @@ class OptionChainFetcher:
             "volume": self._to_int(leg.get("totalTradedVolume"), 0),
             "iv": round(iv, 4),
             "ltp": round(ltp, 4),
-            "bid": round(self._to_float(leg.get("bidprice"), 0.0), 4),
-            "ask": round(self._to_float(leg.get("askPrice"), 0.0), 4),
+            "bid": round(self._to_float(leg.get("bidprice", leg.get("buyPrice1")), 0.0), 4),
+            "ask": round(self._to_float(leg.get("askPrice", leg.get("sellPrice1")), 0.0), 4),
             "price_change": round(self._to_float(leg.get("change"), 0.0), 4),
             "greeks": self._greeks.compute_greeks(spot, strike, dte, iv, option_type),
         }
@@ -147,7 +149,7 @@ class OptionChainFetcher:
         for row in data_rows:
             if not isinstance(row, dict):
                 continue
-            row_expiry = self._as_iso_date(row.get("expiryDate"))
+            row_expiry = self._as_iso_date(row.get("expiryDate") or row.get("expiryDates"))
             if selected_expiry and row_expiry and row_expiry != selected_expiry:
                 continue
             strike = self._to_float(row.get("strikePrice"), 0.0)
@@ -181,7 +183,7 @@ class OptionChainFetcher:
         ts = datetime.now(timezone.utc).isoformat()
         if isinstance(records.get("timestamp"), str) and records.get("timestamp"):
             try:
-                ts = datetime.strptime(str(records["timestamp"]), "%d-%b-%Y %H:%M:%S").replace(tzinfo=timezone.utc).isoformat()
+                ts = datetime.strptime(str(records["timestamp"]), "%d-%b-%Y %H:%M:%S").replace(tzinfo=ZoneInfo("Asia/Kolkata")).astimezone(timezone.utc).isoformat()
             except Exception:
                 ts = datetime.now(timezone.utc).isoformat()
 
@@ -214,11 +216,27 @@ class OptionChainFetcher:
         except Exception:
             return None
 
-    def _fetch_with_nse_api(self, symbol: str) -> dict[str, Any] | None:
-        path = self._option_path(symbol)
+    def _fetch_with_nse_api(self, symbol: str, expiry: str | None = None) -> dict[str, Any] | None:
+        # The NSE website replaced the index/equity chain endpoints with v3.
+        # v3 needs a provider-published expiry; without it the API returns {}.
         try:
-            out = self._nse.get(path, {"symbol": symbol})
-            return out if isinstance(out, dict) else None
+            info = self._nse.get("/api/option-chain-contract-info", {"symbol": symbol})
+            dates = info.get("expiryDates", []) if isinstance(info, dict) else []
+            date_map = {self._as_iso_date(value): str(value) for value in dates if value}
+            selected = self._pick_expiry(list(date_map), expiry)
+            if not selected:
+                return None
+            out = self._nse.get("/api/option-chain-v3", {
+                "type": "Indices" if self._option_path(symbol).endswith("indices") else "Equity",
+                "symbol": symbol,
+                "expiry": date_map[selected],
+            })
+            records = out.get("records") if isinstance(out, dict) else None
+            if not isinstance(records, dict) or not records.get("data"):
+                return None
+            if not records.get("expiryDates"):
+                records["expiryDates"] = list(date_map.values())
+            return out
         except Exception:
             return None
 
@@ -270,11 +288,14 @@ class OptionChainFetcher:
                 "totals": {"ce_oi_total": 0, "pe_oi_total": 0, "ce_volume_total": 0, "pe_volume_total": 0, "pcr_oi": None, "pcr_volume": None},
             }
 
-        market_classifier = self._get_market_classifier()
-        cls = await market_classifier.classify(symbol_u)
-        is_us = cls.country_code == "US"
+        # Exchange indices are absent from equity-symbol CSVs and must never
+        # fall through to the classifier's unknown-symbol US default.
+        is_us = False
+        if symbol_u not in INDEX_SYMBOLS:
+            cls = await self._get_market_classifier().classify(symbol_u)
+            is_us = cls.country_code == "US"
 
-        cache_key = self._cache.build_key("fno_option_chain", symbol_u, {"expiry": expiry or "", "range": int(strike_range)})
+        cache_key = self._cache.build_key("fno_option_chain_v3", symbol_u, {"expiry": expiry or "", "range": int(strike_range)})
         cached = await self._cache.get(cache_key)
         if cached:
             return cached
@@ -292,11 +313,11 @@ class OptionChainFetcher:
             chain["market"] = "US"
         else:
             # NSE Logic (Existing)
-            raw = await asyncio.to_thread(self._fetch_with_nsepython, symbol_u)
+            raw = await asyncio.to_thread(self._fetch_with_nse_api, symbol_u, expiry)
             if not isinstance(raw, dict):
-                raw = await asyncio.to_thread(self._fetch_with_nse_api, symbol_u)
-
-            if isinstance(raw, dict):
+                raw = await asyncio.to_thread(self._fetch_with_nsepython, symbol_u)
+            has_records = isinstance(raw, dict) and bool((raw.get("records") or {}).get("data"))
+            if has_records:
                 chain = self._from_nse_records(symbol_u, raw, expiry, strike_range)
             else:
                 spot_fallback = await asyncio.to_thread(self._fallback_spot_from_nsetools, symbol_u)
@@ -307,7 +328,7 @@ class OptionChainFetcher:
                     "spot_price": spot_fallback,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "expiry_date": expiry or "",
-                    "available_expiries": [expiry] if expiry else [],
+                    "available_expiries": [],
                     "atm_strike": 0.0,
                     "strikes": [],
                     "totals": {"ce_oi_total": 0, "pe_oi_total": 0, "ce_volume_total": 0, "pe_volume_total": 0, "pcr_oi": None, "pcr_volume": None},
@@ -334,10 +355,10 @@ class OptionChainFetcher:
 
     async def get_expiry_dates(self, symbol: str) -> list[str]:
         symbol_u = symbol.strip().upper()
-        market_classifier = self._get_market_classifier()
-        cls = await market_classifier.classify(symbol_u)
-        if cls.country_code == "US":
-            return await self._get_us_adapter().get_expiry_dates(symbol_u)
+        if symbol_u not in INDEX_SYMBOLS:
+            cls = await self._get_market_classifier().classify(symbol_u)
+            if cls.country_code == "US":
+                return await self._get_us_adapter().get_expiry_dates(symbol_u)
 
         chain = await self.get_option_chain(symbol_u, expiry=None, strike_range=40)
         expiries = chain.get("available_expiries")

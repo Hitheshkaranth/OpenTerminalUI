@@ -714,7 +714,18 @@ function escapeAttr(value: unknown): string {
 
 /** Inline conversions (bold + links) for already-escaped markdown text. */
 function inline(md: string): string {
-  let out = md.replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, (whole, label, url) => `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`);
+  // The public print API also accepts Markdown strings. Encode raw markup at
+  // the sink instead of trusting every upstream producer to have escaped it.
+  const text = md.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  let out = text.replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, (_whole, label, url) => {
+    try {
+      const value = String(url).replace(/&amp;/g, "&");
+      if (!/^https?:\/\//i.test(value)) return label;
+      const parsed = new URL(value);
+      if (parsed.username || parsed.password) return label;
+      return `<a href="${escapeAttr(parsed.href)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+    } catch { return label; }
+  });
   out = out.replace(/\*\*([^*]+?)\*\*/g, "<strong>$1</strong>");
   return out;
 }
@@ -869,6 +880,7 @@ export function downloadMarkdown(symbol: string, data: ResearchNoteData): void {
 export function openPrintWindow(source: string | ResearchNoteData): void {
   const win = window.open("", "_blank");
   if (!win) return;
+  win.opener = null;
   win.document.write(toPrintHtml(source));
   win.document.close();
   setTimeout(() => {

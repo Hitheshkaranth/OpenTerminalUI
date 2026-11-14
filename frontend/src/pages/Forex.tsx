@@ -1,3 +1,4 @@
+import { apiFetch } from "../api/base";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -54,7 +55,7 @@ function normalizePair(raw: string | null): string {
 }
 
 async function requestJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${path.startsWith("/") ? path : `/${path}`}`);
+  const response = await apiFetch(`${API_BASE}${path.startsWith("/") ? path : `/${path}`}`);
   const raw = await response.text();
   const payload = raw ? JSON.parse(raw) : null;
   if (!response.ok) {
@@ -298,8 +299,8 @@ export function ForexPage() {
         subtitle="Cross rates, pair detail, central banks, and major-currency relative strength"
         actions={
           <div className="flex items-center gap-2">
-            <TerminalBadge variant={fallbackMode ? "warn" : "live"} dot>
-              {fallbackMode ? "Seeded fallback" : "Backend live"}
+            <TerminalBadge variant={fallbackMode ? "warn" : "info"} dot>
+              {fallbackMode ? "Synthetic examples · not market data" : "Provider response"}
             </TerminalBadge>
             <TerminalBadge variant="accent">FX</TerminalBadge>
           </div>

@@ -1,0 +1,79 @@
+[
+  {
+    "tab": "Overview",
+    "settled": true,
+    "waitMs": 10951,
+    "text": "AAPL\nNASDAQ\nTECHNOLOGY\nBullish 0.15\nApple Inc.\nLAST\n356.27\nCHANGE %\n+0.39%\nVOLUME\n39.99M\nOVERVIEW\nFINANCIALS\nCHART\nNEWS\nOWNERSHIP\nESTIMATES\nPEERS\nESG\nTAPE\nINSIDER\nFILINGS\nEXPORT REPORT\nRESEARCH NOTE\nV\nnone\nOVERVIEW\nDES-STYLE SNAPSHOT\nDELAYED · YAHOO\nMARKET CAP\n5.18T\nP/E\n39.5\nDIV YIELD\n0.30%\n52W RANGE\n243.42 - 360.83\n52-WEEK POSITION\nOPEN\n357.96\nHIGH\n360.83\nLOW\n355.75\nP/B\n46.19\nEV/EBITDA\n30.41\nROE\n142.3%\nNET MARGIN\n27.6%\nREV GROWTH\n11.7%\nEPS GROWTH\n14.1%\nANALYST CONSENSUS\nNo analyst ratings from the current data source.\nCLASSIFICATION\nSector: Technology\nIndustry: Consumer Electronics\nCountry: US\nCurrency: USD\nnone\nPRICE\nHOVER THE CHART FOR ANY DAY'S CLOSE\n356.27\n+58.54 (+19.66%)over 6M\n1M\n3M\n6M\n1Y\n5Y\n\t\n\t\n\n\t\n\t\nAAPL up 19.66 percent over 6M\nPREV CLOSE\n354.88\nAVG VOLUME (30D)\n44.14M\nBETA\n1.09\nnone\nGROWTH & HEADWINDS\nPRIMARY-DOCUMENT SIGNALS\nOPEN FILINGS\n\nNo growth / headwind read yet. Import documents into the Filings tab and run an analysis to surface cited drivers of return.\n\nGO TO FILINGS\nnone\nREVERSE DCF\nWHAT THE PRICE IMPLIES\nIMPLIED GROWTH\n19.1%\nHistorical 3y revenue CAGR\n7.7%\nHistorical 3y profit CAGR\n10.9%\nREAD\nPRICED FOR PERFECTION\nAI CATALYST CONVICTIONNo catalyst notes ingested for AAPL yet.\nOpen screener",
+    "pending": []
+  },
+  {
+    "tab": "Financials",
+    "settled": true,
+    "waitMs": 1535,
+    "text": "AAPL\nNASDAQ\nTECHNOLOGY\nBullish 0.15\nApple Inc.\nLAST\n356.27\nCHANGE %\n+0.39%\nVOLUME\n39.99M\nOVERVIEW\nFINANCIALS\nCHART\nNEWS\nOWNERSHIP\nESTIMATES\nPEERS\nESG\nTAPE\nINSIDER\nFILINGS\nEXPORT REPORT\nRESEARCH NOTE\nV\nnone\nFINANCIALS\nANNUAL (4Y) + QUARTERLY (6Q) — AS REPORTED BY THE PROVIDER\nDENSE TABLE\n4 rows\nCSV\nPERIOD\nSORT\nREVENUE\nSORT\nNET INCOME\nSORT\nEPS\nSORT\n2026-09-30\n478.8B\n132.2B\n8.98\n2025-09-30\n416.2B\n112.0B\n7.46\n2024-09-30\n391.0B\n93.7B\n6.08\n2023-09-30\n383.3B\n97.0B\n6.13\nDENSE TABLE\n6 rows\nCSV\nQUARTER\nSORT\nREVENUE\nSORT\nOPERATING INCOME\nSORT\nNET INCOME\nSORT\n2026-09-30\n114.5B\n35.6B\n30.7B\n2026-06-30\n109.4B\n35.7B\n29.8B\n2026-03-31\n111.2B\n35.9B\n29.6B\n2025-12-31\n143.8B\n50.9B\n42.1B\n2025-09-30\n102.5B\n32.4B\n27.5B\n2025-06-30\n-\n-\n-\nnone\nBUSINESS METRICS\nDERIVED FROM FILINGS\nEXTRACT FROM FILINGS\nOPERATING KPIS\nALL\nORDER BOOK\nCAPACITY\nOPERATIONAL\nCUSTOMERS\nNo operating KPIs extracted.\nREVENUE MIX\nNo revenue mix data.\nMARKET SHARE\nNo market share data.\nnone\nREVERSE DCF\nWHAT GROWTH THE PRICE IMPLIES\nDISCOUNT RATE\nTERMINAL GROWTH\nYEARS\nBASIS\nFCF\nNET INCOME\nASSUMPTIONS\nASSUMPTION\tVALUE\n\nPrice\n\t\n356.27 USD\n\n\nMarket cap\n\t\n5.18T\n\n\nNet debt\n\t\n43.81B\n\n\nBase cash flow (Free cash flow)\n\t\n136.06B\nIMPLIED GROWTH — SENSITIVITY\nDISC. \\ TERM.\t2.0%\t3.0%\t4.0%\t5.0%\t6.0%\n10.0%\t17.2%\t15.9%\t14.5%\t12.8%\t10.6%\n11.0%\t19.3%\t18.2%\t16.9%\t15.4%\t13.7%\n12.0%\t21.2%\t20.2%\t19.1%\t17.9%\t16.4%\n13.0%\t23.1%\t22.2%\t21.2%\t20.1%\t18.8%\n14.0%\t24.9%\t24.1%\t23.2%\t22.2%\t21.1%\nNOTES\n•\nImplied growth is the annual cash-flow growth rate that justifies today's enterprise value (market cap + net debt).",
+    "pending": []
+  },
+  {
+    "tab": "Chart",
+    "settled": true,
+    "waitMs": 1785,
+    "text": "AAPL\nNASDAQ\nTECHNOLOGY\nBullish 0.15\nApple Inc.\nLAST\n356.27\nCHANGE %\n+0.39%\nVOLUME\n39.99M\nOVERVIEW\nFINANCIALS\nCHART\nNEWS\nOWNERSHIP\nESTIMATES\nPEERS\nESG\nTAPE\nINSIDER\nFILINGS\nEXPORT REPORT\nRESEARCH NOTE\nV\nnone\nCHART\nSECURITY PRICE HISTORY\n\t\n\t\n\n\n\n\t\n\t\n\n\t\n\t\nAAPL 1D 11/13/2026, 10:30:00 AM: open 357.96, high 360.83, low 355.75, close 356.27\nChart data table\nREPLAY\nGO\nPNG\nCSV\nLEG\nSTAT\nDATA\nSESS\nEVT\nACT\nMKT\nFUND\nPX-R\nLinear\nLog\nPercent\nIndex 100\nMKT RTH\nSESS RTH\nAAPL\n1D\nC 356.27\n-0.47%\nO 357.96\nH 360.83\nL 355.75\nV 39,985,300\n11/13/2026, 10:30:00 AM | RTH | VOL 39,985,300 | SCALE RIGHT LINEAR",
+    "pending": []
+  },
+  {
+    "tab": "News",
+    "settled": true,
+    "waitMs": 1787,
+    "text": "OO FINANCE\n[object Object] 0.00\n11/12/2026, 2:45:00 AM\nApple Shares (AAPL) Look Expensive Heading into 2027 - Yahoo Finance\nTHE MOTLEY FOOL\n[object Object] 0.00\n11/9/2026, 10:20:00 PM\nWhere Will Apple Stock Be in 5 Years? - The Motley Fool\nYAHOO FINANCE\n[object Object] 0.00\n11/9/2026, 10:40:00 PM\nWhere Will Apple Stock Be in 5 Years? - Yahoo Finance\nYAHOO FINANCE\n[object Object] 0.00\n11/14/2026, 2:43:10 AM\nA $1,999 Sellout. What China Renaissance Sees in Apple (AAPL) - Yahoo Finance\nYAHOO FINANCE\n[object Object] 0.00\n10/29/2026, 12:30:00 PM\nApple's Q4 Earnings Loom: Buy or Sell AAPL Stock Ahead of Results? - Yahoo Finance\nYAHOO FINANCE\n[object Object] 0.00\n11/13/2026, 4:30:39 PM\nETFs Are Buying Apple (AAPL) on Wednesday - Yahoo Finance\nYAHOO FINANCE\n[object Object] 0.00\n11/13/2026, 6:42:16 PM\nApple (AAPL) Puts Tim Cook At The Center Of A Surprise CEO Search - Yahoo Finance\nYAHOO FINANCE\n[object Object] 0.00\n11/13/2026, 5:47:02 PM\nWhat Does Apple’s Run Mean for a 72-Year-Old Widow With $600,000 of a $1.6 Million IRA in the Stock? - Yahoo Finance\nYAHOO FINANCE\n[object Object] 0.00\n11/13/2026, 8:02:00 AM\nWhy Did AAPL, COST, JNJ Stocks Hit 52-Week Highs Today? - Yahoo Finance\nYAHOO FINANCE\n[object Object] 0.00\n11/8/2026, 7:11:45 PM\nApple’s iPhone Demand Surges, But AAPL Still Isn’t a ‘Strong Buy’ - Yahoo Finance\nYAHOO FINANCE\n[object Object] 0.00\n11/11/2026, 6:33:52 PM\nHow Much Capital Gains Tax Does a 61-Year-Old Owe on $750,000 of Inherited Apple Stock? - Yahoo Finance\nYAHOO FINANCE\n[object Object] 0.00\n11/12/2026, 4:30:40 PM\nApple (AAPL) Sees $460.3 Million in Net ETF Buying on Nov. 10 - Yahoo Finance\nYAHOO FINANCE\n[object Object] 0.00\n11/13/2026, 4:03:45 AM\nChina Renaissance Upgraded Apple (AAPL) to Buy. DZ Bank Cut It to Sell. Here’s the Split - Yahoo Finance\nYAHOO FINANCE\n[object Object] 0.00\n11/10/2026, 5:39:44 PM\nApple (AAPL) Pushes AI Timelines Higher As Siri Engineering Leadership May Change - Yahoo Finance\nnone\nCONCALL SUMMARIES\nEARNINGS-CALL TAKEAWAYS\nBUILD SUMMARIES\nNO CALL SUMMARIES YET\n\nThe knowledge base has not been built for this symbol. Build it to generate tone, highlights, key numbers and cited Q&A themes for each earnings call.\n\nBUILD SUMMARIES",
+    "pending": []
+  },
+  {
+    "tab": "Ownership",
+    "settled": true,
+    "waitMs": 4334,
+    "text": "AAPL\nNASDAQ\nTECHNOLOGY\nBullish 0.15\nApple Inc.\nLAST\n356.27\nCHANGE %\n+0.39%\nVOLUME\n39.99M\nOVERVIEW\nFINANCIALS\nCHART\nNEWS\nOWNERSHIP\nESTIMATES\nPEERS\nESG\nTAPE\nINSIDER\nFILINGS\nEXPORT REPORT\nRESEARCH NOTE\nV\nnone\nOWNERSHIP\nINSTITUTIONAL HOLDERS + INSIDER TRANSACTIONS\nPROMOTER %\n0\nFII %\n0\nDII %\n0\nPUBLIC %\n100\nDENSE TABLE\n0 rows\nCSV\nHOLDER\nSORT\nSHARES\nSORT\nCHANGE\nSORT\nREPORTED\nSORT\nDENSE TABLE\n0 rows\nCSV\nINSIDER\nSORT\nDATE\nSORT\nTYPE\nSORT\nCHANGE\nSORT\nPRICE\nSORT",
+    "pending": []
+  },
+  {
+    "tab": "Estimates",
+    "settled": true,
+    "waitMs": 2295,
+    "text": "AAPL\nNASDAQ\nTECHNOLOGY\nBullish 0.15\nApple Inc.\nLAST\n356.27\nCHANGE %\n+0.39%\nVOLUME\n39.99M\nOVERVIEW\nFINANCIALS\nCHART\nNEWS\nOWNERSHIP\nESTIMATES\nPEERS\nESG\nTAPE\nINSIDER\nFILINGS\nEXPORT REPORT\nRESEARCH NOTE\nV\nnone\nESTIMATES\nANALYST ESTIMATES + TARGETS\nCONSENSUS SNAPSHOT\nCONSENSUS\nN/A\nTARGET PX\n—\nBUY %\n—\nHOLD %\n—\nDENSE TABLE\n0 rows\nCSV\nPERIOD\nSORT\nBUY\nSORT\nHOLD\nSORT\nSELL\nSORT\nDENSE TABLE\n0 rows\nCSV\nDATE\nSORT\nREV EST AVG\nSORT\nEPS EST AVG\nSORT\nANALYSTS REV\nSORT\nANALYSTS EPS\nSORT\nnone\nGUIDANCE TRACKER\nMANAGEMENT FORWARD-LOOKING STATEMENTS\nBUILD GUIDANCE\nNO GUIDANCE TRACKED YET\n\nManagement guidance (targets, cadence, forward statements) is not built for this symbol. Build the knowledge base to track raised / lowered / missed guidance over time.\n\nBUILD GUIDANCE",
+    "pending": []
+  },
+  {
+    "tab": "Peers",
+    "settled": true,
+    "waitMs": 4849,
+    "text": "h 0.15\nApple Inc.\nLAST\n356.27\nCHANGE %\n+0.39%\nVOLUME\n39.99M\nOVERVIEW\nFINANCIALS\nCHART\nNEWS\nOWNERSHIP\nESTIMATES\nPEERS\nESG\nTAPE\nINSIDER\nFILINGS\nEXPORT REPORT\nRESEARCH NOTE\nV\nnone\nPEERS\nCOMPARABLE COMPANIES\nDENSE TABLE\n10 rows\nCSV\nSYMBOL\nSORT\nNAME\nSORT\nMKT CAP\nSORT\nP/E\nSORT\nCHG%\nSORT\n2,241\n0\n-\n-\n+0.00%\n66,570\n0\n-\n-\n+0.00%\n300,857\n0\n-\n-\n+0.00%\n300,866\n0\n-\n-\n+0.00%\n603,296\n0\n-\n-\n+0.00%\n688,036\n0\n-\n-\n+0.00%\nPCRFF\nPanasonic Holdings Corporation\n47.3B\n23.01\n+0.70%\nSONY\nSony Group Corporation\n157.8B\n20.2\n+1.54%\nSSNLF\nSAMSUNG ELECTRONICS CO\n424.6B\n19.01\n+0.00%\nXIACF\nXiaomi Corp.\n93.4B\n21.35\n-4.22%\nnone\nPEER KPI COMPARISON\nOPERATIONAL + FINANCIAL COMPARISON\n6 PEERS\nComparing against AAPL → 002241, 066570, 300857, 300866, 603296, 688036\nMISSING COVERAGE\nNo extracted KPIs — run Extract in the Hub\n002241\n066570\n300857\n300866\n603296\n688036\nOPERATIONAL KPIS\nNo KPI coverage for these peers yet.\nFINANCIAL COMPARISON\n6 METRICS\nMETRIC\n\nREVENUE GROWTH %\n▲\n\n\nOPERATING MARGIN %\n▲\n\n\nNET MARGIN %\n▲\n\n\nROE %\n▲\n\n\nP/E\n▼\n\n\nEV/EBITDA\n▼\nnone\nVALUE CHAIN\nCONSUMER ELECTRONICS\nEXTRACT FROM FILINGS\nNo filing-derived counterparties found; filings may be unavailable for this symbol.\nSUPPLIERS0\nNo suppliers mapped.\nSUPPLIES →\nAAPL\nTechnology\n→ SELLS TO\nCUSTOMERS0\nNo customers mapped.\nCOMPETITORS\nGOERTEK\nPeer in the same sector/industry (FMP peers dataset)\nPEERS\nLGELECTRONICS\nPeer in the same sector/industry (FMP peers dataset)\nPEERS\nSHARETRONIC DATA\nPeer in the same sector/industry (FMP peers dataset)\nPEERS\nANKER\nPeer in the same sector/industry (FMP peers dataset)\nPEERS\nHUAQIN TECHNOLOGY CO LTD\nPeer in the same sector/industry (FMP peers dataset)\nPEERS\nSHENZHEN TRANSSION HOLDINGS CO\nPeer in the same sector/industry (FMP peers dataset)\nPEERS\nPANASONIC HOLDINGS CORPORATION\nPeer in the same sector/industry (FMP peers dataset)\nPEERS\nSONY GROUP CORPORATION\nPeer in the same sector/industry (FMP peers dataset)\nPEERS\nSAMSUNG ELECTRONICS CO\nPeer in the same sector/industry (FMP peers dataset)\nPEERS\nXIAOMI CORP.\nPeer in the same sector/industry (FMP peers dataset)\nPEERS\nRAW MATERIALS\nMATERIAL\tPRICE\t1M %\t1Y %\tCOST SHARE\n\nAluminium\nALI=F\n\t\n3,133.25 USD\n\t\n118.7%\n\t\n—\n\t\n—\n\n\nCopper\nHG=F\n\t\n6.08 USD\n\t\n-663.4%\n\t\n—\n\t\n—",
+    "pending": []
+  },
+  {
+    "tab": "ESG",
+    "settled": true,
+    "waitMs": 1532,
+    "text": "AAPL\nNASDAQ\nTECHNOLOGY\nBullish 0.15\nApple Inc.\nLAST\n356.27\nCHANGE %\n+0.39%\nVOLUME\n39.99M\nOVERVIEW\nFINANCIALS\nCHART\nNEWS\nOWNERSHIP\nESTIMATES\nPEERS\nESG\nTAPE\nINSIDER\nFILINGS\nEXPORT REPORT\nRESEARCH NOTE\nV\nnone\nESG\nESG RATINGS AND SCORES\nENVIRONMENTAL\n—\nSOCIAL\n—\nGOVERNANCE\n—\nTOTAL ESG\n—\nRISK RATING\nN/A\nDATE\nN/A\nDENSE TABLE\n0 rows\nCSV\nDATE\nSORT\nENV\nSORT\nSOCIAL\nSORT\nGOV\nSORT\nTOTAL\nSORT",
+    "pending": []
+  },
+  {
+    "tab": "Tape",
+    "settled": true,
+    "waitMs": 3820,
+    "text": "AAPL\nNASDAQ\nTECHNOLOGY\nBullish 0.15\nApple Inc.\nLAST\n356.27\nCHANGE %\n+0.39%\nVOLUME\n39.99M\nOVERVIEW\nFINANCIALS\nCHART\nNEWS\nOWNERSHIP\nESTIMATES\nPEERS\nESG\nTAPE\nINSIDER\nFILINGS\nEXPORT REPORT\nRESEARCH NOTE\nV\nnone\nTIME & SALES\nAAPL TAPE\n\nSimulated tape · not executed market trades. Prices and flow statistics are illustrative.\n\nBUY / SELL FLOW\n50.5% / 46.2%\nTOTAL VOLUME\n7,832,130\nBUY VOL %\n50.5%\nSELL VOL %\n46.2%\nLARGE TRADES\n60\nTRADES / MIN\n10.02\nALL\nBUYS ONLY\nSELLS ONLY\nLARGE ONLY\nMIN SIZE\nTIME\nPRICE\nSIZE\nVALUE\n11:10:54\n242.38\n1,350\n327,213.00\n11:10:48\n242.51\n20,692\n5,018,016.92\n11:10:42\n242.44\n10,569\n2,562,348.36\n11:10:36\n242.46\n14,751\n3,576,527.46\n11:10:30\n242.61\n25,219\n6,118,381.59\n11:10:24\n242.35\n6,399\n1,550,797.65\n11:10:18\n242.48\n3,827\n927,970.96\n11:10:12\n242.23\n9,816\n2,377,729.68\n11:10:06\n242.53\n10,559\n2,560,874.27\n11:10:00\n242.21\n11,622\n2,814,964.62\n11:09:54\n242.44\n13,830\n3,352,945.20\n11:09:48\n242.35\n28,741\n6,965,381.35\n11:09:42\n242.39\n8,946\n2,168,420.94\n11:09:36\n242.22\n1,635\n396,029.70\n11:09:30\n242.29\n27,204\n6,591,257.16\n11:09:24\n242.06\n28,152\n6,814,473.12\n11:09:18\n242.02\n23,308\n5,641,002.16\n11:09:12\n241.85\n34,657\n8,381,795.45\n11:09:06\n241.96\n22,851\n5,529,027.96\n11:09:00\n241.84\n26,041\n6,297,755.44\n11:08:54\n241.66\n20,447\n4,941,222.02\n11:08:48\n241.86\n25,825\n6,246,034.50\n11:08:42\n241.86\n28,256\n6,833,996.16\n11:08:36\n241.83\n1,704\n412,078.32\n11:08:30\n241.80\n11,605\n2,806,089.00\n11:08:24\n241.71\n20,142\n4,868,522.82\n11:08:18\n241.66\n9,800\n2,368,268.00\n11:08:12\n241.73\n2,946\n712,136.58\n11:08:06\n241.70\n25,862\n6,250,845.40\n11:08:00\n241.66\n22,054\n5,329,569.64\n11:07:54\n241.67\n1,558\n376,521.86\n11:07:48\n241.65\n30,103\n7,274,389.95\n11:07:42\n241.69\n6,922\n1,672,978.18\n11:07:36\n241.65\n28,817\n6,963,628.05",
+    "pending": []
+  },
+  {
+    "tab": "Insider",
+    "settled": true,
+    "waitMs": 1802,
+    "text": "AAPL\nNASDAQ\nTECHNOLOGY\nBullish 0.15\nApple Inc.\nLAST\n356.27\nCHANGE %\n+0.39%\nVOLUME\n39.99M\nOVERVIEW\nFINANCIALS\nCHART\nNEWS\nOWNERSHIP\nESTIMATES\nPEERS\nESG\nTAPE\nINSIDER\nFILINGS\nEXPORT REPORT\nRESEARCH NOTE\nV\nTOTAL BUYS\n$0\nTOTAL SELLS\n$0\nNET INSIDER FLOW\n$0\nACTIVE INSIDERS\n0\nnone\nINSIDER TIMELINE\nAAPL BUYS AND SELLS OVER THE LAST YEAR\n\t\n\t\n\n\n\n\t\n\t\n\n\t\n\t\nAAPL 1D 11/13/2026, 10:30:00 AM: open 357.96, high 360.83, low 355.75, close 356.27\nChart data table\nREPLAY\nGO\nPNG\nCSV\nLEG\nSTAT\nDATA\nSESS\nEVT\nACT\nMKT\nFUND\nPX-R\nLinear\nLog\nPercent\nIndex 100\nMKT RTH\nSESS RTH\nAAPL\n1D\nC 356.27\n-0.47%\nO 357.96\nH 360.83\nL 355.75\nV 39,985,300\n11/13/2026, 10:30:00 AM | RTH | VOL 39,985,300 | SCALE RIGHT LINEAR\nnone\nINSIDER TRADES\nLATEST FILINGS FOR THE SELECTED TICKER\nDENSE TABLE\n0 rows\nCSV\nDATE\nSORT\nINSIDER\nSORT\nTYPE\nSORT\nQTY\nSORT\nPRICE\nSORT\nVALUE\nSORT\nSECURITY",
+    "pending": []
+  },
+  {
+    "tab": "Filings",
+    "settled": true,
+    "waitMs": 1529,
+    "text": "AAPL\nNASDAQ\nTECHNOLOGY\nBullish 0.15\nApple Inc.\nLAST\n356.27\nCHANGE %\n+0.39%\nVOLUME\n39.99M\nOVERVIEW\nFINANCIALS\nCHART\nNEWS\nOWNERSHIP\nESTIMATES\nPEERS\nESG\nTAPE\nINSIDER\nFILINGS\nEXPORT REPORT\nRESEARCH NOTE\nV\nnone\nDOCUMENTS\n0 DOCUMENTS INDEXED\nAUTO-IMPORT FROM SEC/NSE\nNO DOCUMENTS INDEXED\n\nImport filings to get started. Drop in an annual report, earnings call transcript, 10-Q/8-K or investor presentation, or auto-import from SEC / NSE.\n\nnone\nIMPORT\nUPLOAD A FILE TO INDEX\nFILE (PDF / HTML / TXT)\nDOCUMENT TYPE\nAnnual report\nQuarterly filing\nConcall transcript\nInvestor presentation\nPress release\nRegulatory\nOther\nv\nPERIOD\nUPLOAD\nnone\nANALYSIS\nGROWTH & HEADWIND DRIVERS\nANALYZE\nUSE AI MODEL: ON\nNOTHING TO ANALYZE YET\n\nImport at least one document before running an analysis.",
+    "pending": []
+  }
+]

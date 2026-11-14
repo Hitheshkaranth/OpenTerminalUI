@@ -156,6 +156,12 @@ export function TimeAndSales({ ticker, limit = 500, className = "" }: TimeAndSal
       bodyClassName="flex h-full min-h-0 flex-col gap-3"
       actions={paused ? <span className="rounded-sm border border-yellow-400/50 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-yellow-300">Paused</span> : null}
     >
+      {recentQuery.data?.source !== "provider_trades" ? (
+        <p role="status" className="rounded-sm border border-yellow-500/40 px-3 py-2 text-xs text-yellow-300">
+          {recentQuery.data?.simulated ? "Simulated tape · not executed market trades. Prices and flow statistics are illustrative." : "Trade provenance is unavailable. Do not treat this tape as verified executions."}
+        </p>
+      ) : null}
+      {recentQuery.isError || summaryQuery.isError ? <p role="alert" className="text-xs text-red-400">Tape data could not be loaded. Retry when the provider is available.</p> : null}
       <div className="grid gap-3">
         <div className="rounded-sm border border-terminal-border bg-terminal-panel px-3 py-3">
           <div className="grid gap-3 lg:grid-cols-[1.2fr_repeat(5,minmax(0,1fr))]">

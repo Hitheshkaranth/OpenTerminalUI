@@ -336,10 +336,14 @@ export interface TapeTrade {
 }
 
 export interface TapeRecentResponse {
+  source?: string;
+  simulated?: boolean;
   trades: TapeTrade[];
 }
 
 export interface TapeSummaryResponse {
+  source?: string;
+  simulated?: boolean;
   total_volume: number;
   buy_volume: number;
   sell_volume: number;
@@ -597,13 +601,17 @@ export type QuarterlyReportApiItem = {
 };
 
 export type FuturesChainContract = {
+  source?: string;
+  as_of?: string | null;
+  provider_identifier?: string;
+  volume_unit?: string;
   expiry_date: string;
   tradingsymbol: string;
   exchange: string;
   ws_symbol: string;
-  instrument_token: number;
-  lot_size: number;
-  tick_size: number;
+  instrument_token: number | null;
+  lot_size: number | null;
+  tick_size: number | null;
   ltp?: number | null;
   change?: number | null;
   change_pct?: number | null;

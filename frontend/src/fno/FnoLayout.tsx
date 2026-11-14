@@ -174,7 +174,7 @@ export function FnoLayout() {
     }
   }, [expiries, expiry]);
 
-  const ctx: FnoContextValue = { symbol, setSymbol, expiry, setExpiry, expiries };
+  const ctx: FnoContextValue = { symbol, setSymbol, expiry, setExpiry, expiries, market };
 
   return (
     <TerminalShell
@@ -192,6 +192,7 @@ export function FnoLayout() {
               <span className="mb-1 block uppercase tracking-wide text-terminal-muted">Symbol</span>
               <select
                 className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs outline-none focus:border-terminal-accent"
+                aria-label="Symbol"
                 value={symbol}
                 onChange={(e) => setSymbol(e.target.value.toUpperCase())}
               >
@@ -207,6 +208,7 @@ export function FnoLayout() {
               <span className="mb-1 block uppercase tracking-wide text-terminal-muted">Expiry</span>
               <select
                 className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs outline-none focus:border-terminal-accent"
+                aria-label="Expiry"
                 value={expiry}
                 onChange={(e) => setExpiry(e.target.value)}
               >
@@ -222,7 +224,7 @@ export function FnoLayout() {
             <div className="text-[11px]">
               <span className="mb-1 block uppercase tracking-wide text-terminal-muted">Data</span>
               <div className="rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs">
-                {expiryQuery.isFetching ? "Refreshing..." : "Live cache 60s"}
+                {expiryQuery.isFetching ? "Refreshing..." : expiryQuery.isError ? "Provider unavailable" : !expiries.length ? "No expiry data" : "Refresh every 60s"}
               </div>
             </div>
 

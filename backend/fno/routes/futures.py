@@ -6,10 +6,10 @@ from typing import Any
 from fastapi import APIRouter, Query
 from sqlalchemy import distinct, func
 
-from backend.adapters.registry import get_adapter_registry
 from backend.api.deps import get_unified_fetcher
 from backend.core.ttl_policy import market_open_now, ttl_seconds
 from backend.db.models import FutureContract
+from backend.fno.services.nse_derivatives import get_nse_futures_snapshot
 from backend.shared.cache import cache as cache_instance
 from backend.shared.db import SessionLocal
 
@@ -57,7 +57,7 @@ async def list_futures_underlyings(
 @router.get("/futures/chain/{underlying}")
 async def get_futures_chain(underlying: str) -> dict[str, Any]:
     key_underlying = (underlying or "").strip().upper()
-    cache_key = cache_instance.build_key("futures_chain", key_underlying, {})
+    cache_key = cache_instance.build_key("futures_chain_v2", key_underlying, {})
     cached = await cache_instance.get(cache_key)
     if cached:
         return cached
@@ -76,49 +76,8 @@ async def get_futures_chain(underlying: str) -> dict[str, Any]:
         db.close()
 
     if not rows:
-        try:
-            mock = get_adapter_registry()._instance("mock")
-            fallback_contracts = await mock.get_futures_chain(key_underlying)
-        except Exception:
-            fallback_contracts = []
-
-        contracts = []
-        ws_symbols: list[str] = []
-        token_to_ws_symbol: dict[str, str] = {}
-        for idx, c in enumerate(fallback_contracts):
-            ws_symbol = c.symbol
-            ws_symbols.append(ws_symbol)
-            token = str(-(idx + 1))
-            token_to_ws_symbol[token] = ws_symbol
-            contracts.append(
-                {
-                    "expiry_date": c.expiry,
-                    "tradingsymbol": c.symbol.split(":")[-1],
-                    "exchange": c.symbol.split(":")[0],
-                    "ws_symbol": ws_symbol,
-                    "instrument_token": int(token),
-                    "lot_size": c.lot_size,
-                    "tick_size": None,
-                    "ltp": c.ltp,
-                    "change": c.change,
-                    "change_pct": c.change_pct,
-                    "oi": c.oi,
-                    "volume": c.volume,
-                }
-            )
-
-        response = {
-            "underlying": key_underlying,
-            "count": len(contracts),
-            "ws_symbols": ws_symbols,
-            "token_to_ws_symbol": token_to_ws_symbol,
-            "contracts": contracts,
-        }
-        await cache_instance.set(
-            cache_key,
-            response,
-            ttl=ttl_seconds("futures_chain", market_open_now()),
-        )
+        response = await get_nse_futures_snapshot(key_underlying)
+        await cache_instance.set(cache_key, response, ttl=ttl_seconds("futures_chain", market_open_now()))
         return response
 
     instruments = [f"{row.exchange}:{row.tradingsymbol}" for row in rows]
@@ -135,6 +94,8 @@ async def get_futures_chain(underlying: str) -> dict[str, Any]:
             except Exception:
                 quotes_by_instrument = {}
 
+    snapshot = await get_nse_futures_snapshot(key_underlying) if len(quotes_by_instrument) < len(instruments) else {}
+    snapshots_by_expiry = {row["expiry_date"]: row for row in snapshot.get("contracts", [])}
     contracts: list[dict[str, Any]] = []
     ws_symbols: list[str] = []
     token_to_ws_symbol: dict[str, str] = {}
@@ -144,10 +105,12 @@ async def get_futures_chain(underlying: str) -> dict[str, Any]:
         token_to_ws_symbol[str(row.instrument_token)] = instrument
         quote = quotes_by_instrument.get(instrument, {})
         ohlc = quote.get("ohlc") if isinstance(quote.get("ohlc"), dict) else {}
+        observed = snapshots_by_expiry.get(str(row.expiry_date), {})
         ltp = _to_float(quote.get("last_price"))
         close = _to_float(ohlc.get("close"))
         change = (ltp - close) if (ltp is not None and close not in (None, 0.0)) else None
         change_pct = ((change / close) * 100.0) if (change is not None and close not in (None, 0.0)) else None
+        has_quote = ltp is not None
         contracts.append(
             {
                 "expiry_date": row.expiry_date,
@@ -157,20 +120,27 @@ async def get_futures_chain(underlying: str) -> dict[str, Any]:
                 "instrument_token": row.instrument_token,
                 "lot_size": row.lot_size,
                 "tick_size": row.tick_size,
-                "ltp": ltp,
-                "change": change,
-                "change_pct": change_pct,
-                "oi": _to_float(quote.get("oi")),
-                "volume": _to_float(quote.get("volume")),
+                "ltp": ltp if has_quote else observed.get("ltp"),
+                "change": change if has_quote else observed.get("change"),
+                "change_pct": change_pct if has_quote else observed.get("change_pct"),
+                "oi": _to_float(quote.get("oi")) if has_quote else observed.get("oi"),
+                "volume": _to_float(quote.get("volume")) if has_quote else observed.get("volume"),
+                "volume_unit": "shares" if has_quote else "contracts",
+                "source": "kite" if has_quote else observed.get("source", "unavailable"),
+                "as_of": quote.get("timestamp") if has_quote else observed.get("as_of"),
             }
         )
 
+    sources = {row["source"] for row in contracts}
     response = {
         "underlying": key_underlying,
         "count": len(contracts),
         "ws_symbols": ws_symbols,
         "token_to_ws_symbol": token_to_ws_symbol,
         "contracts": contracts,
+        "source": next(iter(sources)) if len(sources) == 1 else "mixed",
+        "as_of": snapshot.get("as_of"),
+        "data_status": "snapshot" if any(row.get("ltp") is not None for row in contracts) else "unavailable",
     }
     await cache_instance.set(
         cache_key,

@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from backend.shared.cache import cache
 
@@ -25,6 +25,13 @@ class ShareholdingCategory(BaseModel):
 
 
 class ShareholdingPattern(BaseModel):
+    @field_validator("warning", mode="before", check_fields=False)
+    @classmethod
+    def safe_provider_warning(cls, value):
+        # Provider exceptions can contain authenticated URLs. This also
+        # sanitizes older cached payloads before returning them to clients.
+        return "Shareholding provider data is unavailable or incomplete." if value else None
+
     symbol: str
     total_shares: int = 0
     promoter_holding: float = 0.0
@@ -387,7 +394,7 @@ class ShareholdingService:
         try:
             payload = await self._fetch_nse_shareholding_payload(clean_symbol)
         except Exception as exc:
-            warning = f"NSE shareholding unavailable: {exc}"
+            warning = "NSE shareholding provider is unavailable"
 
         rows = self._extract_rows(payload)
         categories: list[ShareholdingCategory] = []
@@ -525,7 +532,7 @@ class ShareholdingService:
                                 }
                             )
             except Exception as exc:
-                warning = f"FMP institutional fallback unavailable: {exc}"
+                warning = "FMP institutional provider is unavailable"
 
         quarter = "Latest"
         as_of = datetime.now(timezone.utc).strftime("%Y-%m-%d")

@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, List, Optional
 from uuid import uuid4
+import re
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field, ConfigDict
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from sqlalchemy.orm import Session
 
 from backend.api.deps import get_db
@@ -14,23 +15,60 @@ from backend.db.models import WatchlistORM
 
 router = APIRouter(prefix="/api/watchlists", tags=["watchlists"])
 
+MAX_WATCHLIST_SYMBOLS = 1000
+MAX_BULK_SYMBOLS = 500
+
+
+def _clean_name(value: str) -> str:
+    name = value.strip()
+    if not name or any(ord(char) < 32 or ord(char) == 127 for char in name):
+        raise ValueError("Enter a watchlist name without control characters.")
+    return name
+
+
+def _clean_symbols(symbols: List[str], limit: int) -> List[str]:
+    # Import UI limits are not an API security boundary. Validate the complete
+    # write before touching persistent membership, including direct API calls.
+    if len(symbols) > limit:
+        raise HTTPException(status_code=422, detail=f"At most {limit} symbols are allowed per request.")
+    normalized = []
+    for value in symbols:
+        symbol = value.strip().upper()
+        if not re.fullmatch(r"[A-Z0-9^][A-Z0-9._:=&^/\-]{0,79}", symbol):
+            raise HTTPException(status_code=422, detail="Symbols must contain 1–80 financial identifier characters without whitespace or formula syntax.")
+        normalized.append(symbol)
+    return list(dict.fromkeys(normalized))
+
 
 class WatchlistBase(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=80)
     column_config: dict = Field(default_factory=dict)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        return _clean_name(value)
 
 
 class WatchlistCreate(WatchlistBase):
-    symbols: List[str] = Field(default_factory=list)
+    symbols: List[str] = Field(default_factory=list, max_length=MAX_WATCHLIST_SYMBOLS)
 
 
 class WatchlistUpdate(BaseModel):
-    name: Optional[str] = None
-    symbols: Optional[List[str]] = None
+    name: Optional[str] = Field(default=None, min_length=1, max_length=80)
+    symbols: Optional[List[str]] = Field(default=None, max_length=MAX_WATCHLIST_SYMBOLS)
     column_config: Optional[dict] = None
 
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str | None) -> str | None:
+        return _clean_name(value) if value is not None else None
 
-class WatchlistResponse(WatchlistBase):
+
+class WatchlistResponse(BaseModel):
+    # Read existing records without imposing new write limits retroactively.
+    name: str
+    column_config: dict = Field(default_factory=dict)
     id: str
     symbols: List[str]
     created_at: datetime
@@ -78,7 +116,7 @@ def create_watchlist(payload: WatchlistCreate, db: Session = Depends(get_db), cu
         user_id=user_id,
         name=payload.name,
         # Honour the symbols sent on create (previously always stored []).
-        symbols_json=list(dict.fromkeys(s.strip().upper() for s in (payload.symbols or []) if s and s.strip())),
+        symbols_json=_clean_symbols(payload.symbols, MAX_WATCHLIST_SYMBOLS),
         column_config_json=payload.column_config,
         created_at=datetime.now(timezone.utc)
     )
@@ -100,10 +138,11 @@ def update_watchlist(watchlist_id: str, payload: WatchlistUpdate, db: Session = 
     if not wl:
         raise HTTPException(status_code=404, detail="Watchlist not found")
 
+    normalized_symbols = _clean_symbols(payload.symbols, MAX_WATCHLIST_SYMBOLS) if payload.symbols is not None else None
     if payload.name is not None:
         wl.name = payload.name
     if payload.symbols is not None:
-        wl.symbols_json = payload.symbols
+        wl.symbols_json = normalized_symbols
     if payload.column_config is not None:
         wl.column_config_json = payload.column_config
 
@@ -129,16 +168,18 @@ def delete_watchlist(watchlist_id: str, db: Session = Depends(get_db), current_u
 
 
 @router.post("/{watchlist_id}/symbols", response_model=WatchlistResponse)
-def add_symbols(watchlist_id: str, symbols: List[str], db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def add_symbols(watchlist_id: str, symbols: List[str] = Body(..., max_length=MAX_BULK_SYMBOLS), db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     wl = db.query(WatchlistORM).filter(WatchlistORM.id == watchlist_id, WatchlistORM.user_id == current_user.id).first()
     if not wl:
         raise HTTPException(status_code=404, detail="Watchlist not found")
 
     current_symbols = list(wl.symbols_json)
-    for s in symbols:
-        s_upper = s.strip().upper()
+    for s_upper in _clean_symbols(symbols, MAX_BULK_SYMBOLS):
         if s_upper not in current_symbols:
             current_symbols.append(s_upper)
+
+    if len(current_symbols) > MAX_WATCHLIST_SYMBOLS:
+        raise HTTPException(status_code=422, detail=f"A watchlist can contain at most {MAX_WATCHLIST_SYMBOLS} symbols.")
 
     wl.symbols_json = current_symbols
     db.commit()

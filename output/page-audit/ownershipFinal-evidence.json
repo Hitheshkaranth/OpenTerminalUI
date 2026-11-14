@@ -1,0 +1,36 @@
+[
+  {
+    "path": "/equity/security/AAPL?ticker=AAPL&tab=ownership",
+    "title": "OpenTerminalUI",
+    "url": "/equity/security/AAPL?ticker=AAPL&tab=ownership",
+    "headings": [],
+    "text": "AAPL\nNASDAQ\nTECHNOLOGY\nApple Inc.\nLAST\n356.27\nCHANGE %\n+0.39%\nVOLUME\n39.99M\nOVERVIEW\nFINANCIALS\nCHART\nNEWS\nOWNERSHIP\nESTIMATES\nPEERS\nESG\nTAPE\nINSIDER\nFILINGS\nEXPORT REPORT\nRESEARCH NOTE\nV\nnone\nOWNERSHIP\nINSTITUTIONAL HOLDERS + INSIDER TRANSACTIONS\n\nShareholding percentages are unavailable from the current provider. Holder records below are shown separately.\n\nPROMOTER %\n—\nFII %\n—\nDII %\n—\nPUBLIC %\n—\nDENSE TABLE\n0 rows\nCSV\nHOLDER\nSORT\nSHARES\nSORT\nCHANGE\nSORT\nREPORTED\nSORT\nDENSE TABLE\n0 rows\nCSV\nINSIDER\nSORT\nDATE\nSORT\nTYPE\nSORT\nCHANGE\nSORT\nPRICE\nSORT",
+    "overflow": false,
+    "loaders": [],
+    "unlabelledButtons": 0,
+    "settled": true,
+    "waitPolicy": "initial API requests and visible loading states; 90s deadline",
+    "errors": [],
+    "failed": [
+      {
+        "path": "/api/filings-rag/AAPL/analysis",
+        "status": 404
+      },
+      {
+        "path": "/api/filings-rag/AAPL/knowledge",
+        "status": 404
+      },
+      {
+        "path": "/api/filings-rag/AAPL/analysis",
+        "status": 404
+      },
+      {
+        "path": "/api/filings-rag/AAPL/knowledge",
+        "status": 404
+      }
+    ],
+    "pending": [],
+    "waitMs": 18290,
+    "failure": null
+  }
+]

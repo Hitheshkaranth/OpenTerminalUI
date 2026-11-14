@@ -1,3 +1,4 @@
+import { apiFetch } from "../api/base";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLocation } from "react-router-dom";
@@ -616,7 +617,7 @@ export function BacktestingPage() {
     if (!runId || jobState !== "done") return;
     setAnalyticsLoading(true);
     try {
-      const resp = await fetch(`/api/backtests/${runId}/analytics`);
+      const resp = await apiFetch(`/api/backtests/${runId}/analytics`);
       if (resp.ok) {
         const data = (await resp.json()) as { analytics: Analytics };
         setAnalytics(data.analytics);
@@ -632,7 +633,7 @@ export function BacktestingPage() {
     if (!runId || jobState !== "done") return;
     setRobustnessLoading(true);
     try {
-      const resp = await fetch(`/api/backtests/${runId}/robustness`);
+      const resp = await apiFetch(`/api/backtests/${runId}/robustness`);
       const data = resp.ok ? await resp.json() : null;
       if (data?.robustness) {
         setRobustness(data.robustness);
@@ -661,7 +662,7 @@ export function BacktestingPage() {
     let active = true;
     void (async () => {
       try {
-        const wfResp = await fetch("/api/v1/backtest/validate/walkforward", {
+        const wfResp = await apiFetch("/api/v1/backtest/validate/walkforward", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ run_id: runId, folds: 4, in_sample_ratio: 0.7 }),
@@ -674,7 +675,7 @@ export function BacktestingPage() {
       }
 
       try {
-        const optResp = await fetch("/api/v1/backtest/optimize", {
+        const optResp = await apiFetch("/api/v1/backtest/optimize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
