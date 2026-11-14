@@ -1,8 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { IconRail } from "../components/layout/IconRail";
+import { PINNED_DEFAULT } from "../components/layout/navConfig";
+import { useNavigationStore } from "../store/navigationStore";
+import { useQuickAccessStore } from "../store/quickAccessStore";
 
 const navigateSpy = vi.fn();
 
@@ -15,13 +18,11 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
-import { useNavigationStore } from "../store/navigationStore";
-
 describe("IconRail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    navigateSpy.mockClear();
     window.localStorage.clear();
+    useQuickAccessStore.setState({ pinnedIds: [...PINNED_DEFAULT] });
     useNavigationStore.setState({
       history: [
         { path: "/equity/screener", label: "Screener", breadcrumbs: ["Markets", "Screener"], timestamp: 1 },
@@ -32,161 +33,118 @@ describe("IconRail", () => {
     });
   });
 
+  afterEach(() => vi.restoreAllMocks());
+
   function renderIconRail() {
     return render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/home"]}>
+      <MemoryRouter initialEntries={["/home"]}>
         <IconRail />
       </MemoryRouter>,
     );
   }
 
+  async function expandRail() {
+    fireEvent.click(screen.getByRole("button", { name: "Expand navigation" }));
+    await screen.findByRole("button", { name: "Collapse navigation" });
+  }
+
   describe("collapsed mode (default)", () => {
     it("shows the brand icon", () => {
       renderIconRail();
-      expect(screen.getByAltText("OpenTerminalUI")).toBeTruthy();
+      expect(screen.getByAltText("OpenTerminalUI")).toBeInTheDocument();
     });
 
-    it("shows the 9 pinned labels", () => {
+    it("shows the core pinned links", () => {
       renderIconRail();
-      const pinnedLabels = [
-        "Home",
-        "Market",
-        "Security Hub",
-        "Screener",
-        "Workstation",
-        "Portfolio",
-        "Watchlist",
-        "Alerts",
-        "Settings",
-      ];
-      for (const label of pinnedLabels) {
-        expect(screen.getByLabelText(label)).toBeTruthy();
+      for (const label of ["Home", "Market", "Security Hub", "Screener", "Workstation", "Portfolio", "Watchlist", "Alerts", "Settings"]) {
+        expect(screen.getByRole("link", { name: label, exact: true })).toBeInTheDocument();
       }
     });
 
     it("shows a More button to expand", () => {
       renderIconRail();
-      const moreBtn = screen.getByRole("button", { name: "Expand navigation" });
-      expect(moreBtn).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Expand navigation" })).toBeInTheDocument();
     });
 
-    it("clicking More expands the rail", () => {
+    it("clicking More expands the rail", async () => {
       renderIconRail();
-      const moreBtn = screen.getByRole("button", { name: "Expand navigation" });
-      fireEvent.click(moreBtn);
-
-      waitFor(() => {
-        expect(screen.getByRole("button", { name: "Collapse navigation" })).toBeTruthy();
-      });
+      await expandRail();
+      expect(screen.queryByRole("button", { name: "Expand navigation" })).not.toBeInTheDocument();
     });
   });
 
   describe("expanded mode", () => {
-    it("shows section headers", () => {
+    it("shows section headers", async () => {
       renderIconRail();
-      const moreBtn = screen.getByRole("button", { name: "Expand navigation" });
-      fireEvent.click(moreBtn);
-
-      waitFor(() => {
-        expect(screen.getByText("Markets")).toBeTruthy();
-        expect(screen.getByText("Research")).toBeTruthy();
-        expect(screen.getByText("Charts")).toBeTruthy();
-      });
+      await expandRail();
+      for (const name of ["Markets", "Research", "Charts"]) {
+        expect(screen.getByRole("button", { name, exact: true })).toBeInTheDocument();
+      }
     });
 
-    it("clicking a section header toggles its items", () => {
+    it("clicking a section header toggles its items", async () => {
       renderIconRail();
-      const moreBtn = screen.getByRole("button", { name: "Expand navigation" });
-      fireEvent.click(moreBtn);
-
-      waitFor(() => {
-        const marketsHeader = screen.getByText("Markets");
-        fireEvent.click(marketsHeader);
-        expect(screen.queryByText("Home")).toBeNull();
-      });
+      await expandRail();
+      expect(screen.getByRole("link", { name: "Economics", exact: true })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Markets", exact: true }));
+      expect(screen.queryByRole("link", { name: "Economics", exact: true })).not.toBeInTheDocument();
+      // Closing the section must not remove its separately pinned Home link.
+      expect(screen.getByRole("link", { name: "Home", exact: true })).toBeInTheDocument();
     });
 
-    it("toggling the header again shows items", () => {
+    it("toggling the header again shows items", async () => {
       renderIconRail();
-      const moreBtn = screen.getByRole("button", { name: "Expand navigation" });
-      fireEvent.click(moreBtn);
-
-      waitFor(() => {
-        const marketsHeader = screen.getByText("Markets");
-        fireEvent.click(marketsHeader);
-        fireEvent.click(marketsHeader);
-        expect(screen.getByLabelText("Home")).toBeTruthy();
-      });
+      await expandRail();
+      const markets = screen.getByRole("button", { name: "Markets", exact: true });
+      fireEvent.click(markets);
+      expect(screen.queryByRole("link", { name: "Economics", exact: true })).not.toBeInTheDocument();
+      fireEvent.click(markets);
+      expect(await screen.findByRole("link", { name: "Economics", exact: true })).toBeInTheDocument();
     });
 
-    it("expanded state persists to localStorage", () => {
+    it("expanded state persists to localStorage", async () => {
       renderIconRail();
-      const moreBtn = screen.getByRole("button", { name: "Expand navigation" });
-      fireEvent.click(moreBtn);
-
+      await expandRail();
       expect(window.localStorage.getItem("ot:nav:expanded")).toBe("true");
     });
 
-    it("shows a Collapse button", () => {
+    it("can collapse the expanded rail", async () => {
       renderIconRail();
-      const moreBtn = screen.getByRole("button", { name: "Expand navigation" });
-      fireEvent.click(moreBtn);
-
-      waitFor(() => {
-        const collapseBtn = screen.getByRole("button", { name: "Collapse navigation" });
-        expect(collapseBtn).toBeTruthy();
-      });
+      await expandRail();
+      fireEvent.click(screen.getByRole("button", { name: "Collapse navigation" }));
+      expect(await screen.findByRole("button", { name: "Expand navigation" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Markets", exact: true })).not.toBeInTheDocument();
     });
 
-    it("shows Recent items", () => {
+    it("shows Recent items", async () => {
       renderIconRail();
-      const moreBtn = screen.getByRole("button", { name: "Expand navigation" });
-      fireEvent.click(moreBtn);
-
-      waitFor(() => {
-        expect(screen.getByText("Recent")).toBeTruthy();
-        expect(screen.getByText("Screener")).toBeTruthy();
-        expect(screen.getByText("Factors")).toBeTruthy();
-        expect(screen.getByText("Workstation")).toBeTruthy();
-      });
+      await expandRail();
+      const recent = within(screen.getByText("Recent").parentElement!);
+      for (const name of ["Screener", "Factors", "Workstation"]) {
+        expect(recent.getByRole("link", { name, exact: true })).toBeInTheDocument();
+      }
     });
 
-    it("shows Pinned section", () => {
+    it("shows Pinned section", async () => {
       renderIconRail();
-      const moreBtn = screen.getByRole("button", { name: "Expand navigation" });
-      fireEvent.click(moreBtn);
-
-      waitFor(() => {
-        expect(screen.getByText("Pinned")).toBeTruthy();
-        expect(screen.getByLabelText("Home")).toBeTruthy();
-      });
+      await expandRail();
+      const pinned = within(screen.getByText("Pinned").parentElement!);
+      expect(pinned.getByRole("link", { name: "Home", exact: true })).toBeInTheDocument();
     });
 
-    it("Cmd button dispatches keyboard event", () => {
+    it("Cmd button dispatches keyboard event", async () => {
       renderIconRail();
+      await expandRail();
       const dispatchSpy = vi.spyOn(window, "dispatchEvent");
-
-      waitFor(() => {
-        const cmdBtn = screen.getByText("Cmd");
-        fireEvent.click(cmdBtn);
-
-        expect(dispatchSpy).toHaveBeenCalledWith(
-          expect.objectContaining({
-            type: "keydown",
-            key: "k",
-          }),
-        );
-      });
+      fireEvent.click(screen.getByRole("button", { name: "Cmd", exact: true }));
+      expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "keydown", key: "k", ctrlKey: true }));
     });
 
-    it("account button navigates to /account", () => {
+    it("account button navigates to /account", async () => {
       renderIconRail();
-
-      waitFor(() => {
-        const accountBtn = screen.getByText("trader");
-        fireEvent.click(accountBtn);
-        expect(navigateSpy).toHaveBeenCalledWith("/account");
-      });
+      await expandRail();
+      fireEvent.click(screen.getByRole("button", { name: /Sign in/i }));
+      expect(navigateSpy).toHaveBeenCalledWith("/account");
     });
   });
 });
