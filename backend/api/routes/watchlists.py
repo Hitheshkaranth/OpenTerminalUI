@@ -115,8 +115,9 @@ def create_watchlist(payload: WatchlistCreate, db: Session = Depends(get_db), cu
         id=str(uuid4()),
         user_id=user_id,
         name=payload.name,
-        # Honour the symbols sent on create (previously always stored []).
-        symbols_json=_clean_symbols(payload.symbols, MAX_WATCHLIST_SYMBOLS),
+        # Creation historically ignores blank import rows. Keep that behavior
+        # while validating every nonblank identifier before persisting anything.
+        symbols_json=_clean_symbols([symbol for symbol in payload.symbols if symbol.strip()], MAX_WATCHLIST_SYMBOLS),
         column_config_json=payload.column_config,
         created_at=datetime.now(timezone.utc)
     )

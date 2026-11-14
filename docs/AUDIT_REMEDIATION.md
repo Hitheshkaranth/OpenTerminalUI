@@ -68,3 +68,7 @@ The first functional expiry attempt used an incorrectly matched selector. Inspec
 Evidence: [80 route observations](../output/page-audit/remediation/all-loaded-pages.json), [four record routes](../output/page-audit/remediation/record-loaded-pages.json), [screenshot gallery](../output/page-audit/index.html).
 
 This closes the three listed findings within the tested local scope. It does not assert an external penetration-test certification, a Python dependency CVE scan, exchange reconciliation of every analytical metric, or real broker execution.
+
+## CI follow-up: blank watchlist creation rows
+
+The full GitHub backend suite exposed a compatibility regression: creating a watchlist with a blank import row returned 422 instead of retaining its valid symbols. Creation now drops blank rows before identifier validation. Nonblank malformed identifiers still reject the complete write, bulk updates remain strict, and request size limits remain enforced. The original failing regression and the watchlist validation/ownership checks pass together (31 tests); five new cases cover blank rows and rejected mixed input. Full verification runs in the [main CI workflow](https://github.com/Hitheshkaranth/OpenTerminalUI/actions/workflows/ci.yml).

@@ -46,6 +46,26 @@ def test_create_update_and_add_normalize_the_same_financial_identifiers(saved_li
     assert routes.add_symbols(identifier, [" gc=f "], db=db, current_user=owner)["symbols"] == result["symbols"]
 
 
+@pytest.mark.parametrize("symbols, expected", [
+    (["", "  ", " aapl ", "AAPL", "\t", "GC=F"], ["AAPL", "GC=F"]),
+    (["", " \t\n"], []),
+])
+def test_creation_ignores_blank_import_rows(saved_list, symbols, expected):
+    db, owner, _ = saved_list
+    result = routes.create_watchlist(routes.WatchlistCreate(name="Imported", symbols=symbols), db=db, current_user=owner)
+    assert result["symbols"] == expected
+
+
+@pytest.mark.parametrize("symbol", ["=1+1", "AAPL MSFT", "\x00TCS"])
+def test_blank_create_rows_do_not_bypass_identifier_validation(saved_list, symbol):
+    db, owner, _ = saved_list
+    before = db.query(WatchlistORM).count()
+    with pytest.raises(HTTPException) as exc:
+        routes.create_watchlist(routes.WatchlistCreate(name="Invalid import", symbols=["", "MSFT", symbol]), db=db, current_user=owner)
+    assert exc.value.status_code == 422
+    assert db.query(WatchlistORM).count() == before
+
+
 def test_bulk_and_total_membership_limits_are_enforced(saved_list):
     db, owner, identifier = saved_list
     with pytest.raises(HTTPException) as exc:
