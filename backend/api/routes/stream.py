@@ -6,7 +6,8 @@ import secrets
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from jose import jwt, JWTError
+import jwt
+from jwt import PyJWTError as JWTError
 
 from backend.services.marketdata_hub import get_marketdata_hub
 from backend.services.orderbook_service import service as orderbook_service
@@ -59,7 +60,7 @@ def _validate_ws_origin(header: str | None) -> bool:
 def _validate_ws_jwt(token: str) -> dict | None:
     """Validate a JWT from a query param or header, return payload or None."""
     try:
-        payload = jwt.decode(token, get_jwt_secret(), algorithms=["HS256"])
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=["HS256"], options={"require": ["exp", "sub", "type"]})
         if str(payload.get("type", "")) == "access":
             return payload
     except (JWTError, Exception):

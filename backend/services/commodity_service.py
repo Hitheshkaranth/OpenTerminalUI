@@ -46,7 +46,7 @@ class CommodityFuturesPoint(BaseModel):
     contract: str
     contract_symbol: str | None = None
     months_out: int
-    expiry: date
+    expiry: date | None = None
     price: float
     change_pct: float | None = None
     change: float | None = None
@@ -97,7 +97,7 @@ class _ContractRequest:
     contract: str
     contract_symbol: str
     months_out: int
-    expiry: date
+    expiry: date | None
 
 
 _CATEGORY_LABELS: dict[CommodityCategory, str] = {
@@ -382,10 +382,10 @@ class CommodityService:
         base_month = self._now().date().replace(day=1)
         schedule = [
             _ContractRequest(
-                contract="Front",
+                contract="Front continuous",
                 contract_symbol=item.yahoo_symbol,
                 months_out=1,
-                expiry=_month_end(_add_months(base_month, 1)),
+                expiry=None,
             )
         ]
         for offset in range(1, count):
@@ -396,7 +396,7 @@ class CommodityService:
                     contract=f"{month_abbr[delivery.month]} {delivery.year}",
                     contract_symbol=symbol,
                     months_out=offset + 1,
-                    expiry=_month_end(delivery),
+                    expiry=None,
                 )
             )
         return schedule
@@ -465,29 +465,6 @@ class CommodityService:
             source="fmp",
         )
 
-    def _project_chain_point(
-        self,
-        request: _ContractRequest,
-        base_point: CommodityFuturesPoint,
-        curve_step: float,
-    ) -> CommodityFuturesPoint:
-        projected_price = max(0.01, base_point.price + curve_step * (request.months_out - 1))
-        change = curve_step if request.months_out > 1 else base_point.change
-        previous_close = projected_price - (change or 0.0)
-        change_pct = (change / previous_close) * 100.0 if previous_close and change is not None else 0.0
-        return CommodityFuturesPoint(
-            contract=request.contract,
-            contract_symbol=request.contract_symbol,
-            months_out=request.months_out,
-            expiry=request.expiry,
-            price=round(projected_price, 4),
-            change=round(change, 4) if change is not None else None,
-            change_pct=round(change_pct, 4) if change_pct is not None else None,
-            open_interest=max(0, int(base_point.open_interest / max(1, request.months_out))),
-            volume=max(0, int(base_point.volume / max(1, request.months_out))),
-            source="projected",
-        )
-
     async def _fetch_live_futures_chain(self, item: CommodityDefinition) -> CommodityFuturesChainResponse:
         fetcher = await self._fetcher_factory()
         schedule = self._contract_schedule(item)
@@ -513,25 +490,11 @@ class CommodityService:
                 points_by_month[1] = front_point
                 source = "fmp"
 
-        if front_point is None:
-            raise RuntimeError(f"No futures-chain data available for {item.yahoo_symbol}")
-
-        ordered_actual = sorted(points_by_month.values(), key=lambda point: point.months_out)
-        if len(ordered_actual) >= 2:
-            first = ordered_actual[0]
-            last = ordered_actual[-1]
-            divisor = max(1, last.months_out - first.months_out)
-            curve_step = (last.price - first.price) / divisor
-        else:
-            curve_step = item.curve_step
-
-        points: list[CommodityFuturesPoint] = []
-        for entry in schedule:
-            point = points_by_month.get(entry.months_out)
-            if point is None:
-                point = self._project_chain_point(entry, front_point, curve_step)
-                source = "mixed" if source == "yahoo" else source
-            points.append(point)
+        # Missing delivery months have no observed quote. Never synthesize a
+        # price, expiry, volume or open interest to complete the curve.
+        points = sorted(points_by_month.values(), key=lambda point: point.months_out)
+        if not points:
+            raise RuntimeError(f"No observed futures-chain data available for {item.yahoo_symbol}")
 
         return CommodityFuturesChainResponse(
             symbol=item.yahoo_symbol,
@@ -699,8 +662,8 @@ class CommodityService:
 
     async def get_futures_chain(self, symbol: str) -> CommodityFuturesChainResponse:
         item = self._commodity_for_symbol(symbol)
-        cache_key = self._cache_key("commodities_futures_chain", item.yahoo_symbol)
-        stale_key = self._cache_key("commodities_futures_chain", f"{item.yahoo_symbol}_stale")
+        cache_key = self._cache_key("commodities_futures_chain_observed_v2", item.yahoo_symbol)
+        stale_key = self._cache_key("commodities_futures_chain_observed_v2", f"{item.yahoo_symbol}_stale")
         cached = _restore_model(CommodityFuturesChainResponse, await self._cache.get(cache_key))
         if isinstance(cached, CommodityFuturesChainResponse):
             return cached

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
+import math
 from statistics import mean
 from typing import Any
 
@@ -28,7 +29,7 @@ class OptionsFlowService:
     def _to_float(self, value: Any, default: float = 0.0) -> float:
         try:
             out = float(value)
-            if out != out:
+            if not math.isfinite(out):
                 return default
             return out
         except (TypeError, ValueError):
@@ -37,7 +38,7 @@ class OptionsFlowService:
     def _to_int(self, value: Any, default: int = 0) -> int:
         try:
             return int(float(value))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             return default
 
     def _as_timestamp(self, value: Any) -> datetime:
@@ -89,13 +90,17 @@ class OptionsFlowService:
         avg_oi_change = max(chain_avg_oi_change * 0.8, abs(oi) * 0.015, 1.0)
         volume_ratio = round(volume / avg_volume, 2)
         oi_change_ratio = round(abs(oi_change) / avg_oi_change, 2)
-        premium_value = round(max(volume, 0) * max(ltp, 0.0) * 100.0, 2)
+        # Volume is contracts; latest price is not executed turnover. Only use
+        # an explicit provider turnover, never an assumed contract multiplier.
+        reported_premium = leg.get("premium_turnover")
+        premium_value = self._to_float(reported_premium, -1.0)
+        premium_value = round(premium_value, 2) if premium_value >= 0 else None
 
         if volume_ratio <= 2.0 and oi_change_ratio <= 2.0:
             return None
 
-        event_timestamp = timestamp + timedelta(seconds=(row_index * 37) + (0 if option_type == "CE" else 19))
-        sentiment = "bullish" if option_type == "CE" else "bearish"
+        event_timestamp = timestamp
+        sentiment = "neutral"
 
         return {
             "timestamp": event_timestamp.isoformat(),
@@ -109,9 +114,11 @@ class OptionsFlowService:
             "oi": oi,
             "oi_change": oi_change,
             "premium_value": premium_value,
+            "currency": chain.get("currency") or ("INR" if str(chain.get("symbol", "")).upper() in DEFAULT_FLOW_SYMBOLS else None),
+            "activity_basis": "cross_sectional_snapshot",
             "implied_vol": round(iv, 4),
             "sentiment": sentiment,
-            "heat_score": self.compute_heat_score(volume_ratio, oi_change_ratio, premium_value),
+            "heat_score": self.compute_heat_score(volume_ratio, oi_change_ratio, 0.0),
             "spot_price": round(self._to_float(chain.get("spot_price")), 4),
             "chain_context": {
                 "atm_strike": self._to_float(chain.get("atm_strike")),
@@ -147,19 +154,19 @@ class OptionsFlowService:
                 flows.append(pe_flow)
         return flows
 
-    async def detect_unusual_activity(self, symbol: str | None = None, min_premium: float = 0) -> list[dict[str, Any]]:
+    async def detect_unusual_activity(self, symbol: str | None = None, min_premium: float = 0, expiry: str | None = None) -> list[dict[str, Any]]:
         """
-        For each option contract, compare current volume to 20-day average.
+        Compare activity against the current chain cross-section, not historical volume.
         Flag as unusual if: current_volume > 2 * avg_volume OR oi_change > 2 * avg_oi_change
         """
         symbols = self._symbols_for_scan(symbol)
         flows: list[dict[str, Any]] = []
         for symbol_u in symbols:
             expiries = await self._fetcher.get_expiry_dates(symbol_u)
-            selected_expiry = expiries[0] if expiries else None
+            selected_expiry = expiry or (expiries[0] if expiries else None)
             chain = await self._fetcher.get_option_chain(symbol_u, expiry=selected_expiry, strike_range=24)
             for flow in self._build_flows_from_chain(chain):
-                if self._to_float(flow.get("premium_value")) >= max(min_premium, 0):
+                if min_premium <= 0 or (flow.get("premium_value") is not None and self._to_float(flow.get("premium_value")) >= min_premium):
                     flows.append(flow)
 
         flows.sort(
@@ -172,81 +179,34 @@ class OptionsFlowService:
         )
         return flows
 
-    def _period_days(self, period: str) -> int:
-        text = str(period or "1d").strip().lower()
-        if text.endswith("d"):
-            try:
-                return max(int(text[:-1]), 1)
-            except ValueError:
-                return 1
-        return 1
-
-    async def get_flow_summary(self, period: str = "1d") -> dict[str, Any]:
-        """
-        Aggregate flow data.
-        """
-        flows = await self.detect_unusual_activity()
-        period_days = self._period_days(period)
-        symbol_buckets: dict[str, dict[str, float]] = defaultdict(lambda: {"premium": 0.0, "flow_count": 0.0})
-        premium_by_hour: dict[str, dict[str, float]] = defaultdict(lambda: {"bullish": 0.0, "bearish": 0.0})
-
-        total_premium = 0.0
-        bullish_premium = 0.0
-        bearish_premium = 0.0
-
+    async def get_flow_summary(self, period: str = "1d", symbol: str | None = None,
+                               min_premium: float = 0, option_type: str | None = None,
+                               expiry: str | None = None) -> dict[str, Any]:
+        flows = await self.detect_unusual_activity(symbol=symbol, min_premium=min_premium, expiry=expiry)
+        flows = [f for f in flows if (not option_type or f["option_type"] == option_type)
+                 and (not expiry or f["expiry"] == expiry)]
+        currencies = {f.get("currency") for f in flows if f.get("premium_value") is not None}
+        complete = bool(flows) and all(f.get("premium_value") is not None for f in flows) and len(currencies) == 1 and None not in currencies
+        calls = sum(f["option_type"] == "CE" for f in flows)
+        puts = len(flows) - calls
+        total = sum(f["premium_value"] for f in flows) if complete else None
+        call_premium = sum(f["premium_value"] for f in flows if f["option_type"] == "CE") if complete else None
+        buckets: dict[str, int] = defaultdict(int)
         for flow in flows:
-            base_ts = self._as_timestamp(flow.get("timestamp"))
-            base_premium = self._to_float(flow.get("premium_value"))
-            sentiment = str(flow.get("sentiment") or "bullish")
-            symbol = str(flow.get("symbol") or "").upper()
-
-            for day_offset in range(period_days):
-                weight = max(0.55, 1.0 - (day_offset * 0.12))
-                weighted_premium = round(base_premium * weight, 2)
-                point_ts = (base_ts - timedelta(days=day_offset, hours=day_offset)).replace(minute=0, second=0, microsecond=0)
-                hour_key = point_ts.isoformat()
-
-                premium_by_hour[hour_key][sentiment] += weighted_premium
-                symbol_buckets[symbol]["premium"] += weighted_premium
-                symbol_buckets[symbol]["flow_count"] += 1
-                total_premium += weighted_premium
-                if sentiment == "bullish":
-                    bullish_premium += weighted_premium
-                else:
-                    bearish_premium += weighted_premium
-
-        top_symbols = sorted(
-            (
-                {"symbol": symbol, "premium": round(values["premium"], 2), "flow_count": int(values["flow_count"])}
-                for symbol, values in symbol_buckets.items()
-            ),
-            key=lambda item: (item["premium"], item["flow_count"]),
-            reverse=True,
-        )[:5]
-
-        hourly_rows = [
-            {
-                "hour": hour,
-                "bullish": round(values["bullish"], 2),
-                "bearish": round(values["bearish"], 2),
-            }
-            for hour, values in sorted(premium_by_hour.items())
-        ]
-
-        bullish_pct = round((bullish_premium / total_premium) * 100.0, 2) if total_premium > 0 else 0.0
-        bearish_pct = round((bearish_premium / total_premium) * 100.0, 2) if total_premium > 0 else 0.0
-
-        total_flow_count = sum(int(values["flow_count"]) for values in symbol_buckets.values())
-
+            buckets[flow["symbol"]] += 1
         return {
-            "total_premium": round(total_premium, 2),
-            "bullish_premium": round(bullish_premium, 2),
-            "bearish_premium": round(bearish_premium, 2),
-            "bullish_pct": bullish_pct,
-            "bearish_pct": bearish_pct,
-            "top_symbols": top_symbols,
-            "premium_by_hour": hourly_rows,
-            "flow_count": total_flow_count,
+            "total_premium": total, "bullish_premium": call_premium,
+            "bearish_premium": total - call_premium if complete else None,
+            "bullish_pct": round(calls / len(flows) * 100, 2) if flows else 0,
+            "bearish_pct": round(puts / len(flows) * 100, 2) if flows else 0,
+            "top_symbols": [{"symbol": name, "premium": None, "flow_count": count}
+                            for name, count in sorted(buckets.items(), key=lambda x: x[1], reverse=True)[:5]],
+            "premium_by_hour": [], "flow_count": len(flows),
+            "currency": next(iter(currencies)) if complete else None,
+            "history_available": False, "requested_period": period,
+            "activity_basis": "cross_sectional_snapshot", "sentiment_basis": "option_type_only",
+            "as_of": max((f["timestamp"] for f in flows), default=None),
+            "notice": "Current chain snapshot only. Call/put counts do not indicate trade direction. Historical flow and execution-level premium are unavailable.",
         }
 
 

@@ -187,7 +187,7 @@ export function FnoLayout() {
     >
       {!location.pathname.endsWith("/about") ? (
         <div className="sticky top-0 z-20 border-b border-terminal-border bg-terminal-panel px-3 py-2">
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             <label className="text-[11px]">
               <span className="mb-1 block uppercase tracking-wide text-terminal-muted">Symbol</span>
               <select

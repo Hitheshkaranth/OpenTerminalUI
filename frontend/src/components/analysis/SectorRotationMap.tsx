@@ -158,12 +158,15 @@ export function SectorRotationMap({ defaultBenchmark = "SPY", width = "100%", he
 
         <div className="flex items-center gap-2">
           <button
+            aria-label={isPlaying ? "Pause rotation history" : "Play rotation history"}
+            aria-pressed={isPlaying}
             onClick={() => setIsPlaying(!isPlaying)}
             className="p-1 rounded bg-terminal-bg border border-terminal-border text-terminal-accent hover:bg-terminal-border"
           >
             {isPlaying ? <Pause size={12} /> : <Play size={12} />}
           </button>
           <input
+            aria-label="Rotation history position"
             type="range"
             min={0}
             max={maxHistory}

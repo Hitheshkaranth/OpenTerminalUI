@@ -337,3 +337,16 @@ def test_service_uses_stale_pair_cache_when_live_sources_fail() -> None:
 
     assert payload["source_symbol"] == "stale-cache"
     assert payload["current_rate"] == 1.083
+
+
+def test_cross_rates_recovers_observed_chart_prices_when_batch_quotes_fail():
+    quotes = _yahoo_quote_payload()
+    yahoo = _FakeYahoo(raise_quotes=RuntimeError("quote authentication unavailable"), chart_payloads={
+        q["symbol"]: _yahoo_chart_payload(start_price=q["regularMarketPrice"], closes=[q["regularMarketPrice"]] * 3)
+        for q in quotes
+    })
+    service = ForexService(yahoo=yahoo, finnhub=_FakeFinnhub(), cache_backend=_FakeCache(), now_factory=lambda: FIXED_NOW)
+    result = asyncio.run(service.get_cross_rates())
+    assert result["pair_quotes"]["EURUSD"]["rate"] == 1.085
+    assert result["pair_quotes"]["USDJPY"]["rate"] == 151.32
+    assert len(yahoo.chart_calls) == 7

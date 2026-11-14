@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { useFnoContext } from "../FnoLayout";
 import { TerminalBadge } from "../../components/terminal/TerminalBadge";
 import { TerminalPanel } from "../../components/terminal/TerminalPanel";
 import { fetchOptionsFlow, fetchOptionsFlowSummary } from "../api/fnoApi";
@@ -20,10 +21,10 @@ type SortKey = "time" | "heat" | "premium";
 type TypeFilter = "ALL" | "CE" | "PE";
 type ChartWindow = "1d" | "5d";
 
-function formatPremium(value: number): string {
-  if (!Number.isFinite(value)) return "-";
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
-  return `${formatIndianCompact(value)}`;
+function formatPremium(value: number | null | undefined, currency?: string | null): string {
+  if (value == null || !Number.isFinite(value) || !currency) return "Unavailable";
+  if (Math.abs(value) >= 1_000_000) return `${currency} ${(value / 1_000_000).toFixed(2)}M`;
+  return `${currency} ${formatIndianCompact(value)}`;
 }
 
 function formatTs(value: string): string {
@@ -51,11 +52,13 @@ function rowId(flow: OptionsFlowItem): string {
 }
 
 export function OptionsFlowPage() {
-  const [symbolInput, setSymbolInput] = useState("");
+  const { symbol, expiry: activeExpiry } = useFnoContext();
+  const [symbolInput, setSymbolInput] = useState(symbol);
+  useEffect(() => { setSymbolInput(symbol); setExpiryFilter("ALL"); }, [symbol]);
   const deferredSymbol = useDeferredValue(symbolInput.trim().toUpperCase());
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("ALL");
   const [expiryFilter, setExpiryFilter] = useState("ALL");
-  const [minPremium, setMinPremium] = useState(100_000);
+  const [minPremium, setMinPremium] = useState(0);
   const [sortKey, setSortKey] = useState<SortKey>("time");
   const [chartWindow, setChartWindow] = useState<ChartWindow>("1d");
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
@@ -63,15 +66,15 @@ export function OptionsFlowPage() {
   const previousIdsRef = useRef<Set<string>>(new Set());
 
   const flowQuery = useQuery({
-    queryKey: ["fno-flow", deferredSymbol, minPremium],
-    queryFn: () => fetchOptionsFlow({ symbol: deferredSymbol || undefined, minPremium, limit: 100 }),
+    queryKey: ["fno-flow", deferredSymbol, minPremium, activeExpiry],
+    queryFn: () => fetchOptionsFlow({ symbol: deferredSymbol || undefined, minPremium, expiry: activeExpiry || undefined, limit: 100 }),
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
 
   const summaryQuery = useQuery({
-    queryKey: ["fno-flow-summary", chartWindow],
-    queryFn: () => fetchOptionsFlowSummary(chartWindow),
+    queryKey: ["fno-flow-summary", chartWindow, deferredSymbol, minPremium, typeFilter, expiryFilter, activeExpiry],
+    queryFn: () => fetchOptionsFlowSummary(chartWindow, { symbol: deferredSymbol || undefined, minPremium, optionType: typeFilter === "ALL" ? undefined : typeFilter, expiry: expiryFilter === "ALL" ? activeExpiry || undefined : expiryFilter }),
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
@@ -106,7 +109,7 @@ export function OptionsFlowPage() {
 
     list.sort((a, b) => {
       if (sortKey === "heat") return b.heat_score - a.heat_score;
-      if (sortKey === "premium") return b.premium_value - a.premium_value;
+      if (sortKey === "premium") return (b.premium_value ?? -1) - (a.premium_value ?? -1);
       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
     return list;
@@ -129,15 +132,17 @@ export function OptionsFlowPage() {
 
   return (
     <div className="space-y-3">
-      <TerminalPanel title="Options Flow" subtitle="Unusual activity tracker" bodyClassName="space-y-3">
+      <TerminalPanel title="Options Flow" subtitle="Current chain activity · cross-sectional heuristic" bodyClassName="space-y-3">
+        <p role="note" className="text-xs text-terminal-muted">Snapshot activity compares contracts within the current chain, not a 20-day average. Calls and puts do not reveal buying, selling, or sentiment. Premium is unavailable unless explicitly reported by the provider.</p>
+        {summaryQuery.isError ? <p role="alert">Unable to load activity summary.</p> : null}
         <div className="grid gap-3 lg:grid-cols-4">
           <div className="rounded border border-terminal-border bg-terminal-bg px-3 py-2">
             <div className="text-[10px] uppercase tracking-wide text-terminal-muted">Total Premium</div>
-            <div className="mt-1 text-xl font-semibold text-terminal-text">{formatPremium(summary?.total_premium ?? 0)}</div>
+            <div className="mt-1 text-xl font-semibold text-terminal-text">{formatPremium(summary?.total_premium, summary?.currency)}</div>
           </div>
           <div className="rounded border border-terminal-border bg-terminal-bg px-3 py-2">
             <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-terminal-muted">
-              <span>Sentiment Split</span>
+              <span>Call / Put Activity</span>
               <span>{bullishPct.toFixed(1)} / {bearishPct.toFixed(1)}</span>
             </div>
             <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-terminal-panel">
@@ -149,7 +154,7 @@ export function OptionsFlowPage() {
             <div className="text-[10px] uppercase tracking-wide text-terminal-muted">Most Active</div>
             <div className="mt-1 flex items-center gap-2">
               <TerminalBadge variant="accent" size="md">{mostActive?.symbol ?? "N/A"}</TerminalBadge>
-              <span className="text-xs text-terminal-muted">{mostActive ? formatPremium(mostActive.premium) : "-"}</span>
+              <span className="text-xs text-terminal-muted">{mostActive ? formatPremium(mostActive.premium, summary?.currency) : "-"}</span>
             </div>
           </div>
           <div className="rounded border border-terminal-border bg-terminal-bg px-3 py-2">
@@ -159,7 +164,7 @@ export function OptionsFlowPage() {
         </div>
       </TerminalPanel>
 
-      <TerminalPanel title="Flow Tape" subtitle="Live every 60s" bodyClassName="space-y-3">
+      <TerminalPanel title="Activity Snapshot" subtitle="Refreshes every 60s · provider snapshot, not executions" bodyClassName="space-y-3">
         <div className="grid gap-2 xl:grid-cols-[1.3fr_0.9fr_0.9fr_1.1fr_1fr]">
           <label className="text-[11px]">
             <span className="mb-1 block uppercase tracking-wide text-terminal-muted">Symbol</span>
@@ -209,6 +214,7 @@ export function OptionsFlowPage() {
             <span className="mb-1 block uppercase tracking-wide text-terminal-muted">Min Premium</span>
             <div className="space-y-1">
               <input
+                aria-label="Minimum reported premium slider"
                 type="range"
                 min={0}
                 max={2_000_000}
@@ -218,11 +224,12 @@ export function OptionsFlowPage() {
                 className="w-full"
               />
               <input
+                aria-label="Minimum reported premium"
                 type="number"
                 min={0}
                 step={50_000}
                 value={minPremium}
-                onChange={(event) => setMinPremium(Number(event.target.value) || 0)}
+                onChange={(event) => { const value = Number(event.target.value); setMinPremium(Number.isFinite(value) ? Math.max(0, value) : 0); }}
                 className="w-full rounded border border-terminal-border bg-terminal-bg px-2 py-1 text-xs outline-none focus:border-terminal-accent"
               />
             </div>
@@ -250,7 +257,7 @@ export function OptionsFlowPage() {
             <table className="min-w-full text-left text-xs">
               <thead className="bg-terminal-bg text-terminal-muted">
                 <tr>
-                  {["Time", "Symbol", "Expiry", "Strike", "Type", "Volume", "OI Chg", "Premium", "IV", "Heat Score", "Sentiment"].map((label) => (
+                  {["As of", "Symbol", "Expiry", "Strike", "Type", "Volume", "OI Chg", "Premium", "IV", "Heat Score", "Option Side"].map((label) => (
                     <th key={label} className="px-3 py-2 font-medium uppercase tracking-wide">
                       {label}
                     </th>
@@ -261,7 +268,7 @@ export function OptionsFlowPage() {
                 {flows.map((flow) => {
                   const id = rowId(flow);
                   const expanded = expandedRowId === id;
-                  const bullish = flow.sentiment === "bullish";
+                  const bullish = flow.option_type === "CE";
                   const highlight = highlightedIds.includes(id);
                   return (
                     <Fragment key={id}>
@@ -272,6 +279,14 @@ export function OptionsFlowPage() {
                           bullish ? "border-l-2 border-l-emerald-500 bg-emerald-500/5" : "border-l-2 border-l-red-500 bg-red-500/5",
                           highlight ? "animate-pulse" : "",
                         ].join(" ").trim()}
+                        tabIndex={0}
+                        aria-expanded={expanded}
+                        aria-label={`${flow.symbol} ${flow.strike} ${flow.option_type} details`}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault(); setExpandedRowId(expanded ? null : id);
+                          }
+                        }}
                         onClick={() => setExpandedRowId(expanded ? null : id)}
                       >
                         <td className="px-3 py-2">{formatTs(flow.timestamp)}</td>
@@ -283,7 +298,7 @@ export function OptionsFlowPage() {
                         </td>
                         <td className="px-3 py-2">{flow.volume.toLocaleString("en-IN")}</td>
                         <td className="px-3 py-2">{flow.oi_change.toLocaleString("en-IN")}</td>
-                        <td className="px-3 py-2">{formatPremium(flow.premium_value)}</td>
+                        <td className="px-3 py-2">{formatPremium(flow.premium_value, flow.currency)}</td>
                         <td className="px-3 py-2">{flow.implied_vol.toFixed(2)}</td>
                         <td className="px-3 py-2">
                           <div className="w-28" data-testid="heat-score-bar">
@@ -300,7 +315,7 @@ export function OptionsFlowPage() {
                           </div>
                         </td>
                         <td className="px-3 py-2">
-                          <TerminalBadge variant={bullish ? "success" : "danger"}>{flow.sentiment}</TerminalBadge>
+                          <TerminalBadge variant={bullish ? "success" : "danger"}>{flow.option_type === "CE" ? "Call" : "Put"}</TerminalBadge>
                         </td>
                       </tr>
                       {expanded ? (
@@ -339,10 +354,10 @@ export function OptionsFlowPage() {
                               <div className="rounded border border-terminal-border bg-terminal-panel px-3 py-2">
                                 <div className="mb-2 text-[10px] uppercase tracking-wide text-terminal-muted">Signal Read</div>
                                 <div className="space-y-1 text-sm text-terminal-text">
-                                  <div>Avg Vol: {flow.avg_volume.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
+                                  <div>Chain volume baseline: {flow.avg_volume.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
                                   <div>Vol Ratio: {flow.volume_ratio.toFixed(2)}x</div>
                                   <div>Heat: {flow.heat_score.toFixed(2)}</div>
-                                  <div>Premium: {formatPremium(flow.premium_value)}</div>
+                                  <div>Premium: {formatPremium(flow.premium_value, flow.currency)}</div>
                                 </div>
                               </div>
                               <div className="flex items-start">
@@ -375,7 +390,7 @@ export function OptionsFlowPage() {
 
       <TerminalPanel
         title="Premium Flow"
-        subtitle="Bullish vs bearish premium over time"
+        subtitle="Historical execution data is not supplied by the current feed"
         actions={
           <div className="flex gap-1">
             {(["1d", "5d"] as const).map((window) => (
@@ -390,7 +405,7 @@ export function OptionsFlowPage() {
           </div>
         }
       >
-        <div className="h-[320px] w-full">
+        {!summary?.history_available ? <p className="p-4 text-sm text-terminal-muted">Historical flow is unavailable. Current snapshots are not backfilled into a time series.</p> : <div className="h-[320px] w-full">
           <ResponsiveContainer>
             <AreaChart data={chartData} margin={{ top: 8, right: 12, left: 12, bottom: 0 }}>
               <defs>
@@ -408,13 +423,13 @@ export function OptionsFlowPage() {
               <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(value) => formatIndianCompact(Number(value))} />
               <Tooltip
                 contentStyle={{ background: "#111827", border: "1px solid rgba(148,163,184,0.2)" }}
-                formatter={(value) => formatPremium(Number(value ?? 0))}
+                formatter={(value) => formatPremium(Number(value ?? 0), summary?.currency)}
               />
               <Area type="monotone" dataKey="bullish" stackId="premium" stroke="#10b981" fill="url(#bullishFlow)" />
               <Area type="monotone" dataKey="bearish" stackId="premium" stroke="#ef4444" fill="url(#bearishFlow)" />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
+        </div>}
       </TerminalPanel>
     </div>
   );

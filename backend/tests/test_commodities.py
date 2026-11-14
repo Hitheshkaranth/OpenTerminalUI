@@ -238,3 +238,22 @@ def test_service_caches_payloads_until_ttl_expires() -> None:
 
     assert third.as_of == now[0]
     assert build_calls["quotes"] == 2
+
+
+def test_missing_futures_months_are_not_projected():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    yahoo = SimpleNamespace(get_quotes=AsyncMock(return_value=[{
+        "symbol": "GC=F", "regularMarketPrice": 3886.3,
+        "regularMarketVolume": 151000, "openInterest": 90000,
+    }]))
+    fetcher = SimpleNamespace(yahoo=yahoo)
+    service = CommodityService(fetcher_factory=AsyncMock(return_value=fetcher))
+    result = asyncio.run(service._fetch_live_futures_chain(service._commodity_for_symbol("GC=F")))
+    assert len(result.points) == 1
+    point = result.points[0]
+    assert point.price == 3886.3
+    assert point.source == "yahoo"
+    assert point.expiry is None
+    assert point.contract == "Front continuous"
+    assert point.volume == 151000

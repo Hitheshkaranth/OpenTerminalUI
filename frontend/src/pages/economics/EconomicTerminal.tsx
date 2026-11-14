@@ -105,11 +105,11 @@ export function EconomicTerminal() {
             <div className="lg:col-span-3 flex flex-col gap-4 h-full">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="text-terminal-muted hover:text-terminal-accent">
+                  <button aria-label="Previous month" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="text-terminal-muted hover:text-terminal-accent">
                     <ChevronLeft size={20} />
                   </button>
                   <h2 className="text-lg font-bold uppercase">{format(currentMonth, "MMMM yyyy")}</h2>
-                  <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="text-terminal-muted hover:text-terminal-accent">
+                  <button aria-label="Next month" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="text-terminal-muted hover:text-terminal-accent">
                     <ChevronRight size={20} />
                   </button>
                 </div>

@@ -10,15 +10,15 @@ pydantic
 PyYAML
 requests
 httpx
-aiohttp
-h2
+aiohttp>=3.14.4
+h2>=4.4.1
 redis
 apscheduler
-kiteconnect
+kiteconnect>=5.2.2
 nsepython>=2.97
 nsetools>=1.0.10
 mibian>=0.1.3
-python-jose
+PyJWT>=2.15.0
 passlib[bcrypt]
 bcrypt==4.0.1
 alembic
@@ -40,9 +40,19 @@ websockets>=12.0
 python-multipart
 scipy
 scikit-learn
-pypdf
+pypdf>=6.21.4
 beautifulsoup4
 lxml
-mcp>=1.9,<2
+mcp>=1.30.0,<2
 
 fxmacrodata-public-client @ https://github.com/fxmacrodata/fxmacrodata-public-client/releases/download/v0.1.0/fxmacrodata_public_client-0.1.0-py3-none-any.whl#sha256=5c60ff217243ff4001f178d4fdd8c3c8ce29001ad1ea0a170ed96606f0dd07c8
+
+# Security floors for transitive runtime dependencies.
+certifi>=2026.10.18
+cryptography>=50.0.0
+multidict>=6.9.1
+pillow>=13.0.0
+pyasn1>=0.6.5
+soupsieve>=4.0.0
+urllib3>=2.8.0
+twisted>=26.10.0

@@ -63,7 +63,7 @@ export function EarningsCalendarPage() {
 
   const range = useMemo(() => getMonthRange(currentYear, currentMonth), [currentYear, currentMonth]);
 
-  const { data: earnings = [], isLoading } = useQuery({
+  const { data: earnings = [], isLoading, isError } = useQuery({
     queryKey: ["earnings-calendar", range.from, range.to, symbolFilter],
     queryFn: () => fetchEarningsCalendar({ from_date: range.from, to_date: range.to, symbols: symbolFilter ? [symbolFilter] : undefined }),
     staleTime: 60_000,
@@ -134,6 +134,7 @@ export function EarningsCalendarPage() {
             <div className="flex items-center gap-3">
               <button
                 type="button"
+                aria-label="Previous earnings month"
                 onClick={prevMonth}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-terminal-border bg-terminal-bg text-terminal-muted transition-colors hover:border-terminal-accent hover:text-terminal-accent"
               >
@@ -144,6 +145,7 @@ export function EarningsCalendarPage() {
               </h2>
               <button
                 type="button"
+                aria-label="Next earnings month"
                 onClick={nextMonth}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-terminal-border bg-terminal-bg text-terminal-muted transition-colors hover:border-terminal-accent hover:text-terminal-accent"
               >
@@ -191,7 +193,7 @@ export function EarningsCalendarPage() {
             <div className="flex h-32 items-center justify-center rounded-sm border border-terminal-border bg-terminal-bg">
               <div className="text-center">
                 <Filter className="mx-auto mb-2 h-6 w-6 text-terminal-border" />
-                <div className="text-sm text-terminal-muted">No earnings in this period</div>
+                <div className="text-sm text-terminal-muted">{isError ? "Earnings data is unavailable. Try again later." : "No earnings in this period"}</div>
               </div>
             </div>
           ) : (

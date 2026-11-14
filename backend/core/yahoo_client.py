@@ -8,6 +8,14 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+
+def _safe_error(exc: Exception) -> str:
+    # HTTP exception strings include authenticated URLs (notably Yahoo crumbs).
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"HTTP {exc.response.status_code}"
+    return type(exc).__name__
+
+
 # Constants for Fundamental Timeseries modules
 ANNUAL_MODULES = [
     "annualTotalRevenue",
@@ -126,7 +134,7 @@ class YahooClient:
             if resp.status_code == 200:
                 self._crumb = resp.text.strip()
         except Exception as e:
-            logger.warning(f"Failed to get Yahoo crumb: {e}")
+            logger.warning(f"Failed to get Yahoo crumb: {_safe_error(e)}")
 
     async def get_quotes(self, symbols: List[str]) -> List[Dict[str, Any]]:
         """
@@ -157,7 +165,7 @@ class YahooClient:
                 results.extend(quotes)
 
             except Exception as e:
-                logger.error(f"Failed to fetch Yahoo quotes for batch {batch}: {e}")
+                logger.error(f"Failed to fetch Yahoo quotes for batch {batch}: {_safe_error(e)}")
 
         return results
 
@@ -186,7 +194,7 @@ class YahooClient:
             results = (data.get("quoteSummary") or {}).get("result") or [{}]
             return results[0] if results else {}
         except Exception as e:
-            logger.warning(f"Yahoo quoteSummary failed for {symbol}: {e}")
+            logger.warning(f"Yahoo quoteSummary failed for {symbol}: {_safe_error(e)}")
             return {}
 
     async def get_chart(self, symbol: str, range_str: str = "1y", interval: str = "1d") -> Dict[str, Any]:
@@ -209,7 +217,7 @@ class YahooClient:
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            logger.error(f"Failed to fetch Yahoo chart for {symbol}: {e}")
+            logger.error(f"Failed to fetch Yahoo chart for {symbol}: {_safe_error(e)}")
             raise
 
     async def get_fundamentals_timeseries(self, symbol: str, period1: int = 946684800, period2: int = 1999999999) -> Dict[str, Any]:
@@ -243,7 +251,7 @@ class YahooClient:
                     ts_result = (data.get("timeseries") or {}).get("result") or []
                     return ts_result
             except Exception as e:
-                logger.warning(f"Yahoo fundamental chunk failed: {e}")
+                logger.warning(f"Yahoo fundamental chunk failed: {_safe_error(e)}")
             return []
 
         tasks = []
@@ -320,7 +328,7 @@ class YahooClient:
                 return []
             return [x for x in rows if isinstance(x, dict)][:limit]
         except Exception as e:
-            logger.warning(f"Yahoo news search failed for {q}: {e}")
+            logger.warning(f"Yahoo news search failed for {q}: {_safe_error(e)}")
             return []
 
     async def search_symbols(self, query: str, limit: int = 15) -> List[Dict[str, Any]]:
@@ -348,5 +356,5 @@ class YahooClient:
                 return []
             return [x for x in quotes if isinstance(x, dict)][:limit]
         except Exception as e:
-            logger.warning(f"Yahoo symbol search failed for {q}: {e}")
+            logger.warning(f"Yahoo symbol search failed for {q}: {_safe_error(e)}")
             return []

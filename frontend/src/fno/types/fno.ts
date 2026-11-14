@@ -182,21 +182,24 @@ export type OptionsFlowItem = {
   volume_ratio: number;
   oi: number;
   oi_change: number;
-  premium_value: number;
+  premium_value: number | null;
+  currency?: string | null;
   implied_vol: number;
-  sentiment: "bullish" | "bearish";
+  sentiment: "bullish" | "bearish" | "neutral";
   heat_score: number;
   spot_price?: number;
   chain_context?: FlowStrikeContext;
 };
 
 export type OptionsFlowSummary = {
-  total_premium: number;
-  bullish_premium: number;
-  bearish_premium: number;
+  total_premium: number | null;
+  bullish_premium: number | null;
+  bearish_premium: number | null;
+  currency?: string | null;
+  history_available?: boolean;
   bullish_pct: number;
   bearish_pct: number;
-  top_symbols: Array<{ symbol: string; premium: number; flow_count: number }>;
+  top_symbols: Array<{ symbol: string; premium: number | null; flow_count: number }>;
   premium_by_hour: Array<{ hour: string; bullish: number; bearish: number }>;
   flow_count?: number;
 };

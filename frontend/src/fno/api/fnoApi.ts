@@ -175,21 +175,21 @@ export async function fetchOptionsFlow(params: {
   };
 }
 
-export async function fetchOptionsFlowSummary(period: "1d" | "5d" = "1d"): Promise<OptionsFlowSummary> {
-  const { data } = await api.get<OptionsFlowSummary>("/fno/flow/summary", { params: { period } });
+export async function fetchOptionsFlowSummary(period: "1d" | "5d" = "1d", filters: { symbol?: string; minPremium?: number; optionType?: string; expiry?: string } = {}): Promise<OptionsFlowSummary> {
+  const { data } = await api.get<OptionsFlowSummary>("/fno/flow/summary", { params: { period, symbol: filters.symbol, min_premium: filters.minPremium, option_type: filters.optionType, expiry: filters.expiry } });
   return data;
 }
 
 export async function fetchOptionsTickerFlow(symbol: string): Promise<{
   flows: OptionsFlowItem[];
-  ticker_summary: { total_premium: number; bullish_pct: number; top_strikes: Array<{ strike: number; premium: number; flow_count: number }> };
+  ticker_summary: { total_premium: number | null; bullish_pct: number; top_strikes: Array<{ strike: number; premium: number | null; flow_count: number }> };
 }> {
   const { data } = await api.get<{
     flows: OptionsFlowItem[];
-    ticker_summary: { total_premium: number; bullish_pct: number; top_strikes: Array<{ strike: number; premium: number; flow_count: number }> };
+    ticker_summary: { total_premium: number | null; bullish_pct: number; top_strikes: Array<{ strike: number; premium: number | null; flow_count: number }> };
   }>(`/fno/flow/ticker/${encodeURIComponent(symbol.trim().toUpperCase())}`);
   return {
     flows: Array.isArray(data?.flows) ? data.flows : [],
-    ticker_summary: data?.ticker_summary ?? { total_premium: 0, bullish_pct: 0, top_strikes: [] },
+    ticker_summary: data?.ticker_summary ?? { total_premium: null, bullish_pct: 0, top_strikes: [] },
   };
 }

@@ -191,20 +191,7 @@ function normalizeCategories(payload: unknown): CommodityCategory[] {
   return FALLBACK_CATEGORIES;
 }
 
-function buildFallbackCurve(symbol: string): FuturesCurvePoint[] {
-  const row =
-    FALLBACK_CATEGORIES.flatMap((category) => category.items).find((item) => item.symbol === symbol) ||
-    FALLBACK_CATEGORIES[0].items[0];
-  const base = row?.price || 100;
-  return ["Front", "M+1", "M+2", "M+3", "M+6", "M+12"].map((contract, index) => ({
-    contract,
-    expiry: `2026-${String(index + 4).padStart(2, "0")}-15`,
-    price: Number((base + index * (base > 100 ? 4.6 : 0.08) - (index > 3 ? 1.4 : 0)).toFixed(2)),
-    change_pct: Number(((index - 1.5) * 0.28).toFixed(2)),
-  }));
-}
 
-// " · Backwardation (-9.4% front → back)" so the curve's meaning is stated, not left to the eye.
 function curveShapeLabel(points: FuturesCurvePoint[]): string {
   const quoted = points.filter((p) => p.price > 0);
   if (quoted.length < 2) return "";
@@ -231,7 +218,7 @@ function normalizeCurve(payload: unknown): FuturesCurvePoint[] {
       if (!point || typeof point !== "object" || Array.isArray(point)) return null;
       const row = point as Record<string, unknown>;
       const contract = String(row.contract || row.label || row.month || row.expiry || "");
-      if (!contract) return null;
+      if (!contract || row.source === "projected" || row.source === "synthetic" || row.price == null || !Number.isFinite(Number(row.price)) || Number(row.price) <= 0) return null;
       const normalizedPoint: FuturesCurvePoint = {
         contract,
         expiry: String(row.expiry || row.contract || ""),
@@ -319,7 +306,7 @@ export function CommoditiesPage() {
   const [quotesFallback, setQuotesFallback] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsFallback, setDetailsFallback] = useState(false);
-  const [curvePoints, setCurvePoints] = useState<FuturesCurvePoint[]>(buildFallbackCurve("CL=F"));
+  const [curvePoints, setCurvePoints] = useState<FuturesCurvePoint[]>([]);
   const [seasonalData, setSeasonalData] = useState<{ years: number; monthly: SeasonalPoint[] }>({
     years: 7,
     monthly: buildFallbackSeasonal("CL=F"),
@@ -409,7 +396,7 @@ export function CommoditiesPage() {
       const seasonal = seasonalResult.status === "fulfilled" ? normalizeSeasonal(seasonalResult.value) : { years: 0, monthly: [] };
       const curveOk = curve.length > 0;
       const seasonalOk = seasonal.monthly.length > 0;
-      setCurvePoints(curveOk ? curve : buildFallbackCurve(selectedCommodity.symbol));
+      setCurvePoints(curve);
       setSeasonalData(
         seasonalOk
           ? seasonal
@@ -472,7 +459,7 @@ export function CommoditiesPage() {
             <div className="rounded border border-terminal-warn/40 bg-terminal-warn/10 px-3 py-2 text-xs text-terminal-warn">
               {quotesFallback
                 ? "Live commodity quotes are unavailable — prices below are seeded sample values, not market data."
-                : "Futures curve or seasonality is unavailable — those panels show seeded sample values, not market data."}
+                : "Some commodity details are unavailable. Missing futures quotes are omitted; seasonality may show labeled sample values."}
             </div>
           ) : null}
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
@@ -595,7 +582,7 @@ export function CommoditiesPage() {
                 actions={detailsLoading ? <TerminalBadge variant="info" dot>Updating</TerminalBadge> : null}
                 bodyClassName="h-[260px]"
               >
-                <ResponsiveContainer width="100%" height="100%">
+                {curvePoints.length < 2 ? <p className="text-sm text-terminal-muted">Fewer than two observed contract quotes are available. A futures curve cannot be inferred from a single price.</p> : <ResponsiveContainer width="100%" height="85%">
                   <LineChart data={curvePoints} margin={{ top: 12, right: 18, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" />
                     <XAxis dataKey="contract" stroke="#94A3B8" tickLine={false} axisLine={false} fontSize={10} />
@@ -627,7 +614,8 @@ export function CommoditiesPage() {
                       }}
                     />
                   </LineChart>
-                </ResponsiveContainer>
+                </ResponsiveContainer>}
+                <p className="mt-2 text-xs text-terminal-muted">Observed quotes only. Missing delivery months are omitted; expiry dates are unavailable unless reported by the provider.</p>
               </TerminalPanel>
             </div>
           </div>

@@ -4,7 +4,8 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from jose import JWTError, jwt
+import jwt
+from jwt import PyJWTError as JWTError
 
 from backend.config.constants import DEFAULT_ACCESS_TOKEN_TTL_MINUTES, DEFAULT_REFRESH_TOKEN_TTL_DAYS
 from backend.config.security import get_jwt_secret
@@ -51,7 +52,7 @@ def create_refresh_token(subject: str, email: str, role: str, jti: str | None = 
 
 def decode_token(token: str) -> dict[str, Any]:
     try:
-        return jwt.decode(token, _secret(), algorithms=[ALGORITHM])
+        return jwt.decode(token, _secret(), algorithms=[ALGORITHM], options={"require": ["exp", "sub", "type"]})
     except JWTError as exc:
         raise ValueError("Invalid or expired token") from exc
 

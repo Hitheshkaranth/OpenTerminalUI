@@ -1,0 +1,105 @@
+[
+  {
+    "check": "NIFTY expiry change, Greeks toggle and strike range",
+    "expiry": "2026-11-23",
+    "spot": 25144.3,
+    "strikes": 21,
+    "market": "NSE"
+  },
+  {
+    "check": "BANKNIFTY contract prices agree with API after credential reload",
+    "source": "nse_snapshot",
+    "asOf": "2026-11-13T10:10:00+00:00",
+    "contracts": [
+      {
+        "expiry": "2026-11-23",
+        "ltp": 60942,
+        "source": "nse_snapshot"
+      },
+      {
+        "expiry": "2026-12-29",
+        "ltp": 61361,
+        "source": "nse_snapshot"
+      },
+      {
+        "expiry": "2027-01-25",
+        "ltp": 61598,
+        "source": "nse_snapshot"
+      }
+    ]
+  },
+  {
+    "check": "Populated futures on mobile",
+    "width": 390,
+    "overflow": false
+  },
+  {
+    "check": "AAPL Financials tab after data load",
+    "text": "PE\nINSIDER\nFILINGS\nEXPORT REPORT\nRESEARCH NOTE\nV\nnone\nFINANCIALS\nANNUAL (4Y) + QUARTERLY (6Q) — AS REPORTED BY THE PROVIDER\nDENSE TABLE\n4 rows\nCSV\nPERIOD\nSORT\nREVENUE\nSORT\nNET INCOME\nSORT\nEPS\nSORT\n2026-09-30\n478.8B\n132.2B\n8.98\n2025-09-30\n416.2B\n112.0B\n7.46\n2024-09-30\n391.0B\n93.7B\n6.08\n2023-09-30\n383.3B\n97.0B\n6.13\nDENSE TABLE\n6 rows\nCSV\nQUARTER\nSORT\nREVENUE\nSORT\nOPERATING INCOME\nSORT\nNET INCOME\nSORT\n2026-09-30\n114.5B\n35.6B\n30.7B\n2026-06-30\n109.4B\n35.7B\n29.8B\n2026-03-31\n111.2B\n35.9B\n29.6B\n2025-12-31\n143.8B\n50.9B\n42.1B\n2025-09-30\n102.5B\n32.4B\n27.5B\n2025-06-30\n-\n-\n-\nnone\nBUSINESS METRICS\nDERIVED FROM FILINGS\nEXTRACT FROM FILINGS\nOPERATING KPIS\nALL\nORDER BOOK\nCAPACITY\nOPERATIONAL\nCUSTOMERS\nNo operating KPIs extracted.\nREVENUE MIX\nNo revenue mix data.\nMARKET SHARE\nNo market share data.\nnone\nREVERSE DCF\nWHAT GROWTH THE PRICE IMPLIES\nDISCOUNT RATE\nTERMINAL GROWTH\nYEARS\nBASIS\nFCF\nNET INCOME\nASSUMPTIONS\nASSUMPTION\tVALUE\n\nPrice\n\t\n356.27 USD\n\n\nMarket cap\n\t\n5.18T\n\n\nNet debt\n\t\n43.81B\n\n\nBase cash flow (Free cash flow)\n\t\n136.06B\nIMPLIED GROWTH — SENSITIVITY\nDISC. \\ TERM.\t2.0%\t3.0%\t4.0%\t5.0%\t6.0%\n10.0%\t17.2%\t15.9%\t14.5%\t12.8%\t10.6%\n11.0%\t19.3%\t18.2%\t16.9%\t15.4%\t13.7%\n12.0%\t21.2%\t20.2%\t19.1%\t17.9%\t16.4%\n13.0%\t23.1%\t22.2%\t21.2%\t20.1%\t18.8%\n14.0%\t24.9%\t24.1%\t23.2%\t22.2%\t21.1%\nNOTES\n•\nImplied growth is the annual cash-flow growth rate that justifies today's enterprise value (market cap + net debt)."
+  },
+  {
+    "check": "Gold → WTI Crude → Gold",
+    "passed": true
+  },
+  {
+    "check": "NIFTY calls filter, keyboard expansion and no fabricated five-day history",
+    "before": 28,
+    "calls": 13,
+    "status": 200,
+    "history": false,
+    "points": 0,
+    "premium": null
+  },
+  {
+    "check": "Flow mobile layout",
+    "width": 390,
+    "overflow": false
+  },
+  {
+    "check": "Gold futures contains observed quotes only, missing months omitted",
+    "status": 200,
+    "source": "yahoo",
+    "points": [
+      {
+        "contract": "Front continuous",
+        "source": "yahoo",
+        "expiry": null,
+        "price": 3886.3
+      },
+      {
+        "contract": "Jan 2027",
+        "source": "yahoo",
+        "expiry": null,
+        "price": 3903.6
+      },
+      {
+        "contract": "Feb 2027",
+        "source": "yahoo",
+        "expiry": null,
+        "price": 3918.3
+      },
+      {
+        "contract": "Mar 2027",
+        "source": "yahoo",
+        "expiry": null,
+        "price": 3933.7
+      },
+      {
+        "contract": "Apr 2027",
+        "source": "yahoo",
+        "expiry": null,
+        "price": 3950.6
+      },
+      {
+        "contract": "May 2027",
+        "source": "yahoo",
+        "expiry": null,
+        "price": 3968.5
+      }
+    ]
+  },
+  {
+    "check": "Commodity mobile layout",
+    "overflow": false
+  }
+]

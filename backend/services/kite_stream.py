@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import threading
 import time
 from typing import Any, Callable
 
@@ -28,8 +27,6 @@ class KiteStreamAdapter:
         self._last_tick_mono = 0.0
         self._manual_reconnect_task: asyncio.Task | None = None
         self._heartbeat_task: asyncio.Task | None = None
-        self._thread_lock = threading.Lock()
-        self._ws_thread: threading.Thread | None = None
         self._last_status = "init"
 
     @property
@@ -162,17 +159,12 @@ class KiteStreamAdapter:
         if ticker is None:
             return
 
-        def _runner() -> None:
-            try:
-                ticker.connect(threaded=False)
-            except Exception as exc:
-                logger.warning("Kite WS connect runner failed: %s", exc)
-
-        with self._thread_lock:
-            if self._ws_thread and self._ws_thread.is_alive():
-                return
-            self._ws_thread = threading.Thread(target=_runner, name="kite-ws-thread", daemon=True)
-            self._ws_thread.start()
+        try:
+            # Let the SDK own its reactor thread. Calling threaded=False from
+            # our own thread installs signal handlers outside the main thread.
+            ticker.connect(threaded=True)
+        except Exception:
+            logger.warning("Kite WS connection could not start")
 
     def _schedule_coroutine(self, coro: asyncio.coroutines) -> None:
         loop = self._loop

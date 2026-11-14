@@ -11,7 +11,7 @@ const Location = () => <output data-testid="commodity-url">{useLocation().search
 function renderPage(symbol: string) {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/commodities/quotes") ? { categories: [
     { id: "energy", items: [quote("CL=F", "Crude Oil", 80)] }, { id: "metals", items: [quote("GC=F", "Gold", 2000)] },
-  ] } : url.includes("futures-chain") ? { contracts: [{ contract: "Front", price: url.includes("GC") ? 2000 : 80 }] } : { years: 7, monthly: [{ month: "Jan", average_return_pct: 1 }] }), { status: 200 })));
+  ] } : url.includes("futures-chain") ? { contracts: [{ contract: "Front", price: url.includes("GC") ? 2000 : 80, source: "yahoo" }, { contract: "M+1", price: 9999, source: "projected" }] } : { years: 7, monthly: [{ month: "Jan", average_return_pct: 1 }] }), { status: 200 })));
   render(<MemoryRouter initialEntries={[`/equity/commodities?symbol=${encodeURIComponent(symbol)}`]}><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><CommoditiesPage /><Location /></QueryClientProvider></MemoryRouter>);
 }
 afterEach(() => vi.unstubAllGlobals());
@@ -22,6 +22,8 @@ describe("commodity identity and category routing", () => {
     await waitFor(() => expect(screen.getByTestId("selected-price-symbol")).toHaveTextContent("GC=F"));
     expect(screen.getByTestId("commodity-url")).toHaveTextContent("GC%3DF");
     expect(screen.getByText("Provider response")).toBeInTheDocument();
+    expect(await screen.findByText(/Fewer than two observed contract quotes/)).toBeInTheDocument();
+    expect(screen.queryByText(/Contango/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Energy", exact: true }));
     await waitFor(() => expect(screen.getByTestId("selected-price-symbol")).toHaveTextContent("CL=F"));
     expect(screen.getByTestId("commodity-url")).toHaveTextContent("CL%3DF");

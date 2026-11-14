@@ -1,0 +1,60 @@
+{
+  "date": "2026-11-14",
+  "baseline": "25163697b309c11ad9e9fcf14ee86b1aed0bb7e9",
+  "state": "pre-commit local validation snapshot",
+  "browser_route_entries": 84,
+  "settled_routes": 84,
+  "uncaught_page_errors": 0,
+  "desktop_document_overflow": 0,
+  "backend": {
+    "passed": 1768,
+    "coverage_percent": 76.72,
+    "required_percent": 75
+  },
+  "frontend": {
+    "passed": 839,
+    "files_passed": 164,
+    "commodity_regression_retest_passed": 2
+  },
+  "production_build": "passed (large chunk warning remains)",
+  "playwright": {
+    "passed": 74,
+    "skipped": 10,
+    "failed": 0,
+    "projects": [
+      "chromium",
+      "mobile-chromium"
+    ],
+    "skip_entries": [
+      "-  13 [chromium] \u203a frontend/tests/e2e/mobile-interactions.spec.ts:57:3 \u203a mobile interactions \u203a bottom nav switches views",
+      "-  14 [chromium] \u203a frontend/tests/e2e/mobile-interactions.spec.ts:69:3 \u203a mobile interactions \u203a watchlist pull-to-refresh hint appears",
+      "-  15 [chromium] \u203a frontend/tests/e2e/mobile-interactions.spec.ts:84:3 \u203a mobile interactions \u203a portfolio swipe changes timeframe",
+      "-  34 [chromium] \u203a frontend/tests/e2e/terminal-shell-go-bar.spec.ts:94:3 \u203a Terminal shell + GO bar \u203a mobile route keeps shell status visible without immediate crash",
+      "-  52 [mobile-chromium] \u203a frontend/tests/e2e/hotkey-trading.spec.ts:26:1 \u203a ctrl+t opens paper hotkey trading widget and submits a mock buy order",
+      "-  64 [mobile-chromium] \u203a frontend/tests/e2e/position-sizer.spec.ts:30:1 \u203a position sizer calculates fixed fractional and Kelly sizing",
+      "-  72 [mobile-chromium] \u203a frontend/tests/e2e/terminal-shell-go-bar.spec.ts:29:3 \u203a Terminal shell + GO bar \u203a shell bars render and stack on desktop routes",
+      "-  73 [mobile-chromium] \u203a frontend/tests/e2e/terminal-shell-go-bar.spec.ts:48:3 \u203a Terminal shell + GO bar \u203a Ctrl+G focuses GO bar and routes with command execution",
+      "-  74 [mobile-chromium] \u203a frontend/tests/e2e/terminal-shell-go-bar.spec.ts:75:3 \u203a Terminal shell + GO bar \u203a autocomplete keyboard navigation and escape behavior work",
+      "-  76 [mobile-chromium] \u203a frontend/tests/e2e/terminal-shell-go-bar.spec.ts:103:3 \u203a Terminal shell + GO bar \u203a priority route smoke pass with shell present"
+    ]
+  },
+  "npm_vulnerabilities": 0,
+  "python_remaining_vulnerable_packages": [
+    {
+      "name": "autobahn",
+      "version": "19.11.2",
+      "advisories": [
+        "PYSEC-2020-25",
+        "PYSEC-2026-4027"
+      ],
+      "reason": "kiteconnect 5.2.2 pins this exact version; patched upgrade is resolver-incompatible"
+    }
+  ],
+  "pip_check": "no broken requirements",
+  "diff_check": "passed",
+  "limits": [
+    "isolated audit database and development auth",
+    "authenticated broker streaming and real-money order placement not certified",
+    "no deployment; CI results are reported separately"
+  ]
+}

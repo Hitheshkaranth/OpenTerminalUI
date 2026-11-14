@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import math
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable
@@ -145,7 +147,7 @@ def _yahoo_symbol(base_currency: str, quote_currency: str) -> str:
 def _f(value: Any, default: float = 0.0) -> float:
     try:
         result = float(value)
-        if result != result:
+        if not math.isfinite(result):
             return default
         return result
     except Exception:
@@ -386,6 +388,24 @@ class ForexService:
                 missing.append(currency)
                 continue
             usd_per_unit[currency] = (1.0 / price) if invert else price
+
+        if missing:
+            # Yahoo's batch quote endpoint may require a crumb even while public
+            # chart data remains available. Recover observed reference prices;
+            # never substitute seeded rates for missing currencies.
+            async def chart_reference(currency: str) -> tuple[str, float]:
+                symbol, invert = _YAHOO_USD_REFERENCE_SYMBOLS[currency]
+                try:
+                    payload = await self._yahoo.get_chart(symbol, range_str="5d", interval="1d")
+                    candles = _parse_yahoo_candles(payload)
+                    price = _f(candles[-1]["c"]) if candles else 0.0
+                    return currency, ((1.0 / price) if invert else price) if price > 0 else 0.0
+                except Exception:
+                    return currency, 0.0
+            for currency, price in await asyncio.gather(*(chart_reference(c) for c in missing)):
+                if price > 0:
+                    usd_per_unit[currency] = price
+            missing = [c for c in missing if c not in usd_per_unit]
 
         if missing:
             fallback = await self._finnhub_get_forex_rates("USD")

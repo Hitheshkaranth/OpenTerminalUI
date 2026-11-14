@@ -60,7 +60,9 @@ def test_get_unusual_flow_returns_expected_shape(monkeypatch) -> None:
     for field in ("symbol", "strike", "option_type", "volume", "heat_score", "sentiment"):
         assert field in first
     assert 0 <= first["heat_score"] <= 100
-    assert first["sentiment"] in {"bullish", "bearish"}
+    assert first["sentiment"] == "neutral"
+    assert first["premium_value"] is None
+    assert first["timestamp"] == "2026-04-05T10:15:00+00:00"
 
 
 def test_get_flow_summary_returns_aggregates(monkeypatch) -> None:
@@ -69,9 +71,11 @@ def test_get_flow_summary_returns_aggregates(monkeypatch) -> None:
     response = client.get("/api/fno/flow/summary", params={"period": "1d"})
     assert response.status_code == 200
     body = response.json()
-    assert body["total_premium"] > 0
-    assert body["bullish_premium"] >= 0
-    assert body["bearish_premium"] >= 0
+    assert body["total_premium"] is None
+    assert body["bullish_premium"] is None
+    assert body["bearish_premium"] is None
+    assert body["history_available"] is False
+    assert body["premium_by_hour"] == []
     assert isinstance(body["top_symbols"], list)
     assert isinstance(body["premium_by_hour"], list)
 
@@ -94,3 +98,50 @@ def test_min_premium_filter_works(monkeypatch) -> None:
     body = response.json()
     assert body["count"] == 0
     assert body["flows"] == []
+
+
+def test_history_is_not_fabricated_and_summary_is_scoped(monkeypatch):
+    client = create_client(monkeypatch)
+    one = client.get("/api/fno/flow/summary", params={"period": "1d", "symbol": "TCS"}).json()
+    five = client.get("/api/fno/flow/summary", params={"period": "5d", "symbol": "TCS"}).json()
+    assert one["flow_count"] > 0
+    assert five["flow_count"] == one["flow_count"]
+    assert five["premium_by_hour"] == []
+    assert {row["symbol"] for row in five["top_symbols"]} == {"TCS"}
+    puts = client.get("/api/fno/flow/summary", params={"symbol": "TCS", "option_type": "PE"}).json()
+    assert puts["bullish_pct"] == 0
+    assert puts["bearish_pct"] == 100
+
+
+def test_missing_premium_is_not_zero_or_eligible_for_premium_filter(monkeypatch):
+    client = create_client(monkeypatch)
+    assert client.get("/api/fno/flow/unusual", params={"symbol": "TCS"}).json()["count"] > 0
+    assert client.get("/api/fno/flow/unusual", params={"symbol": "TCS", "min_premium": 1}).json()["count"] == 0
+
+
+def test_reported_turnover_is_used_without_multiplier():
+    service = OptionsFlowService(fetcher=StubFlowFetcher())
+    import asyncio
+    chain = asyncio.run(StubFlowFetcher().get_option_chain("NIFTY"))
+    for row in chain["strikes"]:
+        for side in ("ce", "pe"):
+            row[side]["premium_turnover"] = 12345.67
+    flows = service._build_flows_from_chain(chain)
+    assert flows and all(f["premium_value"] == 12345.67 for f in flows)
+    assert all(f["currency"] == "INR" for f in flows)
+
+
+def test_nonfinite_and_overlong_filters_rejected(monkeypatch):
+    client = create_client(monkeypatch)
+    for path in ("unusual", "summary"):
+        assert client.get(f"/api/fno/flow/{path}", params={"min_premium": "inf"}).status_code == 422
+        assert client.get(f"/api/fno/flow/{path}", params={"symbol": "A" * 33}).status_code == 422
+
+
+def test_expiry_filter_fetches_requested_chain(monkeypatch):
+    client = create_client(monkeypatch)
+    params = {"symbol": "NIFTY", "expiry": "2026-05-28"}
+    flows = client.get("/api/fno/flow/unusual", params=params).json()["flows"]
+    assert flows and all(f["expiry"] == "2026-05-28" for f in flows)
+    summary = client.get("/api/fno/flow/summary", params=params).json()
+    assert summary["flow_count"] == len(flows)

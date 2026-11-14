@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { expect, test, type Route } from "@playwright/test";
 
@@ -49,7 +49,7 @@ test("fno option chain table renders with mocked backend data", async ({ page })
     [accessToken, refreshToken],
   );
 
-  const fixturePath = path.resolve(process.cwd(), "tests/e2e/fixtures/fno-option-chain.json");
+  const fixturePath = fileURLToPath(new URL("./fixtures/fno-option-chain.json", import.meta.url));
   const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf-8")) as FixtureShape;
 
   await page.context().route("**/api/fno/chain/*/expiries*", async (route) => {

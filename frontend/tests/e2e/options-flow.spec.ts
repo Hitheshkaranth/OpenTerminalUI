@@ -36,6 +36,7 @@ test("options flow page renders summary, filters, heat bars, and row expansion",
         oi: 150000,
         oi_change: 4800,
         premium_value: 412500000,
+        currency: "INR",
         implied_vol: 18.4,
         sentiment: "bullish",
         heat_score: 82.4,
@@ -63,6 +64,7 @@ test("options flow page renders summary, filters, heat bars, and row expansion",
         oi: 132000,
         oi_change: 5100,
         premium_value: 368000000,
+        currency: "INR",
         implied_vol: 20.1,
         sentiment: "bearish",
         heat_score: 79.2,
@@ -90,6 +92,7 @@ test("options flow page renders summary, filters, heat bars, and row expansion",
         oi: 104000,
         oi_change: 3100,
         premium_value: 289000000,
+        currency: "INR",
         implied_vol: 16.2,
         sentiment: "bullish",
         heat_score: 71.3,
@@ -109,6 +112,8 @@ test("options flow page renders summary, filters, heat bars, and row expansion",
   };
 
   const summary1d = {
+    currency: "INR",
+    history_available: false,
     total_premium: 1069500000,
     bullish_premium: 701500000,
     bearish_premium: 368000000,
@@ -176,16 +181,23 @@ test("options flow page renders summary, filters, heat bars, and row expansion",
 
   await expect(page.getByText("Options Flow", { exact: true })).toBeVisible();
   await expect(page.getByText("Total Premium")).toBeVisible();
-  await expect(page.getByText("$1069.50M", { exact: true })).toBeVisible();
+  await expect(page.getByText("INR 1069.50M", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Calls" })).toBeVisible();
   await expect(page.locator("[data-testid='flow-row']")).toHaveCount(3);
 
+  await expect(page.getByText(/Historical flow is unavailable/)).toBeVisible();
+  const callsSummary = page.waitForRequest(request => {
+    const url = new URL(request.url());
+    return url.pathname === "/api/fno/flow/summary" && url.searchParams.get("option_type") === "CE" && url.searchParams.get("symbol") === "NIFTY";
+  });
   await page.getByRole("button", { name: "Calls" }).click();
+  await callsSummary;
   await expect(page.locator("[data-testid='flow-row']")).toHaveCount(2);
 
   await expect(page.locator("[data-testid='heat-score-bar']")).toHaveCount(2);
 
-  await page.locator("[data-testid='flow-row']").first().click();
+  await page.locator("[data-testid='flow-row']").first().focus();
+  await page.keyboard.press("Enter");
   await expect(page.getByText("Option Chain Context")).toBeVisible();
   await expect(page.getByRole("link", { name: "Open Full Chain" })).toBeVisible();
 });
