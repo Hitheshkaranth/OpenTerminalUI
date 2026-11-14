@@ -2,15 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections import defaultdict, deque
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 from typing import Any, Awaitable, Callable
 
-logger = logging.getLogger(__name__)
+from backend.services.quality_calendar import session_for
 
-US_EASTERN = ZoneInfo("America/New_York")
+logger = logging.getLogger(__name__)
 
 AlertEmitter = Callable[[dict[str, Any]], Awaitable[None]]
 
@@ -31,30 +30,12 @@ def _minute_key(ts: datetime) -> str:
     return ts.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M")
 
 
-def _is_us_regular_or_extended_market_hours(ts: datetime) -> bool:
-    et = ts.astimezone(US_EASTERN)
-    if et.weekday() >= 5:
-        return False
-    minutes = et.hour * 60 + et.minute
-    return (4 * 60) <= minutes < (20 * 60)
-
-
-def _trading_minutes_elapsed_today(ts: datetime) -> int:
-    et = ts.astimezone(US_EASTERN)
-    if et.weekday() >= 5:
-        return 0
-    start = et.replace(hour=4, minute=0, second=0, microsecond=0)
-    end = et.replace(hour=20, minute=0, second=0, microsecond=0)
-    if et <= start:
-        return 0
-    if et >= end:
-        return 960
-    return int((et - start).total_seconds() // 60)
-
-
 @dataclass
 class SymbolMetrics:
     symbol: str
+    market: str | None = None
+    session_scope: str = "regular"
+    _bar_session_date: str | None = None
     last_tick_time: datetime | None = None
     last_bar_time: datetime | None = None
     bars_received_today: int = 0
@@ -70,7 +51,7 @@ class SymbolMetrics:
 
     def on_tick(self, ts: datetime, latency_ms: float | None, provider: str) -> None:
         ts = _to_utc(ts) or _utcnow()
-        self.last_tick_time = ts
+        self.last_tick_time = max(ts, self.last_tick_time) if self.last_tick_time else ts
         self.provider_source = provider
         minute = _minute_key(ts)
         if self._current_minute_key is None:
@@ -87,40 +68,58 @@ class SymbolMetrics:
             self.average_latency_ms += (latency_ms - self.average_latency_ms) / float(self._latency_count)
         self._stale_alert_emitted = False
 
-    def on_bar(self, bar_time: datetime) -> None:
-        bar_time = _to_utc(bar_time) or _utcnow()
-        self.last_bar_time = bar_time
-        key = _minute_key(bar_time)
-        day_prefix = bar_time.strftime("%Y-%m-%d")
-        # Reset day counters when the day changes.
-        if self._bar_minutes_seen_today and not any(k.startswith(day_prefix) for k in self._bar_minutes_seen_today):
+    def configure(self, market: str | None = None, session_scope: str | None = None) -> None:
+        next_market = market if market is not None else self.market
+        next_scope = session_scope if session_scope is not None else self.session_scope
+        if (next_market, next_scope) != (self.market, self.session_scope):
+            self.market, self.session_scope = next_market, next_scope
+            self._bar_session_date = None
             self._bar_minutes_seen_today.clear()
             self.bars_received_today = 0
-        if self._bar_minutes_seen_today:
-            prev_keys = sorted(self._bar_minutes_seen_today)
-            last_key = prev_keys[-1]
-            try:
-                prev_dt = datetime.fromisoformat(f"{last_key}:00+00:00")
-                curr_dt = datetime.fromisoformat(f"{key}:00+00:00")
-                gap_minutes = int((curr_dt - prev_dt).total_seconds() // 60)
-                if gap_minutes > 1:
-                    self._gap_log.append(
-                        {
-                            "type": "missing_bars",
-                            "symbol": self.symbol,
-                            "from": prev_dt.isoformat(),
-                            "to": curr_dt.isoformat(),
-                            "missing_count": gap_minutes - 1,
-                        }
-                    )
-            except Exception:
-                pass
-        if key not in self._bar_minutes_seen_today:
-            self._bar_minutes_seen_today.add(key)
-            self.bars_received_today += 1
+            self._stale_alert_emitted = False
 
-    def bars_expected_today(self, now: datetime | None = None) -> int:
-        return _trading_minutes_elapsed_today(now or _utcnow())
+    def session(self, now: datetime):
+        return session_for(self.symbol, now, self.market, self.session_scope)
+
+    def on_bar(self, bar_time: datetime) -> None:
+        bar_time = _to_utc(bar_time) or _utcnow()
+        previous_bar = self.last_bar_time
+        self.last_bar_time = max(bar_time, self.last_bar_time) if self.last_bar_time else bar_time
+        session = self.session(bar_time)
+        # Only completed one-minute bar starts within the selected session count.
+        if session.state != "open" or session.date is None:
+            return
+        if self._bar_session_date and session.date < self._bar_session_date:
+            return  # Late arrivals from a previous day must not reset today.
+        if self._bar_session_date != session.date:
+            self._bar_session_date = session.date
+            self._bar_minutes_seen_today.clear()
+            self.bars_received_today = 0
+        key = _minute_key(bar_time)
+        if self._bar_minutes_seen_today:
+            previous = datetime.fromisoformat(max(self._bar_minutes_seen_today) + ":00+00:00")
+        elif session.scope == "continuous" and previous_bar:
+            # UTC midnight resets daily counters, not a 24/7 venue's continuity.
+            previous = previous_bar.replace(second=0, microsecond=0)
+        else:
+            previous = None
+        if previous:
+            current = datetime.fromisoformat(key + ":00+00:00")
+            gap = int((current - previous).total_seconds() // 60)
+            if gap > 1:
+                self._gap_log.append({"type": "missing_bars", "symbol": self.symbol,
+                                      "from": previous.isoformat(), "to": current.isoformat(),
+                                      "missing_count": gap - 1})
+        self._bar_minutes_seen_today.add(key)
+        self.bars_received_today = len(self._bar_minutes_seen_today)
+
+    def bars_received_for(self, now: datetime) -> int:
+        session = self.session(now)
+        return self.bars_received_today if session.date == self._bar_session_date else 0
+
+    def bars_expected_today(self, now: datetime | None = None) -> int | None:
+        current = _to_utc(now) or _utcnow()
+        return self.session(current).elapsed_minutes(current)
 
     def tick_rate_sparkline(self) -> list[int]:
         history = list(self._tick_rate_history)
@@ -132,21 +131,36 @@ class SymbolMetrics:
         return list(self._gap_log)
 
     def health_status(self, now: datetime | None = None, provider_connected: bool = True) -> str:
-        current = now or _utcnow()
+        current = _to_utc(now) or _utcnow()
+        session = self.session(current)
         if not provider_connected:
             return "disconnected"
+        if session.state == "unknown":
+            return "unknown"
+        if session.state == "closed":
+            return "closed"
         if self.last_tick_time is None:
-            return "degraded"
-        age_s = (current - self.last_tick_time).total_seconds()
-        if _is_us_regular_or_extended_market_hours(current) and age_s > 300:
+            return "no_data"
+        # A previous session's last quote gets the same opening grace period as
+        # a new subscription, not an immediate overnight stale alert.
+        reference = self.last_tick_time
+        if session.scope != "continuous" and session.open:
+            reference = max(reference, session.open)
+        age_s = max(0, (current - reference).total_seconds())
+        if age_s > 300:
             return "stale"
+        if session.scope != "continuous" and session.open and self.last_tick_time < session.open:
+            return "no_data"
         if age_s > 60 or self.average_latency_ms > 5000:
             return "degraded"
         return "healthy"
 
 
 class DataQualityMonitor:
-    def __init__(self, alert_emitter: AlertEmitter | None = None) -> None:
+    def __init__(self, alert_emitter: AlertEmitter | None = None, *,
+                 default_market: str | None = None, default_session_scope: str = "regular") -> None:
+        self._default_market = default_market
+        self._default_session_scope = default_session_scope
         self._symbols: dict[str, SymbolMetrics] = {}
         self._lock = asyncio.Lock()
         self._alert_emitter = alert_emitter
@@ -186,6 +200,7 @@ class DataQualityMonitor:
         ts: datetime,
         provider: str,
         latency_ms: float | None = None,
+        *, market: str | None = None, exchange: str | None = None, session_scope: str | None = None,
     ) -> None:
         key = str(symbol or "").strip().upper()
         if not key:
@@ -193,19 +208,22 @@ class DataQualityMonitor:
         async with self._lock:
             metrics = self._symbols.get(key)
             if metrics is None:
-                metrics = SymbolMetrics(symbol=key)
+                metrics = SymbolMetrics(symbol=key, market=self._default_market, session_scope=self._default_session_scope)
                 self._symbols[key] = metrics
-            metrics.on_tick(ts, latency_ms, provider)
+            metrics.configure(exchange or market, session_scope)
+            metrics.on_tick(ts, latency_ms, provider.lower())
 
-    async def record_bar(self, symbol: str, bar_start: datetime) -> None:
+    async def record_bar(self, symbol: str, bar_start: datetime, *, market: str | None = None,
+                         exchange: str | None = None, session_scope: str | None = None) -> None:
         key = str(symbol or "").strip().upper()
         if not key:
             return
         async with self._lock:
             metrics = self._symbols.get(key)
             if metrics is None:
-                metrics = SymbolMetrics(symbol=key)
+                metrics = SymbolMetrics(symbol=key, market=self._default_market, session_scope=self._default_session_scope)
                 self._symbols[key] = metrics
+            metrics.configure(exchange or market, session_scope)
             metrics.on_bar(bar_start)
 
     async def get_report(self) -> dict[str, Any]:
@@ -225,7 +243,8 @@ class DataQualityMonitor:
                         "last_tick_time": metrics.last_tick_time.isoformat() if metrics.last_tick_time else None,
                         "ticks_per_minute": metrics.tick_rate_sparkline()[-1] if metrics.tick_rate_sparkline() else 0,
                         "tick_rate_history": metrics.tick_rate_sparkline(),
-                        "bars_received_today": metrics.bars_received_today,
+                        "bars_received_today": metrics.bars_received_for(now),
+                        **metrics.session(now).fields(),
                         "bars_expected_today": bars_expected,
                         "average_latency_ms": round(metrics.average_latency_ms, 2),
                         "provider_source": metrics.provider_source,
@@ -255,15 +274,15 @@ class DataQualityMonitor:
         if emitter is None:
             return
         now = _utcnow()
-        if not _is_us_regular_or_extended_market_hours(now):
-            return
         events: list[dict[str, Any]] = []
         async with self._lock:
             for metrics in self._symbols.values():
-                if metrics.last_tick_time is None:
+                connected = bool(self._provider_health.get(metrics.provider_source, {}).get("connected", True))
+                if metrics.health_status(now, connected) != "stale":
+                    metrics._stale_alert_emitted = False
                     continue
                 age_s = (now - metrics.last_tick_time).total_seconds()
-                if age_s <= 300 or metrics._stale_alert_emitted:
+                if metrics._stale_alert_emitted:
                     continue
                 metrics._stale_alert_emitted = True
                 events.append(

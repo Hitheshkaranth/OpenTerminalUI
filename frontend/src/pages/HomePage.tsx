@@ -146,6 +146,7 @@ const NAV_CARD_SECTIONS: Array<{ title: string; cards: NavCard[] }> = [
     title: "WORKSPACE",
     cards: [
       { label: "Workflows", to: "/equity/workflows", badge: "WF" },
+      { label: "Getting started", to: "/equity/getting-started", badge: "GS" },
       { label: "Launchpad", to: "/equity/launchpad", badge: "LP" },
       { label: "Workstation", to: "/equity/chart-workstation", badge: "WS" },
       { label: "Cockpit", to: "/equity/cockpit", badge: "CP" },
@@ -668,6 +669,7 @@ export function HomePage() {
                     >
                       Explore workflows
                     </button>
+                    <button type="button" className="rounded-sm border border-terminal-border px-3 py-1.5 text-xs text-terminal-text hover:border-terminal-accent" onClick={() => navigate("/equity/getting-started")}>Set up your desk</button>
                     <button
                       type="button"
                       className="rounded-sm border border-terminal-border px-3 py-1.5 text-[11px] uppercase tracking-[0.12em] text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"

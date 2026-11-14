@@ -51,6 +51,8 @@ Most retail tools stop at price charts and ratios. OpenTerminalUI is built for t
 
 ### Daily research review
 
+Open **Getting started** from Home or enter `SETUP` to check provider readiness, choose a research goal and create a personal watchlist. **Watchlists → Import symbols** previews TXT/CSV rows and exchange-qualified TradingView TXT entries, identifies duplicates and invalid rows, and saves only after confirmation. Watchlists also support remembered sorting and keyboard row traversal. **Data Quality** now separates provider health, observed feeds and venue-specific session assumptions. See the [second-wave feature analysis](docs/TERMINAL_ADOPTION_WAVE2_ANALYSIS.md) and [validation report](docs/TERMINAL_ADOPTION_WAVE2_QC.md).
+
 Open **Workflows** from quick access, Home, or the `FLOW` / `WORKFLOWS` command for eight guided paths and 36 searchable tools. Filter by purpose, bookmark workflows, and carry symbol context into compatible tools. Current-tool favorites are shared with the sidebar and saved in this browser. See the [competitive research and feature roadmap](docs/TERMINAL_COMPETITIVE_ANALYSIS.md) and [validation report](docs/TERMINAL_UPGRADE_QC.md).
 
 Open **Today** to review thesis changes and scheduled screen entries/exits, inspect cited evidence, acknowledge or snooze events, and explore shared portfolio relationships. Dossiers now support measurable assumptions, frozen earnings expectations, optional daily SEC/NSE ingestion and dataset preflight for exploratory or point-in-time experiments. See the [research review workflow guide](docs/RESEARCH_REVIEW_WORKFLOWS.md) for setup, supported behavior and data-coverage limits.

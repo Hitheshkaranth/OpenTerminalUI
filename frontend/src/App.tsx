@@ -22,6 +22,7 @@ const AccountLayout = lazyWithRetry(() => import("./pages/AccountLayout").then((
 
 const HomePage = lazyWithRetry(() => import("./pages/HomePage").then((m) => ({ default: m.HomePage })));
 const WorkflowHubPage = lazyWithRetry(() => import("./pages/WorkflowHub").then((m) => ({ default: m.WorkflowHubPage })));
+const GettingStartedPage = lazyWithRetry(() => import("./pages/GettingStarted").then((m) => ({ default: m.GettingStartedPage })));
 
 const StockDetailPage = lazyWithRetry(() => import("./pages/StockDetail").then((m) => ({ default: m.StockDetailPage })));
 const SecurityHubPage = lazyWithRetry(() => import("./pages/SecurityHub").then((m) => ({ default: m.SecurityHubPage })));
@@ -152,6 +153,7 @@ function App() {
             <Route path="stocks/about" element={<AboutPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="workflows" element={<WorkflowHubPage />} />
+            <Route path="getting-started" element={<GettingStartedPage />} />
             <Route path="heatmap" element={<MarketHeatmapPage />} />
             <Route path="dividends" element={<DividendDashboardPage />} />
             <Route path="rs" element={<RelativeStrengthPage />} />

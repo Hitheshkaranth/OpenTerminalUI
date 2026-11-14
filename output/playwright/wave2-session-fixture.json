@@ -1,0 +1,100 @@
+{
+  "timestamp": "2026-11-13T15:30:00+00:00",
+  "symbols": [
+    {
+      "symbol": "AAPL",
+      "last_tick_time": "2026-11-13T15:20:00+00:00",
+      "ticks_per_minute": 1,
+      "tick_rate_history": [
+        1
+      ],
+      "bars_received_today": 1,
+      "market": "NASDAQ",
+      "session_scope": "regular",
+      "session_state": "open",
+      "timezone": "America/New_York",
+      "session_date": "2026-11-13",
+      "session_open": "2026-11-13T14:30:00+00:00",
+      "session_close": "2026-11-13T21:00:00+00:00",
+      "calendar_source": "data/holidays.json + NYSE/Nasdaq 2026 early closes",
+      "calendar_coverage": "bundled_years:2026",
+      "calendar_note": "Bundled holiday entries, not a live exchange calendar; exceptional sessions and unscheduled closures are not modeled. US cash equities; regular 09:30\u201316:00 or explicit consolidated extended 04:00\u201320:00 assumption.",
+      "bars_expected_today": 60,
+      "average_latency_ms": 0.0,
+      "provider_source": "qc_fixture",
+      "health_status": "stale"
+    },
+    {
+      "symbol": "BTC-USD",
+      "last_tick_time": "2026-11-13T15:29:50+00:00",
+      "ticks_per_minute": 1,
+      "tick_rate_history": [
+        1
+      ],
+      "bars_received_today": 1,
+      "market": "CRYPTO",
+      "session_scope": "continuous",
+      "session_state": "open",
+      "timezone": "UTC",
+      "session_date": "2026-11-13",
+      "session_open": "2026-11-13T00:00:00+00:00",
+      "session_close": "2026-11-14T00:00:00+00:00",
+      "calendar_source": "continuous_24x7",
+      "calendar_coverage": "not_applicable",
+      "calendar_note": "Continuous trading assumption; venue maintenance is not modeled.",
+      "bars_expected_today": 930,
+      "average_latency_ms": 0.0,
+      "provider_source": "qc_fixture",
+      "health_status": "healthy"
+    },
+    {
+      "symbol": "TCS.NS",
+      "last_tick_time": "2026-11-13T12:43:20+00:00",
+      "ticks_per_minute": 1,
+      "tick_rate_history": [
+        1
+      ],
+      "bars_received_today": 0,
+      "market": "NSE",
+      "session_scope": "regular",
+      "session_state": "closed",
+      "timezone": "Asia/Kolkata",
+      "session_date": "2026-11-13",
+      "session_open": "2026-11-13T03:45:00+00:00",
+      "session_close": "2026-11-13T10:00:00+00:00",
+      "calendar_source": "data/holidays.json",
+      "calendar_coverage": "bundled_years:2026",
+      "calendar_note": "Bundled holiday entries, not a live exchange calendar; exceptional sessions and unscheduled closures are not modeled. Cash equities only; special/Muhurat sessions and equity derivatives are excluded.",
+      "bars_expected_today": 375,
+      "average_latency_ms": 0.0,
+      "provider_source": "qc_fixture",
+      "health_status": "closed"
+    },
+    {
+      "symbol": "UNRESOLVED",
+      "last_tick_time": "2026-11-13T15:29:50+00:00",
+      "ticks_per_minute": 1,
+      "tick_rate_history": [
+        1
+      ],
+      "bars_received_today": 0,
+      "market": "UNKNOWN",
+      "session_scope": "regular",
+      "session_state": "unknown",
+      "timezone": null,
+      "session_date": null,
+      "session_open": null,
+      "session_close": null,
+      "calendar_source": "unavailable",
+      "calendar_coverage": "unsupported",
+      "calendar_note": "Explicit supported cash-equity market or crypto metadata is required; bare tickers are ambiguous.",
+      "bars_expected_today": null,
+      "average_latency_ms": 0.0,
+      "provider_source": "qc_fixture",
+      "health_status": "unknown"
+    }
+  ],
+  "provider_health": {},
+  "gaps": [],
+  "qc_note": "Deterministic backend-generated fixture, not live market observations."
+}

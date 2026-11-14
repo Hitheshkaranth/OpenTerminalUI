@@ -267,10 +267,20 @@ export type OpsDataQualitySymbolRow = {
   ticks_per_minute: number;
   tick_rate_history?: number[];
   bars_received_today: number;
-  bars_expected_today: number;
+  bars_expected_today: number | null;
   average_latency_ms: number;
   provider_source: string;
   health_status: "healthy" | "degraded" | "stale" | "disconnected" | string;
+  market?: string;
+  session_scope?: string;
+  session_state?: "open" | "closed" | "unknown";
+  timezone?: string | null;
+  session_date?: string | null;
+  calendar_source?: string;
+  calendar_coverage?: string;
+  calendar_note?: string;
+  session_open?: string | null;
+  session_close?: string | null;
 };
 
 export type OpsDataQualityReport = {

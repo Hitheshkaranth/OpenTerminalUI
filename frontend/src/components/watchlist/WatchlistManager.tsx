@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { MoreHorizontal, Plus, Table, Grid3X3, Trash2 } from "lucide-react";
+import { MoreHorizontal, Plus, Table, Grid3X3, Trash2, Upload } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -11,22 +11,34 @@ import { HeatmapView } from "./HeatmapView";
 import { fetchQuotesBatch } from "../../api/marketData";
 import { useQuotesStream, useQuotesStore } from "../../realtime/useQuotesStream";
 import { useSettingsStore } from "../../store/settingsStore";
-import { useDisplayCurrency } from "../../hooks/useDisplayCurrency";
 import { ExportButton } from "../common/ExportButton";
 import { TerminalButton } from "../terminal/TerminalButton";
 import { TerminalInput } from "../terminal/TerminalInput";
 import { TerminalCombobox } from "../terminal/TerminalCombobox";
 import { SymbolContextMenu } from "../common/SymbolContextMenu";
+import { WatchlistImportPanel } from "./WatchlistImportPanel";
 
 const PULL_THRESHOLD = 30;
 const RELEASE_THRESHOLD = 70;
+const SORT_OPTIONS = [
+  { id: "manual", label: "Watchlist order" },
+  { id: "symbol", label: "Symbol A–Z" },
+  { id: "change", label: "Change: highest first" },
+  { id: "price", label: "Price: highest first" },
+] as const;
+type WatchlistSort = typeof SORT_OPTIONS[number]["id"];
+function readSort(): WatchlistSort {
+  try {
+    const saved = localStorage.getItem("ot:watchlist:sort");
+    return SORT_OPTIONS.some((option) => option.id === saved) ? saved as WatchlistSort : "manual";
+  } catch { return "manual"; }
+}
 
 export function WatchlistManager() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const selectedMarket = useSettingsStore(s => s.selectedMarket);
-  const { formatDisplayMoney } = useDisplayCurrency();
   const { subscribe, unsubscribe, connectionState } = useQuotesStream(selectedMarket);
   const ticksByToken = useQuotesStore(s => s.ticksByToken);
 
@@ -40,6 +52,15 @@ export function WatchlistManager() {
   const [resultsQuery, setResultsQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ symbol: string; x: number; y: number } | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importPending, setImportPending] = useState(false);
+  const [sort, setSort] = useState<WatchlistSort>(readSort);
+  const [focusedSymbol, setFocusedSymbol] = useState<string | null>(null);
+
+  useEffect(() => {
+    try { localStorage.setItem("ot:watchlist:sort", sort); } catch { /* Sorting still works for this visit. */ }
+  }, [sort]);
+  useEffect(() => { if (importPending) setContextMenu(null); }, [importPending]);
 
   // Pull-to-refresh state
   const [pullY, setPullY] = useState(0);
@@ -121,6 +142,23 @@ export function WatchlistManager() {
     };
   };
 
+  const displayedSymbols = [...(activeWl?.symbols || [])];
+  if (sort === "symbol") displayedSymbols.sort((left, right) => left.localeCompare(right));
+  if (sort === "change" || sort === "price") {
+    displayedSymbols.sort((left, right) => {
+      const leftQuote = quoteFor(left);
+      const rightQuote = quoteFor(right);
+      const leftValue = sort === "price" ? leftQuote.ltp : leftQuote.change_pct;
+      const rightValue = sort === "price" ? rightQuote.ltp : rightQuote.change_pct;
+      const leftValid = typeof leftValue === "number" && Number.isFinite(leftValue);
+      const rightValid = typeof rightValue === "number" && Number.isFinite(rightValue);
+      if (!leftValid) return rightValid ? 1 : 0;
+      if (!rightValid) return -1;
+      return rightValue - leftValue;
+    });
+  }
+  const rowTabStop = displayedSymbols.includes(focusedSymbol || "") ? focusedSymbol : displayedSymbols[0];
+
   // Mutations
   const createMut = useMutation({
     mutationFn: createWatchlist,
@@ -152,7 +190,7 @@ export function WatchlistManager() {
   // Add the typed ticker: an exact search match wins, else the top result. Only symbols
   // the search endpoint returned are added, so typos never land in the watchlist.
   const addFromSearch = () => {
-    if (!activeWl) return;
+    if (!activeWl || importPending) return;
     const typed = searchQuery.trim().toUpperCase();
     // Results still belong to an earlier query while the debounced search is in flight.
     if (resultsQuery.trim().toUpperCase() !== typed) return;
@@ -244,7 +282,7 @@ export function WatchlistManager() {
       <aside className="w-full border-r border-terminal-border bg-terminal-panel lg:w-64 flex flex-col shrink-0">
         <div className="flex items-center justify-between border-b border-terminal-border p-3">
           <h2 className="text-xs font-bold uppercase tracking-widest text-terminal-muted">Watchlists</h2>
-          <button onClick={() => setIsCreating(true)} className="text-terminal-muted hover:text-terminal-accent">
+          <button disabled={importPending} aria-label="Create watchlist" onClick={() => setIsCreating(true)} className="text-terminal-muted hover:text-terminal-accent disabled:opacity-50">
             <Plus size={16} />
           </button>
         </div>
@@ -254,14 +292,15 @@ export function WatchlistManager() {
             <div className="p-2 border border-terminal-accent bg-terminal-accent/5 rounded mb-2">
               <TerminalInput
                 autoFocus
+                disabled={importPending}
                 size="sm"
                 placeholder="Name..."
                 value={newWlName}
                 onChange={e => setNewWlName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && createMut.mutate(newWlName)}
+                onKeyDown={e => e.key === 'Enter' && !importPending && createMut.mutate(newWlName)}
               />
               <div className="mt-2 flex gap-2">
-                <TerminalButton size="sm" variant="accent" onClick={() => createMut.mutate(newWlName)}>SAVE</TerminalButton>
+                <TerminalButton size="sm" variant="accent" disabled={importPending} onClick={() => createMut.mutate(newWlName)}>SAVE</TerminalButton>
                 <TerminalButton size="sm" onClick={() => setIsCreating(false)}>CANCEL</TerminalButton>
               </div>
             </div>
@@ -274,6 +313,7 @@ export function WatchlistManager() {
             >
               <button
                 type="button"
+                disabled={importPending}
                 onClick={() => setActiveWlId(wl.id)}
                 className="flex min-w-0 flex-1 flex-col px-3 py-2 text-left"
                 aria-pressed={activeWlId === wl.id}
@@ -282,6 +322,7 @@ export function WatchlistManager() {
                 <span className="text-[9px] opacity-60">{wl.symbols.length} items</span>
               </button>
               <button
+                disabled={importPending}
                 onClick={(e) => { e.stopPropagation(); if(confirm('Delete?')) deleteMut.mutate(wl.id); }}
                 className="mr-2 text-terminal-neg opacity-0 hover:text-red-400 group-hover:opacity-100 focus:opacity-100"
                 aria-label={`Delete watchlist ${wl.name}`}
@@ -296,8 +337,8 @@ export function WatchlistManager() {
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Header — always rendered so "Add to Watchlist" is always visible */}
-        <header className="flex items-center justify-between border-b border-terminal-border bg-terminal-panel/50 px-4 py-2">
-          <div className="flex items-center gap-4">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-terminal-border bg-terminal-panel/50 px-4 py-2">
+          <div className="flex flex-wrap items-center gap-3">
             {activeWl && (
               <>
                 <h1 className="text-sm font-bold uppercase text-terminal-accent">{activeWl.name}</h1>
@@ -309,12 +350,18 @@ export function WatchlistManager() {
                 </div>
                 <div className="flex rounded border border-terminal-border p-0.5 bg-terminal-bg">
                   <button
+                    type="button"
+                    aria-label="Show watchlist table"
+                    aria-pressed={viewMode === "table"}
                     onClick={() => setViewByMode("table")}
                     className={`p-1 rounded-sm ${viewMode === 'table' ? 'bg-terminal-accent text-terminal-bg' : 'text-terminal-muted'}`}
                   >
                     <Table size={14} />
                   </button>
                   <button
+                    type="button"
+                    aria-label="Show watchlist heatmap"
+                    aria-pressed={viewMode === "heatmap"}
                     onClick={() => setViewByMode("heatmap")}
                     className={`p-1 rounded-sm ${viewMode === 'heatmap' ? 'bg-terminal-accent text-terminal-bg' : 'text-terminal-muted'}`}
                   >
@@ -325,7 +372,7 @@ export function WatchlistManager() {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {activeWl && (
               <>
                 <ExportButton
@@ -336,7 +383,8 @@ export function WatchlistManager() {
                   })}
                   filename={`${activeWl.name}_watchlist.csv`}
                 />
-                <div className="relative w-52">
+                <TerminalButton size="sm" disabled={importPending} aria-expanded={importOpen} aria-controls="watchlist-import-region" leftIcon={<Upload size={13} aria-hidden="true" />} onClick={() => setImportOpen((open) => !open)}>Import symbols</TerminalButton>
+                <fieldset disabled={importPending} className="relative min-w-0 w-52">
                   <TerminalCombobox
                   placeholder="Search ticker..."
                   listClassName="absolute right-0 z-50 mt-1 max-h-64 w-72 overflow-auto rounded-sm border border-terminal-border bg-terminal-panel p-1 shadow-lg"
@@ -356,6 +404,7 @@ export function WatchlistManager() {
                   onChange={v => setSearchQuery(v)}
                   getItemKey={item => item.ticker}
                   onSelect={item => {
+                    if (importPending) return;
                     addSymbolMut.mutate({ id: activeWl.id, symbols: [item.ticker] });
                     setSearchQuery("");
                     setIsTickerSearchOpen(false);
@@ -367,11 +416,12 @@ export function WatchlistManager() {
                     </div>
                   )}
                 />
-              </div>
+              </fieldset>
               </>
             )}
             <TerminalButton
               size="sm"
+              disabled={importPending}
               variant="accent"
               onClick={() => {
                 if (!activeWl) setIsCreating(true);
@@ -395,35 +445,52 @@ export function WatchlistManager() {
             ref={containerRef}
             className="space-y-3 p-4"
           >
+            {activeWl && importOpen && <div id="watchlist-import-region"><WatchlistImportPanel key={activeWl.id} watchlist={activeWl} onPendingChange={setImportPending} onClose={() => setImportOpen(false)} onImported={() => { void queryClient.invalidateQueries({ queryKey: ["watchlists"] }); }} /></div>}
+            {activeWl && viewMode === "table" && <div className="flex flex-wrap items-center justify-between gap-3">
+              <p id="watchlist-keyboard-help" className="text-[11px] text-terminal-muted">Focus a row, use ↑ / ↓ or Home / End to move, and Enter to open Security Hub.</p>
+              <label className="flex items-center gap-2 text-xs text-terminal-muted">Sort rows<select value={sort} onChange={(event) => setSort(event.target.value as WatchlistSort)} className="min-h-8 rounded-sm border border-terminal-border bg-terminal-panel px-2 text-xs text-terminal-text focus-visible:outline focus-visible:outline-terminal-accent">{SORT_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>
+            </div>}
             {loadingWl ? (
               <p className="animate-pulse text-center text-xs text-terminal-muted">SYNCHRONIZING WATCHLISTS...</p>
             ) : activeWl ? (
               viewMode === "table" ? (
                 <div className="overflow-x-auto rounded border border-terminal-border">
-                  <table className="w-full text-left text-xs font-mono">
+                  <table className="w-full text-left text-xs font-mono" aria-describedby="watchlist-keyboard-help">
+                    <caption className="sr-only">{activeWl.name} watchlist quotes</caption>
                     <thead className="bg-terminal-panel text-terminal-muted border-b border-terminal-border">
                       <tr>
-                        <th className="px-3 py-2">SYMBOL</th>
-                        <th className="px-3 py-2 text-right">LTP</th>
-                        <th className="px-3 py-2 text-right">CHG%</th>
-                        <th className="px-3 py-2 text-right">VOLUME</th>
-                        <th className="px-3 py-2 text-center">ACTION</th>
+                        <th scope="col" aria-sort={sort === "symbol" ? "ascending" : undefined} className="px-3 py-2">SYMBOL</th>
+                        <th scope="col" aria-sort={sort === "price" ? "descending" : undefined} className="px-3 py-2 text-right">LTP</th>
+                        <th scope="col" aria-sort={sort === "change" ? "descending" : undefined} className="px-3 py-2 text-right">CHG%</th>
+                        <th scope="col" className="px-3 py-2 text-right">VOLUME</th>
+                        <th scope="col" className="px-3 py-2 text-center">ACTION</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-terminal-border/30">
-                      {activeWl.symbols.map(s => {
+                      {displayedSymbols.map(s => {
                         const live = quoteFor(s);
                         const changePct = Number.isFinite(Number(live?.change_pct)) && live?.ltp != null ? Number(live.change_pct) : null;
                         return (
                           <tr
                             key={s}
-                            className="cursor-pointer hover:bg-terminal-accent/5 focus-within:bg-terminal-accent/5"
-                            tabIndex={0}
-                            onClick={() => navigate(`/equity/stocks?ticker=${s}`)}
+                            className="cursor-pointer hover:bg-terminal-accent/5 focus-within:bg-terminal-accent/5 focus-visible:outline focus-visible:outline-1 focus-visible:outline-terminal-accent"
+                            tabIndex={rowTabStop === s ? 0 : -1}
+                            data-watchlist-symbol={s}
+                            onFocus={() => setFocusedSymbol(s)}
+                            onClick={() => navigate(`/equity/security?ticker=${encodeURIComponent(s)}`)}
                             onKeyDown={(event) => {
+                              if (event.target !== event.currentTarget) return;
+                              if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                const rows = Array.from(event.currentTarget.closest("table")!.querySelectorAll<HTMLTableRowElement>("tbody tr[data-watchlist-symbol]"));
+                                const index = rows.indexOf(event.currentTarget);
+                                const target = event.key === "Home" ? 0 : event.key === "End" ? rows.length - 1 : Math.max(0, Math.min(rows.length - 1, index + (event.key === "ArrowDown" ? 1 : -1)));
+                                rows[target]?.focus();
+                              }
                               if (event.key === "Enter" || event.key === " ") {
                                 event.preventDefault();
-                                navigate(`/equity/stocks?ticker=${s}`);
+                                navigate(`/equity/security?ticker=${encodeURIComponent(s)}`);
                               }
                               if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
                                 event.preventDefault();
@@ -446,6 +513,7 @@ export function WatchlistManager() {
                             <td className="px-3 py-2 text-center">
                               <button
                                 type="button"
+                                disabled={importPending}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   const rect = e.currentTarget.getBoundingClientRect();
@@ -458,6 +526,7 @@ export function WatchlistManager() {
                               </button>
                               <button
                                 type="button"
+                                disabled={importPending}
                                 onClick={(e) => { e.stopPropagation(); removeSymbolMut.mutate({ id: activeWl.id, symbol: s }); }}
                                 className="text-terminal-muted hover:text-terminal-neg"
                                 aria-label={`Remove ${s} from watchlist`}

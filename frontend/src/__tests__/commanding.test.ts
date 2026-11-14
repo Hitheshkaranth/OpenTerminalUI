@@ -57,6 +57,12 @@ describe("GO commanding", () => {
     expect(navigate).toHaveBeenCalledWith("/equity/workflows");
   });
 
+  it.each(["SETUP", "ONBOARD"])("opens onboarding with %s", (command) => {
+    const navigate = vi.fn();
+    expect(executeParsedCommand(parseCommand(command), navigate as any).ok).toBe(true);
+    expect(navigate).toHaveBeenCalledWith("/equity/getting-started");
+  });
+
   it.each(["AAPL FLOW", "FLOW AAPL"])("preserves symbol context with %s", (command) => {
     const navigate = vi.fn();
     expect(executeParsedCommand(parseCommand(command), navigate as any).ok).toBe(true);

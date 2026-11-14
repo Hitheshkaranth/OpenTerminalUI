@@ -1,222 +1,73 @@
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-
+import { ArrowUpRight, RefreshCw } from "lucide-react";
 import { fetchDataQualityHealth, parseProviderHealth } from "../api/dataQuality";
 import { TerminalPanel } from "../components/terminal/TerminalPanel";
 import { TerminalTable } from "../components/terminal/TerminalTable";
 import { TerminalBadge } from "../components/terminal/TerminalBadge";
 import { TerminalButton } from "../components/terminal/TerminalButton";
 
-import type { DataQualityDetail, ProviderHealthItem } from "../api/dataQuality";
-
-const STATUS_DOT: Record<string, string> = {
-  healthy: "bg-terminal-pos",
-  stale: "bg-terminal-warn",
-  offline: "bg-terminal-neg",
-};
-
-function statusVariant(status: string): "success" | "warn" | "danger" | "neutral" {
-  const s = status.toLowerCase();
-  if (s === "healthy" || s === "ok") return "success";
-  if (s === "stale" || s === "degraded" || s === "warning") return "warn";
-  if (s === "unconfigured" || s === "unknown") return "neutral";
-  return "danger";
+export function qualityStatusVariant(status: string): "success" | "warn" | "danger" | "neutral" {
+  if (["healthy", "ok"].includes(status)) return "success";
+  if (["stale", "degraded", "partial"].includes(status)) return "warn";
+  if (["offline", "down", "disconnected"].includes(status)) return "danger";
+  return "neutral";
 }
-
-function formatCount(value?: number): string {
-  return value == null ? "-" : String(value);
+const label = (value?: string | null) => value ? value.replace(/_/g, " ") : "Unknown";
+function timestamp(value?: string | null): string {
+  if (!value) return "Not observed";
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) ? parsed.toLocaleString() : "Unknown time";
 }
-
-function formatLatency(ms?: number): string {
-  if (ms == null) return "-";
-  if (ms < 100) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
-function formatDateTime(iso?: string): string {
-  if (!iso) return "-";
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
-}
-
-function truncateMessage(msg: string, maxLen = 120): string {
-  if (!msg) return "-";
-  return msg.length > maxLen ? `${msg.slice(0, maxLen)}...` : msg;
-}
-
-function parseHealthResponse(raw: Record<string, unknown> | undefined): DataQualityDetail[] {
-  const items: DataQualityDetail[] = [];
-  if (!raw) return items;
-  const keys = Object.keys(raw);
-  for (const key of keys) {
-    const val = raw[key] as Record<string, unknown>;
-    if (val && typeof val === "object") {
-      items.push({
-        provider: key,
-        status: String(val.status || "unknown"),
-        last_update: String(val.last_update || "-"),
-        latency_ms: Number(val.latency_ms) || 0,
-        cache_hit_rate: typeof val.cache_hit_rate === "number" ? val.cache_hit_rate : undefined,
-        errors_last_hour: typeof val.errors_last_hour === "number" ? val.errors_last_hour : undefined,
-      });
-    }
-  }
-  return items;
-}
+const buttonClass = "inline-flex min-h-9 items-center gap-2 rounded-sm border border-terminal-border px-3 text-xs text-terminal-text hover:border-terminal-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-terminal-accent";
 
 export function DataQualityDashboard() {
-  const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["data-quality-health"],
-    queryFn: fetchDataQualityHealth,
-    staleTime: 5_000,
-    refetchInterval: 30_000,
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
+    queryKey: ["data-quality-health"], queryFn: fetchDataQualityHealth,
+    staleTime: 5_000, refetchInterval: 30_000, retry: 1,
   });
-
-  const providerHealth: ProviderHealthItem[] = data ? parseProviderHealth(data.provider_health) : [];
-  const metrics = data?.metrics || {};
-  const issues = data?.issues || [];
-  const backfill = data?.backfill || [];
-  const globalStatus = data?.status || "unknown";
-
+  const providers = parseProviderHealth(data?.provider_health);
+  const rows = useMemo(() => (data?.symbols || []).filter((row) => {
+    const matches = `${row.symbol} ${row.market || ""} ${row.provider_source}`.toLowerCase().includes(query.trim().toLowerCase());
+    return matches && (filter === "all" || (filter === "attention" && ["stale", "disconnected", "degraded"].includes(row.health_status))
+      || (filter === "unknown" && (!row.session_state || row.session_state === "unknown")) || (filter === "closed" && row.session_state === "closed"));
+  }), [data?.symbols, query, filter]);
+  const coverage = data?.coverage;
+  const monitorUnavailable = data?.unavailable_sources?.includes("Feed monitoring") || Boolean(error && !data);
   return (
-    <div className="space-y-3 p-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-sm font-semibold text-terminal-accent">Data Quality Dashboard</div>
-          <div className="text-[11px] text-terminal-muted">
-            Provider health & data quality metrics
-            {isFetching && <span className="text-terminal-warn"> · Refreshing...</span>}
-          </div>
+    <main className="mx-auto max-w-[1600px] space-y-6 p-4 pb-24 font-sans text-terminal-text md:p-7">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div><p className="text-xs font-medium text-terminal-accent">Data trust</p><h1 className="mt-2 text-2xl font-semibold">Know what your data can support.</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-terminal-muted">Inspect provider availability, monitored feeds, and the session behind each freshness check. A running service alone does not establish healthy market data.</p></div>
+        <div className="flex flex-wrap items-center gap-2"><TerminalBadge variant={qualityStatusVariant(data?.status || "unknown")}>{isLoading ? "Checking" : label(data?.status)}</TerminalBadge><TerminalButton variant="ghost" size="sm" onClick={() => void refetch()} loading={isFetching}><RefreshCw size={13} aria-hidden="true" /> Refresh health</TerminalButton><Link to="/equity/settings" className={buttonClass}>Provider settings <ArrowUpRight size={14} aria-hidden="true" /></Link></div>
+      </header>
+      {error && <div role="alert" className="rounded-sm border border-terminal-neg/50 p-4 text-sm"><strong>Data health could not be refreshed.</strong><p className="mt-2 text-terminal-muted">{error instanceof Error ? error.message : "Monitoring is unavailable. Retry to check again."}</p>{data && <p className="mt-2">Showing the last successful report below.</p>}<button type="button" className={`${buttonClass} mt-3`} onClick={() => void refetch()}>Retry data health</button></div>}
+      {(data?.issues || []).map((issue) => <div key={issue.type} role="status" className="border-l-2 border-terminal-warn bg-terminal-panel px-4 py-3 text-sm leading-6">{issue.message}</div>)}
+      <dl className="grid grid-cols-2 gap-5 border-y border-terminal-border py-5 lg:grid-cols-4">
+        {[
+          ["Monitored symbols", coverage?.monitored, "Only symbols observed by the monitor"],
+          ["Stale in session", data?.metrics?.stale_symbols, "Age exceeds the active-session threshold"],
+          ["Session bars missing", data?.metrics?.missing_bars_session, "Expected minus received, known sessions only"],
+          ["Known session calendars", coverage ? `${coverage.known_sessions} / ${coverage.monitored}` : undefined, "Unknown calendars are excluded from expectations"],
+        ].map(([title, value, detail]) => <div key={String(title)}><dt className="text-xs text-terminal-muted">{title}</dt><dd className="mt-2 text-2xl font-semibold tabular-nums">{value ?? (isLoading ? "Checking…" : "Unavailable")}</dd><p className="mt-2 max-w-[32ch] text-xs leading-5 text-terminal-muted">{detail}</p></div>)}
+      </dl>
+      <section aria-labelledby="feed-health-heading" className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 id="feed-health-heading" className="text-lg font-semibold">Feed and session coverage</h2><p className="mt-1 text-xs text-terminal-muted">Report: {timestamp(data?.timestamp)}. Closed sessions are separate from stale feeds.</p></div><div className="flex flex-wrap gap-2"><label className="sr-only" htmlFor="quality-search">Search monitored symbols</label><input id="quality-search" className="min-h-9 w-44 rounded-sm border border-terminal-border bg-terminal-panel px-3 text-xs" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Symbol or provider" /><label className="sr-only" htmlFor="quality-filter">Filter feed coverage</label><select id="quality-filter" className="min-h-9 rounded-sm border border-terminal-border bg-terminal-panel px-2 text-xs" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All coverage</option><option value="attention">Needs attention</option><option value="unknown">Unknown calendar</option><option value="closed">Closed sessions</option></select></div></div>
+        <div className="overflow-x-auto rounded-sm border border-terminal-border">
+          <table className="w-full min-w-[850px] text-left text-xs"><caption className="sr-only">Observed feeds with market sessions and calendar coverage</caption><thead className="border-b border-terminal-border bg-terminal-panel text-terminal-muted"><tr>{["Symbol / venue", "Feed state", "Session", "Last tick", "Bars received / expected", "Calendar coverage"].map((heading) => <th scope="col" className="px-3 py-3 font-medium" key={heading}>{heading}</th>)}</tr></thead><tbody>
+            {rows.map((row) => <tr className="border-b border-terminal-border last:border-b-0" key={row.symbol}><th scope="row" className="px-3 py-4 font-medium"><Link className="text-terminal-accent underline-offset-4 hover:underline" to={`/equity/security?ticker=${encodeURIComponent(row.symbol)}`}>{row.symbol}</Link><div className="mt-1 font-normal text-terminal-muted">{row.market || "UNKNOWN"} · {row.provider_source || "unknown provider"}</div></th><td className="px-3 py-4"><TerminalBadge variant={qualityStatusVariant(row.health_status)}>{label(row.health_status)}</TerminalBadge></td><td className="px-3 py-4">{label(row.session_state)}<div className="mt-1 text-terminal-muted">{label(row.session_scope)} · {row.timezone || "Timezone unknown"}</div><div className="mt-1 text-terminal-muted">{row.session_date || "Date unknown"}</div></td><td className="px-3 py-4 tabular-nums">{timestamp(row.last_tick_time)}</td><td className="px-3 py-4 tabular-nums">{row.bars_received_today} / {row.bars_expected_today ?? "Unknown"}</td><td className="max-w-[300px] px-3 py-4 leading-5">{row.calendar_coverage || "Not supplied"}<div className="mt-1 text-terminal-muted">{row.calendar_note || row.calendar_source || "The monitor has not supplied a verified session calendar for this symbol."}</div></td></tr>)}
+          </tbody></table>
+          {!rows.length && <div className="p-6 text-sm" role="status"><h3 className="font-medium">{isLoading ? "Loading monitored feeds…" : monitorUnavailable ? "Feed monitoring unavailable" : (data?.symbols?.length ? "No feeds match your filters" : "No monitored symbols yet")}</h3><p className="mt-2 max-w-2xl leading-6 text-terminal-muted">{monitorUnavailable ? "Retry health checks to inspect feed coverage. The monitor could not be reached, so symbol counts and missing bars are unavailable." : data?.symbols?.length ? "Try a different symbol, provider, or coverage filter." : "Open a supported quote stream to observe ticks. An empty monitor does not establish live coverage or zero missing bars."}</p><Link to="/equity/watchlist" className={`${buttonClass} mt-3`}>Open watchlists <ArrowUpRight size={14} aria-hidden="true" /></Link></div>}
         </div>
-        <div className="flex items-center gap-2">
-          <TerminalBadge variant={statusVariant(globalStatus)} dot>
-            {globalStatus.toUpperCase()}
-          </TerminalBadge>
-          <TerminalButton variant="ghost" size="sm" onClick={() => refetch()} loading={isFetching}>
-            Refresh
-          </TerminalButton>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <TerminalPanel title="Stale Symbols">
-          <div className={`text-2xl font-bold mt-1 ${metrics.stale_symbols ? "text-terminal-warn" : ""}`}>{formatCount(metrics.stale_symbols)}</div>
-        </TerminalPanel>
-        <TerminalPanel title="Missing Bars (24h)">
-          <div className={`text-2xl font-bold mt-1 ${metrics.missing_bars_24h ? "text-terminal-neg" : ""}`}>{formatCount(metrics.missing_bars_24h)}</div>
-        </TerminalPanel>
-        <TerminalPanel title="Outliers">
-          <div className={`text-2xl font-bold mt-1 ${metrics.outliers_detected ? "text-terminal-warn" : ""}`}>{formatCount(metrics.outliers_detected)}</div>
-        </TerminalPanel>
-        <TerminalPanel title="Cache Hit Rate">
-          <div className="text-2xl font-bold mt-1 text-terminal-pos">
-            {metrics.cache_hit_rate != null ? `${(metrics.cache_hit_rate * 100).toFixed(1)}%` : "-"}
-          </div>
-        </TerminalPanel>
-      </div>
-
-      <TerminalPanel title="Provider Health" subtitle={`${providerHealth.length} providers`}>
-        <TerminalTable
-          rows={providerHealth}
-          rowKey={(r) => r.name}
-          columns={[
-            {
-              key: "name",
-              label: "Provider",
-              render: (r) => <span className="font-mono text-terminal-accent">{r.name}</span>,
-            },
-            {
-              key: "status",
-              label: "Status",
-              render: (r) => (
-                <span className="inline-flex items-center gap-1.5">
-                  <span className={`inline-block h-2 w-2 rounded-full ${STATUS_DOT[r.status] || "bg-terminal-border"}`} />
-                  <TerminalBadge variant={statusVariant(r.status)}>
-                    {r.status.toUpperCase()}
-                  </TerminalBadge>
-                </span>
-              ),
-            },
-            {
-              key: "last_update",
-              label: "Last Update",
-              render: (r) => formatDateTime(r.last_update),
-            },
-            {
-              key: "latency_ms",
-              label: "Latency",
-              align: "right",
-              render: (r) => <span className="font-mono">{formatLatency(r.latency_ms)}</span>,
-            },
-          ]}
-        />
-      </TerminalPanel>
-
-      {issues.length > 0 && (
-        <TerminalPanel title="Active Issues" subtitle={`${issues.length} critical/warning events`}>
-          <TerminalTable
-            rows={issues}
-            rowKey={(r, i) => `${r.type}-${i}`}
-            columns={[
-              {
-                key: "level",
-                label: "Level",
-                render: (r) => (
-                  <TerminalBadge variant={r.level === "critical" ? "danger" : r.level === "warning" ? "warn" : "info"}>
-                    {r.level.toUpperCase()}
-                  </TerminalBadge>
-                ),
-              },
-              {
-                key: "type",
-                label: "Type",
-                render: (r) => <span className="font-mono">{r.type}</span>,
-              },
-              {
-                key: "message",
-                label: "Message",
-                render: (r) => <span className="text-[11px]">{truncateMessage(r.message)}</span>,
-              },
-            ]}
-          />
-        </TerminalPanel>
-      )}
-
-      {backfill.length > 0 && (
-        <TerminalPanel title="Backfill Progress">
-          <TerminalTable
-            rows={backfill}
-            rowKey={(r) => r.task}
-            columns={[
-              { key: "task", label: "Task", render: (r) => <span className="font-mono">{r.task}</span> },
-              {
-                key: "status",
-                label: "Status",
-                render: (r) => (
-                  <TerminalBadge variant={r.status === "completed" ? "success" : "accent"}>
-                    {r.status.toUpperCase()}
-                  </TerminalBadge>
-                ),
-              },
-              {
-                key: "progress",
-                label: "Progress",
-                align: "right",
-                render: (r) => (
-                  <div className="flex items-center gap-2">
-                    <div className="w-20 bg-terminal-bg border border-terminal-border h-2 rounded-full overflow-hidden">
-                      <div className="bg-terminal-accent h-full transition-all" style={{ width: `${Math.min(r.progress, 100)}%` }} />
-                    </div>
-                    <span className="font-mono text-[10px] text-terminal-muted">{Math.round(r.progress)}%</span>
-                  </div>
-                ),
-              },
-            ]}
-          />
-        </TerminalPanel>
-      )}
-    </div>
+      </section>
+      <TerminalPanel title="Provider availability" subtitle="Provider availability is separate from per-symbol freshness."><TerminalTable rows={providers} rowKey={(row) => row.name} emptyText={isLoading ? "Loading provider availability…" : "Provider status is unavailable. Retry health checks or review provider settings."} columns={[
+        { key: "name", label: "Provider", render: (row) => <span className="font-medium text-terminal-text">{row.name}</span> },
+        { key: "status", label: "Status", render: (row) => <TerminalBadge variant={qualityStatusVariant(row.status)}>{label(row.status)}</TerminalBadge> },
+        { key: "last_update", label: "Last successful observation", render: (row) => timestamp(row.last_update) },
+      ]} /></TerminalPanel>
+      <p className="max-w-4xl text-xs leading-6 text-terminal-muted">Calendar coverage is reported by the monitor. Bundled calendars can have limited years and exceptions; unsupported venues, derivatives and uncertain identities require an explicit calendar. This page does not verify execution entitlements.</p>
+    </main>
   );
 }

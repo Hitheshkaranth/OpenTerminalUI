@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WatchlistManager } from "../components/watchlist/WatchlistManager";
@@ -13,6 +13,8 @@ const addWatchlistSymbolsMock = vi.fn();
 const removeWatchlistSymbolMock = vi.fn();
 const searchSymbolsMock = vi.fn();
 const addWatchlistItemMock = vi.fn();
+
+vi.mock("../api/marketData", () => ({ fetchQuotesBatch: vi.fn(async () => ({ quotes: [] })) }));
 
 vi.mock("../api/client", () => ({
   fetchWatchlists: (...args: unknown[]) => fetchWatchlistsMock(...args),
@@ -57,6 +59,8 @@ vi.mock("../hooks/useDisplayCurrency", () => ({
 
 describe("Watchlist symbol context menu", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.removeItem("ot:watchlist:sort");
     fetchWatchlistsMock.mockResolvedValue([
       {
         id: "wl-1",
@@ -106,5 +110,41 @@ describe("Watchlist symbol context menu", () => {
     await waitFor(() => {
       expect(removeWatchlistSymbolMock).toHaveBeenCalledWith("wl-1", "AAPL");
     });
+  });
+
+  it("traverses rows with arrows and Home/End and opens Security Hub with an encoded symbol", async () => {
+    fetchWatchlistsMock.mockResolvedValue([{ id: "wl-1", name: "Default", symbols: ["AAPL", "M&M.NS", "MSFT"] }]);
+    function LocationProbe() { const location = useLocation(); return <output aria-label="Current route">{location.pathname}{location.search}</output>; }
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={client}><MemoryRouter><WatchlistManager /><LocationProbe /></MemoryRouter></QueryClientProvider>);
+    const first = (await screen.findByText("AAPL")).closest("tr")!;
+    const middle = screen.getByText("M&M.NS").closest("tr")!;
+    const last = screen.getByText("MSFT").closest("tr")!;
+    act(() => first.focus());
+    fireEvent.keyDown(first, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(middle);
+    fireEvent.keyDown(middle, { key: "End" });
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(last, { key: "Home" });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: "ArrowDown" });
+    fireEvent.keyDown(middle, { key: "Enter" });
+    expect(screen.getByLabelText("Current route")).toHaveTextContent("/equity/security?ticker=M%26M.NS");
+  });
+
+  it("persists row sorting while leaving the stored watchlist order intact", async () => {
+    const sourceSymbols = ["MSFT", "AAPL", "NVDA"];
+    fetchWatchlistsMock.mockResolvedValue([{ id: "wl-1", name: "Default", symbols: sourceSymbols }]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={client}><MemoryRouter><WatchlistManager /></MemoryRouter></QueryClientProvider>);
+    await screen.findByText("AAPL");
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort rows" }), { target: { value: "symbol" } });
+    expect(screen.getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("cell")[0].textContent)).toEqual(["AAPL", "MSFT", "NVDA"]);
+    expect(sourceSymbols).toEqual(["MSFT", "AAPL", "NVDA"]);
+    expect(localStorage.getItem("ot:watchlist:sort")).toBe("symbol");
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort rows" }), { target: { value: "change" } });
+    expect(screen.getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("cell")[0].textContent)[0]).toBe("AAPL");
   });
 });

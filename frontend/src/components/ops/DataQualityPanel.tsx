@@ -101,22 +101,23 @@ export function DataQualityPanel({ report, loading = false }: Props) {
                 <tr><td className="px-2 py-2 text-terminal-muted" colSpan={8}>Loading data quality metrics...</td></tr>
               )}
               {!loading && rows.length === 0 && (
-                <tr><td className="px-2 py-2 text-terminal-dim" colSpan={8}>No monitored symbols yet. Subscribe to US quotes to populate.</td></tr>
+                <tr><td className="px-2 py-2 text-terminal-muted" colSpan={8}>No monitored symbols yet. Open a supported quote stream to populate.</td></tr>
               )}
               {rows.map((row) => {
                 const typed = row as OpsDataQualitySymbolRow;
                 return (
                   <tr key={typed.symbol} className="border-b border-terminal-border/10">
-                    <td className="px-2 py-1 font-semibold text-terminal-accent">{typed.symbol}</td>
+                    <td className="px-2 py-1 font-semibold text-terminal-accent">{typed.symbol}<div className="mt-1 font-normal text-terminal-muted">{typed.market || "UNKNOWN"}</div></td>
                     <td className="px-2 py-1">
                       <TerminalBadge variant={statusVariant(String(typed.health_status))} size="sm">
                         {String(typed.health_status).toUpperCase()}
                       </TerminalBadge>
+                      <div className="mt-1 text-terminal-muted" title={typed.calendar_note}>{typed.session_state || "unknown"} · {typed.session_scope || "unknown scope"}</div>
                     </td>
                     <td className="px-2 py-1 tabular-nums">{typed.ticks_per_minute ?? 0}</td>
                     <td className="px-2 py-1 tabular-nums">{Number(typed.average_latency_ms ?? 0).toFixed(1)}</td>
                     <td className="px-2 py-1 tabular-nums">
-                      {typed.bars_received_today}/{typed.bars_expected_today}
+                      {typed.bars_received_today}/{typed.bars_expected_today ?? "?"}
                     </td>
                     <td className="px-2 py-1">{typed.last_tick_time ? new Date(typed.last_tick_time).toLocaleTimeString() : "-"}</td>
                     <td className="px-2 py-1 uppercase">{typed.provider_source || "-"}</td>

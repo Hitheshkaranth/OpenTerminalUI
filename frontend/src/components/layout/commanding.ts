@@ -5,6 +5,7 @@ import { inferRecentSecurityAssetClass } from "../../hooks/useRecentSecurities";
 import { useStockStore } from "../../store/stockStore";
 
 export type CommandFunctionCode =
+  | "SETUP"
   | "FLOW"
   | "DESK"
   | "DES"
@@ -101,6 +102,7 @@ export type CommandFunctionSpec = {
 };
 
 export const COMMAND_FUNCTIONS: CommandFunctionSpec[] = [
+  { code: "SETUP", label: "Getting started", description: "Check data readiness, create a watchlist, and choose your next research step", aliases: ["ONBOARD"] },
   { code: "FLOW", label: "Workflow Hub", description: "Find a guided workflow for research, trading, portfolio or quant work", aliases: ["WORKFLOWS", "WORKFLOW", "START"] },
   { code: "DESK", label: "Analyst Desk", description: "Open the cockpit analyst workspace", aliases: ["COCKPIT", "MONITOR"] },
   { code: "DES", label: "Description / Security Hub", description: "Open security hub overview", securityScoped: true, aliases: ["SECURITY", "HUB"] },
@@ -204,6 +206,7 @@ export function parseCommand(input: string): ParsedCommand {
   }
 
   if (tokens.length === 1) {
+    if (tokens[0] === "ONBOARD") return { kind: "function", raw, func: "SETUP", modifiers: [] };
     if (["WORKFLOW", "WORKFLOWS", "START"].includes(tokens[0])) {
       return { kind: "function", raw, func: "FLOW", modifiers: [] };
     }
@@ -362,6 +365,10 @@ export function executeParsedCommand(parsed: ParsedCommand, navigate: NavigateFu
 
   if (parsed.kind === "ticker-function") {
     applyTicker(parsed.ticker);
+    if (parsed.func === "SETUP") {
+      navigate(`/equity/getting-started?ticker=${encodeURIComponent(parsed.ticker)}`);
+      return { ok: true, target: "/equity/getting-started" };
+    }
     if (parsed.func === "FLOW") {
       navigate(`/equity/workflows?ticker=${encodeURIComponent(parsed.ticker)}`);
       return { ok: true, target: "/equity/workflows" };
@@ -394,6 +401,9 @@ export function executeParsedCommand(parsed: ParsedCommand, navigate: NavigateFu
   if (parsed.kind === "function") {
     const mod0 = parsed.modifiers[0];
     switch (parsed.func) {
+      case "SETUP":
+        navigate("/equity/getting-started");
+        return { ok: true, target: "/equity/getting-started" };
       case "FLOW":
         if (mod0 && looksLikeTicker(mod0)) applyTicker(mod0);
         navigate(mod0 && looksLikeTicker(mod0) ? `/equity/workflows?ticker=${encodeURIComponent(mod0)}` : "/equity/workflows");

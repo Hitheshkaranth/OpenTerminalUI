@@ -470,7 +470,9 @@ class USTickStreamService:
         self._finnhub = _FinnhubUSProvider(self)
         self._alpaca = _AlpacaUSProvider(self)
         self._last_trade_seen: dict[str, tuple[int, float, float, str]] = {}
-        self._dq = DataQualityMonitor()
+        # Quality expectations are regular US cash-equity minutes. Extended
+        # ticks are still streamed but do not imply extended-hours entitlement.
+        self._dq = DataQualityMonitor(default_market="US", default_session_scope="regular")
 
     async def start(self) -> None:
         async with self._lock:

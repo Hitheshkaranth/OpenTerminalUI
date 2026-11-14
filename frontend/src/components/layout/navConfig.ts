@@ -19,6 +19,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: "home", label: "Home", to: "/home", glyph: "HM" },
       { id: "workflows", label: "Workflows", to: "/equity/workflows", glyph: "WF" },
+      { id: "getting-started", label: "Getting started", to: "/equity/getting-started", glyph: "GS" },
       { id: "market", label: "Market", to: "/equity/stocks", glyph: "MK" },
       { id: "monitoring", label: "Today", to: "/equity/monitoring", glyph: "MO" },
       { id: "watchlist", label: "Watchlist", to: "/equity/watchlist", glyph: "WL" },
