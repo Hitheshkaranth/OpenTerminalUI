@@ -1,0 +1,81 @@
+{
+  "date": "2026-11-15",
+  "baseline": "9756252b8c7530a72a160bad4dfc04335eba34a8",
+  "state": "pre-commit local validation snapshot",
+  "backend": {
+    "passed": 1784,
+    "coverage_percent": 76.94,
+    "coverage_gate_percent": 75
+  },
+  "frontend": {
+    "passed": 907,
+    "files_passed": 171
+  },
+  "build": {
+    "status": "passed",
+    "existing_large_chunk_warning": true
+  },
+  "playwright": {
+    "passed": 74,
+    "skipped": 10,
+    "failed": 0,
+    "projects": [
+      "chromium",
+      "mobile-chromium"
+    ],
+    "skip_entries": [
+      "-  13 [chromium] \u203a frontend/tests/e2e/mobile-interactions.spec.ts:57:3 \u203a mobile interactions \u203a bottom nav switches views",
+      "-  14 [chromium] \u203a frontend/tests/e2e/mobile-interactions.spec.ts:69:3 \u203a mobile interactions \u203a watchlist pull-to-refresh hint appears",
+      "-  15 [chromium] \u203a frontend/tests/e2e/mobile-interactions.spec.ts:84:3 \u203a mobile interactions \u203a portfolio swipe changes timeframe",
+      "-  34 [chromium] \u203a frontend/tests/e2e/terminal-shell-go-bar.spec.ts:94:3 \u203a Terminal shell + GO bar \u203a mobile route keeps shell status visible without immediate crash",
+      "-  52 [mobile-chromium] \u203a frontend/tests/e2e/hotkey-trading.spec.ts:26:1 \u203a ctrl+t opens paper hotkey trading widget and submits a mock buy order",
+      "-  64 [mobile-chromium] \u203a frontend/tests/e2e/position-sizer.spec.ts:30:1 \u203a position sizer calculates fixed fractional and Kelly sizing",
+      "-  72 [mobile-chromium] \u203a frontend/tests/e2e/terminal-shell-go-bar.spec.ts:29:3 \u203a Terminal shell + GO bar \u203a shell bars render and stack on desktop routes",
+      "-  73 [mobile-chromium] \u203a frontend/tests/e2e/terminal-shell-go-bar.spec.ts:48:3 \u203a Terminal shell + GO bar \u203a Ctrl+G focuses GO bar and routes with command execution",
+      "-  74 [mobile-chromium] \u203a frontend/tests/e2e/terminal-shell-go-bar.spec.ts:75:3 \u203a Terminal shell + GO bar \u203a autocomplete keyboard navigation and escape behavior work",
+      "-  76 [mobile-chromium] \u203a frontend/tests/e2e/terminal-shell-go-bar.spec.ts:103:3 \u203a Terminal shell + GO bar \u203a priority route smoke pass with shell present"
+    ]
+  },
+  "diff_check": "passed",
+  "swarm": [
+    "root integration/QC",
+    "owned notes/statuses and analysis",
+    "table settings",
+    "competitive research and independent QC"
+  ],
+  "feature_plan": {
+    "delivered_P0": 8,
+    "proposed_P1_P2": 16
+  },
+  "manual_checks": [
+    "owned note save/readback",
+    "draft continuity",
+    "review status persistence",
+    "preset and density reload",
+    "text/status filtering and empty preview",
+    "390px no document overflow",
+    "notes GET503 recovery",
+    "ETH selection retained",
+    "NIFTY underlying labeling and populated futures",
+    "market-qualified AAPL navigation",
+    "bounded6mo history",
+    "observed NIFTY contracts:25175,25335,25478 displayed identically to API",
+    "real ArrowDown switches to Reliance without navigation",
+    "simulated notes failure restored to normal service"
+  ],
+  "history_check": {
+    "symbol": "AAPL",
+    "period": "6mo",
+    "count": 128,
+    "first_timestamp_ms": 1778731200000,
+    "last_timestamp_ms": 1794546000000
+  },
+  "limitations": [
+    "generic index quotes may be unavailable",
+    "review status,sort and view preferences are browser-local",
+    "unsaved drafts are bounded tab memory",
+    "known Kite/Autobahn vulnerability remains",
+    "no certified live broker execution",
+    "no deployment; post-push CI results are reported separately"
+  ]
+}

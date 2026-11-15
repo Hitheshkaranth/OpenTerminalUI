@@ -32,25 +32,26 @@ function toSeconds(t: number): number {
   return t > 1e12 ? Math.floor(t / 1000) : Math.floor(t);
 }
 
-type Props = { symbol: string; height?: number };
+type Props = { symbol: string; height?: number; market?: string };
 
 /** Security Hub overview price chart: range tabs, period change, hover readout, volume. */
-export function PriceOverviewChart({ symbol, height = 230 }: Props) {
+export function PriceOverviewChart({ symbol, height = 230, market }: Props) {
   const [rangeId, setRangeId] = useState<RangeId>("6M");
   const spec = RANGES.find((r) => r.id === rangeId) ?? RANGES[2];
-  const history = useStockHistory(symbol, spec.range, spec.interval);
+  const history = useStockHistory(symbol, spec.range, spec.interval, false, market);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const areaRef = useRef<ISeriesApi<"Area"> | null>(null);
   const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const [hover, setHover] = useState<{ t: number; c: number } | null>(null);
+  useEffect(() => { setHover(null); }, [symbol, market, rangeId]);
 
   const points = useMemo(() => {
     const raw = ((history.data as { data?: ChartPoint[] } | undefined)?.data ?? []) as ChartPoint[];
     const byTime = new Map<number, ChartPoint>();
     for (const p of raw) {
       const c = Number(p.c);
-      if (!Number.isFinite(c) || c <= 0) continue;
+      if (!Number.isFinite(c) || c <= 0 || !Number.isFinite(Number(p.t)) || Number(p.t) <= 0) continue;
       byTime.set(toSeconds(Number(p.t)), p); // lightweight-charts needs unique, ascending times
     }
     return [...byTime.entries()].sort((a, b) => a[0] - b[0]).map(([t, p]) => ({ t, c: Number(p.c), v: Number(p.v) || 0 }));
@@ -94,7 +95,15 @@ export function PriceOverviewChart({ symbol, height = 230 }: Props) {
     };
     chart.subscribeCrosshairMove(onMove);
     chartRef.current = chart;
+    let resizeFrame = 0;
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => {
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => chart.timeScale().fitContent());
+    });
+    resizeObserver?.observe(hostRef.current);
     return () => {
+      resizeObserver?.disconnect();
+      cancelAnimationFrame(resizeFrame);
       chart.unsubscribeCrosshairMove(onMove);
       chart.remove();
       chartRef.current = null;

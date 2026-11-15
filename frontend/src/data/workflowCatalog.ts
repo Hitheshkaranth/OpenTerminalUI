@@ -25,6 +25,7 @@ export const WORKFLOW_PERSONAS: Array<{ id: WorkflowPersona; label: string }> = 
 ];
 
 export const TERMINAL_TOOLS: TerminalTool[] = [
+  { id: "review-desk", title: "Watchlist review desk", description: "Review a shortlist with a linked chart, saved notes and review status.", path: "/equity/watchlist?view=review", category: "research" },
   { id: "overview", title: "Market overview", description: "Review indices, movers, and market themes.", path: "/equity/dashboard", category: "trader" },
   { id: "screen", title: "Equity screener", description: "Filter companies by financial, technical, and research criteria.", path: "/equity/screener", category: "research" },
   { id: "security", title: "Security Hub", description: "Inspect company fundamentals, financials, filings, and peers.", path: "/equity/security", category: "research", context: "ticker" },
@@ -84,7 +85,7 @@ export const TERMINAL_WORKFLOWS: TerminalWorkflow[] = [
   ] },
   { id: "daily-review", title: "Build a daily review routine", description: "Keep research, watchlists, and alerts in a repeatable review loop.", outcome: "A review queue with explicit follow-up actions", category: "research", steps: [
     { tool: "today", instruction: "Review changed theses and scheduled screen entries or exits." },
-    { tool: "watchlist", instruction: "Maintain the securities that deserve continued attention." },
+    { tool: "review-desk", instruction: "Move through your shortlist, inspect the linked chart and save notes or a review status." },
     { tool: "alerts", instruction: "Create conditions for price moves or other supported events." },
     { tool: "earnings", instruction: "Check the next reporting dates before scheduling your follow-up." },
   ] },

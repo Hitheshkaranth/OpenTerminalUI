@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import calendar
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -38,6 +40,46 @@ def _utc_dt(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
+
+
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _period_start(period: str, end: datetime) -> datetime | None:
+    text = (period or "").strip().lower()
+    if text == "ytd":
+        return end.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    match = re.fullmatch(r"([1-9][0-9]*)(mo|wk|w|y|d|h|m)", text)
+    if not match:
+        return None  # max, or an unsupported period left to the provider.
+    count, unit = int(match[1]), match[2]
+    try:
+        if unit in {"mo", "y"}:
+            months = count * (12 if unit == "y" else 1)
+            year, month = divmod(end.year * 12 + end.month - 1 - months, 12)
+            month += 1
+            return end.replace(year=year, month=month, day=min(end.day, calendar.monthrange(year, month)[1]))
+        if unit in {"wk", "w"}:
+            return end - timedelta(weeks=count)
+        return end - timedelta(**{{"d": "days", "h": "hours", "m": "minutes"}[unit]: count})
+    except (ValueError, OverflowError):
+        return None
+
+
+def _requested_window(interval: str, period: str, start: datetime | None, end: datetime | None) -> tuple[datetime | None, datetime]:
+    upper = _utc_dt(end) if end is not None else _now_utc()
+    lower = _utc_dt(start) if start is not None else _period_start(period, upper)
+    if start is None and lower is not None and interval in {"1d", "5d", "1wk", "1mo", "3mo"}:
+        # Daily/coarser charts include the first requested calendar day. Explicit
+        # intraday timestamps are never rounded or shifted.
+        lower = lower.replace(hour=0, minute=0, second=0, microsecond=0)
+    return lower, upper
+
+
+def _window_bars(bars: list[OHLCVBar], start: datetime | None, end: datetime | None) -> list[OHLCVBar]:
+    return [bar for bar in bars if (start is None or _utc_dt(bar.timestamp) >= start)
+            and (end is None or _utc_dt(bar.timestamp) <= end)]
 
 
 def _parse_iso_dt(value: str | None) -> datetime | None:
@@ -116,18 +158,21 @@ class ChartDataProvider:
         if not provider_ticker:
             return []
 
-        start = _utc_dt(start) if start else None
-        end = _utc_dt(end) if end else None
+        relative_request = start is None and end is None
+        explicit_range = start is not None and end is not None
+        start, end = _requested_window(interval, period, start, end)
         cache_period_key = f"{period}|prepost={str(bool(prepost)).lower()}"
         cache_key = (provider_ticker, interval, cache_period_key)
         now = time.time()
-        if start is None and end is None:
+        if relative_request:
             cached = self._mem_cache.get(cache_key)
             if cached and (now - cached[0]) < self.chart_cache_ttl:
-                return list(cached[1])
+                # Older process caches may contain an unbounded upstream result
+                # stored under a short-period key. Enforce the request on reads.
+                return _window_bars(cached[1], start, end)
 
         # Tiered cache lookup (hot -> warm -> cold) only for explicit ranges.
-        if start and end and not prepost:
+        if explicit_range and start and end and not prepost:
             cache_result = await self._cache.get_range_with_gaps(
                 provider_ticker,
                 interval,
@@ -136,7 +181,7 @@ class ChartDataProvider:
             )
             cached_rows = cache_result.rows
             if cached_rows and cache_result.complete:
-                return [
+                return _window_bars([
                     OHLCVBar(
                         timestamp=datetime.fromtimestamp(r["t"] / 1000, tz=timezone.utc),
                         open=float(r["o"]),
@@ -148,7 +193,7 @@ class ChartDataProvider:
                         market=market,
                     )
                     for r in cached_rows
-                ]
+                ], start, end)
             if cache_result.missing_ranges:
                 backfilled = await self._backfill_missing_ranges(
                     market=market,
@@ -185,6 +230,10 @@ class ChartDataProvider:
         else:
             bars = await self._us_ohlcv(base_symbol, provider_ticker, interval, period, start, end, prepost=prepost)
 
+        # Some providers return a fixed/full history despite supplied bounds.
+        # Clip before writing either cache and before calculating UI returns.
+        bars = _window_bars(bars, start, end)
+
         if bars:
             normalized = [
                 {
@@ -199,7 +248,7 @@ class ChartDataProvider:
             ]
             if not prepost:
                 await self._cache.put_bars(provider_ticker, interval, normalized)
-            if start is None and end is None:
+            if relative_request:
                 self._mem_cache[cache_key] = (now, list(bars))
         return bars
 
@@ -221,7 +270,7 @@ class ChartDataProvider:
                 gap_bars = await self._india_ohlcv(base_symbol, provider_ticker, interval, period, start_dt, end_dt)
             else:
                 gap_bars = await self._us_ohlcv(base_symbol, provider_ticker, interval, period, start_dt, end_dt, prepost=prepost)
-            for b in gap_bars:
+            for b in _window_bars(gap_bars, start_dt, end_dt):
                 rows.append(
                     {
                         "t": int(_utc_dt(b.timestamp).timestamp() * 1000),
@@ -447,16 +496,17 @@ class ChartDataProvider:
     ) -> list[OHLCVBar]:
         def _fetch():
             t = yf.Ticker(ticker)
-            kwargs: dict[str, str] = {"interval": interval}
+            kwargs: dict[str, object] = {"interval": interval}
             interval_lower = str(interval or "").strip().lower()
             is_intraday = interval_lower.endswith("m") or interval_lower.endswith("h")
             if market == "US" and prepost and is_intraday:
                 kwargs["prepost"] = True
-            if start and end:
-                kwargs["start"] = start.strftime("%Y-%m-%d")
-                kwargs["end"] = end.strftime("%Y-%m-%d")
+            if start is not None:
+                kwargs["start"] = start
             else:
                 kwargs["period"] = period
+            if end is not None:
+                kwargs["end"] = end
             return t.history(**kwargs)
 
         df = await asyncio.to_thread(_fetch)

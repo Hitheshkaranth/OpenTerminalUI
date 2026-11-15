@@ -90,14 +90,15 @@ export function useStock(ticker: string) {
   });
 }
 
-export function useStockHistory(ticker: string, range = "1y", interval = "1d", extended = false) {
+export function useStockHistory(ticker: string, range = "1y", interval = "1d", extended = false, marketOverride?: string) {
   const normalizedTicker = normalizeTicker(ticker);
-  const selectedMarket = useSettingsStore((s) => s.selectedMarket);
+  const deskMarket = useSettingsStore((s) => s.selectedMarket);
+  const selectedMarket = marketOverride || deskMarket;
   const isCrypto = /-USD$/i.test(normalizedTicker || "");
 
   // Logic to allow 1m for US even if UI defaults to 1d
   let safeInterval = interval;
-  const isUS = selectedMarket === "NASDAQ" || selectedMarket === "NYSE" || (!ticker.endsWith(".NS") && !ticker.endsWith(".BO") && !ticker.includes(":"));
+  const isUS = selectedMarket === "NASDAQ" || selectedMarket === "NYSE" || selectedMarket === "AMEX";
   if (isUS && (interval === "1d" || !interval) && (range === "1d" || range === "5d" || range === "1mo")) {
     safeInterval = "1m";
     if (range === "1mo") safeInterval = "5m"; // 1m not allowed for 1mo range by Yahoo

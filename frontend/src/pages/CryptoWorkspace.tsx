@@ -1,6 +1,6 @@
 import { apiFetch } from "../api/base";
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import {
@@ -148,11 +148,12 @@ function MetricCard({
 
 export function CryptoWorkspacePage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedSymbol = (searchParams.get("symbol") || "").trim().toUpperCase();
   const setTicker = useStockStore((s) => s.setTicker);
   const [tab, setTab] = useState<CryptoTab>("markets");
   const [moversMetric, setMoversMetric] = useState("gainers");
   const [corrWindow, setCorrWindow] = useState(30);
-  const [selectedSymbol, setSelectedSymbol] = useState("");
   const [query, setQuery] = useState("");
   const [sector, setSector] = useState("all");
   const [sortBy, setSortBy] = useState<NonNullable<CryptoMarketsQuery["sortBy"]>>("market_cap");
@@ -223,20 +224,17 @@ export function CryptoWorkspacePage() {
   const marketRows = marketsQuery.data || [];
   const moverRows = moversQuery.data || [];
 
-  useEffect(() => {
-    if (!marketRows.length) {
-      setSelectedSymbol("");
-      return;
-    }
-    if (!selectedSymbol || !marketRows.some((row) => row.symbol === selectedSymbol)) {
-      setSelectedSymbol(marketRows[0].symbol);
-    }
-  }, [marketRows, selectedSymbol]);
-
   const selectedAsset = useMemo(
-    () => marketRows.find((row) => row.symbol === selectedSymbol) ?? marketRows[0] ?? null,
-    [marketRows, selectedSymbol],
+    () => requestedSymbol
+      ? marketRows.find((row) => row.symbol.toUpperCase() === requestedSymbol) ?? null
+      : marketRows[0] ?? null,
+    [marketRows, requestedSymbol],
   );
+  const selectSymbol = (symbol: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("symbol", symbol.trim().toUpperCase());
+    setSearchParams(next, { replace: true });
+  };
   const totalMarketCap = useMemo(
     () => marketRows.reduce((sum, row) => sum + (Number(row.market_cap) || 0), 0),
     [marketRows],
@@ -279,13 +277,13 @@ export function CryptoWorkspacePage() {
 
   const openChart = (symbol: string) => {
     const normalized = normalizeChartSymbol(symbol);
-    setSelectedSymbol(symbol);
+    selectSymbol(symbol);
     setTicker(normalized);
     navigate("/equity/chart-workstation");
   };
 
   const focusAsset = (symbol: string) => {
-    setSelectedSymbol(symbol);
+    selectSymbol(symbol);
     setTab("markets");
   };
 
@@ -371,7 +369,7 @@ export function CryptoWorkspacePage() {
                     <tr
                       key={row.symbol}
                       className={`border-t border-terminal-border/50 ${isSelected ? "bg-terminal-accent/6" : ""}`}
-                      onClick={() => setSelectedSymbol(row.symbol)}
+                      onClick={() => selectSymbol(row.symbol)}
                     >
                       <td className="py-2">
                         <button
@@ -379,7 +377,7 @@ export function CryptoWorkspacePage() {
                           className="text-left text-terminal-accent hover:underline"
                           onClick={(event) => {
                             event.stopPropagation();
-                            setSelectedSymbol(row.symbol);
+                            selectSymbol(row.symbol);
                           }}
                         >
                           {row.symbol}
@@ -673,7 +671,7 @@ export function CryptoWorkspacePage() {
 
         <TerminalPanel
           title="Focus Asset"
-          subtitle={selectedAsset ? `${selectedAsset.name} | ${selectedAsset.sector}` : "Awaiting market data"}
+          subtitle={selectedAsset ? `${selectedAsset.name} | ${selectedAsset.sector}` : requestedSymbol ? `Requested asset: ${requestedSymbol.slice(0, 64)}` : "Awaiting market data"}
           bodyClassName="space-y-3"
           actions={<TerminalBadge variant={selectedAsset && selectedAsset.change_24h >= 0 ? "success" : "danger"}>{selectedAsset ? signedPct(selectedAsset.change_24h) : "--"}</TerminalBadge>}
         >
@@ -717,7 +715,15 @@ export function CryptoWorkspacePage() {
               </div>
             </>
           ) : (
-            <div className="text-xs text-terminal-muted">No focus asset available for the current search and sector filter.</div>
+            <div role="status" className="break-words text-xs text-terminal-muted">
+              {marketsQuery.isPending
+                ? `Loading market data${requestedSymbol ? ` for ${requestedSymbol.slice(0, 64)}` : ""}…`
+                : marketsQuery.isError
+                  ? "Focus asset data is unavailable. Your requested symbol is preserved; try again later."
+                  : requestedSymbol
+                    ? `${requestedSymbol.slice(0, 64)} is not available in the current market board. Your selection is preserved. Clear the search or sector filter, or choose an available asset below.`
+                    : "No focus asset available for the current search and sector filter."}
+            </div>
           )}
         </TerminalPanel>
       </div>

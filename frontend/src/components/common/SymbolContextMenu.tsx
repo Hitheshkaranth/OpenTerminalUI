@@ -16,6 +16,7 @@ import {
 
 import { addWatchlistItem } from "../../api/client";
 import { useStockStore } from "../../store/stockStore";
+import { reviewInstrument } from "../watchlist/reviewInstrument";
 
 export type SymbolContextMenuAction = {
   id: string;
@@ -52,6 +53,8 @@ function mergeActions(
   symbol: string,
   navigate: ReturnType<typeof useNavigate>,
   customActions?: SymbolContextMenuAction[] | ((symbol: string) => SymbolContextMenuAction[]),
+  market?: string,
+  assetClass?: string,
 ): SymbolContextMenuAction[] {
   const actions: SymbolContextMenuAction[] = [
     {
@@ -144,11 +147,28 @@ function mergeActions(
     },
   ];
 
+  const instrument = reviewInstrument(symbol, market || "NASDAQ");
+  const declaredClass = assetClass?.trim().toLowerCase();
+  const nonEquityClass = ["commodity", "crypto", "forex", "index", "future", "futures"].includes(declaredClass || "");
+  const isNonEquity = instrument.kind !== "equity" || symbol.startsWith("^") || nonEquityClass;
+  // These actions use stock fundamentals or an equity order ticket. A generic
+  // symbol menu must not offer them for a future, currency, index or crypto pair.
+  const applicableActions = isNonEquity
+    ? actions.filter((action) => ["view-chart", "add-watchlist", "copy-ticker"].includes(action.id)).map((action) => {
+        if (action.id !== "view-chart" || instrument.kind === "equity") return action;
+        return {
+          ...action,
+          label: instrument.primaryLabel,
+          onAction: () => { navigate(instrument.primaryPath); },
+        };
+      })
+    : actions;
+
   const extra = typeof customActions === "function" ? customActions(symbol) : customActions ?? [];
   const custom = extra.filter((item) => Boolean(item?.id && item?.label));
-  if (!custom.length) return actions;
+  if (!custom.length) return applicableActions;
   return [
-    ...actions,
+    ...applicableActions,
     {
       ...custom[0],
       separator: true,
@@ -172,12 +192,12 @@ export function SymbolContextMenu({
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const activeSymbol = normalizeSymbol(symbol);
-  const actions = useMemo(() => mergeActions(activeSymbol, navigate, customActions), [activeSymbol, navigate, customActions]);
+  const actions = useMemo(() => mergeActions(activeSymbol, navigate, customActions, market, assetClass), [activeSymbol, navigate, customActions, market, assetClass]);
 
   useEffect(() => {
     if (!open) return;
     setActiveIndex(0);
-  }, [open, activeSymbol]);
+  }, [open, activeSymbol, market, assetClass]);
 
   useEffect(() => {
     if (!open) return;

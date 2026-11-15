@@ -44,6 +44,17 @@ describe("GO commanding", () => {
     }
   });
 
+  it.each(["REVIEW AAPL", "AAPL REVIEW"])("opens a symbol review with %s", command => {
+    const navigate = vi.fn();
+    expect(executeParsedCommand(parseCommand(command), navigate as any).ok).toBe(true);
+    expect(navigate).toHaveBeenCalledWith("/equity/watchlist?view=review&symbol=AAPL");
+  });
+  it("opens the watchlist review desk directly", () => {
+    const navigate = vi.fn();
+    executeParsedCommand(parseCommand("REVIEW"), navigate as any);
+    expect(navigate).toHaveBeenCalledWith("/equity/watchlist?view=review");
+  });
+
   it("executes function-only route command", () => {
     const navigate = vi.fn();
     const result = executeParsedCommand(parseCommand("WL"), navigate as any);

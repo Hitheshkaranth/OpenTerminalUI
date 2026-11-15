@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from "react";
-import { MoreHorizontal, Plus, Table, Grid3X3, Trash2, Upload } from "lucide-react";
+import { useState, useEffect, useMemo, useRef, useContext } from "react";
+import { MoreHorizontal, Plus, Table, Grid3X3, Trash2, Upload, PanelRightOpen } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -7,6 +7,13 @@ import {
   fetchWatchlists, createWatchlist, deleteWatchlist,
   addWatchlistSymbols, removeWatchlistSymbol, searchSymbols
 } from "../../api/client";
+import { AuthContextRef } from "../../contexts/AuthContext";
+import { useWatchlistView } from "../../store/watchlistViewStore";
+import { REVIEW_STATUSES, useInstrumentReviewStatuses, readInstrumentReviewStatus, type InstrumentReviewStatus } from "../../store/instrumentNotesStore";
+import { WatchlistViewSettings } from "./WatchlistViewSettings";
+import { WatchlistReviewPane } from "./WatchlistReviewPane";
+import { reviewInstrument } from "./reviewInstrument";
+import "./WatchlistReview.css";
 import { HeatmapView } from "./HeatmapView";
 import { fetchQuotesBatch } from "../../api/marketData";
 import { useQuotesStream, useQuotesStore } from "../../realtime/useQuotesStream";
@@ -27,9 +34,11 @@ const SORT_OPTIONS = [
   { id: "price", label: "Price: highest first" },
 ] as const;
 type WatchlistSort = typeof SORT_OPTIONS[number]["id"];
-function readSort(): WatchlistSort {
+const sortKey = (accountId: string) => `ot:watchlist:sort:${encodeURIComponent(accountId)}`;
+function readSort(accountId?: string): WatchlistSort {
+  if (!accountId) return "manual";
   try {
-    const saved = localStorage.getItem("ot:watchlist:sort");
+    const saved = localStorage.getItem(sortKey(accountId));
     return SORT_OPTIONS.some((option) => option.id === saved) ? saved as WatchlistSort : "manual";
   } catch { return "manual"; }
 }
@@ -37,13 +46,34 @@ function readSort(): WatchlistSort {
 export function WatchlistManager() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const accountId = useContext(AuthContextRef)?.user?.id;
+  const { view, updateView, storageError } = useWatchlistView(accountId);
   const selectedMarket = useSettingsStore(s => s.selectedMarket);
   const { subscribe, unsubscribe, connectionState } = useQuotesStream(selectedMarket);
   const ticksByToken = useQuotesStore(s => s.ticksByToken);
 
   const [activeWlId, setActiveWlId] = useState<string | null>(null);
-  const [viewMode, setViewByMode] = useState<"table" | "heatmap">("table");
+  const [viewMode, setViewByMode] = useState<"table" | "heatmap" | "review">(() => searchParams.get("view") === "review" ? "review" : searchParams.get("view") === "heatmap" ? "heatmap" : "table");
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(searchParams.get("symbol")?.toUpperCase() || null);
+  const [listFilter, setListFilter] = useState("");
+  const [reviewFilter, setReviewFilter] = useState<InstrumentReviewStatus | "all">("all");
+  useEffect(() => {
+    const next = searchParams.get("view");
+    setViewByMode(next === "review" ? "review" : next === "heatmap" ? "heatmap" : "table");
+    setSelectedSymbol(searchParams.get("symbol")?.toUpperCase() || null);
+  }, [searchParams]);
+  const selectView = (mode: "table" | "heatmap" | "review") => {
+    const next = new URLSearchParams(searchParams); next.set("view", mode); setViewByMode(mode); setSearchParams(next, { replace: true });
+  };
+  const selectSymbol = (symbol: string) => {
+    setSelectedSymbol(symbol);
+    if (viewMode === "review") { const next = new URLSearchParams(searchParams); next.set("symbol", symbol); setSearchParams(next, { replace: true }); }
+  };
+  const selectWatchlist = (id: string) => {
+    setActiveWlId(id); setSelectedSymbol(null); setListFilter(""); setReviewFilter("all");
+    const next = new URLSearchParams(searchParams); next.delete("name"); next.delete("symbol"); setSearchParams(next, { replace: true });
+  };
   const [isCreating, setIsCreating] = useState(false);
   const [newWlName, setNewWlName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -54,12 +84,16 @@ export function WatchlistManager() {
   const [contextMenu, setContextMenu] = useState<{ symbol: string; x: number; y: number } | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importPending, setImportPending] = useState(false);
-  const [sort, setSort] = useState<WatchlistSort>(readSort);
+  const [sortState, setSortState] = useState<{ accountId?: string; value: WatchlistSort }>(() => ({ accountId, value: readSort(accountId) }));
+  const sort = sortState.accountId === accountId ? sortState.value : readSort(accountId);
+  const [sortError, setSortError] = useState<string | null>(null);
+  const setSort = (value: WatchlistSort) => {
+    setSortState({ accountId, value });
+    try { if (accountId) localStorage.setItem(sortKey(accountId), value); setSortError(null); }
+    catch { setSortError("Sort order could not be saved. It will last for this visit."); }
+  };
   const [focusedSymbol, setFocusedSymbol] = useState<string | null>(null);
 
-  useEffect(() => {
-    try { localStorage.setItem("ot:watchlist:sort", sort); } catch { /* Sorting still works for this visit. */ }
-  }, [sort]);
   useEffect(() => { if (importPending) setContextMenu(null); }, [importPending]);
 
   // Pull-to-refresh state
@@ -70,9 +104,9 @@ export function WatchlistManager() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Data fetching
-  const { data: watchlists, isLoading: loadingWl } = useQuery({
-    queryKey: ["watchlists"],
-    queryFn: fetchWatchlists
+  const { data: watchlists, isLoading: loadingWl, isError: watchlistsError, refetch: retryWatchlists } = useQuery({
+    queryKey: ["watchlists", accountId],
+    queryFn: ({ signal }) => fetchWatchlists({ signal })
   });
 
   const activeWl = useMemo(() => {
@@ -85,9 +119,6 @@ export function WatchlistManager() {
     return safeWatchlists.find(w => w.id === activeWlId) || safeWatchlists[0];
   }, [watchlists, activeWlId, searchParams]);
 
-  useEffect(() => {
-    if (activeWl && activeWlId !== activeWl.id) setActiveWlId(activeWl.id);
-  }, [activeWl, activeWlId]);
 
   // WebSocket Sync
   useEffect(() => {
@@ -102,27 +133,27 @@ export function WatchlistManager() {
     queryKey: ["watchlist-quotes", selectedMarket, activeWl?.symbols.join(",") || ""],
     queryFn: async () => {
       const symbols = activeWl?.symbols || [];
-      const primary = await fetchQuotesBatch(symbols, selectedMarket);
+      const primary = await fetchQuotesBatch(symbols, selectedMarket).catch(() => ({ quotes: [], status: "unavailable" }));
       const quotes = (primary.quotes || []).map((q) => ({ ...q, market: selectedMarket as string }));
       // A watchlist can mix exchanges (AAPL on an NSE desk): resolve symbols the desk market
       // didn't price against the other country's market instead of leaving them blank.
-      const priced = new Set(quotes.map((q) => String(q.symbol).toUpperCase()));
+      const priced = new Set(quotes.filter(q => typeof q.last === "number" && Number.isFinite(q.last) && q.last > 0).map((q) => String(q.symbol).toUpperCase()));
       const missing = symbols.filter((sym) => !priced.has(sym.toUpperCase()));
       if (missing.length) {
         const altMarket = selectedMarket === "NSE" || selectedMarket === "BSE" ? "NASDAQ" : "NSE";
         const alt = await fetchQuotesBatch(missing, altMarket).catch(() => ({ quotes: [] as typeof primary.quotes }));
         quotes.push(...(alt.quotes || []).map((q) => ({ ...q, market: altMarket })));
       }
-      return { quotes };
+      return { quotes, partial: primary.status === "unavailable" || quotes.length < symbols.length };
     },
     enabled: Boolean(activeWl?.symbols.length),
     refetchInterval: 30_000,
     staleTime: 15_000,
   });
   const restBySymbol = useMemo(() => {
-    const map: Record<string, { ltp: number; change_pct: number; market: string; volume?: number | null }> = {};
+    const map: Record<string, { ltp: number; change_pct: number; market: string; ts?: string; change_available?: boolean; currency?: string; timestamp_source?: string; volume?: number | null }> = {};
     for (const q of restQuotesQuery.data?.quotes || []) {
-      map[String(q.symbol).toUpperCase()] = { ltp: q.last, change_pct: q.changePct, market: q.market, volume: q.volume ?? null };
+      map[String(q.symbol).toUpperCase()] = { ltp: q.last, change_pct: q.changePct, market: q.market, ts: q.ts, change_available: q.change_available, currency: q.currency, timestamp_source: q.timestamp_source, volume: q.volume ?? null };
     }
     return map;
   }, [restQuotesQuery.data]);
@@ -133,16 +164,25 @@ export function WatchlistManager() {
   }, [restBySymbol, selectedMarket]);
   // Merge a live tick with the REST fallback so callers get a single quote view.
   const quoteFor = (symbol: string) => {
-    const live = ticksByToken[`${selectedMarket}:${symbol}`];
+    const tick = ticksByToken[`${selectedMarket}:${symbol}`];
     const rest = restBySymbol[symbol.toUpperCase()];
+    const live = tick && tick.market === selectedMarket && Number.isFinite(tick.ltp) && tick.ltp > 0 && Number.isFinite(Date.parse(tick.ts || "")) && (!rest?.market || rest.market === selectedMarket) && (!rest?.ts || (Number.isFinite(Date.parse(rest.ts)) && Date.parse(tick.ts) >= Date.parse(rest.ts))) ? tick : undefined;
+    const price = live?.ltp ?? rest?.ltp;
+    const change = viewMode === "review" ? (rest?.change_available === false ? undefined : rest?.change_pct) : live?.change_pct ?? (rest?.change_available === false ? undefined : rest?.change_pct);
+    const volume = live?.volume ?? rest?.volume;
     return {
-      ltp: live?.ltp ?? rest?.ltp,
-      change_pct: live?.change_pct ?? rest?.change_pct,
-      volume: live?.volume ?? rest?.volume ?? null,
+      ltp: typeof price === "number" && Number.isFinite(price) && price > 0 ? price : undefined,
+      change_pct: typeof change === "number" && Number.isFinite(change) ? change : undefined,
+      volume: typeof volume === "number" && Number.isFinite(volume) && volume >= 0 ? volume : null,
+      currency: rest?.currency, timestamp_source: live ? "stream" : rest?.timestamp_source,
+      ts: live?.ts || rest?.ts, market: rest?.market || selectedMarket,
+      source: live ? "Last received stream tick" : rest ? "Quote snapshot" : undefined,
     };
   };
 
-  const displayedSymbols = [...(activeWl?.symbols || [])];
+  const reviewStatuses = useInstrumentReviewStatuses(accountId, activeWl?.symbols || []);
+  const reviewStorageError = accountId && (activeWl?.symbols || []).some(symbol => Boolean(readInstrumentReviewStatus(accountId, symbol).error));
+  const displayedSymbols = (activeWl?.symbols || []).filter((symbol) => symbol.toUpperCase().includes(listFilter.trim().toUpperCase()) && (viewMode !== "review" || reviewFilter === "all" || (reviewStatuses[symbol] || "unreviewed") === reviewFilter));
   if (sort === "symbol") displayedSymbols.sort((left, right) => left.localeCompare(right));
   if (sort === "change" || sort === "price") {
     displayedSymbols.sort((left, right) => {
@@ -157,6 +197,8 @@ export function WatchlistManager() {
       return rightValue - leftValue;
     });
   }
+  const reviewSymbol = displayedSymbols.includes(selectedSymbol || "") ? selectedSymbol! : displayedSymbols[0];
+  const reviewIndex = displayedSymbols.indexOf(reviewSymbol);
   const rowTabStop = displayedSymbols.includes(focusedSymbol || "") ? focusedSymbol : displayedSymbols[0];
 
   // Mutations
@@ -266,15 +308,16 @@ export function WatchlistManager() {
     };
   }, [queryClient]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const heatmapData = activeWl?.symbols.map(s => {
+  const heatmapData = displayedSymbols.map(s => {
     const live = quoteFor(s);
     return {
       ticker: s,
-      changePct: live?.change_pct || 0,
+      changePct: live?.change_pct ?? null,
       value: 100, // Default to equal weight for now, can be extended to fetch market cap
-      price: live?.ltp || 0
+      price: live?.ltp ?? null,
+      market: live.market,
     };
-  }) || [];
+  });
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-terminal-bg lg:flex-row">
@@ -309,14 +352,14 @@ export function WatchlistManager() {
           {watchlists?.map(wl => (
             <div
               key={wl.id}
-              className={`group flex items-center justify-between rounded transition-colors ${activeWlId === wl.id ? 'bg-terminal-accent/20 text-terminal-accent' : 'text-terminal-muted hover:bg-terminal-bg hover:text-terminal-text'}`}
+              className={`group flex items-center justify-between rounded transition-colors ${activeWl?.id === wl.id ? 'bg-terminal-accent/20 text-terminal-accent' : 'text-terminal-muted hover:bg-terminal-bg hover:text-terminal-text'}`}
             >
               <button
                 type="button"
                 disabled={importPending}
-                onClick={() => setActiveWlId(wl.id)}
+                onClick={() => selectWatchlist(wl.id)}
                 className="flex min-w-0 flex-1 flex-col px-3 py-2 text-left"
-                aria-pressed={activeWlId === wl.id}
+                aria-pressed={activeWl?.id === wl.id}
               >
                 <span className="text-xs font-bold uppercase">{wl.name}</span>
                 <span className="text-[9px] opacity-60">{wl.symbols.length} items</span>
@@ -349,11 +392,12 @@ export function WatchlistManager() {
                   {activeWl.symbols.length} symbols
                 </div>
                 <div className="flex rounded border border-terminal-border p-0.5 bg-terminal-bg">
+                  <button type="button" aria-label="Show watchlist review desk" aria-pressed={viewMode === "review"} onClick={() => selectView("review")} className={`p-1 rounded-sm ${viewMode === 'review' ? 'bg-terminal-accent text-terminal-bg' : 'text-terminal-muted'}`}><PanelRightOpen size={14} /></button>
                   <button
                     type="button"
                     aria-label="Show watchlist table"
                     aria-pressed={viewMode === "table"}
-                    onClick={() => setViewByMode("table")}
+                    onClick={() => selectView("table")}
                     className={`p-1 rounded-sm ${viewMode === 'table' ? 'bg-terminal-accent text-terminal-bg' : 'text-terminal-muted'}`}
                   >
                     <Table size={14} />
@@ -362,7 +406,7 @@ export function WatchlistManager() {
                     type="button"
                     aria-label="Show watchlist heatmap"
                     aria-pressed={viewMode === "heatmap"}
-                    onClick={() => setViewByMode("heatmap")}
+                    onClick={() => selectView("heatmap")}
                     className={`p-1 rounded-sm ${viewMode === 'heatmap' ? 'bg-terminal-accent text-terminal-bg' : 'text-terminal-muted'}`}
                   >
                     <Grid3X3 size={14} />
@@ -446,23 +490,28 @@ export function WatchlistManager() {
             className="space-y-3 p-4"
           >
             {activeWl && importOpen && <div id="watchlist-import-region"><WatchlistImportPanel key={activeWl.id} watchlist={activeWl} onPendingChange={setImportPending} onClose={() => setImportOpen(false)} onImported={() => { void queryClient.invalidateQueries({ queryKey: ["watchlists"] }); }} /></div>}
-            {activeWl && viewMode === "table" && <div className="flex flex-wrap items-center justify-between gap-3">
-              <p id="watchlist-keyboard-help" className="text-[11px] text-terminal-muted">Focus a row, use ↑ / ↓ or Home / End to move, and Enter to open Security Hub.</p>
+            {activeWl && viewMode !== "heatmap" && <div className="flex flex-wrap items-center justify-between gap-3">
+              <p id="watchlist-keyboard-help" className="text-[11px] text-terminal-muted">{viewMode === "review" ? "Select a row or use ↑ / ↓ to update the preview. Enter opens its full workspace. Notes stay with their symbol." : "Focus a row, use ↑ / ↓ or Home / End to move, and Enter to open its workspace."}</p>
               <label className="flex items-center gap-2 text-xs text-terminal-muted">Sort rows<select value={sort} onChange={(event) => setSort(event.target.value as WatchlistSort)} className="min-h-8 rounded-sm border border-terminal-border bg-terminal-panel px-2 text-xs text-terminal-text focus-visible:outline focus-visible:outline-terminal-accent">{SORT_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>
             </div>}
-            {loadingWl ? (
+            {viewMode === "review" && searchParams.get("symbol") && activeWl && !activeWl.symbols.includes(searchParams.get("symbol")!.toUpperCase()) && <p role="status" className="text-xs text-terminal-warn">{searchParams.get("symbol")} is not in {activeWl.name}. The preview shows an available list member. Choose another list or add the requested symbol.</p>}
+            {reviewStorageError && viewMode === "review" && <p role="status" className="text-xs text-terminal-warn">Some saved review statuses could not be read. Status filters may be incomplete; open the notes panel to retry a status.</p>}
+            {activeWl && <div className="watchlist-review-filter"><label>Filter watchlist<input value={listFilter} onChange={event => setListFilter(event.target.value)} placeholder="Find a symbol" maxLength={80} /></label>{viewMode === "review" && <label>Review status<select aria-label="Filter by review status" value={reviewFilter} onChange={event => setReviewFilter(event.target.value as InstrumentReviewStatus | "all")}><option value="all">All statuses</option>{REVIEW_STATUSES.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>}<p role="status">{displayedSymbols.length} of {activeWl.symbols.length} symbols</p>{viewMode === "review" && reviewSymbol && <button type="button" className="underline" onClick={() => { const panel = document.getElementById("watchlist-selected-preview"); panel?.scrollIntoView({ block: "start" }); panel?.focus({ preventScroll: true }); }}>Jump to preview</button>}{(listFilter || reviewFilter !== "all") && <button type="button" onClick={() => { setListFilter(""); setReviewFilter("all"); }}>Clear filters</button>}</div>}
+            {activeWl && viewMode !== "heatmap" && <WatchlistViewSettings view={view} onChange={updateView} storageError={storageError || sortError} />}
+            {watchlistsError ? <div role="alert" className="p-4 text-sm text-terminal-muted">Watchlists could not be loaded. <button type="button" className="underline" onClick={() => void retryWatchlists()}>Retry watchlists</button></div> : loadingWl ? (
               <p className="animate-pulse text-center text-xs text-terminal-muted">SYNCHRONIZING WATCHLISTS...</p>
             ) : activeWl ? (
-              viewMode === "table" ? (
-                <div className="overflow-x-auto rounded border border-terminal-border">
-                  <table className="w-full text-left text-xs font-mono" aria-describedby="watchlist-keyboard-help">
+              viewMode !== "heatmap" ? (
+                <div className={`watchlist-review-layout ${viewMode === "review" && reviewSymbol ? "has-preview" : ""}`}>
+                <div className="watchlist-review-list"><div className="overflow-x-auto rounded border border-terminal-border">
+                  <table className={`watchlist-review-table w-full text-left text-xs font-mono ${view.density === "comfortable" ? "is-comfortable" : ""}`} aria-describedby="watchlist-keyboard-help">
                     <caption className="sr-only">{activeWl.name} watchlist quotes</caption>
                     <thead className="bg-terminal-panel text-terminal-muted border-b border-terminal-border">
                       <tr>
                         <th scope="col" aria-sort={sort === "symbol" ? "ascending" : undefined} className="px-3 py-2">SYMBOL</th>
-                        <th scope="col" aria-sort={sort === "price" ? "descending" : undefined} className="px-3 py-2 text-right">LTP</th>
-                        <th scope="col" aria-sort={sort === "change" ? "descending" : undefined} className="px-3 py-2 text-right">CHG%</th>
-                        <th scope="col" className="px-3 py-2 text-right">VOLUME</th>
+                        {view.columns.last && <th scope="col" aria-sort={sort === "price" ? "descending" : undefined} className="px-3 py-2 text-right">LTP</th>}
+                        {view.columns.change && <th scope="col" aria-sort={sort === "change" ? "descending" : undefined} className="px-3 py-2 text-right">CHG%</th>}
+                        {view.columns.volume && <th scope="col" className="px-3 py-2 text-right">VOLUME</th>}{viewMode === "review" && <th scope="col" className="px-3 py-2">REVIEW</th>}
                         <th scope="col" className="px-3 py-2 text-center">ACTION</th>
                       </tr>
                     </thead>
@@ -476,8 +525,9 @@ export function WatchlistManager() {
                             className="cursor-pointer hover:bg-terminal-accent/5 focus-within:bg-terminal-accent/5 focus-visible:outline focus-visible:outline-1 focus-visible:outline-terminal-accent"
                             tabIndex={rowTabStop === s ? 0 : -1}
                             data-watchlist-symbol={s}
-                            onFocus={() => setFocusedSymbol(s)}
-                            onClick={() => navigate(`/equity/security?ticker=${encodeURIComponent(s)}`)}
+                            aria-selected={viewMode === "review" ? s === reviewSymbol : undefined}
+                            onFocus={(event) => { if (event.target === event.currentTarget) { setFocusedSymbol(s); if (viewMode === "review") selectSymbol(s); } }}
+                            onClick={() => viewMode === "review" ? selectSymbol(s) : navigate(reviewInstrument(s, quoteFor(s).market).primaryPath)}
                             onKeyDown={(event) => {
                               if (event.target !== event.currentTarget) return;
                               if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
@@ -490,7 +540,7 @@ export function WatchlistManager() {
                               }
                               if (event.key === "Enter" || event.key === " ") {
                                 event.preventDefault();
-                                navigate(`/equity/security?ticker=${encodeURIComponent(s)}`);
+                                navigate(reviewInstrument(s, quoteFor(s).market).primaryPath);
                               }
                               if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
                                 event.preventDefault();
@@ -505,11 +555,11 @@ export function WatchlistManager() {
                             }}
                           >
                             <td className="px-3 py-2 font-bold text-terminal-accent">{s}</td>
-                            <td className="px-3 py-2 text-right text-terminal-text">{live?.ltp?.toFixed(2) || '--'}</td>
-                            <td className={`px-3 py-2 text-right ${changePct == null || changePct === 0 ? 'text-terminal-muted' : changePct > 0 ? 'text-terminal-pos' : 'text-terminal-neg'}`}>
+                            {view.columns.last && <td className="px-3 py-2 text-right text-terminal-text">{live?.ltp?.toFixed(2) || '--'}</td>}
+                            {view.columns.change && <td className={`px-3 py-2 text-right ${changePct == null || changePct === 0 ? 'text-terminal-muted' : changePct > 0 ? 'text-terminal-pos' : 'text-terminal-neg'}`}>
                               {changePct == null ? '--' : `${changePct > 0 ? '+' : ''}${changePct.toFixed(2)}%`}
-                            </td>
-                            <td className="px-3 py-2 text-right text-terminal-muted">{live?.volume?.toLocaleString() || '--'}</td>
+                            </td>}
+                            {view.columns.volume && <td className="px-3 py-2 text-right text-terminal-muted">{live?.volume == null ? '--' : live.volume.toLocaleString()}</td>}{viewMode === "review" && <td className="px-3 py-2 text-terminal-muted">{REVIEW_STATUSES.find(item => item.value === (reviewStatuses[s] || "unreviewed"))?.label}</td>}
                             <td className="px-3 py-2 text-center">
                               <button
                                 type="button"
@@ -539,6 +589,8 @@ export function WatchlistManager() {
                       })}
                     </tbody>
                   </table>
+                </div>{displayedSymbols.length === 0 && <p role="status" className="p-4 text-sm text-terminal-muted">{activeWl.symbols.length ? "No symbols match these filters. Clear filters to continue reviewing." : "Add or import symbols to start reviewing this watchlist."}</p>}<p className="mt-2 text-[11px] text-terminal-muted">Exports include all quote columns, regardless of visible columns.</p></div>
+                {viewMode === "review" && reviewSymbol && <WatchlistReviewPane symbol={reviewSymbol} market={selectedMarket} quote={quoteFor(reviewSymbol)} index={reviewIndex} count={displayedSymbols.length} loading={restQuotesQuery.isFetching} error={restQuotesQuery.isError || Boolean(restQuotesQuery.data?.partial)} onPrevious={() => selectSymbol(displayedSymbols[reviewIndex - 1])} onNext={() => selectSymbol(displayedSymbols[reviewIndex + 1])} />}
                 </div>
               ) : (
                 <div className="h-full rounded border border-terminal-border bg-terminal-panel/30 p-2">

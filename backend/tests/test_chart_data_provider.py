@@ -38,6 +38,7 @@ def test_resolve_market_uses_hint_before_classifier() -> None:
 
 
 def test_get_ohlcv_prefers_in_memory_cache(monkeypatch) -> None:
+    monkeypatch.setattr(chart_data, "_now_utc", lambda: datetime(2026, 1, 2, tzinfo=timezone.utc))
     provider = ChartDataProvider()
     provider.chart_cache_ttl = 9999
     sample = [

@@ -1,0 +1,31 @@
+.watchlist-review-layout { display: grid; gap: 16px; align-items: start; }
+.watchlist-review-layout.has-preview { grid-template-columns: minmax(280px, .9fr) minmax(360px, 1.1fr); }
+.watchlist-review-list { min-width: 0; }
+.watchlist-review-pane { min-width: 0; border: 1px solid var(--ot-color-border-default); border-radius: var(--ot-radius-md); background: var(--ot-color-surface-1); color: var(--ot-color-text-primary); font-family: var(--ot-font-ui); }
+.watchlist-review-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 12px; padding: 16px; border-bottom: 1px solid var(--ot-color-border-default); }
+.watchlist-review-heading h2 { margin: 2px 0 4px; font-size: 22px; font-weight: 600; }
+.watchlist-review-heading p, .watchlist-review-provenance { font-size: 12px; color: var(--ot-color-text-secondary); }
+.watchlist-review-heading .watchlist-review-kicker { font-size: 11px; }
+.watchlist-review-stepper { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ot-color-text-secondary); }
+.watchlist-review-stepper button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--ot-color-border-default); border-radius: var(--ot-radius-sm); }
+.watchlist-review-stepper button:disabled { opacity: .4; cursor: default; }
+.watchlist-review-quote { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 16px 16px 8px; }
+.watchlist-review-quote span { display: block; font-size: 11px; color: var(--ot-color-text-secondary); }
+.watchlist-review-quote strong { display: block; margin-top: 4px; font-size: 15px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.watchlist-review-provenance { padding: 0 16px 12px; line-height: 1.5; }
+.watchlist-review-notice { padding: 8px 16px; color: var(--ot-color-text-secondary); font-size: 12px; line-height: 1.5; }
+.watchlist-review-chart { min-width: 0; padding: 8px 16px; }
+.watchlist-review-actions { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 12px 16px; border-top: 1px solid var(--ot-color-border-default); border-bottom: 1px solid var(--ot-color-border-default); font-size: 12px; }
+.watchlist-review-actions a { display: inline-flex; align-items: center; gap: 4px; text-decoration: underline; text-underline-offset: 3px; }
+.watchlist-review-actions a:first-child { color: var(--ot-color-text-primary); font-weight: 600; }
+.watchlist-review-pane :is(button, a, select, textarea):focus-visible { outline: 2px solid var(--ot-color-accent-primary); outline-offset: 2px; }
+.watchlist-review-filter { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 12px; font-size: 12px; }
+.watchlist-review-filter label { display: flex; flex-direction: column; gap: 5px; color: var(--ot-color-text-secondary); }
+.watchlist-review-filter :is(input, select) { min-height: 34px; max-width: 100%; padding: 5px 8px; border: 1px solid var(--ot-color-border-default); border-radius: var(--ot-radius-sm); background: var(--ot-color-canvas); color: var(--ot-color-text-primary); }
+.watchlist-review-filter input { width: 230px; }
+.watchlist-review-layout tr[aria-selected="true"] { background: color-mix(in srgb, var(--ot-color-accent-primary) 10%, var(--ot-color-surface-1)); box-shadow: inset 3px 0 var(--ot-color-accent-primary); }
+.watchlist-review-table.is-comfortable td { padding-top: 13px; padding-bottom: 13px; }
+@media (max-width: 1100px) { .watchlist-review-layout.has-preview { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .watchlist-review-heading { padding: 12px; } .watchlist-review-quote { padding: 12px; } .watchlist-review-filter input { width: 100%; } .watchlist-review-quote strong { font-size: 13px; } }
+
+.watchlist-review-pane > section { padding: 16px; }

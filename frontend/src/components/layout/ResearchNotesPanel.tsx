@@ -1,10 +1,11 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 
 import { addNote, deleteNote, listNotes, type NoteItem } from "../../api/agentExtras";
 import { extractApiErrorMessage } from "../../api/base";
 import type { LaunchpadPanelConfig } from "./LaunchpadContext";
+import { useAuth } from "../../contexts/AuthContext";
 
 type PanelProps = { panel: LaunchpadPanelConfig };
 
@@ -44,15 +45,28 @@ function kindBadgeClassName(kind: NoteItem["kind"]): string {
 }
 
 export function LaunchpadResearchNotesPanel({ panel }: PanelProps) {
+  const { user } = useAuth();
+  if (!user?.id) return <p className="p-2 text-xs text-terminal-muted">Sign in to view account research notes.</p>;
+  return <AccountResearchNotesPanel key={user.id} panel={panel} accountId={user.id} />;
+}
+
+function AccountResearchNotesPanel({ panel, accountId }: PanelProps & { accountId: string }) {
   const queryClient = useQueryClient();
   const controlId = useId();
+  const requestScope = useRef(new AbortController());
+  useEffect(() => {
+    if (requestScope.current.signal.aborted) requestScope.current = new AbortController();
+    const controller = requestScope.current;
+    return () => controller.abort();
+  }, []);
   const symbol = panel.symbol?.trim().toUpperCase() || null;
   const isLinked = symbol !== null;
-  const queryKey = ["agent", "notes", symbol] as const;
+  const queryKey = ["agent", "notes", accountId, symbol] as const;
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey,
-    queryFn: () => listNotes(symbol ?? undefined),
+    queryFn: ({ signal }) => listNotes(symbol ?? undefined, { signal }),
+    enabled: Boolean(accountId),
   });
 
   const [kind, setKind] = useState<"note" | "thesis">("note");
@@ -62,7 +76,10 @@ export function LaunchpadResearchNotesPanel({ panel }: PanelProps) {
   const [banner, setBanner] = useState<string | null>(null);
 
   const addMutation = useMutation({
-    mutationFn: (text: string) => addNote({ symbol, kind, content: text }),
+    mutationFn: (text: string) => {
+      if (requestScope.current.signal.aborted) throw new Error("Account context changed.");
+      return addNote({ symbol, kind, content: text }, { signal: requestScope.current.signal });
+    },
     onSuccess: () => {
       setContent("");
       setBanner(null);
@@ -72,7 +89,10 @@ export function LaunchpadResearchNotesPanel({ panel }: PanelProps) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteNote(id),
+    mutationFn: (id: string) => {
+      if (requestScope.current.signal.aborted) throw new Error("Account context changed.");
+      return deleteNote(id, { signal: requestScope.current.signal });
+    },
     onSuccess: () => {
       setDeletingIds(new Set());
       setBanner("Note deleted.");

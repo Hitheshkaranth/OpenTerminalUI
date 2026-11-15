@@ -4,8 +4,8 @@ import type {
   WatchlistItem,
 } from "../types";
 
-export async function fetchWatchlists(): Promise<Watchlist[]> {
-  const { data } = await api.get<Watchlist[] | { watchlists?: Watchlist[] }>("/watchlists");
+export async function fetchWatchlists(options?: { signal?: AbortSignal }): Promise<Watchlist[]> {
+  const { data } = options ? await api.get<Watchlist[] | { watchlists?: Watchlist[] }>("/watchlists", options) : await api.get<Watchlist[] | { watchlists?: Watchlist[] }>("/watchlists");
   if (Array.isArray(data)) return data;
   if (data && typeof data === "object" && Array.isArray((data as any).watchlists)) return (data as any).watchlists;
   return [];

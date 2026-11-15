@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -22,9 +23,11 @@ SUPPORTED_MARKETS = IN_MARKETS | US_MARKETS
 
 
 def _to_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         out = float(value)
-        if out != out:
+        if not math.isfinite(out):
             return None
         return out
     except (TypeError, ValueError):
@@ -33,6 +36,27 @@ def _to_float(value: Any) -> float | None:
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _quote_time(epoch: Any, retrieved_at: str) -> tuple[str, str]:
+    number = _to_float(epoch)
+    if number is not None and number > 0:
+        try:
+            return datetime.fromtimestamp(number, tz=timezone.utc).isoformat(), "reported"
+        except (ValueError, OverflowError, OSError):
+            pass
+    return retrieved_at, "retrieved"
+
+
+def _reported_currency(value: Any) -> dict[str, str]:
+    # Preserve reported units such as GBp without inferring USD/INR from a desk.
+    if isinstance(value, str) and re.fullmatch(r"[A-Za-z]{3}", value.strip()):
+        return {"currency": value.strip()}
+    return {}
+
+
+def _quote_field(quote: Any, field: str, default: Any = None) -> Any:
+    return quote.get(field, default) if isinstance(quote, dict) else getattr(quote, field, default)
 
 
 def _is_global_symbol(s: str) -> bool:
@@ -80,18 +104,18 @@ async def _fetch_yahoo_quotes(fetcher: Any, symbols: list[str], now_iso: str) ->
                 continue
             change = _to_float(row.get("regularMarketChange"))
             change_pct = _to_float(row.get("regularMarketChangePercent"))
-            epoch = row.get("regularMarketTime")
-            ts_iso = now_iso
-            if isinstance(epoch, (int, float)) and epoch > 0:
-                ts_iso = datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat()
+            ts_iso, timestamp_source = _quote_time(row.get("regularMarketTime"), now_iso)
             quotes.append(
                 {
                     "symbol": raw_symbol,
                     "last": last,
                     "change": change if change is not None else 0.0,
                     "changePct": change_pct if change_pct is not None else 0.0,
+                    "change_available": change_pct is not None,
                     "volume": _to_float(row.get("regularMarketVolume")),
                     "ts": ts_iso,
+                    "timestamp_source": timestamp_source,
+                    **_reported_currency(row.get("currency")),
                 }
             )
     except Exception:
@@ -142,13 +166,23 @@ async def get_quotes(
             quote = None
         if quote is None:
             continue
+        price = _to_float(_quote_field(quote, "price"))
+        if price is None:
+            continue
+        change = _to_float(_quote_field(quote, "change"))
+        change_pct = _to_float(_quote_field(quote, "change_pct"))
+        adapter_ts = _quote_field(quote, "ts")
         adapter_quotes.append(
             {
                 "symbol": symbol_item,
-                "last": quote.price,
-                "change": quote.change,
-                "changePct": quote.change_pct,
-                "ts": quote.ts or now_iso,
+                "last": price,
+                "change": change if change is not None else 0.0,
+                "changePct": change_pct if change_pct is not None else 0.0,
+                # Adapter models may already have defaulted an absent change to
+                # zero. Only an explicit availability flag can establish it.
+                "change_available": _quote_field(quote, "change_available") is True and change_pct is not None,
+                "ts": adapter_ts or now_iso,
+                "timestamp_source": "adapter" if adapter_ts else "retrieved",
             }
         )
     if adapter_quotes:
@@ -171,18 +205,18 @@ async def get_quotes(
                     continue
                 change = _to_float(payload.get("d"))
                 change_pct = _to_float(payload.get("dp"))
-                epoch = payload.get("t")
-                ts_iso = now_iso
-                if isinstance(epoch, (int, float)) and epoch > 0:
-                    ts_iso = datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat()
+                ts_iso, timestamp_source = _quote_time(payload.get("t"), now_iso)
                 local_quotes.append(
                     {
                         "symbol": symbol,
                         "last": last,
                         "change": change if change is not None else 0.0,
                         "changePct": change_pct if change_pct is not None else 0.0,
-                        "volume": _to_float(row.get("regularMarketVolume")),
+                        "change_available": change_pct is not None,
+                        "volume": None,
                         "ts": ts_iso,
+                        "timestamp_source": timestamp_source,
+                        **_reported_currency(payload.get("currency")),
                     }
                 )
         # Finnhub unconfigured or returned nothing usable: fall back to Yahoo,
@@ -219,7 +253,10 @@ async def get_quotes(
                             "last": last,
                             "change": change if change is not None else 0.0,
                             "changePct": change_pct if change_pct is not None else 0.0,
+                            "change_available": change_pct is not None,
                             "ts": now_iso,
+                            "timestamp_source": "retrieved",
+                            **_reported_currency(row.get("currency")),
                         }
                     )
         except Exception:
@@ -243,18 +280,18 @@ async def get_quotes(
                     continue
                 change = _to_float(row.get("regularMarketChange"))
                 change_pct = _to_float(row.get("regularMarketChangePercent"))
-                epoch = row.get("regularMarketTime")
-                ts_iso = now_iso
-                if isinstance(epoch, (int, float)) and epoch > 0:
-                    ts_iso = datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat()
+                ts_iso, timestamp_source = _quote_time(row.get("regularMarketTime"), now_iso)
                 local_quotes.append(
                     {
                         "symbol": symbol,
                         "last": last,
                         "change": change if change is not None else 0.0,
                         "changePct": change_pct if change_pct is not None else 0.0,
+                        "change_available": change_pct is not None,
                         "volume": _to_float(row.get("regularMarketVolume")),
                         "ts": ts_iso,
+                        "timestamp_source": timestamp_source,
+                        **_reported_currency(row.get("currency")),
                     }
                 )
         except Exception:

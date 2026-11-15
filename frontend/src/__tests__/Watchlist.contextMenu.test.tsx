@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AuthContextRef } from "../contexts/AuthContext";
 import { WatchlistManager } from "../components/watchlist/WatchlistManager";
 
 const fetchWatchlistsMock = vi.fn();
@@ -32,11 +33,13 @@ vi.mock("../realtime/useQuotesStream", () => ({
     unsubscribe: vi.fn(),
     connectionState: "LIVE",
   }),
-  useQuotesStore: (selector: (state: { ticksByToken: Record<string, { ltp?: number; change_pct?: number; volume?: number }> }) => unknown) =>
+  useQuotesStore: (selector: (state: { ticksByToken: Record<string, { ltp?: number; change_pct?: number; ts?: string; market?: string; volume?: number }> }) => unknown) =>
     selector({
       ticksByToken: {
         "NSE:AAPL": {
           ltp: 123.45,
+          ts: "2026-11-14T10:00:00Z",
+          market: "NSE",
           change_pct: 1.25,
           volume: 1200,
         },
@@ -60,7 +63,7 @@ vi.mock("../hooks/useDisplayCurrency", () => ({
 describe("Watchlist symbol context menu", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.removeItem("ot:watchlist:sort");
+    localStorage.removeItem("ot:watchlist:sort:watchlist-test");
     fetchWatchlistsMock.mockResolvedValue([
       {
         id: "wl-1",
@@ -138,12 +141,12 @@ describe("Watchlist symbol context menu", () => {
     const sourceSymbols = ["MSFT", "AAPL", "NVDA"];
     fetchWatchlistsMock.mockResolvedValue([{ id: "wl-1", name: "Default", symbols: sourceSymbols }]);
     const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-    render(<QueryClientProvider client={client}><MemoryRouter><WatchlistManager /></MemoryRouter></QueryClientProvider>);
+    render(<AuthContextRef.Provider value={{ user: { id: "watchlist-test" } } as any}><QueryClientProvider client={client}><MemoryRouter><WatchlistManager /></MemoryRouter></QueryClientProvider></AuthContextRef.Provider>);
     await screen.findByText("AAPL");
     fireEvent.change(screen.getByRole("combobox", { name: "Sort rows" }), { target: { value: "symbol" } });
     expect(screen.getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("cell")[0].textContent)).toEqual(["AAPL", "MSFT", "NVDA"]);
     expect(sourceSymbols).toEqual(["MSFT", "AAPL", "NVDA"]);
-    expect(localStorage.getItem("ot:watchlist:sort")).toBe("symbol");
+    expect(localStorage.getItem("ot:watchlist:sort:watchlist-test")).toBe("symbol");
     fireEvent.change(screen.getByRole("combobox", { name: "Sort rows" }), { target: { value: "change" } });
     expect(screen.getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("cell")[0].textContent)[0]).toBe("AAPL");
   });

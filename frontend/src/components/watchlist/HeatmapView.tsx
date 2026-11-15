@@ -1,14 +1,16 @@
 import { useMemo, useRef, useEffect, useState } from "react";
 import * as d3 from "d3-hierarchy";
+import { reviewInstrument } from "./reviewInstrument";
 import { useNavigate } from "react-router-dom";
 import { TerminalTooltip } from "../terminal/TerminalTooltip";
 
 type HeatmapData = {
   ticker: string;
   name?: string;
-  changePct: number;
+  changePct: number | null;
   value: number; // Market cap or weight
-  price: number;
+  price: number | null;
+  market?: string;
 };
 
 type Props = {
@@ -22,7 +24,8 @@ export function HeatmapView({ data, width, height, sizeBy }: Props) {
   const navigate = useNavigate();
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const getColor = (change: number) => {
+  const getColor = (change: number | null) => {
+    if (change == null || !Number.isFinite(change)) return "#303945";
     if (change <= -5) return "#991b1b"; // Deep red
     if (change <= -2) return "#ef4444"; // Light red
     if (change >= 5) return "#166534";  // Deep green
@@ -57,7 +60,7 @@ export function HeatmapView({ data, width, height, sizeBy }: Props) {
               key={item.ticker}
               transform={`translate(${d.x0},${d.y0})`}
               className="cursor-pointer group"
-              onClick={() => navigate(`/equity/stocks?ticker=${encodeURIComponent(item.ticker)}`)}
+              onClick={() => navigate(reviewInstrument(item.ticker, item.market || "NSE").primaryPath)}
             >
               <rect
                 width={Math.max(0, rectWidth)}
@@ -87,7 +90,7 @@ export function HeatmapView({ data, width, height, sizeBy }: Props) {
                   fillOpacity={0.8}
                   className="pointer-events-none select-none text-[8px]"
                 >
-                  {item.changePct >= 0 ? "+" : ""}{item.changePct.toFixed(2)}%
+                  {item.changePct == null ? "Unavailable" : `${item.changePct >= 0 ? "+" : ""}${item.changePct.toFixed(2)}%`}
                 </text>
               )}
             </g>

@@ -6,6 +6,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LaunchpadResearchNotesPanel } from "../components/layout/ResearchNotesPanel";
 import { addNote, deleteNote, listNotes, type NoteItem } from "../api/agentExtras";
 
+const auth = vi.hoisted(() => ({ accountId: "notes-test-user" as string | null }));
+vi.mock("../contexts/AuthContext", () => ({ useAuth: () => ({ user: auth.accountId ? { id: auth.accountId } : null }) }));
+
 vi.mock("../api/agentExtras", () => ({
   listNotes: vi.fn(),
   addNote: vi.fn(),
@@ -46,6 +49,7 @@ function renderPanel(symbol?: string) {
 describe("LaunchpadResearchNotesPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    auth.accountId = "notes-test-user";
   });
 
   it("renders loading then the general-notes empty state", async () => {
@@ -58,7 +62,7 @@ describe("LaunchpadResearchNotesPanel", () => {
 
     resolveNotes?.({ items: [] });
     expect(await screen.findByText("No research notes yet.")).toBeInTheDocument();
-    expect(listNotesMock).toHaveBeenCalledWith(undefined);
+    expect(listNotesMock).toHaveBeenCalledWith(undefined, { signal: expect.any(AbortSignal) });
   });
 
   it("normalizes the linked symbol and creates a trimmed note", async () => {
@@ -72,7 +76,7 @@ describe("LaunchpadResearchNotesPanel", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
-      expect(addNoteMock).toHaveBeenCalledWith({ symbol: "AAPL", kind: "note", content: "Check guidance" });
+      expect(addNoteMock).toHaveBeenCalledWith({ symbol: "AAPL", kind: "note", content: "Check guidance" }, { signal: expect.any(AbortSignal) });
     });
     expect(screen.getByText("Linked · AAPL")).toBeInTheDocument();
   });
@@ -104,8 +108,8 @@ describe("LaunchpadResearchNotesPanel", () => {
     const { invalidateSpy } = renderPanel("AAPL");
 
     await user.click(await screen.findByRole("button", { name: "Delete note note from user" }));
-    await waitFor(() => expect(deleteNoteMock).toHaveBeenCalledWith("note-1"));
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["agent", "notes", "AAPL"] });
+    await waitFor(() => expect(deleteNoteMock).toHaveBeenCalledWith("note-1", { signal: expect.any(AbortSignal) }));
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["agent", "notes", "notes-test-user", "AAPL"] });
   });
 
   it("shows API failures without replacing the composer", async () => {

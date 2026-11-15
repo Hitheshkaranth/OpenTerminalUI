@@ -5,6 +5,7 @@ import { inferRecentSecurityAssetClass } from "../../hooks/useRecentSecurities";
 import { useStockStore } from "../../store/stockStore";
 
 export type CommandFunctionCode =
+  | "REVIEW"
   | "SETUP"
   | "FLOW"
   | "DESK"
@@ -117,6 +118,7 @@ export const COMMAND_FUNCTIONS: CommandFunctionSpec[] = [
   { code: "OWN", label: "Ownership", description: "Open ownership tab", securityScoped: true, aliases: ["OWNERSHIP"] },
   { code: "EQS", label: "Equity Screener", description: "Open equity screener", aliases: ["SCREENER"] },
   { code: "PORT", label: "Portfolio", description: "Open portfolio", aliases: ["PF", "PORTFOLIO"] },
+  { code: "REVIEW", label: "Watchlist review desk", description: "Review a shortlist with linked charts and research notes", securityScoped: true, aliases: ["REVIEWLIST"] },
   { code: "WL", label: "Watchlist", description: "Open watchlist", aliases: ["WATCHLIST"] },
   { code: "TOP", label: "Top Stories", description: "Open top market stories", aliases: ["HEADLINES"] },
   { code: "BT", label: "Backtesting", description: "Open backtesting workspace", aliases: ["BACKTEST"] },
@@ -373,6 +375,10 @@ export function executeParsedCommand(parsed: ParsedCommand, navigate: NavigateFu
       navigate(`/equity/workflows?ticker=${encodeURIComponent(parsed.ticker)}`);
       return { ok: true, target: "/equity/workflows" };
     }
+    if (parsed.func === "REVIEW") {
+      navigate(`/equity/watchlist?view=review&symbol=${encodeURIComponent(parsed.ticker)}`);
+      return { ok: true, target: "/equity/watchlist" };
+    }
     if (parsed.func === "DESK") {
       navigate(`/equity/cockpit?ticker=${encodeURIComponent(parsed.ticker)}`);
       return { ok: true, target: "/equity/cockpit" };
@@ -463,6 +469,12 @@ export function executeParsedCommand(parsed: ParsedCommand, navigate: NavigateFu
       case "PORT":
         navigate("/equity/portfolio");
         return { ok: true, target: "/equity/portfolio" };
+      case "REVIEW": {
+        const params = new URLSearchParams({ view: "review" });
+        if (mod0 && looksLikeTicker(mod0)) params.set("symbol", mod0);
+        navigate(`/equity/watchlist?${params.toString()}`);
+        return { ok: true, target: "/equity/watchlist" };
+      }
       case "WL": {
         const name = mod0 || "";
         const target = name ? `/equity/watchlist?name=${encodeURIComponent(name)}` : "/equity/watchlist";

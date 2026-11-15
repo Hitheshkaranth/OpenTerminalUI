@@ -60,18 +60,18 @@ export interface ReflectionResult {
   skipped: number;
 }
 
-export function listNotes(symbol?: string): Promise<NotesResponse> {
+export function listNotes(symbol?: string, options?: { signal?: AbortSignal }): Promise<NotesResponse> {
   const params: Record<string, string> = {};
   if (symbol) params.symbol = symbol;
-  return api.get("/agent/notes", { params }).then((r) => r.data);
+  return api.get("/agent/notes", { params, ...(options ? { signal: options.signal } : {}) }).then((r) => r.data);
 }
 
-export function addNote(payload: CreateNotePayload): Promise<NoteItem> {
-  return api.post("/agent/notes", payload).then((r) => r.data);
+export function addNote(payload: CreateNotePayload, options?: { signal?: AbortSignal }): Promise<NoteItem> {
+  return (options ? api.post("/agent/notes", payload, { signal: options.signal }) : api.post("/agent/notes", payload)).then((r) => r.data);
 }
 
-export function deleteNote(id: string): Promise<{ status: string }> {
-  return api.delete(`/agent/notes/${id}`).then((r) => r.data);
+export function deleteNote(id: string, options?: { signal?: AbortSignal }): Promise<{ status: string }> {
+  return (options ? api.delete(`/agent/notes/${id}`, { signal: options.signal }) : api.delete(`/agent/notes/${id}`)).then((r) => r.data);
 }
 
 export function runReflections(benchmarkDays = 0): Promise<ReflectionResult> {

@@ -1,0 +1,106 @@
+[
+  {
+    "check": "Server-owned note save, draft continuity across symbols and local review status",
+    "status": 200,
+    "notes": [
+      {
+        "symbol": "AAPL",
+        "kind": "note",
+        "content": "QC review: verify revenue, price history and invalidation before making a decision. 15 Nov 2026."
+      }
+    ]
+  },
+  {
+    "check": "Reliance 1M chart with NSE listing",
+    "text": "Selected instrument\n\nRELIANCE.NS\n\nSecurity · NSE\n\n2 of 6\nLast price · currency not reported\n1,339.70\nSnapshot change\nUnavailable\nVolume\nUnavailable\n\nQuote snapshot · Retrieved 11/15/2026, 1:50:28 AM. Times may reflect retrieval; feed status alone does not establish freshness.\n\nSome quote requests failed. Available snapshots remain visible; missing values are not estimated.\n\n1,339.70\n+173.00 (+14.83%)over 1M\n1M\n3M\n6M\n1Y\n5Y\n\t\n\t\n\n\t\n\t\nRELIANCE.NS up 14.83 percent over 1M\nOpen security\nRead news\nResearch dossiers\nManage alerts\nReview notes\n\nNotes save to your account. Review status stays in this browser for your account.\n\nReview status\nUnreviewed\nWatching\nResearching\nReady for review\nArchived\nSav"
+  },
+  {
+    "check": "NIFTY index history and futures-specific action",
+    "passed": true
+  },
+  {
+    "check": "ETH-USD context into crypto workspace",
+    "path": "/equity/crypto?symbol=ETH-USD",
+    "text": "CRYPTO\nCOMMAND CENTER\nLIVE MARKET MAP\nCrypto Command Center\nTradingView-style crypto navigation with a focus asset, ranked market board, mover radar, and direct entry into heatmap, derivatives, DeFi, and correlation modules.\nACTIVE MODULE\nMARKETS\nMARKETS\nMOVERS\nINDEX\nSECTORS\nHEATMAP\nDERIVATIVES\nDEFI\nCORRELATION\nDOMINANCE\n75.9 / 12.9\nBTC / ETH with 11.2% others\nMARKET CAP\n$1.7T\n12 ranked assets\n24H BREADTH\n0%\n0 up / 12 down\nINDEX\n945.32\n-5.47%\nnone\nFOCUS ASSET\nETHEREUM | L1\n-6.25%\nETH-USD\nEthereum\n1,825.01\n-6.25%\n24h Volume\n$14.3B\nMarket Cap\n$222.9B\nUniverse Share\n12.87%\nVolume Share\n24.06%\nOPEN CHART\nMOVER TAPE\nDEPTH HEATMAP\nDERIVATIVES\nnone\nMARKET BOARD\nSEARCH, RANK, AND ROUTE THE LIQUID CR"
+  },
+  {
+    "check": "Reload preserves column preset, density, local review status and server note",
+    "passed": true
+  },
+  {
+    "check": "Search and status filters update rows and preview without stale data",
+    "passed": true
+  },
+  {
+    "check": "390px layout, explicit preview jump, no document overflow",
+    "passed": true
+  },
+  {
+    "check": "Unavailable note feed has explicit retry/error state",
+    "passed": true
+  },
+  {
+    "check": "Six-month normalized AAPL history is clipped to requested window",
+    "status": 200,
+    "count": 128,
+    "first": {
+      "t": 1778731200000,
+      "o": 299.3342138271551,
+      "h": 299.9631979232699,
+      "l": 294.90140544972155,
+      "c": 297.726806640625,
+      "v": 35324900
+    },
+    "last": {
+      "t": 1794546000000,
+      "o": 357.9599914550781,
+      "h": 360.8299865722656,
+      "l": 355.75,
+      "c": 356.2699890136719,
+      "v": 39985300
+    }
+  },
+  {
+    "check": "Final desktop and mobile rendered history after resize",
+    "passed": true
+  },
+  {
+    "check": "Review NIFTY opens populated dedicated futures screen",
+    "text": "ar\n[ ] Relative Vigor Index\nPANE\nrvi\nStar\n[ ] SMI Ergodic Indicator\nPANE\nsmi-ergodic\nStar\n[ ] SMI Ergodic Oscillator\nPANE\nsmi-ergodic-osc\nStar\n[ ] Stochastic\nPANE\nstoch\nStar\n[ ] Stochastic RSI\nPANE\nstoch-rsi\nStar\n[ ] True Strength Index\nPANE\ntsi\nStar\n[ ] Ultimate Oscillator\nPANE\nultimate-osc\nStar\n[ ] Williams %R\nPANE\nwilliams-r\nStar\n[ ] Woodies CCI\nPANE\nwoodies-cci\nTREND\nStar\n[ ] ADX\nPANE\nadx\nStar\n[ ] Aroon\nPANE\naroon\nStar\n[ ] BBTrend\nPANE\nbbtrend\nStar\n[ ] Chande Kroll Stop\nOVERLAY\nchande-kroll-stop\nStar\n[ ] Choppiness Index\nPANE\nchoppiness\nStar\n[ ] Directional Movement Index\nPANE\ndmi\nStar\n[ ] Ichimoku Cloud\nOVERLAY\nichimoku\nStar\n[ ] KAMA\nOVERLAY\nkama\nStar\n[ ] Linear Regression Channel\nOVERLAY\nlinear-regression-channel\nStar\n[ ] Mass Index\nPANE\nmass-index\nStar\n[ ] Parabolic SAR\nOVERLAY\nparabolic-sar\nStar\n[ ] Supertrend\nOVERLAY\nsupertrend\nStar\n[ ] Trend Strength Index\nPANE\ntrend-strength\nStar\n[ ] Vortex Indicator\nPANE\nvortex\nStar\n[ ] Williams Alligator\nOVERLAY\nwilliams-alligator\nStar\n[ ] Zig Zag\nOVERLAY\nzigzag\nVOLATILITY\nStar\n[ ] Average Day Range (ADR)\nPANE\nadr\nStar\n[ ] Average True Range (ATR)\nPANE\natr\nStar\n[ ] Bollinger BandWidth\nPANE\nbb-bandwidth\nStar\n[ ] Chaikin Volatility\nPANE\nchaikin-volatility\nStar\n[ ] Historical Volatility\nPANE\nhist-volatility\nStar\n[ ] Historical Volatility\nPANE\nhistorical-volatility\nStar\n[ ] Historical Volatility\nPANE\nhv\nStar\n[ ] Standard Deviation\nPANE\nstdev\nStar\n[ ] Standard Deviation\nPANE\nstddev\nVOLUME\nStar\n[ ] Chaikin Money Flow\nPANE\nchaikin-mf\nStar\n[ ] Chaikin Oscillator\nPANE\nchaikin-osc\nStar\n[ ] Ease of Movement\nPANE\neom\nStar\n[ ] Klinger Oscillator\nPANE\nklinger\nStar\n[ ] Money Flow Index\nPANE\nmfi\nStar\n[ ] On Balance Volume (OBV)\nPANE\nobv\nStar\n[ ] Price Volume Trend\nPANE\npvt\nStar\n[ ] Volume Oscillator\nPANE\nvolume-osc\nTEMPLATES\n0 saved\nSave\nSelect template\nLoad\nDel\nCUSTOM JS\nOverlay on main chart\nSave JS\nNIFTY\nClear all\nF&O MARKERS\nATM\n₹25,150.00\nPCR\n0.77\nMAX PAIN\n₹25,150.00\nSUPPORT\n₹24,500.00, ₹25,000.00\nRESISTANCE\n₹26,000.00, ₹25,500.00"
+  },
+  {
+    "check": "Qualified NASDAQ AAPL action reaches correct company",
+    "path": "/equity/security?ticker=NASDAQ%3AAAPL"
+  },
+  {
+    "check": "Dated NIFTY futures rows match observed API prices",
+    "status": 200,
+    "source": "nse_snapshot",
+    "asOf": "2026-11-13T10:10:00+00:00",
+    "contracts": [
+      {
+        "symbol": "NIFTY26NOVFUT",
+        "price": 25175,
+        "expiry": "2026-11-23"
+      },
+      {
+        "symbol": "NIFTY26DECFUT",
+        "price": 25335,
+        "expiry": "2026-12-29"
+      },
+      {
+        "symbol": "NIFTY27JANFUT",
+        "price": 25478,
+        "expiry": "2027-01-25"
+      }
+    ]
+  },
+  {
+    "check": "Real keyboard ArrowDown changes linked preview without leaving watchlist",
+    "passed": true
+  },
+  {
+    "check": "Final notes error screenshot refreshed and service restored",
+    "passed": true
+  }
+]
