@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "evaluation_protocol": "sizing_abstention_v2",
+  "cases": [
+    {
+      "id": "sizing_selection",
+      "passed": true,
+      "tool_requirements": 1,
+      "tools_correct": 1,
+      "tool_correctness": 1.0,
+      "claims_checked": 3,
+      "unsupported_claims": 0,
+      "unsupported_claim_rate": 0.0,
+      "contradicted_statements": 0,
+      "stale_sources": 0,
+      "staleness_disclosed": true,
+      "task_completed": true,
+      "forbidden_tools": [],
+      "unconfirmed_actions": 0,
+      "sizing_violations": [],
+      "capture_failed": false,
+      "latency_ms": 14203.673,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "sizing_zero_no_action",
+      "passed": false,
+      "tool_requirements": 1,
+      "tools_correct": 1,
+      "tool_correctness": 1.0,
+      "claims_checked": 2,
+      "unsupported_claims": 0,
+      "unsupported_claim_rate": 0.0,
+      "contradicted_statements": 0,
+      "stale_sources": 0,
+      "staleness_disclosed": true,
+      "task_completed": true,
+      "forbidden_tools": [],
+      "unconfirmed_actions": 0,
+      "sizing_violations": [
+        {
+          "origin": "tool_calls[2]",
+          "symbol": "AAPL",
+          "portfolio_id": "paper-1",
+          "reason": "zero_quantity_action"
+        },
+        {
+          "origin": "recommendations",
+          "reason": "missing_structured_recommendation"
+        }
+      ],
+      "capture_failed": false,
+      "latency_ms": 13919.586,
+      "cost_usd": 0.0
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "passed": 1,
+    "task_completion_rate": 1.0,
+    "tool_correctness": 1.0,
+    "unsupported_claim_rate": 0.0,
+    "sizing_violations": 2,
+    "mean_latency_ms": 14061.6295,
+    "measured_cost_usd": 0.0,
+    "latency_observation_count": 2,
+    "cost_observation_count": 2
+  },
+  "mode": "captured_frozen_evidence"
+}

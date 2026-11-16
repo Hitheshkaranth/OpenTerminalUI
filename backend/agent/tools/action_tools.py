@@ -36,9 +36,17 @@ async def _mark_prices(symbols: list[str]) -> tuple[dict[str, float], dict[str, 
         async with semaphore:
             try:
                 snap = await asyncio.wait_for(fetcher.fetch_stock_snapshot(symbol), timeout=20)
-                price = float(snap.get("current_price") or snap.get("price") or 0)
+                raw_price = snap.get("current_price")
+                if raw_price is None:
+                    raw_price = snap.get("price")
+                if isinstance(raw_price, bool):
+                    return symbol, None, {}
+                price = float(raw_price or 0)
                 from backend.core.provenance import provenance_from_snapshot
                 provenance = snap.get("provenance") or provenance_from_snapshot(snap)
+                currency = snap.get("currency") or (snap.get("details") or {}).get("currency")
+                if isinstance(currency, str):
+                    provenance = {**provenance, "currency": currency}
                 if not math.isfinite(price) or price <= 0 or (provenance.get("quality") not in {"live", "delayed", "cached"} or provenance.get("source") in {"mock", "synthetic"}):
                     return symbol, None, provenance
                 return symbol, price, provenance
@@ -68,6 +76,8 @@ async def propose_rebalance(args: dict[str, Any], user_id: str) -> dict[str, Any
         return err("rationale is required", code="invalid_args")
 
     portfolio_id = args.get("portfolio_id")
+    if portfolio_id is not None and (not isinstance(portfolio_id, str) or not portfolio_id.strip()):
+        return err("portfolio_id must be a non-empty string", code="invalid_args")
     db = SessionLocal()
     try:
         if portfolio_id:
@@ -93,6 +103,15 @@ async def propose_rebalance(args: dict[str, Any], user_id: str) -> dict[str, Any
         if missing:
             return err("Usable marked prices unavailable for: " + ", ".join(missing),
                        code="missing_prices", hint="Connect a data provider and retry. Entry prices are not used as current valuations.")
+        from decimal import Decimal
+        from backend.paper_trading.currency import convert_marked_prices
+        raw_prices = dict(price_map)
+        try:
+            converted, fx = await convert_marked_prices({s: Decimal(str(p)) for s, p in price_map.items()},
+                                price_sources, portfolio.base_currency, 3600, _mark_prices)
+        except (ValueError, TypeError, OverflowError) as exc:
+            return err(str(exc), code="missing_fx")
+        price_map = {s: float(p) for s, p in converted.items()}
         valued_at = datetime.now(timezone.utc).isoformat()
         position_value = {p.symbol: float(p.quantity) * price_map[p.symbol] for p in positions}
         total_equity = float(portfolio.current_cash) + sum(position_value.values())
@@ -130,11 +149,23 @@ async def propose_rebalance(args: dict[str, Any], user_id: str) -> dict[str, Any
             "total_equity": round(total_equity, 2),
             "valued_at": valued_at,
             "valuation_basis": "marked_prices",
+            "base_currency": portfolio.base_currency,
+            "fx": fx,
             "cash_reserve": round(cash_reserve, 2),
             "execution_profile": {"slippage_bps": 5.0, "commission_bps": 5.0, "max_price_drift_pct": 1.0},
             "portfolio_snapshot": {"cash": float(portfolio.current_cash), "positions": {p.symbol: float(p.quantity) for p in positions}},
             "deltas": deltas,
         }
+        from backend.agent.trade_preflight import get_risk_policy
+        if get_risk_policy(db, user_id)["enabled"]:
+            from backend.agent.rebalance_preflight import preview_rebalance
+            payload["risk_stops"] = args.get("risk_stops") or {}
+            try:
+                payload["risk_preflight"] = await preview_rebalance(db, user_id, payload,
+                    valuation=(raw_prices, price_sources, price_map, fx))
+            except (ValueError, TypeError, OverflowError) as exc:
+                db.rollback()
+                return err(str(exc), code="risk_policy")
         summary = f"Rebalance '{portfolio.name}' to {len(weights)} target weight(s)"
         result = create_proposal(db, user_id, None, "rebalance", payload, summary, rationale)
     finally:
@@ -147,6 +178,8 @@ async def propose_rebalance(args: dict[str, Any], user_id: str) -> dict[str, Any
         "deltas": deltas,
         "cash_reserve": round(cash_reserve, 2),
         "execution_profile": payload["execution_profile"],
+        "risk_preflight": payload.get("risk_preflight"),
+        "base_currency": payload["base_currency"],
         "note": _PENDING_NOTE + " Paper portfolio only. A 0.2% cash reserve covers simulated slippage and fees; changed holdings or >1% quote drift require a new proposal.",
     })
 
@@ -303,6 +336,7 @@ def action_tool_specs(user_id: str) -> list[ToolSpec]:
                         "additionalProperties": {"type": "number"},
                     },
                     "portfolio_id": {"type": "string", "description": "Optional; defaults to the user's first paper portfolio."},
+                    "risk_stops": {"type": "object", "additionalProperties": {"type": "number", "exclusiveMinimum": 0}, "description": "Hypothetical stop in each buy symbol's quote currency, required by saved risk policy."},
                     "rationale": {"type": "string"},
                 },
                 "required": ["target_weights", "rationale"],

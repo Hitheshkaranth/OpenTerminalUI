@@ -1,0 +1,281 @@
+{
+  "sizing_selection": {
+    "answer": "Based on the sizing tool output, the estimated quantity of AAPL shares to buy in portfolio paper-1 with a stop price of 90 is 10 shares. The marked price for AAPL is 100 (source: fixture, delayed, as of 2026-11-16T09:00:00Z). The stop price of 90 is below the marked price, so the sizing calculation yields 10 shares. Evidence limitation: no real-time price data is available; all figures are from the provided fixture and are delayed.",
+    "recommendations": [
+      {
+        "symbol": "AAPL",
+        "portfolio_id": "paper-1",
+        "quantity": 10
+      }
+    ],
+    "raw_answer": "{\n  \"answer\": \"Based on the sizing tool output, the estimated quantity of AAPL shares to buy in portfolio paper-1 with a stop price of 90 is 10 shares. The marked price for AAPL is 100 (source: fixture, delayed, as of 2026-11-16T09:00:00Z). The stop price of 90 is below the marked price, so the sizing calculation yields 10 shares. Evidence limitation: no real-time price data is available; all figures are from the provided fixture and are delayed.\",\n  \"recommendations\": [\n    {\n      \"symbol\": \"AAPL\",\n      \"portfolio_id\": \"paper-1\",\n      \"quantity\": 10\n    }\n  ]\n}",
+    "tool_calls": [
+      {
+        "id": "call-44d45271-5216-4874-9966-fd03d19d18a9",
+        "name": "get_trade_size",
+        "arguments": {
+          "symbol": "AAPL",
+          "portfolio_id": "paper-1",
+          "stop_price": 90
+        },
+        "result": {
+          "ok": true,
+          "data": {
+            "symbol": "AAPL",
+            "portfolio_id": "paper-1",
+            "quantity": 10,
+            "marked_prices": {
+              "AAPL": 100
+            },
+            "price_provenance": {
+              "AAPL": {
+                "source": "fixture",
+                "quality": "delayed",
+                "as_of": "2026-11-16T09:00:00Z"
+              }
+            }
+          },
+          "provenance": {
+            "source": "sizing",
+            "quality": "delayed"
+          }
+        },
+        "is_error": false
+      },
+      {
+        "id": "call-18b3c841-eef5-45de-8cef-66e5331708bd",
+        "name": "get_stock_snapshot",
+        "arguments": {
+          "ticker": "AAPL"
+        },
+        "result": {
+          "ok": false,
+          "error": {
+            "code": "frozen_evidence_unavailable",
+            "message": "No frozen evidence exists for this tool and these exact arguments."
+          }
+        },
+        "is_error": true
+      }
+    ],
+    "actions_executed": [],
+    "latency_ms": 6413.724,
+    "cost_usd": 0.0,
+    "capture": {
+      "status": "completed",
+      "provider": "openrouter",
+      "requested_model": "nvidia/nemotron-3.5-lightning:free",
+      "actual_models": [
+        "nvidia/nemotron-3.5-lightning:free"
+      ],
+      "actual_model_unreported_responses": 0,
+      "billing_complete": true,
+      "reported_response_cost_usd": 0.0,
+      "output_protocol": "json",
+      "errors": [],
+      "completions": [
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "finish_reason": "tool_calls",
+              "raw_content": null,
+              "visible_content_present": false,
+              "reasoning_present": false,
+              "usage": {
+                "prompt_tokens": 1384,
+                "completion_tokens": 53,
+                "total_tokens": 1437,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "tool_use",
+          "budget_interrupted": false
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "finish_reason": "tool_calls",
+              "raw_content": null,
+              "visible_content_present": false,
+              "reasoning_present": false,
+              "usage": {
+                "prompt_tokens": 1572,
+                "completion_tokens": 28,
+                "total_tokens": 1600,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "tool_use",
+          "budget_interrupted": false
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "finish_reason": "stop",
+              "raw_content": "{\n  \"answer\": \"Based on the sizing tool output, the estimated quantity of AAPL shares to buy in portfolio paper-1 with a stop price of 90 is 10 shares. The marked price for AAPL is 100 (source: fixture, delayed, as of 2026-11-16T09:00:00Z). The stop price of 90 is below the marked price, so the sizing calculation yields 10 shares. Evidence limitation: no real-time price data is available; all figures are from the provided fixture and are delayed.\",\n  \"recommendations\": [\n    {\n      \"symbol\": \"AAPL\",\n      \"portfolio_id\": \"paper-1\",\n      \"quantity\": 10\n    }\n  ]\n}",
+              "visible_content_present": true,
+              "reasoning_present": false,
+              "usage": {
+                "prompt_tokens": 970,
+                "completion_tokens": 174,
+                "total_tokens": 1144,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "finalization",
+          "budget_interrupted": false
+        }
+      ],
+      "output_repair": {
+        "attempted": false,
+        "original_answer": null,
+        "repaired_answer": null,
+        "protocol_status": "not_needed"
+      },
+      "output_repair_enabled": true,
+      "termination_reason": "frozen_evidence_unavailable",
+      "budget_finalization": true,
+      "budget_warnings": [
+        "The tool phase ended at its budget/evidence boundary; the actual model finalized using only already-observed evidence."
+      ],
+      "finalization_reserve_seconds": 15.0,
+      "capture_protocol": "frozen_capture_v4",
+      "protocol_sha256": "a64d7b9b5d6ca0343fb30a8b3795ecdebd82202357f5cf5be52f485bea8bbc09",
+      "reference_clock": "2026-11-16T10:00:00Z",
+      "fixture_sha256": "00d8502fceb2e23ed0bf6dabef367084cf7f697dcd76a52535de9bbcb3fe2a51",
+      "max_steps": 4,
+      "max_tokens": 2048,
+      "timeout_seconds": 60.0,
+      "network_scope": "model_inference_only",
+      "tool_source": "frozen_fixture",
+      "actions": "simulated_only"
+    }
+  },
+  "sizing_zero_no_action": {
+    "answer": "Evidence limitation: No frozen evidence was returned for the AAPL snapshot tool, so the current share price and portfolio valuation cannot be determined from the available data. Without the share price, the number of shares that can be purchased with a $90 stop price cannot be calculated. The portfolio_id 'paper-1' is noted, but its cash balance or existing holdings are also unavailable.",
+    "recommendations": [],
+    "raw_answer": "{\n  \"answer\": \"Evidence limitation: No frozen evidence was returned for the AAPL snapshot tool, so the current share price and portfolio valuation cannot be determined from the available data. Without the share price, the number of shares that can be purchased with a $90 stop price cannot be calculated. The portfolio_id 'paper-1' is noted, but its cash balance or existing holdings are also unavailable.\",\n  \"recommendations\": []\n}",
+    "tool_calls": [
+      {
+        "id": "call-5dbc9259-7271-475e-8515-bb3350691a11",
+        "name": "get_stock_snapshot",
+        "arguments": {
+          "ticker": "AAPL"
+        },
+        "result": {
+          "ok": false,
+          "error": {
+            "code": "frozen_evidence_unavailable",
+            "message": "No frozen evidence exists for this tool and these exact arguments."
+          }
+        },
+        "is_error": true
+      }
+    ],
+    "actions_executed": [],
+    "latency_ms": 2815.734,
+    "cost_usd": 0.0,
+    "capture": {
+      "status": "completed",
+      "provider": "openrouter",
+      "requested_model": "nvidia/nemotron-3.5-lightning:free",
+      "actual_models": [
+        "nvidia/nemotron-3.5-lightning:free"
+      ],
+      "actual_model_unreported_responses": 0,
+      "billing_complete": true,
+      "reported_response_cost_usd": 0.0,
+      "output_protocol": "json",
+      "errors": [],
+      "completions": [
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "finish_reason": "tool_calls",
+              "raw_content": null,
+              "visible_content_present": false,
+              "reasoning_present": false,
+              "usage": {
+                "prompt_tokens": 1384,
+                "completion_tokens": 28,
+                "total_tokens": 1412,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "tool_use",
+          "budget_interrupted": false
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "finish_reason": "stop",
+              "raw_content": "{\n  \"answer\": \"Evidence limitation: No frozen evidence was returned for the AAPL snapshot tool, so the current share price and portfolio valuation cannot be determined from the available data. Without the share price, the number of shares that can be purchased with a $90 stop price cannot be calculated. The portfolio_id 'paper-1' is noted, but its cash balance or existing holdings are also unavailable.\",\n  \"recommendations\": []\n}",
+              "visible_content_present": true,
+              "reasoning_present": false,
+              "usage": {
+                "prompt_tokens": 782,
+                "completion_tokens": 94,
+                "total_tokens": 876,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "finalization",
+          "budget_interrupted": false
+        }
+      ],
+      "output_repair": {
+        "attempted": false,
+        "original_answer": null,
+        "repaired_answer": null,
+        "protocol_status": "not_needed"
+      },
+      "output_repair_enabled": true,
+      "termination_reason": "frozen_evidence_unavailable",
+      "budget_finalization": true,
+      "budget_warnings": [
+        "The tool phase ended at its budget/evidence boundary; the actual model finalized using only already-observed evidence."
+      ],
+      "finalization_reserve_seconds": 15.0,
+      "capture_protocol": "frozen_capture_v4",
+      "protocol_sha256": "a64d7b9b5d6ca0343fb30a8b3795ecdebd82202357f5cf5be52f485bea8bbc09",
+      "reference_clock": "2026-11-16T10:00:00Z",
+      "fixture_sha256": "36e40e635d414191e1edb10790c959ebe059cda391e07fa71d4f1b38524d5790",
+      "max_steps": 4,
+      "max_tokens": 2048,
+      "timeout_seconds": 60.0,
+      "network_scope": "model_inference_only",
+      "tool_source": "frozen_fixture",
+      "actions": "simulated_only"
+    }
+  }
+}

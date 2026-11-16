@@ -1,0 +1,67 @@
+{
+  "mode": "captured_frozen_evidence",
+  "fixture_sha256": "cead80a295680bdaf6b9506212ea39cc4b3dac217a648bd820437bc862f4af13",
+  "case_ids": [
+    "sizing_selection",
+    "sizing_zero_no_action"
+  ],
+  "protocol_sha256": "bed6855da632a98cb25a1d2607232f7ca07c890a59d179261810213c07020371",
+  "targets": [
+    {
+      "provider": "openrouter",
+      "requested_model": "nvidia/nemotron-3.5-lightning:free"
+    },
+    {
+      "provider": "openrouter",
+      "requested_model": "inclusionai/ling-3.2-flash:free"
+    }
+  ],
+  "max_steps": 4,
+  "max_tokens": 2048,
+  "timeout_seconds": 60.0,
+  "model_network_calls": true,
+  "production_tools": false,
+  "actions_executed": false,
+  "created_at": "2026-11-16T10:46:37.942188+00:00",
+  "runs": [
+    {
+      "provider": "openrouter",
+      "requested_model": "nvidia/nemotron-3.5-lightning:free",
+      "observations": "output/agent-captures/roadmap-live/openrouter-nvidia_nemotron-3.5-lightning_free-3de55024.observations.json",
+      "score": "output/agent-captures/roadmap-live/openrouter-nvidia_nemotron-3.5-lightning_free-3de55024.score.json",
+      "summary": {
+        "total": 2,
+        "passed": 1,
+        "task_completion_rate": 1.0,
+        "tool_correctness": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "sizing_violations": 1,
+        "mean_latency_ms": 20970.661,
+        "measured_cost_usd": 0.0,
+        "latency_observation_count": 2,
+        "cost_observation_count": 2
+      },
+      "capture_failures": 0
+    },
+    {
+      "provider": "openrouter",
+      "requested_model": "inclusionai/ling-3.2-flash:free",
+      "observations": "output/agent-captures/roadmap-live/openrouter-inclusionai_ling-3.2-flash_free-92c159d5.observations.json",
+      "score": "output/agent-captures/roadmap-live/openrouter-inclusionai_ling-3.2-flash_free-92c159d5.score.json",
+      "summary": {
+        "total": 2,
+        "passed": 0,
+        "task_completion_rate": 0.0,
+        "tool_correctness": 1.0,
+        "unsupported_claim_rate": null,
+        "sizing_violations": 2,
+        "mean_latency_ms": 60002.532,
+        "measured_cost_usd": null,
+        "latency_observation_count": 2,
+        "cost_observation_count": 0
+      },
+      "capture_failures": 2
+    }
+  ],
+  "measurement_note": "Account identifiers redacted; incomplete inference costs unknown. Raw model answers and scores were not tuned."
+}

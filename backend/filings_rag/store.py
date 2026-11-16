@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.filings_rag import parse
 from backend.filings_rag.models import FilingChunkORM, FilingDocumentORM
+from backend.filings_rag.availability import cutoff_utc, publication_time
 
 # OWNER: agent A. Signatures are the cross-agent contract (.swarm/fi_v1/CONTRACT.md); do not change them.
 
@@ -142,7 +143,8 @@ def delete_document(db: Session, symbol: str, doc_id: int) -> bool:
     return True
 
 
-def get_chunks(db: Session, symbol: str, doc_types: list[str] | None = None) -> list[dict[str, Any]]:
+def get_chunks(db: Session, symbol: str, doc_types: list[str] | None = None, *,
+               as_of: str | None = None, require_verified_availability: bool = False) -> list[dict[str, Any]]:
     symbol_u = symbol.strip().upper()
     query = (
         db.query(FilingChunkORM, FilingDocumentORM)
@@ -151,6 +153,21 @@ def get_chunks(db: Session, symbol: str, doc_types: list[str] | None = None) -> 
     )
     if doc_types:
         query = query.filter(FilingDocumentORM.doc_type.in_(doc_types))
+    if as_of is not None:
+        cutoff = cutoff_utc(as_of)
+        # Check document metadata before loading chunk text. Future and undated
+        # passages cannot enter lexical ranking, reranking, or an LLM prompt.
+        documents = db.query(FilingDocumentORM.id, FilingDocumentORM.source, FilingDocumentORM.filed_at).filter(
+            FilingDocumentORM.symbol == symbol_u,
+        ).all()
+        eligible = []
+        for doc_id, source, filed_at in documents:
+            available = publication_time({"source": source, "filed_at": filed_at}, verified=require_verified_availability)
+            if available is not None and available <= cutoff:
+                eligible.append(doc_id)
+        if not eligible:
+            return []
+        query = query.filter(FilingDocumentORM.id.in_(eligible))
     query = query.order_by(FilingChunkORM.document_id, FilingChunkORM.ordinal)
     return [
         {
@@ -160,6 +177,7 @@ def get_chunks(db: Session, symbol: str, doc_types: list[str] | None = None) -> 
             "doc_type": doc.doc_type,
             "period": doc.period,
             "filed_at": doc.filed_at,
+            "source": doc.source,
             "source_url": doc.source_url,
             "page_start": chunk.page_start,
             "page_end": chunk.page_end,

@@ -1,0 +1,229 @@
+{
+  "sizing_selection": {
+    "answer": "",
+    "raw_answer": "",
+    "tool_calls": [
+      {
+        "id": "call_33791f69d60044e1a4b7060b",
+        "name": "get_trade_size",
+        "arguments": {
+          "portfolio_id": "paper-1",
+          "stop_price": 90,
+          "symbol": "AAPL"
+        },
+        "result": {
+          "ok": true,
+          "data": {
+            "symbol": "AAPL",
+            "portfolio_id": "paper-1",
+            "quantity": 10,
+            "marked_prices": {
+              "AAPL": 100
+            },
+            "price_provenance": {
+              "AAPL": {
+                "source": "fixture",
+                "quality": "delayed",
+                "as_of": "2026-11-16T09:00:00Z"
+              }
+            }
+          },
+          "provenance": {
+            "source": "sizing",
+            "quality": "delayed"
+          }
+        },
+        "is_error": false
+      },
+      {
+        "id": "call_4ef281f989544c86a7519cc1",
+        "name": "get_stock_snapshot",
+        "arguments": {
+          "ticker": "AAPL"
+        },
+        "result": {
+          "ok": false,
+          "error": {
+            "code": "frozen_evidence_unavailable",
+            "message": "No frozen evidence exists for this tool and these exact arguments."
+          }
+        },
+        "is_error": true
+      }
+    ],
+    "actions_executed": [],
+    "latency_ms": 60002.13,
+    "cost_usd": null,
+    "capture": {
+      "status": "timeout",
+      "provider": "openrouter",
+      "requested_model": "inclusionai/ling-3.2-flash:free",
+      "actual_models": [
+        "inclusionai/ling-3.2-flash:free"
+      ],
+      "actual_model_unreported_responses": 0,
+      "output_protocol": "unstructured",
+      "errors": [
+        "Capture case wall-clock timeout"
+      ],
+      "completions": [
+        {
+          "requested_model": "inclusionai/ling-3.2-flash:free",
+          "responses": [
+            {
+              "requested_model": "inclusionai/ling-3.2-flash:free",
+              "actual_model": "inclusionai/ling-3.2-flash:free",
+              "usage": {
+                "prompt_tokens": 1917,
+                "completion_tokens": 247,
+                "total_tokens": 2164,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null
+        },
+        {
+          "requested_model": "inclusionai/ling-3.2-flash:free",
+          "responses": [],
+          "error": null
+        }
+      ],
+      "protocol_sha256": "bed6855da632a98cb25a1d2607232f7ca07c890a59d179261810213c07020371",
+      "reference_clock": "2026-11-16T10:00:00Z",
+      "fixture_sha256": "00d8502fceb2e23ed0bf6dabef367084cf7f697dcd76a52535de9bbcb3fe2a51",
+      "max_steps": 4,
+      "max_tokens": 2048,
+      "timeout_seconds": 60.0,
+      "network_scope": "model_inference_only",
+      "tool_source": "frozen_fixture",
+      "actions": "simulated_only",
+      "billing_complete": false,
+      "reported_response_cost_usd": 0.0,
+      "measurement_correction": "Incomplete inference billing changed to unknown; provider-reported response subtotal preserved. No inference, prompts or answers changed."
+    }
+  },
+  "sizing_zero_no_action": {
+    "answer": "",
+    "raw_answer": "",
+    "tool_calls": [
+      {
+        "id": "call_4add8ec9aa074ff597317220",
+        "name": "get_trade_size",
+        "arguments": {
+          "portfolio_id": "paper-1",
+          "symbol": "AAPL",
+          "stop_price": 90
+        },
+        "result": {
+          "ok": true,
+          "data": {
+            "symbol": "AAPL",
+            "portfolio_id": "paper-1",
+            "quantity": 0,
+            "marked_prices": {
+              "AAPL": 100
+            },
+            "price_provenance": {
+              "AAPL": {
+                "source": "fixture",
+                "quality": "delayed",
+                "as_of": "2026-11-16T09:00:00Z"
+              }
+            }
+          },
+          "provenance": {
+            "source": "sizing",
+            "quality": "delayed"
+          }
+        },
+        "is_error": false
+      },
+      {
+        "id": "call_a0ba7aac884641b1bbd1eb2c",
+        "name": "get_stock_snapshot",
+        "arguments": {
+          "ticker": "AAPL"
+        },
+        "result": {
+          "ok": false,
+          "error": {
+            "code": "frozen_evidence_unavailable",
+            "message": "No frozen evidence exists for this tool and these exact arguments."
+          }
+        },
+        "is_error": true
+      }
+    ],
+    "actions_executed": [],
+    "latency_ms": 60002.934,
+    "cost_usd": null,
+    "capture": {
+      "status": "timeout",
+      "provider": "openrouter",
+      "requested_model": "inclusionai/ling-3.2-flash:free",
+      "actual_models": [
+        "inclusionai/ling-3.2-flash:free"
+      ],
+      "actual_model_unreported_responses": 0,
+      "output_protocol": "unstructured",
+      "errors": [
+        "Capture case wall-clock timeout"
+      ],
+      "completions": [
+        {
+          "requested_model": "inclusionai/ling-3.2-flash:free",
+          "responses": [
+            {
+              "requested_model": "inclusionai/ling-3.2-flash:free",
+              "actual_model": "inclusionai/ling-3.2-flash:free",
+              "usage": {
+                "prompt_tokens": 1917,
+                "completion_tokens": 282,
+                "total_tokens": 2199,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null
+        },
+        {
+          "requested_model": "inclusionai/ling-3.2-flash:free",
+          "responses": [
+            {
+              "requested_model": "inclusionai/ling-3.2-flash:free",
+              "actual_model": "inclusionai/ling-3.2-flash:free",
+              "usage": {
+                "prompt_tokens": 2174,
+                "completion_tokens": 743,
+                "total_tokens": 2917,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null
+        },
+        {
+          "requested_model": "inclusionai/ling-3.2-flash:free",
+          "responses": [],
+          "error": null
+        }
+      ],
+      "protocol_sha256": "bed6855da632a98cb25a1d2607232f7ca07c890a59d179261810213c07020371",
+      "reference_clock": "2026-11-16T10:00:00Z",
+      "fixture_sha256": "36e40e635d414191e1edb10790c959ebe059cda391e07fa71d4f1b38524d5790",
+      "max_steps": 4,
+      "max_tokens": 2048,
+      "timeout_seconds": 60.0,
+      "network_scope": "model_inference_only",
+      "tool_source": "frozen_fixture",
+      "actions": "simulated_only",
+      "billing_complete": false,
+      "reported_response_cost_usd": 0.0,
+      "measurement_correction": "Incomplete inference billing changed to unknown; provider-reported response subtotal preserved. No inference, prompts or answers changed."
+    }
+  }
+}

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import math
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from statistics import mean, pstdev
 from typing import Any
@@ -19,6 +21,8 @@ from backend.models import (
 )
 from backend.services.marketdata_hub import MarketDataHub, get_marketdata_hub
 
+risk_checked_fill: ContextVar[tuple[str, float] | None] = ContextVar("paper_risk_checked_fill", default=None)
+
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -26,9 +30,11 @@ def _utcnow() -> datetime:
 
 def _f(value: Any, default: float = 0.0) -> float:
     try:
+        if isinstance(value, bool):
+            return default
         out = float(value)
-        return out if out == out else default
-    except (TypeError, ValueError):
+        return out if math.isfinite(out) else default
+    except (TypeError, ValueError, OverflowError):
         return default
 
 
@@ -36,6 +42,9 @@ class PaperTradingEngine:
     def __init__(self) -> None:
         self._started = False
         self._mark_prices: dict[str, float] = {}
+        self._base_marks: dict[tuple[str, str], float] = {}
+        self._quote_currencies: dict[tuple[str, str], str] = {}
+        self._fx_marks: dict[tuple[str, str], dict] = {}
         self._queue: asyncio.Queue[dict[str, Any]] | None = None
         self._worker_task: asyncio.Task | None = None
         self._hub: MarketDataHub | None = None
@@ -97,7 +106,17 @@ class PaperTradingEngine:
             )
             for order in rows:
                 if self._fillable(order, ltp):
-                    self._fill_order(db, order, ltp)
+                    from backend.agent.trade_preflight import execute_guarded_pending, get_risk_policy
+                    portfolio = db.get(VirtualPortfolio, order.portfolio_id)
+                    guarded = portfolio and get_risk_policy(db, portfolio.user_id)["enabled"]
+                    if guarded or (order.signal_metadata or {}).get("preflight"):
+                        await execute_guarded_pending(db, order, self)
+                    else:
+                        from backend.paper_trading.currency import quote_currency
+                        if portfolio and quote_currency(order.symbol, {}, portfolio.base_currency) != portfolio.base_currency:
+                            await self._fill_currency_order(db, order)
+                        else:
+                            self._fill_order(db, order, ltp)
             db.commit()
         finally:
             db.close()
@@ -111,9 +130,10 @@ class PaperTradingEngine:
         if otype == VirtualOrderType.LIMIT.value:
             if order.limit_price is None:
                 return False
+            slip = max(0.0, _f(order.slippage_bps)) / 10000
             if side == "buy":
-                return ltp <= _f(order.limit_price)
-            return ltp >= _f(order.limit_price)
+                return ltp * (1 + slip) <= _f(order.limit_price)
+            return ltp * (1 - slip) >= _f(order.limit_price)
         if otype == VirtualOrderType.SL.value:
             if order.sl_price is None:
                 return False
@@ -123,17 +143,37 @@ class PaperTradingEngine:
         return False
 
     def _fill_order(self, db: Session, order: VirtualOrder, market_price: float) -> None:
+        if order.status != "pending":
+            return
+        if isinstance(market_price, bool) or not math.isfinite(market_price) or market_price <= 0:
+            order.status = "rejected"
+            return
         portfolio = db.query(VirtualPortfolio).filter(VirtualPortfolio.id == order.portfolio_id).first()
         if portfolio is None:
             order.status = VirtualOrderStatus.REJECTED.value
             return
+        from backend.agent.trade_preflight import get_risk_policy
+        from backend.paper_trading.currency import quote_currency
+        needs_fx = quote_currency(order.symbol, {}, portfolio.base_currency) != portfolio.base_currency
+        if (get_risk_policy(db, portfolio.user_id)["enabled"] or needs_fx) and risk_checked_fill.get() != (order.id, market_price):
+            order.status = "rejected"
+            order.signal_metadata = {**(order.signal_metadata or {}), "risk_rejection": "Fill requires current risk checks"}
+            return
         side = str(order.side).lower()
+        if side not in {"buy", "sell"} or not math.isfinite(order.quantity) or isinstance(order.quantity, bool):
+            order.status = "rejected"
+            return
         qty = max(0.0, _f(order.quantity))
         if qty <= 0:
             order.status = VirtualOrderStatus.REJECTED.value
             return
         slip = max(0.0, _f(order.slippage_bps))
         fill_price = market_price * (1 + (slip / 10000.0) if side == "buy" else 1 - (slip / 10000.0))
+        if order.order_type == "limit":
+            conversion = ((order.signal_metadata or {}).get("fill_preflight") or {}).get("fx", {}).get(order.symbol, {})
+            limit = _f(order.limit_price) * _f(conversion.get("rate"), 1.0)
+            if limit <= 0 or (side == "buy" and fill_price > limit) or (side == "sell" and fill_price < limit):
+                return
         order_value = qty * fill_price
         commission = max(0.0, _f(order.commission))
         if commission <= 0:
@@ -162,8 +202,10 @@ class PaperTradingEngine:
         order.fill_time = _utcnow()
         order.status = VirtualOrderStatus.FILLED.value
 
-        self._update_position(db, order, fill_price)
         realized = self._realized_pnl(db, order, fill_price)
+        if realized is not None:
+            realized -= commission
+        self._update_position(db, order, fill_price)
         db.add(
             VirtualTrade(
                 order_id=order.id,
@@ -222,6 +264,15 @@ class PaperTradingEngine:
     async def maybe_fill_market_order_now(self, db: Session, order: VirtualOrder) -> None:
         if str(order.order_type).lower() != VirtualOrderType.MARKET.value:
             return
+        from backend.agent.trade_preflight import execute_guarded_pending, get_risk_policy
+        portfolio = db.get(VirtualPortfolio, order.portfolio_id)
+        if (portfolio and get_risk_policy(db, portfolio.user_id)["enabled"]) or (order.signal_metadata or {}).get("preflight"):
+            await execute_guarded_pending(db, order, self)
+            return
+        from backend.paper_trading.currency import quote_currency
+        if portfolio and quote_currency(order.symbol, {}, portfolio.base_currency) != portfolio.base_currency:
+            await self._fill_currency_order(db, order)
+            return
         ltp = self._mark_prices.get(order.symbol)
         if ltp is None:
             fetcher = await get_unified_fetcher()
@@ -230,6 +281,44 @@ class PaperTradingEngine:
             ltp = _f(quote.get("last_price") or quote.get("c") or quote.get("regularMarketPrice") or quote.get("price"))
         if ltp and ltp > 0:
             self._fill_order(db, order, ltp)
+
+    async def _fill_currency_order(self, db: Session, order: VirtualOrder) -> None:
+        """Convert foreign quotes even when discretionary risk limits are off."""
+        from decimal import Decimal
+        from sqlalchemy import update
+        from backend.agent.tools.action_tools import _mark_prices
+        from backend.agent.trade_preflight import checked_fill
+        from backend.paper_trading.currency import convert_marked_prices, validate_quote_source
+        try:
+            with db.begin_nested():
+                db.execute(update(VirtualPortfolio).where(VirtualPortfolio.id == order.portfolio_id)
+                    .values(current_cash=VirtualPortfolio.current_cash))
+                db.refresh(order)
+                if order.status != "pending":
+                    return
+                portfolio = db.get(VirtualPortfolio, order.portfolio_id, populate_existing=True)
+                if portfolio is None or not portfolio.is_active:
+                    raise ValueError("Active paper portfolio required")
+                marks, sources = await _mark_prices([order.symbol])
+                validate_quote_source(sources.get(order.symbol, {}), 3600, symbol=order.symbol)
+                quote = marks.get(order.symbol)
+                if not quote or not math.isfinite(quote) or quote <= 0:
+                    raise ValueError("Usable foreign quote required")
+                if not self._fillable(order, quote):
+                    return
+                converted, fx = await convert_marked_prices({order.symbol: Decimal(str(quote))}, sources,
+                                        portfolio.base_currency, 3600, _mark_prices)
+                from backend.paper_trading.currency import require_verified_foreign_basis
+                require_verified_foreign_basis(db, portfolio.id, [order.symbol])
+                current = {"base_prices": {s: float(p) for s, p in converted.items()}, "fx": fx,
+                           "prices": marks, "quote_provenance": sources, "base_currency": portfolio.base_currency}
+                checked_fill(db, order, self, current)
+                db.flush()
+                if order.status != "filled":
+                    raise ValueError("Foreign paper order could not be funded")
+        except (ValueError, TypeError, OverflowError) as exc:
+            order.status = "rejected"
+            order.signal_metadata = {**(order.signal_metadata or {}), "risk_rejection": str(exc)}
 
     def portfolio_performance(self, db: Session, portfolio_id: str) -> dict[str, Any]:
         trades = (
@@ -244,7 +333,7 @@ class PaperTradingEngine:
         positions = db.query(VirtualPosition).filter(VirtualPosition.portfolio_id == portfolio_id).all()
         equity = portfolio.current_cash
         for pos in positions:
-            mark = self._mark_prices.get(pos.symbol, pos.avg_entry_price)
+            mark = self.mark_in_base(portfolio, pos)
             equity += _f(pos.quantity) * _f(mark)
         pnl = equity - _f(portfolio.initial_capital)
         cumulative_return = (pnl / _f(portfolio.initial_capital, 1.0)) if portfolio.initial_capital else 0.0
@@ -275,6 +364,7 @@ class PaperTradingEngine:
             sharpe = (mean(returns) / pstdev(returns)) * (252**0.5)
         return {
             "portfolio_id": portfolio_id,
+            "base_currency": portfolio.base_currency,
             "equity": equity,
             "pnl": pnl,
             "cumulative_return": cumulative_return,
@@ -286,6 +376,25 @@ class PaperTradingEngine:
             "profit_factor": profit_factor,
             "trade_count": len(trades),
         }
+
+    def mark_in_base(self, portfolio: VirtualPortfolio, position: VirtualPosition) -> float:
+        from backend.paper_trading.currency import quote_currency, validate_quote_source
+        key = (portfolio.id, position.symbol)
+        currency = self._quote_currencies.get(key) or quote_currency(position.symbol, {}, portfolio.base_currency)
+        if currency == portfolio.base_currency:
+            return self._mark_prices.get(position.symbol, self._base_marks.get(key, position.avg_entry_price))
+        conversion = self._fx_marks.get(key)
+        if conversion and position.symbol in self._mark_prices:
+            try:
+                validate_quote_source(conversion.get("provenance") or {}, 3600, symbol=conversion.get("pair", "FX"))
+                return self._mark_prices[position.symbol] * conversion["rate"]
+            except ValueError:
+                pass
+        if key in self._base_marks:
+            return self._base_marks[key]
+        # A quote in another currency is never added directly to base cash.
+        # Until a fresh FX-backed valuation is available, expose cost basis.
+        return position.avg_entry_price
 
 
 _paper_engine = PaperTradingEngine()

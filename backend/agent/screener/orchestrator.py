@@ -136,6 +136,8 @@ class ScreenerAgentOrchestrator:
         *,
         screen_context: dict[str, Any] | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
+        from backend.agent.historical import validate_historical_mode
+        validate_historical_mode("screener", screen_context or {})
         final_yielded = False
         fallback = "Unable to complete the screener profile."
         try:

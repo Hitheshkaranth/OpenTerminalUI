@@ -1,0 +1,53 @@
+{
+  "sizing_selection": {
+    "answer": "The model request failed; please try again.",
+    "raw_answer": "The model request failed; please try again.",
+    "tool_calls": [],
+    "actions_executed": [],
+    "latency_ms": 808.503,
+    "cost_usd": null,
+    "capture": {
+      "status": "provider_error",
+      "provider": "openrouter",
+      "requested_model": "google/gemma-4-26b-a4b-it:free",
+      "actual_models": [],
+      "actual_model_unreported_responses": 0,
+      "billing_complete": false,
+      "reported_response_cost_usd": null,
+      "output_protocol": "unstructured",
+      "errors": [
+        "LLMError: LLM HTTP 429: {\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-4-26b-a4b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own provider key to use your own limits: https://openrouter.a"
+      ],
+      "completions": [
+        {
+          "requested_model": "google/gemma-4-26b-a4b-it:free",
+          "responses": [],
+          "error": "LLMError: LLM HTTP 429: {\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-4-26b-a4b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own provider key to use your own limits: https://openrouter.a",
+          "phase": "tool_use",
+          "budget_interrupted": false
+        }
+      ],
+      "output_repair": {
+        "attempted": false,
+        "original_answer": null,
+        "repaired_answer": null,
+        "protocol_status": "not_needed"
+      },
+      "output_repair_enabled": true,
+      "termination_reason": null,
+      "budget_finalization": false,
+      "budget_warnings": [],
+      "finalization_reserve_seconds": 15.0,
+      "capture_protocol": "frozen_capture_v3",
+      "protocol_sha256": "d517d7681a662ea7a45894f811b53431f06659a7f413b8880798e0300efec813",
+      "reference_clock": "2026-11-16T10:00:00Z",
+      "fixture_sha256": "00d8502fceb2e23ed0bf6dabef367084cf7f697dcd76a52535de9bbcb3fe2a51",
+      "max_steps": 4,
+      "max_tokens": 2048,
+      "timeout_seconds": 60.0,
+      "network_scope": "model_inference_only",
+      "tool_source": "frozen_fixture",
+      "actions": "simulated_only"
+    }
+  }
+}

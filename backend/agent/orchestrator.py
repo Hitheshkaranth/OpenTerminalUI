@@ -21,6 +21,10 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = GENERALIST_SYSTEM_PROMPT
 
 
+class ToolPhaseBudgetExhausted(LLMError):
+    """A caller reserved the remaining inference budget for finalization."""
+
+
 class Orchestrator:
     def __init__(
         self,
@@ -29,11 +33,23 @@ class Orchestrator:
         registry: ToolRegistry,
         max_steps: int = 12,
         system_prompt: str = SYSTEM_PROMPT,
+        finalize_last_step: bool = False,
+        synthesize_after_tool_answer: bool = True,
+        stop_on_tool_stagnation: bool = False,
+        unavailable_tool_recovery_limit: int = 0,
     ) -> None:
         self.provider = provider
         self.registry = registry
         self.max_steps = max_steps
         self.system_prompt = system_prompt
+        self.finalize_last_step = finalize_last_step
+        self.synthesize_after_tool_answer = synthesize_after_tool_answer
+        self.stop_on_tool_stagnation = stop_on_tool_stagnation
+        if isinstance(unavailable_tool_recovery_limit, bool) or not isinstance(unavailable_tool_recovery_limit, int) or unavailable_tool_recovery_limit < 0:
+            raise ValueError("unavailable_tool_recovery_limit must be a nonnegative integer")
+        self.unavailable_tool_recovery_limit = unavailable_tool_recovery_limit
+        self.unavailable_tool_recoveries = 0
+        self.termination_reason: str | None = None
 
     @staticmethod
     def _context_directive(ctx: dict[str, Any]) -> str:
@@ -108,6 +124,25 @@ class Orchestrator:
         settings = get_settings()
         from backend.agent.run_context import active_market
 
+        historical_as_of = (screen_context or {}).get("historical_as_of")
+        if historical_as_of is None:
+            historical_as_of = getattr(self.registry, "historical_as_of", None)
+        if historical_as_of is not None:
+            from backend.agent.historical import validate_historical_as_of, historical_prompt
+            from backend.agent.tools.historical_tools import build_historical_registry
+            historical_as_of = validate_historical_as_of(historical_as_of)
+            bound = getattr(self.registry, "historical_as_of", None)
+            if bound is not None and historical_as_of != bound:
+                raise ValueError("Historical cutoff cannot override the server-bound registry")
+            # Direct orchestrator callers receive the same safe tool boundary
+            # as HTTP callers; a broad registry can never bypass historical mode.
+            self.registry = build_historical_registry(historical_as_of)
+            self.system_prompt = historical_prompt(historical_as_of)
+            history = None
+            memory_directive = None
+            screen_context = {key: value for key, value in (screen_context or {}).items() if key in {"symbol", "market"}}
+            screen_context["historical_as_of"] = historical_as_of
+
         active_market.set(str((screen_context or {}).get("market") or "").strip().upper() or None)
         intent = classify_intent(user_prompt)
         tool_models = select_chain(
@@ -122,7 +157,7 @@ class Orchestrator:
                 role="system",
                 content=self._context_directive(screen_context),
             ))
-        if self._looks_like_screening_task(user_prompt):
+        if historical_as_of is None and self._looks_like_screening_task(user_prompt):
             messages.append(LLMMessage(
                 role="system",
                 content=self._screening_directive(user_prompt, screen_context),
@@ -150,12 +185,24 @@ class Orchestrator:
 
         tool_defs = self.registry.tool_defs()
         tools_used = False
+        force_final_reason: str | None = None
+        seen_queries: set[str] = set()
+        self.termination_reason = None
+        self.unavailable_tool_recoveries = 0
         yield events.model(self._announced_model(tool_models), "tool_use")
         for _step in range(self.max_steps):
+            finalizing = bool(force_final_reason) or (self.finalize_last_step and _step == self.max_steps - 1)
+            if finalizing:
+                messages.append(LLMMessage(role="user", content=(
+                    "The tool phase is finished. No further tools, retries, or alternate market queries are available. "
+                    "Give your final answer now using only evidence already returned above. "
+                    "If evidence is missing, state that limitation and abstain from unsupported facts or quantities. "
+                    f"Keep the required output format and answer the original question: {user_prompt}"
+                )))
             try:
                 assistant: AssistantMessage | None = None
                 async for ev in complete_with_status(
-                    self.provider, messages, tools=tool_defs, models=tool_models,
+                    self.provider, messages, tools=None if finalizing else tool_defs, models=tool_models,
                     max_tokens=settings.agent_max_tokens,
                 ):
                     if ev["type"] == "result":
@@ -163,6 +210,10 @@ class Orchestrator:
                     else:
                         yield ev
                 assert assistant is not None
+            except ToolPhaseBudgetExhausted:
+                force_final_reason = "tool_phase_time_budget"
+                yield events.status("Tool inference budget reached; using the reserved finalization turn.")
+                continue
             except LLMError as exc:
                 yield events.error(str(exc))
                 yield events.final("The model request failed; please try again.")
@@ -173,9 +224,20 @@ class Orchestrator:
                 yield events.final("The model request failed unexpectedly; please try again.")
                 return
 
+            if finalizing and assistant.tool_calls:
+                # Preserve the model's attempted calls in the event record, but
+                # do not execute any handler after the boundary has closed.
+                for call in assistant.tool_calls:
+                    yield events.tool_call(call.id, call.name, call.arguments)
+                    yield events.tool_result(call.id, call.name, {"ok": False, "error": {
+                        "code": "tools_disabled", "message": "Finalization cannot execute further tools."}}, is_error=True)
+                self.termination_reason = "finalization_tool_calls_rejected"
+                break
+
             if not assistant.tool_calls:
                 original_answer = assistant.content or ""
-                if not tools_used:
+                if not tools_used or not self.synthesize_after_tool_answer or finalizing:
+                    self.termination_reason = (force_final_reason or "step_budget_finalization") if finalizing else "model_final"
                     yield events.final(original_answer)
                     return
                 # Don't feed the draft back: a conversation ending on the model's own finished answer
@@ -215,8 +277,22 @@ class Orchestrator:
                 tools_used = True
                 yield events.tool_call(call.id, call.name, call.arguments)
                 try:
-                    result = await self.registry.execute(call.name, call.arguments)
-                    is_error = tool_failed(result)
+                    query_key = json.dumps([call.name, call.arguments], sort_keys=True, allow_nan=False) if self.stop_on_tool_stagnation else ""
+                    if self.stop_on_tool_stagnation and (force_final_reason or query_key in seen_queries):
+                        force_final_reason = force_final_reason or "repeated_tool_query"
+                        result = {"ok": False, "error": {"code": "tool_phase_closed",
+                                  "message": "This query was already answered or frozen evidence is unavailable. Use existing evidence to finalize."}}
+                        is_error = True
+                    else:
+                        if self.stop_on_tool_stagnation:
+                            seen_queries.add(query_key)
+                        result = await self.registry.execute(call.name, call.arguments)
+                        is_error = tool_failed(result)
+                        if self.stop_on_tool_stagnation and isinstance(result, dict) and isinstance(result.get("error"), dict) and result["error"].get("code") == "frozen_evidence_unavailable":
+                            if self.unavailable_tool_recoveries < self.unavailable_tool_recovery_limit:
+                                self.unavailable_tool_recoveries += 1
+                            else:
+                                force_final_reason = "frozen_evidence_unavailable"
                 except Exception as exc:  # tool failures are fed back, not raised
                     logger.warning("Tool %s failed: %s", call.name, exc)
                     result = {"error": str(exc)}
@@ -232,6 +308,7 @@ class Orchestrator:
                     content=tool_context(result, reference=f"tool:{call.id}"),
                 ))
 
+        self.termination_reason = self.termination_reason or "step_budget_exhausted"
         yield events.final(
             "I reached the step budget for this run. Here is what I gathered so far; "
             "ask a follow-up to continue.")

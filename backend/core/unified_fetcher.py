@@ -179,10 +179,37 @@ class UnifiedFetcher:
         if exchange:
             start_date, end_date = _range_to_dates(range_str)
             try:
-                rows = await get_adapter_registry().invoke(exchange, "get_history", adapter_symbol, interval, start_date, end_date)
+                registry = get_adapter_registry()
+                provider_call = getattr(registry, "invoke_with_provider", None)
+                if callable(provider_call):
+                    rows, adapter, slot_name = await provider_call(exchange, "get_history", adapter_symbol, interval, start_date, end_date)
+                else:
+                    # A custom/legacy registry may omit identity. Its data can be
+                    # displayed, but must not acquire verified history quality.
+                    rows = await registry.invoke(exchange, "get_history", adapter_symbol, interval, start_date, end_date)
+                    adapter, slot_name = None, None
                 if isinstance(rows, list) and rows:
-                    # "_source" lets callers (the agent's grounding layer) cite which provider served the bars.
-                    return {**_chart_payload_from_rows(rows), "_source": f"adapter:{exchange}"}
+                    from backend.adapters.alpaca import AlpacaAdapter
+                    from backend.adapters.alpha_vantage import AlphaVantageAdapter
+                    from backend.adapters.crypto import CryptoDataAdapter
+                    from backend.adapters.kite import KiteAdapter
+                    from backend.adapters.mock import MockDataAdapter
+                    from backend.adapters.yahoo import YahooFinanceAdapter
+                    known = {
+                        AlpacaAdapter: ("alpaca", "live", "alpaca"),
+                        AlphaVantageAdapter: ("alpha_vantage", "delayed", "alpha_vantage"),
+                        YahooFinanceAdapter: ("yahoo", "delayed", "yahoo"),
+                        # These adapters' history implementations use Yahoo, even
+                        # when their quote endpoints use another provider.
+                        KiteAdapter: ("kite", "delayed", "yahoo"),
+                        CryptoDataAdapter: ("crypto", "delayed", "yahoo"),
+                    }
+                    name, quality, data_provider = known.get(type(adapter), ("unreported", "unreported", None))
+                    if isinstance(adapter, MockDataAdapter):
+                        name, quality, data_provider = "mock", "synthetic", "mock"
+                    return {**_chart_payload_from_rows(rows), "_source": f"adapter:{name}",
+                            "_adapter_name": name, "_quality": quality, "_data_provider": data_provider,
+                            "_adapter_slot": slot_name, "_adapter_exchange": exchange}
             except Exception as e:
                 logger.debug("Adapter history failed for %s via %s: %s", symbol, exchange, e)
 

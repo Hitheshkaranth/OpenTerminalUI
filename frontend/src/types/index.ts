@@ -61,6 +61,7 @@ export type StockSnapshot = {
   sector?: string;
   industry?: string;
   current_price?: number;
+  currency?: string;
   change_pct?: number;
   market_cap?: number;
   pe?: number;
@@ -505,6 +506,7 @@ export type PaperPortfolio = {
   name: string;
   initial_capital: number;
   current_cash: number;
+  base_currency?: string;
   is_active?: boolean;
   created_at?: string;
 };
@@ -522,7 +524,11 @@ export type PaperOrder = {
   fill_time?: string | null;
   slippage_bps?: number;
   commission?: number;
+  risk_rejection?: string | null;
+  base_currency?: string;
 };
+
+export type PaperOrderResult = Pick<PaperOrder, "id" | "symbol" | "status" | "fill_price" | "fill_time" | "risk_rejection" | "base_currency">;
 
 export type PaperTrade = {
   id: string;

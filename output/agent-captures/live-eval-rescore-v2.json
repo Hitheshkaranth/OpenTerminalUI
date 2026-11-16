@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "evaluation_protocol": "sizing_abstention_v2",
+  "cases": [
+    {
+      "id": "sizing_selection",
+      "passed": true,
+      "tool_requirements": 1,
+      "tools_correct": 1,
+      "tool_correctness": 1.0,
+      "claims_checked": 2,
+      "unsupported_claims": 0,
+      "unsupported_claim_rate": 0.0,
+      "contradicted_statements": 0,
+      "stale_sources": 0,
+      "staleness_disclosed": true,
+      "task_completed": true,
+      "forbidden_tools": [],
+      "unconfirmed_actions": 0,
+      "sizing_violations": [],
+      "capture_failed": false,
+      "latency_ms": 16813.311,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "sizing_zero_no_action",
+      "passed": true,
+      "tool_requirements": 1,
+      "tools_correct": 1,
+      "tool_correctness": 1.0,
+      "claims_checked": 3,
+      "unsupported_claims": 0,
+      "unsupported_claim_rate": 0.0,
+      "contradicted_statements": 0,
+      "stale_sources": 0,
+      "staleness_disclosed": true,
+      "task_completed": true,
+      "forbidden_tools": [],
+      "unconfirmed_actions": 0,
+      "sizing_violations": [],
+      "capture_failed": false,
+      "latency_ms": 25128.011,
+      "cost_usd": 0.0
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "passed": 2,
+    "task_completion_rate": 1.0,
+    "tool_correctness": 1.0,
+    "unsupported_claim_rate": 0.0,
+    "sizing_violations": 0,
+    "mean_latency_ms": 20970.661,
+    "measured_cost_usd": 0.0,
+    "latency_observation_count": 2,
+    "cost_observation_count": 2
+  },
+  "mode": "offline_rescore",
+  "source_observations": "output/agent-captures/roadmap-live/openrouter-nvidia_nemotron-3.5-lightning_free-3de55024.observations.json",
+  "source_sha256": "4becf5864a997b87a638d9efb3ac932dc1146000717d8dcca02a9bac639f37f4",
+  "model_inference_calls": 0,
+  "note": "Same original model output, graded under the corrected explicit-zero-abstention contract. Original capture and score are unchanged."
+}

@@ -1,0 +1,424 @@
+{
+  "sizing_selection": {
+    "answer": "Based on the available evidence, the system calculated a buy quantity of 10 shares of AAPL for portfolio paper-1 using a stop price of 90. The marked price for AAPL was 100 (delayed, as of 2026-11-16T09:00:00Z). The sizing tool determined 10 shares as the incremental long-buy allowance given the portfolio's cash, holdings, and risk limits relative to the stop price of 90 and the marked price of 100.",
+    "recommendations": [
+      {
+        "symbol": "AAPL",
+        "portfolio_id": "paper-1",
+        "quantity": 10
+      }
+    ],
+    "raw_answer": "{\n  \"answer\": \"Based on the available evidence, the system calculated a buy quantity of 10 shares of AAPL for portfolio paper-1 using a stop price of 90. The marked price for AAPL was 100 (delayed, as of 2026-11-16T09:00:00Z). The sizing tool determined 10 shares as the incremental long-buy allowance given the portfolio's cash, holdings, and risk limits relative to the stop price of 90 and the marked price of 100.\",\n  \"recommendations\": [\n    {\n      \"symbol\": \"AAPL\",\n      \"portfolio_id\": \"paper-1\",\n      \"quantity\": 10\n    }\n  ]\n}",
+    "tool_calls": [
+      {
+        "id": "call-f836c2c3-1385-4264-908c-eff883e001d0",
+        "name": "get_stock_snapshot",
+        "arguments": {
+          "ticker": "AAPL"
+        },
+        "result": {
+          "ok": false,
+          "error": {
+            "code": "frozen_evidence_unavailable",
+            "message": "No frozen evidence exists for this tool and these exact arguments."
+          }
+        },
+        "is_error": true
+      },
+      {
+        "id": "call-b3ca114d-bf17-49df-81f0-9bff2c898e53",
+        "name": "get_trade_size",
+        "arguments": {
+          "symbol": "AAPL",
+          "portfolio_id": "paper-1",
+          "stop_price": 90
+        },
+        "result": {
+          "ok": true,
+          "data": {
+            "symbol": "AAPL",
+            "portfolio_id": "paper-1",
+            "quantity": 10,
+            "marked_prices": {
+              "AAPL": 100
+            },
+            "price_provenance": {
+              "AAPL": {
+                "source": "fixture",
+                "quality": "delayed",
+                "as_of": "2026-11-16T09:00:00Z"
+              }
+            }
+          },
+          "provenance": {
+            "source": "sizing",
+            "quality": "delayed"
+          }
+        },
+        "is_error": false
+      },
+      {
+        "id": "call-479594a7-244b-4901-afe6-41aa514572ef",
+        "name": "propose_paper_order",
+        "arguments": {
+          "symbol": "AAPL",
+          "portfolio_id": "paper-1",
+          "side": "buy",
+          "quantity": 10,
+          "rationale": "Incremental long-buy allowance calculated from portfolio cash, holdings, and risk limits using stop price 90 and marked price 100.",
+          "stop_price": 90
+        },
+        "result": {
+          "ok": false,
+          "error": {
+            "code": "frozen_evidence_unavailable",
+            "message": "No frozen evidence exists for this tool and these exact arguments."
+          }
+        },
+        "is_error": true
+      }
+    ],
+    "actions_executed": [],
+    "latency_ms": 6565.133,
+    "cost_usd": 0.0,
+    "capture": {
+      "status": "completed",
+      "provider": "openrouter",
+      "requested_model": "nvidia/nemotron-3.5-lightning:free",
+      "actual_models": [
+        "nvidia/nemotron-3.5-lightning:free"
+      ],
+      "actual_model_unreported_responses": 0,
+      "billing_complete": true,
+      "reported_response_cost_usd": 0.0,
+      "output_protocol": "json",
+      "errors": [],
+      "completions": [
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "finish_reason": "tool_calls",
+              "raw_content": null,
+              "visible_content_present": false,
+              "reasoning_present": false,
+              "usage": {
+                "prompt_tokens": 1458,
+                "completion_tokens": 28,
+                "total_tokens": 1486,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "tool_use",
+          "budget_interrupted": false
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "finish_reason": "tool_calls",
+              "raw_content": null,
+              "visible_content_present": false,
+              "reasoning_present": false,
+              "usage": {
+                "prompt_tokens": 1539,
+                "completion_tokens": 53,
+                "total_tokens": 1592,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "tool_use",
+          "budget_interrupted": false
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "finish_reason": "tool_calls",
+              "raw_content": null,
+              "visible_content_present": false,
+              "reasoning_present": false,
+              "usage": {
+                "prompt_tokens": 1727,
+                "completion_tokens": 115,
+                "total_tokens": 1842,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "tool_use",
+          "budget_interrupted": false
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "finish_reason": "stop",
+              "raw_content": "{\n  \"answer\": \"Based on the available evidence, the system calculated a buy quantity of 10 shares of AAPL for portfolio paper-1 using a stop price of 90. The marked price for AAPL was 100 (delayed, as of 2026-11-16T09:00:00Z). The sizing tool determined 10 shares as the incremental long-buy allowance given the portfolio's cash, holdings, and risk limits relative to the stop price of 90 and the marked price of 100.\",\n  \"recommendations\": [\n    {\n      \"symbol\": \"AAPL\",\n      \"portfolio_id\": \"paper-1\",\n      \"quantity\": 10\n    }\n  ]\n}",
+              "visible_content_present": true,
+              "reasoning_present": false,
+              "usage": {
+                "prompt_tokens": 1174,
+                "completion_tokens": 169,
+                "total_tokens": 1343,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "finalization",
+          "budget_interrupted": false
+        }
+      ],
+      "output_repair": {
+        "attempted": false,
+        "original_answer": null,
+        "repaired_answer": null,
+        "protocol_status": "not_needed"
+      },
+      "output_repair_enabled": true,
+      "termination_reason": "frozen_evidence_unavailable",
+      "budget_finalization": true,
+      "unavailable_tool_recoveries": 1,
+      "budget_warnings": [
+        "The tool phase ended at its budget/evidence boundary; the actual model finalized using only already-observed evidence."
+      ],
+      "finalization_reserve_seconds": 15.0,
+      "capture_protocol": "frozen_capture_v5",
+      "protocol_sha256": "38105c7a7ed075ed5cc7e1edbf73339600a36eed02582e31c9a67e771b83cb70",
+      "reference_clock": "2026-11-16T10:00:00Z",
+      "fixture_sha256": "00d8502fceb2e23ed0bf6dabef367084cf7f697dcd76a52535de9bbcb3fe2a51",
+      "max_steps": 4,
+      "max_tokens": 2048,
+      "timeout_seconds": 60.0,
+      "network_scope": "model_inference_only",
+      "tool_source": "frozen_fixture",
+      "actions": "simulated_only"
+    }
+  },
+  "sizing_zero_no_action": {
+    "answer": "The trade size tool returned a quantity of 0 shares for a stop price of 90, indicating that no additional AAPL shares can be purchased within the portfolio's current risk and position limits at that stop price. The marked price for AAPL is 100 (delayed fixture as of 2026-11-16T09:00:00Z).",
+    "recommendations": [],
+    "raw_answer": "{\n  \"answer\": \"The trade size tool returned a quantity of 0 shares for a stop price of 90, indicating that no additional AAPL shares can be purchased within the portfolio's current risk and position limits at that stop price. The marked price for AAPL is 100 (delayed fixture as of 2026-11-16T09:00:00Z).\",\n  \"recommendations\": []\n}",
+    "tool_calls": [
+      {
+        "id": "call-f0b4d9b0-ebed-473f-8122-cada43319c86",
+        "name": "get_stock_snapshot",
+        "arguments": {
+          "ticker": "AAPL"
+        },
+        "result": {
+          "ok": false,
+          "error": {
+            "code": "frozen_evidence_unavailable",
+            "message": "No frozen evidence exists for this tool and these exact arguments."
+          }
+        },
+        "is_error": true
+      },
+      {
+        "id": "call-dfecf95e-58ef-4795-82a6-9d3da56f181a",
+        "name": "get_trade_size",
+        "arguments": {
+          "symbol": "AAPL",
+          "portfolio_id": "paper-1",
+          "stop_price": 90
+        },
+        "result": {
+          "ok": true,
+          "data": {
+            "symbol": "AAPL",
+            "portfolio_id": "paper-1",
+            "quantity": 0,
+            "marked_prices": {
+              "AAPL": 100
+            },
+            "price_provenance": {
+              "AAPL": {
+                "source": "fixture",
+                "quality": "delayed",
+                "as_of": "2026-11-16T09:00:00Z"
+              }
+            }
+          },
+          "provenance": {
+            "source": "sizing",
+            "quality": "delayed"
+          }
+        },
+        "is_error": false
+      },
+      {
+        "id": "call-8c23b468-4cd2-4696-8136-54c0faccb11c",
+        "name": "propose_paper_order",
+        "arguments": {
+          "symbol": "AAPL",
+          "portfolio_id": "paper-1",
+          "side": "buy",
+          "quantity": 0,
+          "rationale": "Trade size calculation returned zero additional shares fitting the portfolio's risk and position limits at a stop price of 90.",
+          "stop_price": 90
+        },
+        "result": {
+          "ok": false,
+          "error": {
+            "code": "frozen_evidence_unavailable",
+            "message": "No frozen evidence exists for this tool and these exact arguments."
+          }
+        },
+        "is_error": true
+      }
+    ],
+    "actions_executed": [],
+    "latency_ms": 6033.387,
+    "cost_usd": 0.0,
+    "capture": {
+      "status": "completed",
+      "provider": "openrouter",
+      "requested_model": "nvidia/nemotron-3.5-lightning:free",
+      "actual_models": [
+        "nvidia/nemotron-3.5-lightning:free"
+      ],
+      "actual_model_unreported_responses": 0,
+      "billing_complete": true,
+      "reported_response_cost_usd": 0.0,
+      "output_protocol": "json",
+      "errors": [],
+      "completions": [
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "finish_reason": "tool_calls",
+              "raw_content": null,
+              "visible_content_present": false,
+              "reasoning_present": false,
+              "usage": {
+                "prompt_tokens": 1458,
+                "completion_tokens": 28,
+                "total_tokens": 1486,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "tool_use",
+          "budget_interrupted": false
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "finish_reason": "tool_calls",
+              "raw_content": null,
+              "visible_content_present": false,
+              "reasoning_present": false,
+              "usage": {
+                "prompt_tokens": 1539,
+                "completion_tokens": 53,
+                "total_tokens": 1592,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "tool_use",
+          "budget_interrupted": false
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "finish_reason": "tool_calls",
+              "raw_content": null,
+              "visible_content_present": false,
+              "reasoning_present": false,
+              "usage": {
+                "prompt_tokens": 1726,
+                "completion_tokens": 108,
+                "total_tokens": 1834,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "tool_use",
+          "budget_interrupted": false
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "finish_reason": "stop",
+              "raw_content": "{\n  \"answer\": \"The trade size tool returned a quantity of 0 shares for a stop price of 90, indicating that no additional AAPL shares can be purchased within the portfolio's current risk and position limits at that stop price. The marked price for AAPL is 100 (delayed fixture as of 2026-11-16T09:00:00Z).\",\n  \"recommendations\": []\n}",
+              "visible_content_present": true,
+              "reasoning_present": false,
+              "usage": {
+                "prompt_tokens": 1166,
+                "completion_tokens": 101,
+                "total_tokens": 1267,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "finalization",
+          "budget_interrupted": false
+        }
+      ],
+      "output_repair": {
+        "attempted": false,
+        "original_answer": null,
+        "repaired_answer": null,
+        "protocol_status": "not_needed"
+      },
+      "output_repair_enabled": true,
+      "termination_reason": "frozen_evidence_unavailable",
+      "budget_finalization": true,
+      "unavailable_tool_recoveries": 1,
+      "budget_warnings": [
+        "The tool phase ended at its budget/evidence boundary; the actual model finalized using only already-observed evidence."
+      ],
+      "finalization_reserve_seconds": 15.0,
+      "capture_protocol": "frozen_capture_v5",
+      "protocol_sha256": "38105c7a7ed075ed5cc7e1edbf73339600a36eed02582e31c9a67e771b83cb70",
+      "reference_clock": "2026-11-16T10:00:00Z",
+      "fixture_sha256": "36e40e635d414191e1edb10790c959ebe059cda391e07fa71d4f1b38524d5790",
+      "max_steps": 4,
+      "max_tokens": 2048,
+      "timeout_seconds": 60.0,
+      "network_scope": "model_inference_only",
+      "tool_source": "frozen_fixture",
+      "actions": "simulated_only"
+    }
+  }
+}

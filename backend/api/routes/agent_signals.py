@@ -27,7 +27,7 @@ def get_signals(
 
 @router.post("/signals/evaluate")
 async def post_evaluate_signals(
-    horizon_days: int = Query(10, ge=1),
+    horizon_days: int = Query(10, ge=1, le=365),
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_user),
 ) -> dict[str, Any]:

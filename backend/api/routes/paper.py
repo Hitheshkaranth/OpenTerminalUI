@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
 from backend.api.deps import get_db
@@ -22,20 +22,31 @@ router = APIRouter()
 
 
 class PortfolioCreateRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
     name: str = "Paper Portfolio"
     initial_capital: float = Field(gt=0)
+    base_currency: str = "INR"
 
 
 class OrderCreateRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
     portfolio_id: str
     symbol: str
     side: str
     order_type: str = "market"
     quantity: float = Field(gt=0)
-    limit_price: float | None = None
-    sl_price: float | None = None
-    slippage_bps: float = 5.0
-    commission: float = 0.0
+    limit_price: float | None = Field(default=None, gt=0)
+    sl_price: float | None = Field(default=None, gt=0)
+    slippage_bps: float = Field(default=5.0, ge=0, le=1000)
+    commission: float = Field(default=0.0, ge=0)
+    stop_price: float | None = Field(default=None, gt=0)
+
+    @field_validator("quantity", "limit_price", "sl_price", "slippage_bps", "commission", "stop_price", mode="before")
+    @classmethod
+    def reject_boolean_amount(cls, value):
+        if isinstance(value, bool):
+            raise ValueError("Order amounts must be numeric, not boolean")
+        return value
 
 
 class DeployStrategyRequest(BaseModel):
@@ -60,9 +71,15 @@ def create_virtual_portfolio(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
+    from backend.paper_trading.currency import validate_currency
+    try:
+        validate_currency(payload.base_currency)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     row = VirtualPortfolio(
         user_id=current_user.id,
         name=payload.name.strip() or "Paper Portfolio",
+        base_currency=payload.base_currency,
         initial_capital=float(payload.initial_capital),
         current_cash=float(payload.initial_capital),
         is_active=True,
@@ -70,7 +87,7 @@ def create_virtual_portfolio(
     db.add(row)
     db.commit()
     db.refresh(row)
-    return {"id": row.id, "name": row.name, "initial_capital": row.initial_capital, "current_cash": row.current_cash}
+    return {"id": row.id, "name": row.name, "base_currency": row.base_currency, "initial_capital": row.initial_capital, "current_cash": row.current_cash}
 
 
 @router.get("/paper/portfolios")
@@ -89,6 +106,7 @@ def list_virtual_portfolios(
             {
                 "id": row.id,
                 "name": row.name,
+                "base_currency": row.base_currency,
                 "initial_capital": row.initial_capital,
                 "current_cash": row.current_cash,
                 "is_active": row.is_active,
@@ -105,16 +123,25 @@ async def place_virtual_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    _portfolio_for_user(db, payload.portfolio_id, current_user.id)
+    portfolio = _portfolio_for_user(db, payload.portfolio_id, current_user.id)
     side = payload.side.strip().lower()
     if side not in {"buy", "sell"}:
         raise HTTPException(status_code=400, detail="side must be buy or sell")
     order_type = payload.order_type.strip().lower()
     if order_type not in {"market", "limit", "sl"}:
         raise HTTPException(status_code=400, detail="order_type must be market/limit/sl")
+    if (order_type == "limit" and payload.limit_price is None) or (order_type == "sl" and payload.sl_price is None):
+        raise HTTPException(status_code=422, detail="The selected order type requires its positive trigger price")
     symbol = payload.symbol.strip().upper()
+    if not symbol or len(symbol) > 64:
+        raise HTTPException(status_code=422, detail="A symbol of one to 64 characters is required")
     if ":" not in symbol:
         symbol = f"NSE:{symbol}"
+    from backend.paper_trading.currency import quote_currency
+    try:
+        quote_currency(symbol, {}, portfolio.base_currency)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     row = VirtualOrder(
         portfolio_id=payload.portfolio_id,
         symbol=symbol,
@@ -127,6 +154,16 @@ async def place_virtual_order(
         slippage_bps=float(payload.slippage_bps),
         commission=float(payload.commission),
     )
+    from backend.agent.trade_preflight import build_preflight, get_risk_policy
+    if get_risk_policy(db, current_user.id)["enabled"]:
+        order_payload = payload.model_dump()
+        order_payload.update(symbol=symbol, side=side, order_type=order_type)
+        try:
+            preflight = await build_preflight(db, current_user.id, order_payload)
+        except (ValueError, TypeError, OverflowError) as exc:
+            db.rollback()
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        row.signal_metadata = {"risk_order": order_payload, "preflight": preflight, "paper_only": True}
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -139,7 +176,24 @@ async def place_virtual_order(
         "symbol": row.symbol,
         "fill_price": row.fill_price,
         "fill_time": row.fill_time.isoformat() if row.fill_time else None,
+        "risk_rejection": (row.signal_metadata or {}).get("risk_rejection"),
+        "base_currency": db.get(VirtualPortfolio, row.portfolio_id).base_currency,
     }
+
+
+@router.delete("/paper/orders/{order_id}")
+def cancel_virtual_order(order_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict:
+    from sqlalchemy import update
+    row = db.query(VirtualOrder).join(VirtualPortfolio).filter(
+        VirtualOrder.id == order_id, VirtualPortfolio.user_id == current_user.id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+    claimed = db.execute(update(VirtualOrder).where(VirtualOrder.id == order_id,
+                VirtualOrder.status == "pending").values(status="cancelled")).rowcount
+    if not claimed:
+        raise HTTPException(status_code=409, detail="Only pending orders can be cancelled")
+    db.commit()
+    return {"id": order_id, "status": "cancelled"}
 
 
 @router.get("/paper/portfolios/{portfolio_id}/positions")
@@ -150,10 +204,10 @@ def get_positions(
 ) -> dict[str, Any]:
     _portfolio_for_user(db, portfolio_id, current_user.id)
     rows = db.query(VirtualPosition).filter(VirtualPosition.portfolio_id == portfolio_id).all()
-    mark_map = get_paper_engine()._mark_prices
+    portfolio = _portfolio_for_user(db, portfolio_id, current_user.id)
     items = []
     for row in rows:
-        mark = mark_map.get(row.symbol, row.avg_entry_price)
+        mark = get_paper_engine().mark_in_base(portfolio, row)
         unrealized = (mark - row.avg_entry_price) * row.quantity
         items.append(
             {
@@ -162,6 +216,7 @@ def get_positions(
                 "quantity": row.quantity,
                 "avg_entry_price": row.avg_entry_price,
                 "mark_price": mark,
+                "base_currency": portfolio.base_currency,
                 "unrealized_pnl": unrealized,
             }
         )
@@ -174,7 +229,7 @@ def get_orders(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    _portfolio_for_user(db, portfolio_id, current_user.id)
+    portfolio = _portfolio_for_user(db, portfolio_id, current_user.id)
     rows = (
         db.query(VirtualOrder)
         .filter(VirtualOrder.portfolio_id == portfolio_id)
@@ -196,6 +251,8 @@ def get_orders(
                 "fill_time": row.fill_time.isoformat() if row.fill_time else None,
                 "slippage_bps": row.slippage_bps,
                 "commission": row.commission,
+                "risk_rejection": (row.signal_metadata or {}).get("risk_rejection"),
+                "base_currency": portfolio.base_currency,
             }
             for row in rows
         ]

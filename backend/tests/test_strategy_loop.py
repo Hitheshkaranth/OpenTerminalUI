@@ -45,7 +45,7 @@ class FixtureRegistry:
 async def test_strategy_loop_is_bounded_validates_and_reports_non_significance():
     registry = FixtureRegistry()
     events = [event async for event in StrategyLoopOrchestrator(
-        provider=ScriptedProvider(), registry=registry, max_rounds=2,
+        provider=ScriptedProvider(), registry=registry, max_rounds=2, holdout_loader=None,
     ).run("AAPL")]
 
     finals = [event for event in events if event["type"] == "final"]
@@ -60,7 +60,7 @@ async def test_strategy_loop_is_bounded_validates_and_reports_non_significance()
 @pytest.mark.asyncio
 async def test_strategy_loop_never_raises_when_provider_fails_mid_loop():
     events = [event async for event in StrategyLoopOrchestrator(
-        provider=ScriptedProvider(fail_after=2), registry=FixtureRegistry(), max_rounds=3,
+        provider=ScriptedProvider(fail_after=2), registry=FixtureRegistry(), max_rounds=3, holdout_loader=None,
     ).run("AAPL")]
 
     assert len([event for event in events if event["type"] == "final"]) == 1

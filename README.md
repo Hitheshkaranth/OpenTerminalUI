@@ -124,7 +124,9 @@ Tijori-style company research, blended into the Security Hub: operating KPIs ext
 
 ### AI research agent
 
-A slide-over console (`Ctrl+J`) that researches on demand. It picks tools, fetches data, and writes the answer from the results, rendering snapshots and tables as cards. Modes include **multi-agent debate** (analyst team → bull vs bear → portfolio-manager decision), **Strategy Lab** (propose → backtest → iterate → out-of-sample validation), **screen membership** and **ensemble** analysis. The same tool registry is exposed as an authenticated **MCP server** for Claude Code, Claude Desktop and other MCP clients.
+A slide-over console (`Ctrl+J`) that researches on demand. It picks tools, fetches data, and writes the answer from the results, rendering snapshots and tables as cards. Modes include **multi-agent debate** (analyst team → bull vs bear → portfolio-manager decision), **Strategy Lab** (train → tune → test a frozen SMA winner on a chronological holdout), **screen membership** and **ensemble** analysis. The same tool registry is exposed as an authenticated **MCP server** for Claude Code, Claude Desktop and other MCP clients.
+
+The agent can estimate incremental long paper-trade sizes using marked portfolio equity, a user-specified stop, available cash and concentration limits. Enable **Paper risk limits** in the console to enforce saved limits for agent and manual paper orders, delayed fills and atomic rebalances, with dated FX conversion into each paper book's base currency. Agent actions still require confirmation. Strategy Lab reports chronological holdout and expanding walk-forward results with persistent repeated-test accounting. Historical research threads restrict tools to cutoff-eligible filings, verified news and released fundamentals; ensemble outcomes settle at their stated horizon. See the [roadmap implementation, model captures and limitations](docs/agent-roadmap-implementation.md) and [competitive comparison](docs/agent-competitive-analysis.md).
 
 <img src="assets/readme/agent.jpg" alt="AI agent comparing MSFT and GOOGL using live tool calls" width="100%" />
 

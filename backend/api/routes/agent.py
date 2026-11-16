@@ -109,6 +109,14 @@ async def create_run(payload: Dict[str, Any], user=Depends(get_current_user), db
     }
     if not isinstance(spec["context"], dict):
         raise HTTPException(status_code=422, detail="context must be an object")
+    from backend.agent.historical import historical_context, validate_historical_mode
+    try:
+        if spec.get("ticker") and not spec["context"].get("symbol"):
+            spec["context"]["symbol"] = spec["ticker"]
+        spec["context"] = historical_context(db, user_id or "", thread_id, spec["context"], payload.get("historical_as_of"))
+        validate_historical_mode(mode, spec["context"])
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     if spec["context"].get("dossier_id"):
         from backend.research_dossiers import service as dossier_service
         dossier = dossier_service.owned(db, user_id, str(spec["context"]["dossier_id"]))
@@ -297,7 +305,16 @@ async def _generate_run(run_id: str, spec: dict):
     user_id = spec.get("user_id") or ""
 
     run_kwargs: Dict[str, Any] = {}
-    if spec["mode"] == "ensemble":
+    from backend.agent.historical import validate_historical_mode, historical_prompt
+    validate_historical_mode(spec["mode"], spec.get("context") or {})
+    historical_as_of = (spec.get("context") or {}).get("historical_as_of")
+    if historical_as_of is not None:
+        from backend.agent.tools.historical_tools import build_historical_registry
+        orchestrator = Orchestrator(provider=provider, registry=build_historical_registry(historical_as_of),
+            max_steps=settings.agent_deep_max_steps if spec["mode"] == "deep" else settings.agent_max_steps,
+            system_prompt=historical_prompt(historical_as_of))
+        run_args = (spec["prompt"],)
+    elif spec["mode"] == "ensemble":
         from backend.agent.ensemble import EnsembleOrchestrator
         try:
             orchestrator = EnsembleOrchestrator(
@@ -333,16 +350,13 @@ async def _generate_run(run_id: str, spec: dict):
         if not settings.agent_strategy_loop_enabled:
             raise HTTPException(status_code=403, detail="strategy mode disabled")
         subject = (spec.get("ticker") or spec["prompt"]).strip()
-        try:
-            registry = build_default_registry(user_id=user_id)
-        except TypeError:
-            registry = build_default_registry()
-        for ms in memory_service.memory_tool_specs(user_id):
-            registry.register(ms)
+        registry = build_strategy_registry()
         orchestrator = StrategyLoopOrchestrator(
             provider=provider,
             registry=registry,
             max_rounds=settings.agent_strategy_loop_max_rounds,
+            user_id=user_id,
+            run_id=run_id,
         )
         run_args = (subject,)
     elif spec["mode"] == "screener":
@@ -399,7 +413,7 @@ async def _generate_run(run_id: str, spec: dict):
         stream = ground_stream(
             orchestrator.run(*run_args, screen_context=spec["context"], **run_kwargs),
             prompt=spec.get("prompt"),
-            repair=_repairer(provider, settings) if spec["mode"] in _MODEL_WRITTEN_FINALS else None,
+            repair=_repairer(provider, settings) if spec["mode"] in _MODEL_WRITTEN_FINALS and historical_as_of is None else None,
         )
         async for event in stream:
             if event.get("type") == "final":
@@ -459,6 +473,11 @@ def get_thread(thread_id: str, user=Depends(get_current_user), db: Session = Dep
     result = memory_service.get_thread(db, getattr(user, "id", ""), thread_id)
     if result is None:
         raise HTTPException(status_code=404, detail="thread not found")
+    from backend.agent.historical import historical_context
+    try:
+        result["context"] = historical_context(db, getattr(user, "id", ""), thread_id, {})
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return result
 
 
@@ -503,6 +522,15 @@ def delete_note(note_id: str, user=Depends(get_current_user), db: Session = Depe
     if not deleted:
         raise HTTPException(status_code=404, detail="note not found")
     return {"status": "deleted"}
+
+
+@router.get("/strategy-experiments")
+def list_strategy_experiments(
+    limit: int = Query(50, ge=1, le=200),
+    user=Depends(get_current_user),
+) -> Dict[str, Any]:
+    from backend.agent.strategy_loop.experiments import StrategyExperimentLog
+    return {"events": StrategyExperimentLog(session_factory=SessionLocal).list_events(getattr(user, "id", ""), limit=limit)}
 
 
 # --- Reflections ---

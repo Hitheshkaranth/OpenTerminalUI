@@ -33,10 +33,23 @@ def init_db() -> None:
 
     Base.metadata.create_all(bind=engine)
     _ensure_news_sentiment_columns()
+    _ensure_news_availability_columns()
     _ensure_backtest_columns()
     _ensure_fundamentals_pit_columns()
     _ensure_alerts_columns()
     _ensure_agent_run_columns()
+    _ensure_paper_currency_column()
+
+
+def _ensure_paper_currency_column() -> None:
+    inspector = inspect(engine)
+    if not inspector.has_table("virtual_portfolios"):
+        return
+    existing = {column["name"] for column in inspector.get_columns("virtual_portfolios")}
+    if "base_currency" not in existing:
+        with engine.begin() as conn:
+            # Legacy paper orders defaulted to NSE symbols and INR cash.
+            conn.execute(text("ALTER TABLE virtual_portfolios ADD COLUMN base_currency VARCHAR(3) NOT NULL DEFAULT 'INR'"))
 
 
 def _ensure_agent_run_columns() -> None:
@@ -50,6 +63,18 @@ def _ensure_agent_run_columns() -> None:
         if "finished_at" not in existing:
             # TIMESTAMP is accepted by both SQLite and PostgreSQL.
             conn.execute(text("ALTER TABLE agent_runs ADD COLUMN finished_at TIMESTAMP"))
+
+
+def _ensure_news_availability_columns() -> None:
+    inspector = inspect(engine)
+    if not inspector.has_table("news_articles"):
+        return
+    existing = {str(column["name"]) for column in inspector.get_columns("news_articles")}
+    with engine.begin() as conn:
+        for name, ddl in {"source_published_at": "VARCHAR(40)",
+                          "publication_verified": "BOOLEAN DEFAULT FALSE", "publication_source": "VARCHAR(32)"}.items():
+            if name not in existing:
+                conn.execute(text(f"ALTER TABLE news_articles ADD COLUMN {name} {ddl}"))
 
 
 def _ensure_news_sentiment_columns() -> None:

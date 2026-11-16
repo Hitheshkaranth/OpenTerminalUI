@@ -447,6 +447,34 @@ async def test_propose_paper_order_invalid_quantity(monkeypatch_session_local, t
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("quantity", [True, False, float("nan"), float("inf"), -float("inf"), 0, -1, "10", pytest.param(10**1000, id="oversized-int")])
+async def test_paper_order_rejects_invalid_quantity_before_writing(monkeypatch_session_local, test_user_id, quantity):
+    from backend.agent.proposals import proposal_tool_specs
+
+    handler = {s.name: s for s in proposal_tool_specs(test_user_id)}["propose_paper_order"].handler
+    result = await handler({"symbol": "NSE:TCS", "side": "buy", "quantity": quantity})
+    assert "quantity" in result["error"]
+    monkeypatch_session_local.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("overrides", [
+    {"symbol": " "}, {"symbol": None}, {"symbol": True}, {"symbol": {}}, {"symbol": "X" * 65}, {"order_type": "unknown"},
+    {"order_type": "limit"}, {"order_type": "sl"},
+    {"limit_price": float("nan")}, {"sl_price": float("inf")},
+    {"limit_price": 0}, {"sl_price": -1}, {"slippage_bps": True},
+    {"commission": -1}, {"commission": "10"}, {"slippage_bps": float("inf")},
+])
+async def test_paper_order_rejects_invalid_execution_fields_before_writing(monkeypatch_session_local, test_user_id, overrides):
+    from backend.agent.proposals import proposal_tool_specs
+
+    handler = {s.name: s for s in proposal_tool_specs(test_user_id)}["propose_paper_order"].handler
+    result = await handler({"symbol": "NSE:TCS", "side": "buy", "quantity": 10, **overrides})
+    assert "error" in result
+    monkeypatch_session_local.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_propose_alert_tool(monkeypatch_session_local, test_user_id):
     from backend.agent.proposals import proposal_tool_specs
 

@@ -3,9 +3,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
+from email.utils import parsedate_to_datetime
+from zoneinfo import ZoneInfo
 
 from backend.api.deps import get_unified_fetcher
 from backend.shared.db import SessionLocal
@@ -21,8 +24,11 @@ def _now_iso() -> str:
 
 def _to_iso(raw: Any) -> str:
     if isinstance(raw, (int, float)):
-        if raw > 0:
-            return datetime.fromtimestamp(raw, tz=timezone.utc).isoformat()
+        if not isinstance(raw, bool) and math.isfinite(raw) and raw > 0:
+            try:
+                return datetime.fromtimestamp(raw, tz=timezone.utc).isoformat()
+            except (ValueError, OverflowError, OSError):
+                return _now_iso()
     if isinstance(raw, str):
         text = raw.strip()
         if not text:
@@ -32,6 +38,39 @@ def _to_iso(raw: Any) -> str:
         except Exception:
             return _now_iso()
     return _now_iso()
+
+
+def _source_publication(raw: Any, provider: str) -> str | None:
+    """Parse source metadata without ever substituting ingestion time."""
+    try:
+        if isinstance(raw, bool):
+            return None
+        if isinstance(raw, (int, float)):
+            if not math.isfinite(raw) or raw <= 0:
+                return None
+            stamp = datetime.fromtimestamp(raw, tz=timezone.utc)
+        elif isinstance(raw, str) and raw.strip():
+            text = raw.strip()
+            if len(text) == 10:
+                # A source date without time is available conservatively at its
+                # source-local day end, not an invented midnight publication.
+                from datetime import time
+                zone = ZoneInfo("America/New_York")
+                stamp = datetime.combine(date.fromisoformat(text), time.max, tzinfo=zone)
+            else:
+                try:
+                    stamp = datetime.fromisoformat(text.replace("Z", "+00:00"))
+                except ValueError:
+                    stamp = parsedate_to_datetime(text)
+                if stamp.tzinfo is None:
+                    if provider != "fmp":
+                        return None
+                    stamp = stamp.replace(tzinfo=ZoneInfo("America/New_York"))
+        else:
+            return None
+        return stamp.astimezone(timezone.utc).isoformat()
+    except (ValueError, TypeError, OverflowError, OSError):
+        return None
 
 
 def _normalize_tickers(raw: Any) -> list[str]:
@@ -69,6 +108,9 @@ class NormalizedNews:
     sentiment_score: float = 0.0
     sentiment_label: str = "Neutral"
     sentiment_confidence: float = 0.0
+    source_published_at: str | None = None
+    publication_verified: bool = False
+    publication_source: str | None = None
 
 
 def normalize_news_record(row: dict[str, Any], provider: str) -> NormalizedNews | None:
@@ -89,6 +131,9 @@ def normalize_news_record(row: dict[str, Any], provider: str) -> NormalizedNews 
             published_at=_to_iso(row.get("datetime")),
             tickers=_normalize_tickers(row.get("related")),
         )
+        payload.source_published_at = _source_publication(row.get("datetime"), "finnhub")
+        payload.publication_verified = payload.source_published_at is not None
+        payload.publication_source = "finnhub" if payload.publication_verified else None
         _attach_sentiment(payload)
         return payload
 
@@ -106,6 +151,9 @@ def normalize_news_record(row: dict[str, Any], provider: str) -> NormalizedNews 
             published_at=_to_iso(row.get("publishedDate") or row.get("publishedAt")),
             tickers=_normalize_tickers(row.get("symbol") or row.get("ticker")),
         )
+        payload.source_published_at = _source_publication(row.get("publishedDate") or row.get("publishedAt"), "fmp")
+        payload.publication_verified = payload.source_published_at is not None
+        payload.publication_source = "fmp" if payload.publication_verified else None
         _attach_sentiment(payload)
         return payload
     return None
@@ -228,6 +276,9 @@ class NewsIngestor:
                         sentiment_label=str(sentiment.get("label", "Neutral")),
                         sentiment_confidence=float(sentiment.get("confidence", 0.0)),
                     )
+                    item.source_published_at = _source_publication(row.get("providerPublishTime") or row.get("pubDate"), "yahoo")
+                    item.publication_verified = item.source_published_at is not None
+                    item.publication_source = "yahoo" if item.publication_verified else None
                     out.append(item)
             except Exception as e:
                 logger.warning("Yahoo ingest failed for %s: %s", ticker, e)
@@ -278,13 +329,22 @@ class NewsIngestor:
         db = SessionLocal()
         try:
             urls = [i.url for i in items if i.url]
-            existing = {
-                str(row[0]) for row in db.query(NewsArticle.url).filter(NewsArticle.url.in_(urls)).all() if row and row[0]
-            }
+            existing = {row.url: row for row in db.query(NewsArticle).filter(NewsArticle.url.in_(urls)).all()}
             inserted = 0
             now_iso = _now_iso()
             for item in items:
-                if not item.url or item.url in existing:
+                if not item.url:
+                    continue
+                if item.url in existing:
+                    row = existing[item.url]
+                    if item.publication_verified and not row.publication_verified:
+                        # Reingestion must preserve the corresponding source
+                        # payload; never bless an old ingestion-time fallback.
+                        row.source_published_at = item.source_published_at
+                        row.publication_verified = True
+                        row.publication_source = item.publication_source
+                        row.title = item.title[:1024]
+                        row.summary = item.summary[:4096]
                     continue
                 db.add(
                     NewsArticle(
@@ -294,6 +354,9 @@ class NewsIngestor:
                         summary=item.summary[:4096],
                         image_url=item.image_url[:2048],
                         published_at=item.published_at,
+                        source_published_at=item.source_published_at,
+                        publication_verified=item.publication_verified,
+                        publication_source=item.publication_source,
                         tickers=json.dumps(item.tickers),
                         sentiment_score=item.sentiment_score,
                         sentiment_label=item.sentiment_label[:16],
@@ -302,8 +365,7 @@ class NewsIngestor:
                     )
                 )
                 inserted += 1
-            if inserted:
-                db.commit()
+            db.commit()
             return inserted
         except Exception:
             logger.exception("News store failed for %d items", len(items))

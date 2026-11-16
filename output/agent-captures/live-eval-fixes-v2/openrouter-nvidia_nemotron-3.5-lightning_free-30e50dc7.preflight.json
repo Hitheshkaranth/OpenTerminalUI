@@ -1,0 +1,40 @@
+{
+  "ready": false,
+  "status": "free_constraint_unverified",
+  "requested_model": "nvidia/nemotron-3.5-lightning:free",
+  "selected_model": null,
+  "available_free_models": [],
+  "advertised_tools": null,
+  "capabilities": {
+    "tool_calling": null,
+    "json_output": null
+  },
+  "errors": [
+    "The selected free model lacks verified zero text/request pricing; no inference was sent."
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "endpoint": "/key",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "/models",
+      "status": 200
+    }
+  ],
+  "inference_requests": 0,
+  "probe_billing": {
+    "cost_usd": null,
+    "billing_complete": false
+  },
+  "metadata": {
+    "checked_at": "2026-11-16T11:24:23.252265+00:00",
+    "catalog_source": "configured_provider_models_endpoint",
+    "no_paid_fallback": true,
+    "probe_requested": false,
+    "latency_ms": 1396.191
+  },
+  "resolution": null
+}

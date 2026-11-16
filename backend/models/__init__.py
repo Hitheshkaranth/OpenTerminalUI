@@ -70,6 +70,8 @@ from backend.models.journal import JournalEntry
 from backend.models.agent_memory import AgentMessage, AgentNote, AgentRun, AgentThread  # noqa: F401
 from backend.models.agent_proposals import AgentProposal  # noqa: F401
 from backend.models.agent_signals import AgentSignal  # noqa: F401
+from backend.models.agent_risk_policy import AgentRiskPolicy  # noqa: F401
+from backend.models.agent_strategy_experiment import AgentStrategyExperiment  # noqa: F401
 from backend.models.notification import Notification
 
 __all__ = [

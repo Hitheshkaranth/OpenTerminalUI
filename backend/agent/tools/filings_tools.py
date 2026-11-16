@@ -26,13 +26,28 @@ async def search_company_filings(args: dict[str, Any]) -> dict[str, Any]:
         k = int(args.get("k") or 6)
         if not 1 <= k <= 20:
             return err("k must be between 1 and 20.", code="bad_request")
+        as_of = args.get("as_of")
+        if as_of is not None:
+            from backend.filings_rag.availability import cutoff_utc
+            try:
+                if not isinstance(as_of, str):
+                    raise ValueError("as_of must be a YYYY-MM-DD string")
+                cutoff_utc(as_of)
+            except ValueError as exc:
+                return err(str(exc), code="bad_request")
 
         db = SessionLocal()
         try:
-            result = await filings_ask(db, symbol, question, k=k)
+            if as_of is None:
+                result = await filings_ask(db, symbol, question, k=k)
+            else:
+                result = await filings_ask(db, symbol, question, k=k, as_of=as_of)
         finally:
             db.close()
-        return ok(result, source="filings_rag", note=f"Answered from filings of {symbol}.")
+        if result.get("status") == "unsupported":
+            return err(result["answer"], code=result["code"], hint="Use a later cutoff or ingest source-dated SEC/NSE documents. Current filings are not substituted.")
+        return ok(result, source="filings_rag", as_of=as_of,
+                  note=f"Answered from filings of {symbol}." + (" Historical publication cutoff: inclusive end of UTC date; source date-only filings are conservatively available at source-local day end." if as_of else ""))
     except Exception as exc:  # noqa: BLE001 - agent tools must never raise
         return err(f"search_company_filings failed: {exc}", code="tool_error")
 
@@ -46,13 +61,16 @@ def filings_tool_specs() -> list[ToolSpec]:
             "transcripts, investor presentations, order-win / USFDA announcements) and return an "
             "answer with verbatim quotes cited to the originating document and page. The answer is "
             "built only from that symbol's filings, or falls back to the best matching snippets if "
-            "no LLM is configured. Symbol is required; question is free text.",
+            "no LLM is configured. Optional as_of restricts retrieval BEFORE ranking and model context "
+            "to verified SEC/NSE publication availability by the end of that UTC date; undated and "
+            "unverified availability is excluded. Symbol is required; question is free text.",
             parameters={
                 "type": "object",
                 "properties": {
                     "symbol": {"type": "string", "description": "Ticker/symbol to search, e.g. RELIANCE, AAPL."},
                     "question": {"type": "string", "minLength": 3, "description": "The question about the company's filings."},
                     "k": {"type": "integer", "minimum": 1, "maximum": 20, "description": "How many filing chunks to draw from."},
+                    "as_of": {"type": "string", "format": "date", "description": "Optional YYYY-MM-DD historical cutoff, inclusive end of UTC date; uses publication availability, never fiscal period."},
                 },
                 "required": ["symbol", "question"],
             },

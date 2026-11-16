@@ -150,8 +150,21 @@ def _history_provenance(raw: Any, what: str, as_of: str | None = None) -> dict[s
     source = raw.get("_source") if isinstance(raw, dict) else None
     if not source:
         return make_provenance("price history", "unreported", as_of=as_of, note=f"{what}; provider not reported")
-    quality = _HISTORY_QUALITY.get(source, "live" if str(source).startswith("adapter:") else "unreported")
-    return make_provenance(source, quality, as_of=as_of, note=f"{what} from {source} daily bars")
+    quality = _HISTORY_QUALITY.get(source, "unreported")
+    if str(source).startswith("adapter:"):
+        name = raw.get("_adapter_name")
+        expected = {"alpaca": "live", "alpha_vantage": "delayed", "yahoo": "delayed",
+                    "kite": "delayed", "crypto": "delayed", "mock": "synthetic"}
+        if source == f"adapter:{name}" and name in expected and raw.get("_quality") == expected[name]:
+            quality = expected[name]
+        # Synthetic history cannot be promoted by a contradictory quality label.
+        if name == "mock" or source == "adapter:mock":
+            quality = "synthetic"
+    elif source in {"mock", "synthetic"}:
+        quality = "synthetic"
+    provider = raw.get("_data_provider")
+    via = f" (data provider: {provider})" if provider else ""
+    return make_provenance(source, quality, as_of=as_of, note=f"{what} from {source} daily bars{via}")
 
 
 def _technical_empty(ticker: str, note: str) -> dict[str, Any]:
@@ -753,6 +766,7 @@ def build_default_registry(user_id: str | None = None) -> ToolRegistry:
         from backend.agent.tools.news_tools import news_tool_specs
         from backend.agent.tools.action_tools import action_tool_specs
         from backend.agent.tools.risk_tools import risk_tool_specs
+        from backend.agent.tools.sizing_tools import sizing_tool_specs
         reg.register_many([
             *portfolio_tool_specs(user_id),
             *dossier_tool_specs(user_id),
@@ -760,6 +774,7 @@ def build_default_registry(user_id: str | None = None) -> ToolRegistry:
             *news_tool_specs(user_id),
             *action_tool_specs(user_id),
             *risk_tool_specs(user_id),
+            *sizing_tool_specs(user_id),
         ])
     reg.register_many([
         *derivatives_tool_specs(),

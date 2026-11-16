@@ -59,6 +59,7 @@ class OpenAICompatibleProvider:
         transport: httpx.BaseTransport | None = None,
         fallback_models: list[str] | None = None,
         honor_model_chain: bool = True,
+        max_attempts: int = 3,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         # A single-model local server (LM Studio / vLLM) ignores routed model chains.
@@ -69,6 +70,9 @@ class OpenAICompatibleProvider:
         self.extra_headers = extra_headers or {}
         self._transport = transport  # injected in tests
         self.fallback_models = fallback_models or []
+        if isinstance(max_attempts, bool) or not isinstance(max_attempts, int) or not 1 <= max_attempts <= 3:
+            raise ValueError("max_attempts must be an integer from one to three")
+        self.max_attempts = max_attempts
 
     def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json", **self.extra_headers}
@@ -79,6 +83,10 @@ class OpenAICompatibleProvider:
     def _is_local_server(self) -> bool:
         host = self.base_url.lower()
         return not any(h in host for h in ("openrouter.ai", "api.openai.com", "generativelanguage.googleapis.com"))
+
+    def _request_options(self, model: str) -> dict[str, Any]:
+        """Trusted adapter-specific routing options; normal calls add none."""
+        return {}
 
     async def complete(
         self,
@@ -128,11 +136,12 @@ class OpenAICompatibleProvider:
         total = len(candidates)
         for ci, model in enumerate(candidates):
             payload["model"] = model
+            payload.update(self._request_options(model))
             short = _short_model(model)
             await notify(
                 f"Contacting {short}…" if ci == 0 else f"Falling back to {short}…"
             )
-            for attempt in range(3):
+            for attempt in range(self.max_attempts):
                 try:
                     async with httpx.AsyncClient(
                         timeout=self.timeout, trust_env=False, transport=self._transport
@@ -152,7 +161,7 @@ class OpenAICompatibleProvider:
                     last_exc = LLMError(f"LLM HTTP {status}" + (f": {detail}" if detail else ""))
                     if status == 401:
                         raise last_exc from exc  # bad key — no point trying other models
-                    if status in (429, 500, 502, 503, 504) and attempt < 2:
+                    if status in (429, 500, 502, 503, 504) and attempt + 1 < self.max_attempts:
                         # Gemini free tier has strict RPM limits; wait longer on 429
                         wait_time = 15.0 if status == 429 else 1.5 * (attempt + 1)
                         reason = "rate-limited" if status == 429 else f"error {status}"
@@ -164,7 +173,7 @@ class OpenAICompatibleProvider:
                     break  # 404/other -> move on to the next candidate model
                 except (httpx.HTTPError, ValueError) as exc:
                     last_exc = LLMError(f"LLM request failed: {exc}")
-                    if attempt < 2:
+                    if attempt + 1 < self.max_attempts:
                         await notify(f"{short} connection issue; retrying…")
                         await asyncio.sleep(1.0 * (attempt + 1))
                         continue

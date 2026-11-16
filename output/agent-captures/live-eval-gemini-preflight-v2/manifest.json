@@ -1,0 +1,37 @@
+{
+  "mode": "provider_preflight",
+  "fixture_sha256": "cead80a295680bdaf6b9506212ea39cc4b3dac217a648bd820437bc862f4af13",
+  "case_ids": [],
+  "capture_protocol": "frozen_capture_v2",
+  "protocol_sha256": "c6241dc35d07409c7e8945b04af8f84efd6ab813ef7406d248ae6f5a61fdde7c",
+  "targets": [
+    {
+      "provider": "gemini",
+      "requested_model": "gemini-3.8-flash"
+    }
+  ],
+  "max_steps": 4,
+  "max_tokens": 1024,
+  "timeout_seconds": 60,
+  "preflight_only": true,
+  "provider_network_calls": true,
+  "model_network_calls": false,
+  "production_tools": false,
+  "actions_executed": false,
+  "created_at": "2026-11-16T11:27:44.193934+00:00",
+  "runs": [
+    {
+      "provider": "gemini",
+      "requested_model": "gemini-3.8-flash",
+      "selected_model": null,
+      "preflight": "output/agent-captures/live-eval-gemini-preflight-v2/gemini-gemini-3.8-flash-a39c93af.preflight.json",
+      "preflight_status": "authentication_failed",
+      "observations": null,
+      "score": null,
+      "summary": null,
+      "capture_failures": 0,
+      "evaluated_cases": 0,
+      "skipped_cases": []
+    }
+  ]
+}

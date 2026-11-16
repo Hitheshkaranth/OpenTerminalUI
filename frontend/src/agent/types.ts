@@ -129,6 +129,7 @@ export interface RunContext extends WorkspaceSelection {
   route?: string;
   symbol?: string;
   market?: string;
+  historical_as_of?: string;
 }
 
 export interface RunRequest {

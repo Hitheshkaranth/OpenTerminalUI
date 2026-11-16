@@ -25,6 +25,7 @@ class ToolSpec:
 class ToolRegistry:
     def __init__(self) -> None:
         self._tools: dict[str, ToolSpec] = {}
+        self.historical_as_of: str | None = None
 
     def register(self, spec: ToolSpec) -> None:
         if spec.name in self._tools:
@@ -54,6 +55,7 @@ class ToolRegistry:
         through here rather than trusting the caller to avoid them.
         """
         view = ToolRegistry()
+        view.historical_as_of = self.historical_as_of
         for spec in self._tools.values():
             if allow_writes or spec.write_class == "none":
                 view._tools[spec.name] = spec

@@ -11,21 +11,23 @@ import { AgentAvatar, AiWorkingBeam } from "../../components/ai/AiVisuals";
 import { ArtifactCanvas } from "./ArtifactCanvas";
 import { ChatThread } from "./ChatThread";
 import { MemoryPanel } from "./MemoryPanel";
+import { PaperRiskPanel } from "./PaperRiskPanel";
 import { exportRun } from "../agentApi";
 import { downloadJson } from "../../lib/downloadJson";
 import { createDossier, emptyDossier, dossierMarket } from "../../api/researchDossiers";
 import { extractApiErrorMessage } from "../../api/base";
 import { useWorkspaceContextStore } from "../workspaceContextStore";
 
-function ModeToggle({ active, label, onToggle, title }: { active: boolean; label: string; onToggle: () => void; title: string }) {
+function ModeToggle({ active, label, onToggle, title, disabled = false }: { active: boolean; label: string; onToggle: () => void; title: string; disabled?: boolean }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onToggle}
       aria-pressed={active}
       aria-label={`Toggle ${label} mode`}
       title={title}
-      className={`rounded border px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide transition-colors ${
+      className={`rounded border px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide transition-colors disabled:opacity-50 ${
         active
           ? "border-terminal-accent bg-terminal-accent text-terminal-bg"
           : "border-terminal-border text-terminal-muted hover:border-terminal-accent hover:text-terminal-accent"
@@ -88,6 +90,10 @@ function ThreadsPanel({ onSelect, onClose }: { onSelect: (t: ThreadItem) => void
 
 export function AgentConsole() {
   const auth = useContext(AuthContextRef);
+  const historicalAsOf = useAgentStore((s) => s.historicalAsOf);
+  const historicalLocked = useAgentStore((s) => s.historicalLocked);
+  const historicalContext = useAgentStore((s) => s.historicalContext);
+  const setHistoricalAsOf = useAgentStore((s) => s.setHistoricalAsOf);
   useEffect(() => { if (auth && !auth.isInitializing) void useAgentStore.getState().setAuthenticatedUser(auth.user?.id ?? null); }, [auth?.user?.id, auth?.isInitializing]);
   const open = useAgentStore((s) => s.open);
   const running = useAgentStore((s) => s.running);
@@ -114,10 +120,11 @@ export function AgentConsole() {
   const loadThread = useAgentStore((s) => s.loadThread);
   // Subscribe to the active ticker so the context chip re-renders on symbol change.
   useStockStore((s) => s.ticker);
-  const contextSymbol = buildScreenContext().symbol;
+  const contextSymbol = historicalAsOf && historicalContext ? historicalContext.symbol : buildScreenContext().symbol;
   const [draft, setDraft] = useState("");
   const [showThreads, setShowThreads] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
+  const [showPaperRisk, setShowPaperRisk] = useState(false);
   const [view, setView] = useState<"overlay" | "docked" | "expanded">("overlay");
   const [saveResearch, setSaveResearch] = useState(false);
   const [researchSymbol, setResearchSymbol] = useState("");
@@ -126,7 +133,7 @@ export function AgentConsole() {
   const [actionNotice, setActionNotice] = useState("");
   const [savedDossierId, setSavedDossierId] = useState<string | null>(null);
   useWorkspaceContextStore((s) => s.selection);
-  const context = buildScreenContext();
+  const context = historicalAsOf && historicalContext ? historicalContext : buildScreenContext();
   const latestAnswer = [...messages].reverse().find((message) => message.role === "assistant" && message.content && !message.pending);
   const activeModel = [...messages].reverse().find((message) => message.role === "assistant")?.model;
   const modelLabel = activeModel?.replace(/^.*\//, "").replace(/:free$/, "");
@@ -181,10 +188,12 @@ export function AgentConsole() {
           <select aria-label="Agent panel layout" value={view} onChange={(e) => setView(e.target.value as typeof view)} className="rounded border border-terminal-border bg-terminal-panel px-2 py-1 text-xs">
             <option value="overlay">Side panel</option><option value="docked">Dock beside research</option><option value="expanded">Expanded research</option>
           </select>
-          <ModeToggle active={debate} label="Debate" onToggle={toggleDebate} title="Multi-agent debate: analyst team → bull vs bear → portfolio-manager decision" />
-          <ModeToggle active={strategy} label="Strategy Lab" onToggle={toggleStrategy} title="Strategy Lab: bounded, read-only backtest iteration with out-of-sample validation" />
-          <ModeToggle active={screener} label="Screener" onToggle={toggleScreener} title="Screen membership: which built-in screens this stock qualifies under" />
-          <ModeToggle active={ensemble} label="Ensemble" onToggle={toggleEnsemble} title="Ensemble: multiple personas analyse a basket of symbols" />
+          <ModeToggle disabled={!!historicalAsOf} active={debate} label="Debate" onToggle={toggleDebate} title="Multi-agent debate: analyst team → bull vs bear → portfolio-manager decision" />
+          <ModeToggle disabled={!!historicalAsOf} active={strategy} label="Strategy Lab" onToggle={toggleStrategy} title="Strategy Lab: fixed-symbol SMA research with a frozen holdout, expanding walk-forward tests and repeated-test accounting" />
+          <ModeToggle disabled={!!historicalAsOf} active={screener} label="Screener" onToggle={toggleScreener} title="Screen membership: which built-in screens this stock qualifies under" />
+          <ModeToggle disabled={!!historicalAsOf} active={ensemble} label="Ensemble" onToggle={toggleEnsemble} title="Ensemble: multiple personas analyse a basket of symbols" />
+          <button type="button" disabled={!auth?.user} aria-expanded={showPaperRisk} aria-controls="agent-paper-risk"
+            onClick={() => setShowPaperRisk((value) => !value)} className="rounded border border-terminal-border px-2 py-1 text-xs disabled:opacity-50">Paper risk limits</button>
           <div style={{ display: "flex", gap: "var(--ot-space-1)" }}>
             <button
               type="button"
@@ -242,7 +251,22 @@ export function AgentConsole() {
         </button>
       </header>
 
-      {(context.selected_symbols?.length || context.portfolio_id || context.dossier_id) && <div className="border-b border-terminal-border px-3 py-2 text-xs text-terminal-muted">
+      <div className="border-b border-terminal-border px-3 py-2 text-xs text-terminal-text">
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="agent-evidence-cutoff">Evidence cutoff (UTC)</label>
+          <input id="agent-evidence-cutoff" type="date" value={historicalAsOf || ""}
+            max={new Date().toISOString().slice(0, 10)} disabled={transportBusy || historicalLocked || !!messages.length || !!activeRunId}
+            onChange={(event) => setHistoricalAsOf(event.target.value || null)}
+            aria-describedby="agent-cutoff-help"
+            className="rounded border border-terminal-border bg-terminal-panel px-2 py-1 text-terminal-text disabled:opacity-60 focus-visible:outline focus-visible:outline-1 focus-visible:outline-terminal-accent" />
+          <span>{historicalAsOf ? `Historical evidence through ${historicalAsOf}` : "Current research"}</span>
+        </div>
+        <p id="agent-cutoff-help" className="mt-1">{historicalAsOf
+          ? "Source-dated fundamentals, news and filings only. Other modes are unavailable. Start a new thread to change the date."
+          : "Optional: choose a past date before sending. Start a new thread to change the cutoff after a run."}</p>
+      </div>
+
+      {!historicalAsOf && (context.selected_symbols?.length || context.portfolio_id || context.dossier_id) && <div className="border-b border-terminal-border px-3 py-2 text-xs text-terminal-muted">
         Context: {context.selected_symbols?.join(", ")}{context.portfolio_id ? " · Selected portfolio" : ""}{context.dossier_id ? " · Research dossier" : ""}{context.universe ? ` · ${context.universe}` : ""}
       </div>}
       {activeRunId && <div className="flex flex-wrap gap-2 border-b border-terminal-border p-2 text-xs">
@@ -255,7 +279,8 @@ export function AgentConsole() {
       {(runNotice || actionNotice) && <p role="status" className="border-b border-terminal-border p-3 text-sm">{runNotice || actionNotice}</p>}
 
       <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-        {showMemory && <MemoryPanel symbol={contextSymbol ?? null} />}
+        {showPaperRisk && auth?.user && <PaperRiskPanel key={auth.user.id} />}
+        {showMemory && !historicalAsOf && <MemoryPanel symbol={contextSymbol ?? null} />}
         <ChatThread messages={messages} proposalReplacements={(m) => {
           return m.steps
             .filter((s) => s.name.startsWith("propose_") && s.result && typeof s.result === "object")
@@ -293,7 +318,9 @@ export function AgentConsole() {
         <button
           type="button"
           onClick={() => setShowMemory((v) => !v)}
-          className={`shrink-0 rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors ${
+          disabled={!!historicalAsOf}
+          title={historicalAsOf ? "Current notes are excluded from historical evidence" : "Saved research notes"}
+          className={`shrink-0 rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors disabled:opacity-50 ${
             showMemory
               ? "border-terminal-accent text-terminal-accent"
               : "border-terminal-border text-terminal-muted hover:text-terminal-text"

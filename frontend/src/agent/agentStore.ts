@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { getThread as fetchThread } from "../api/agentExtras";
 import { cancelRun, createRun, getRun, resumeRun, streamRun } from "./agentApi";
 import { buildScreenContext } from "./screenContext";
-import type { AgentArtifact, AgentEvent, AgentMessage } from "./types";
+import type { AgentArtifact, AgentEvent, AgentMessage, RunContext } from "./types";
 
 let seq = 0;
 let streamController: AbortController | null = null;
@@ -35,6 +35,10 @@ function invalidateOperation() {
 const nextId = () => `m${Date.now()}_${seq++}`;
 
 interface AgentState {
+  historicalAsOf: string | null;
+  historicalLocked: boolean;
+  historicalContext: RunContext | null;
+  setHistoricalAsOf: (date: string | null) => void;
   authenticatedUserId: string | null;
   setAuthenticatedUser: (userId: string | null) => Promise<void>;
   open: boolean;
@@ -67,12 +71,23 @@ interface AgentState {
 }
 
 export const useAgentStore = create<AgentState>((set, get) => ({
+  historicalAsOf: null,
+  historicalLocked: false,
+  historicalContext: null,
+  setHistoricalAsOf: (date) => {
+    if (get().transportBusy || get().messages.length || get().activeRunId || get().historicalLocked) return;
+    if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`)) ||
+      new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date || date > new Date().toISOString().slice(0, 10))) {
+      set({ runNotice: "Choose a valid cutoff on or before today (UTC)." }); return;
+    }
+    set({ historicalAsOf: date || null, debate: false, strategy: false, screener: false, ensemble: false, runNotice: null });
+  },
   authenticatedUserId: null,
   setAuthenticatedUser: async (userId) => {
     if (get().authenticatedUserId === userId) return;
     const ticket = invalidateOperation();
     set({ authenticatedUserId: userId, running: false, transportBusy: false, open: false,
-      messages: [], artifacts: [], activeRunId: null, eventCursor: 0, threadId: crypto.randomUUID(), runNotice: null });
+      messages: [], artifacts: [], activeRunId: null, eventCursor: 0, threadId: crypto.randomUUID(), runNotice: null, historicalAsOf: null, historicalLocked: false, historicalContext: null });
     if (!userId) return;
     const saved = readRecovery(userId);
     if (!saved) return;
@@ -84,7 +99,9 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       if (generation !== ticket || get().authenticatedUserId !== userId) return;
       const threadId = run.thread_id || saved.threadId;
       const pending = run.status === "running" || run.status === "pending";
-      set({ threadId, activeRunId: run.run_id, eventCursor: 0,
+      set({ threadId, activeRunId: run.run_id, eventCursor: 0, historicalAsOf: run.context?.historical_as_of || null, historicalLocked: true,
+        historicalContext: run.context?.historical_as_of ? run.context : null,
+        ...(run.context?.historical_as_of ? { debate: false, strategy: false, screener: false, ensemble: false } : {}),
         messages: [
           { id: nextId(), role: "user", content: run.prompt, steps: [], phases: [], roles: [], pending: false },
           { id: nextId(), role: "assistant", content: run.final || "", steps: [], phases: [], roles: [], pending },
@@ -120,17 +137,17 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   toggleOpen: () => set((s) => ({ open: !s.open })),
   setOpen: (open) => set({ open }),
-  toggleDebate: () => set((s) => ({ debate: !s.debate, strategy: false, screener: false, ensemble: false })),
-  toggleStrategy: () => set((s) => ({ strategy: !s.strategy, debate: false, screener: false, ensemble: false })),
-  toggleScreener: () => set((s) => ({ screener: !s.screener, debate: false, strategy: false, ensemble: false })),
-  toggleEnsemble: () => set((s) => ({ ensemble: !s.ensemble, debate: false, strategy: false, screener: false })),
+  toggleDebate: () => set((s) => s.historicalAsOf ? {} : ({ debate: !s.debate, strategy: false, screener: false, ensemble: false })),
+  toggleStrategy: () => set((s) => s.historicalAsOf ? {} : ({ strategy: !s.strategy, debate: false, screener: false, ensemble: false })),
+  toggleScreener: () => set((s) => s.historicalAsOf ? {} : ({ screener: !s.screener, debate: false, strategy: false, ensemble: false })),
+  toggleEnsemble: () => set((s) => s.historicalAsOf ? {} : ({ ensemble: !s.ensemble, debate: false, strategy: false, screener: false })),
 
   newThread: () => {
     if (get().transportBusy && operation === "stream") return;
     invalidateOperation();
     clearRecovery(get().authenticatedUserId);
     set({ threadId: crypto.randomUUID(), messages: [], artifacts: [], running: false, transportBusy: false,
-      activeRunId: null, eventCursor: 0, runNotice: null });
+      activeRunId: null, eventCursor: 0, runNotice: null, historicalAsOf: null, historicalLocked: false, historicalContext: null });
   },
 
   loadThread: async (threadId) => {
@@ -147,7 +164,11 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         ...(m.role === "assistant" ? { grounding: m.grounding ?? undefined } : {}),
       }));
       const latestRun = [...data.messages].reverse().find((m) => m.run_id)?.run_id;
-      set({ messages, threadId, artifacts: [], running: false, activeRunId: latestRun ?? null, eventCursor: 0, runNotice: null });
+      set({ messages, threadId, artifacts: [], running: false, activeRunId: latestRun ?? null, eventCursor: 0, runNotice: null,
+        historicalAsOf: data.context?.historical_as_of || null,
+        historicalLocked: !!data.context?.historical_as_of || !!latestRun || !!messages.length,
+        historicalContext: data.context?.historical_as_of ? data.context : null,
+        ...(data.context?.historical_as_of ? { debate: false, strategy: false, screener: false, ensemble: false } : {}) });
     } catch (error) {
       if (ticket === generation) set({ runNotice: `Unable to load thread: ${(error as Error).message}` });
     } finally {
@@ -247,13 +268,18 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     operation = "stream";
     const current = () => ticket === generation && streamController === controller && owner === get().authenticatedUserId;
     get().appendUserAndPending(text);
-    set({ running: true, transportBusy: true, eventCursor: 0, activeRunId: null, runNotice: null });
+    set({ running: true, transportBusy: true, eventCursor: 0, activeRunId: null, runNotice: null, historicalLocked: true });
     let sawFinal = false;
     let sawError = false;
     try {
-      const { debate, strategy, screener, ensemble, threadId } = get();
-      const runRequest = { prompt: text, context: buildScreenContext(), thread_id: threadId,
-        ...(debate ? { mode: "debate" as const, ticker: text }
+      const { debate, strategy, screener, ensemble, threadId, historicalAsOf } = get();
+      const screenContext = historicalAsOf ? get().historicalContext || buildScreenContext() : buildScreenContext();
+      if (historicalAsOf && !get().historicalContext) set({ historicalContext: {
+        symbol: screenContext.symbol, market: screenContext.market, historical_as_of: historicalAsOf,
+      } });
+      const runRequest = { prompt: text, context: historicalAsOf
+        ? { symbol: screenContext.symbol, market: screenContext.market, historical_as_of: historicalAsOf } : screenContext, thread_id: threadId,
+        ...(historicalAsOf ? { mode: "standard" as const } : debate ? { mode: "debate" as const, ticker: text }
           : strategy ? { mode: "strategy" as const, ticker: text }
             : screener ? { mode: "screener" as const, ticker: text }
               : ensemble ? { mode: "ensemble" as const, ticker: text } : {}),
@@ -347,6 +373,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   runScreenerFor: async (ticker) => {
     const t = (ticker || "").trim().toUpperCase();
     if (!t) return;
+    if (get().historicalAsOf) { set({ open: true, runNotice: "Start a new thread to use the current-data screener." }); return; }
     set({ screener: true, debate: false, strategy: false, ensemble: false, open: true });
     await get().startRun(t);
   },

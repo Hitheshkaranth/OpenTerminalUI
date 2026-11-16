@@ -445,6 +445,8 @@ async def ask(
     symbol: str,
     question: str,
     k: int = 6,
+    *,
+    as_of: str | None = None,
 ) -> dict[str, Any]:
     """Answer a question from a symbol's filings, citing verbatim quotes.
 
@@ -454,10 +456,37 @@ async def ask(
     if not question:
         raise ValueError("question must not be empty")
 
-    chunks = retrieve_search(db, symbol, question, k=k) or []
+    if as_of is None:
+        chunks = retrieve_search(db, symbol, question, k=k) or []
+    else:
+        from backend.filings_rag.availability import cutoff_utc
+        cutoff_utc(as_of)  # Validate before retrieval or any model call.
+        chunks = retrieve_search(db, symbol, question, k=k, as_of=as_of,
+                                 require_verified_availability=True) or []
+        if not chunks:
+            return {
+                "status": "unsupported", "code": "historical_evidence_unavailable", "as_of": as_of,
+                "answer": "Historical filing evidence is unavailable: no matching passages have verified publication availability by the inclusive end of this UTC date. Undated, estimated and unverified-source filings are excluded; fiscal periods and ingestion dates are never used as publication dates.",
+                "engine": "none", "model": None, "citations": [],
+            }
+    historical_metadata = ({"as_of": as_of, "cutoff_timezone": "UTC",
+                            "availability_basis": "verified source publication; date-only filings at source-local day end"}
+                           if as_of is not None else {})
 
     if llm_available():
         prompt = _build_ask_prompt(question, chunks)
+        if as_of is not None:
+            from backend.filings_rag.availability import publication_time
+            availability = "\n".join(
+                f"[{index}] available by {publication_time(chunk, verified=True).isoformat()}"
+                for index, chunk in enumerate(chunks, start=1)
+            )
+            prompt = (
+                f"Historical evidence cutoff: inclusive end of {as_of} UTC. "
+                "Use only these cutoff-eligible passages; do not fill gaps with current facts or model memory. "
+                "Fiscal periods are not publication dates. Date-only availability is conservatively "
+                f"the end of the source-local publication day.\n{availability}\n\n{prompt}"
+            )
         parsed = await complete_json(
             "You answer strictly from the supplied chunks and cite the source by its number in brackets.",
             prompt,
@@ -470,10 +499,11 @@ async def ask(
                 "engine": "llm",
                 "model": get_llm_provider().model,
                 "citations": citations,
+                **historical_metadata,
             }
 
     answer, citations = _lexical_ask(question, chunks)
-    return {"answer": answer, "engine": "lexical", "model": None, "citations": citations}
+    return {"answer": answer, "engine": "lexical", "model": None, "citations": citations, **historical_metadata}
 
 
 def _build_ask_prompt(question: str, chunks: list[dict]) -> str:

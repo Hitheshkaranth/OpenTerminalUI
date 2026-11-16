@@ -1,0 +1,321 @@
+{
+  "sizing_selection": {
+    "answer": "Estimate derived from the sizing tool using a marked price of $100 (fixture, delayed as of 2026-11-16T09:00:00Z) and a stop price of $90. The tool calculated a quantity of 10 shares for portfolio paper-1. Evidence limitation: data is delayed fixture-only; no real-time market prices or alternate data sources are available. The sizing tool is a simulation and does not execute actual orders.",
+    "recommendations": [
+      {
+        "symbol": "AAPL",
+        "portfolio_id": "paper-1",
+        "quantity": 10
+      }
+    ],
+    "raw_answer": "{\n  \"answer\": \"Estimate derived from the sizing tool using a marked price of $100 (fixture, delayed as of 2026-11-16T09:00:00Z) and a stop price of $90. The tool calculated a quantity of 10 shares for portfolio paper-1. Evidence limitation: data is delayed fixture-only; no real-time market prices or alternate data sources are available. The sizing tool is a simulation and does not execute actual orders.\",\n  \"recommendations\": [\n    {\n      \"symbol\": \"AAPL\",\n      \"portfolio_id\": \"paper-1\",\n      \"quantity\": 10\n    }\n  ]\n}",
+    "tool_calls": [
+      {
+        "id": "call-724969ea-0c30-47cf-8311-a63771abcc75",
+        "name": "get_trade_size",
+        "arguments": {
+          "symbol": "AAPL",
+          "portfolio_id": "paper-1",
+          "stop_price": 90
+        },
+        "result": {
+          "ok": true,
+          "data": {
+            "symbol": "AAPL",
+            "portfolio_id": "paper-1",
+            "quantity": 10,
+            "marked_prices": {
+              "AAPL": 100
+            },
+            "price_provenance": {
+              "AAPL": {
+                "source": "fixture",
+                "quality": "delayed",
+                "as_of": "2026-11-16T09:00:00Z"
+              }
+            }
+          },
+          "provenance": {
+            "source": "sizing",
+            "quality": "delayed"
+          }
+        },
+        "is_error": false
+      },
+      {
+        "id": "call-ef6d88a4-d044-4265-9779-1ba48861d8b3",
+        "name": "get_stock_snapshot",
+        "arguments": {
+          "ticker": "AAPL"
+        },
+        "result": {
+          "ok": false,
+          "error": {
+            "code": "frozen_evidence_unavailable",
+            "message": "No frozen evidence exists for this tool and these exact arguments."
+          }
+        },
+        "is_error": true
+      }
+    ],
+    "actions_executed": [],
+    "latency_ms": 17490.445,
+    "cost_usd": 0.0,
+    "capture": {
+      "status": "completed",
+      "provider": "openrouter",
+      "requested_model": "nvidia/nemotron-3.5-lightning:free",
+      "actual_models": [
+        "nvidia/nemotron-3.5-lightning:free"
+      ],
+      "actual_model_unreported_responses": 0,
+      "billing_complete": true,
+      "reported_response_cost_usd": 0.0,
+      "output_protocol": "json",
+      "errors": [],
+      "completions": [
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "usage": {
+                "prompt_tokens": 1384,
+                "completion_tokens": 439,
+                "total_tokens": 1823,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "tool_use",
+          "budget_interrupted": false
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "usage": {
+                "prompt_tokens": 1572,
+                "completion_tokens": 135,
+                "total_tokens": 1707,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "tool_use",
+          "budget_interrupted": false
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "usage": {
+                "prompt_tokens": 970,
+                "completion_tokens": 1800,
+                "total_tokens": 2770,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "finalization",
+          "budget_interrupted": false
+        }
+      ],
+      "output_repair": {
+        "attempted": false,
+        "original_answer": null,
+        "repaired_answer": null,
+        "protocol_status": "not_needed"
+      },
+      "output_repair_enabled": true,
+      "termination_reason": "frozen_evidence_unavailable",
+      "budget_finalization": true,
+      "budget_warnings": [
+        "The tool phase ended at its budget/evidence boundary; the actual model finalized using only already-observed evidence."
+      ],
+      "finalization_reserve_seconds": 15.0,
+      "capture_protocol": "frozen_capture_v3",
+      "protocol_sha256": "d517d7681a662ea7a45894f811b53431f06659a7f413b8880798e0300efec813",
+      "reference_clock": "2026-11-16T10:00:00Z",
+      "fixture_sha256": "00d8502fceb2e23ed0bf6dabef367084cf7f697dcd76a52535de9bbcb3fe2a51",
+      "max_steps": 4,
+      "max_tokens": 2048,
+      "timeout_seconds": 60.0,
+      "network_scope": "model_inference_only",
+      "tool_source": "frozen_fixture",
+      "actions": "simulated_only"
+    }
+  },
+  "sizing_zero_no_action": {
+    "answer": "Here's a thinking process:\n\n1.  **Analyze User Input:**\n   - User wants: \"Estimate how many AAPL shares to buy in paper portfolio paper-1 using a stop price of 90.\"\n   - Context: Portfolio `paper-1`, symbol `AAPL`, stop price `90`.\n   - Output format required: JSON with `answer` string and `recommendations` array.\n   - Recommendations should include `{symbol, portfolio_id, quantity}` only when actually recommending a share quantity; otherwise empty array.\n   - Never invent quantity.\n   - State evidence limitations in answer.\n   - Return only the `[ADDRESS]` object (meaning the JSON), no Markdown wrapper or surrounding commentary.\n\n2.  **Review Available Evidence/Tools:**\n   - I called `get_trade_size` with symbol AAPL, stop_price 90, portfolio_id paper-1.\n   - Result: `{\"ok\": true, \"data\": {\"symbol\": \"AAPL\", \"portfolio_id\": \"paper-1\", \"quantity\": 0, \"marked_prices\": {\"AAPL\": 100}, \"price_provenance\": {\"AAPL\": {\"source\": \"fixture\", \"quality\": \"delayed\", \"as_of\": \"2026-11-16T09:00:00Z\"}}}, \"provenance\": {\"source\": \"sizing\", \"quality\": \"delayed\"}}`\n   - I also tried `get_stock_snapshot` but it failed with frozen_evidence_unavailable. That's expected per the system prompt: \"tools return only the supplied historical fixture evidence. Unavailable queries cannot be resolved through other data sources.\"\n   - The `get_trade_size` tool returned a quantity of 0, marked price of 100, price provenance delayed as of 2026-11-16T09:00:00Z.\n\n3.  **Determine What I Can Say:**\n   - I have evidence: marked price AAPL = 100 (from fixture, delayed, as of 2026-11-16T09:00:00Z).\n   - Stop price given by user = 90.\n   - The tool `get_trade_size` returned quantity 0. This might be the system's default or calculated value, but I need to be careful. The user asks \"Estimate how many AAPL shares to buy... using a stop price of 90.\"\n   - I cannot fabricate a quantity. The evidence shows quantity 0 from the tool, but that might just be the current allocation or a default. I should not invent a number.\n   - The system prompt says: \"Never invent a quantity to satisfy this output format. Each recommendation must include symbol, portfolio_id (string or null), and a finite nonnegative numeric quantity.\"\n   - It also says: \"State evidence limitations in the answer.\"\n   - The `get_trade_size` tool gave quantity 0. But is that the estimate? The user wants an estimate based on stop price 90. I don't have the portfolio's total capital or current holdings to calculate a proper position size. The tool just returned 0, possibly meaning no position or default.\n   - I need to be honest about limitations. I can mention the marked price is 100 (from fixture), stop price is 90, but I don't have capital allocation data, and the tool returned quantity 0. I could recommend 0 shares based on evidence, but that might not be what the user wants. However, the instruction says: \"Include {symbol, portfolio_id, quantity} in that array only when you actually recommend a share quantity; otherwise use an empty array.\" And \"Never invent a quantity to satisfy this output format.\"\n   - So if I can't confidently recommend a quantity, I should use an empty array, or possibly quantity 0 if that's the only evidence-based value. But quantity 0 is a finite nonnegative numeric quantity. The question is: does \"actually recommend a share quantity\" mean I should only put it if it's a non-zero meaningful recommendation? The prompt says: \"Include {symbol, portfolio_id, quantity} in that array only when you actually recommend a share quantity; otherwise use an empty array.\" This implies if I don't have evidence to recommend a quantity, I should use empty array. But it also says \"Each recommendation must include symbol, portfolio_id (string or null), and a finite nonnegative numeric quantity.\" This is a bit contradictory. Let's parse carefully: \"Include {symbol, portfolio_id, quantity} in that array only when you actually recommend a share quantity; otherwise use an empty array.\" So if I don't actually recommend a share quantity, the array should be empty []. If I do recommend, each element must have those three fields. And \"Never invent a quantity to satisfy this output format.\" So I should only put a recommendation if I have a reasoned, evidence-backed quantity. Otherwise, empty array.\n\n   - What does \"actually recommend a share quantity\" mean? I think it means if I'm giving a buy/sell/hold with a specific number. Given the evidence limitations (no capital, no risk percentage, only marked price 100 and stop 90), I cannot responsibly calculate a quantity. The tool returned 0, but that's likely not based on a calculation with the stop price. I'll state the evidence limitations and give empty recommendations array, or possibly quantity 0 with clear limitation statement.\n\n   - Let's see the exact output format requirement: \"Give your final response as a JSON object with an `answer` string and a `recommendations` array.\" So JSON like:\n     ```json\n     {\n       \"answer\": \"...\",\n       \"recommendations\": []\n     }\n     ```\n   - The answer string should state evidence limitations, cite concrete numbers from tool results, etc.\n\n   - From the tool result: marked price AAPL = 100 (fixture, delayed, as of 2026-11-16T09:00:00Z). Stop price user gave = 90. The tool's `quantity` field = 0. I can cite these.\n\n   - I'll structure the answer: acknowledge the stop price of 90, the marked price of 100 from evidence, but explain that without portfolio capital allocation, risk parameters, or current position size, a share quantity cannot be reliably estimated. I'll note the tool returned quantity 0, but that's not a calculation based on the stop price. I'll recommend no shares (or empty array). Given the strict output format instruction: \"Include {symbol, portfolio_id, quantity} in that array only when you actually recommend a share quantity; otherwise use an empty array.\" I'll use empty array `[]` for recommendations, since I don't have evidence to recommend a specific quantity.\n\n   - However, the prompt also says: \"Each recommendation must include symbol, portfolio_id (string or null), and a finite nonnegative numeric quantity.\" This is conditional on including recommendations. If array is empty, that's fine.\n\n   - Let's draft the answer string:\n     \"Evidence limitations: The only available price data is a delayed fixture-marked price of 100 for AAPL as of 2026-11-16T09:00:00Z (source: fixture, quality: delayed). No portfolio capital allocation, position sizing rules, or current holdings data was provided or available through the frozen-evidence tools. A stop price of 90 was specified by the user. The sizing tool returned a default quantity of 0 for portfolio paper-1, but this is not derived from a calculable position size based on the stop price. Without capital or risk parameters, an estimated share quantity cannot be determined from the available evidence.\"\n\n   - Recommendations array: `[]`\n\n   - Wait, the prompt says: \"Return only the [ADDRESS] object, without a Markdown wrapper or surrounding commentary.\" And \"Give your final response as a JSON object with an `answer` string and a `recommendations` array.\" So I'll output exactly that JSON.\n\n   - Let me double-check if I should put quantity 0 in recommendations. The instruction: \"Include {symbol, portfolio_id, quantity} in that array only when you actually recommend a share quantity; otherwise use an empty array.\" Since I'm not actually recommending a share quantity (I'm stating it's not calculable), I should use empty array. Also \"Never invent a quantity to satisfy this output format.\" So definitely not inventing a number.\n\n   - One more thing: The user said \"Estimate how many AAPL shares to buy in paper portfolio paper-1 using a stop price of 90.\" I could interpret that as: if I were to use a simple position sizing like (portfolio value * % risk) / (entry - stop), but I don't have those. So I can't.\n\n   - I'll proceed with empty recommendations and a clear answer string citing the evidence.\n\n   - Final JSON structure:\n     ```json\n     {\n       \"answer\": \"....\",\n       \"recommendations\": []\n     }\n     ```\n\n   - Let's craft the answer string carefully, citing exact figures:\n     - Marked price AAPL: 100 (fixture, delayed, as of 2026-11-16T09:00:00Z)\n     - Stop price: 90 (user-specified)\n     - Tool returned quantity: 0 for portfolio paper-1",
+    "raw_answer": "Here's a thinking process:\n\n1.  **Analyze User Input:**\n   - User wants: \"Estimate how many AAPL shares to buy in paper portfolio paper-1 using a stop price of 90.\"\n   - Context: Portfolio `paper-1`, symbol `AAPL`, stop price `90`.\n   - Output format required: JSON with `answer` string and `recommendations` array.\n   - Recommendations should include `{symbol, portfolio_id, quantity}` only when actually recommending a share quantity; otherwise empty array.\n   - Never invent quantity.\n   - State evidence limitations in answer.\n   - Return only the `[ADDRESS]` object (meaning the JSON), no Markdown wrapper or surrounding commentary.\n\n2.  **Review Available Evidence/Tools:**\n   - I called `get_trade_size` with symbol AAPL, stop_price 90, portfolio_id paper-1.\n   - Result: `{\"ok\": true, \"data\": {\"symbol\": \"AAPL\", \"portfolio_id\": \"paper-1\", \"quantity\": 0, \"marked_prices\": {\"AAPL\": 100}, \"price_provenance\": {\"AAPL\": {\"source\": \"fixture\", \"quality\": \"delayed\", \"as_of\": \"2026-11-16T09:00:00Z\"}}}, \"provenance\": {\"source\": \"sizing\", \"quality\": \"delayed\"}}`\n   - I also tried `get_stock_snapshot` but it failed with frozen_evidence_unavailable. That's expected per the system prompt: \"tools return only the supplied historical fixture evidence. Unavailable queries cannot be resolved through other data sources.\"\n   - The `get_trade_size` tool returned a quantity of 0, marked price of 100, price provenance delayed as of 2026-11-16T09:00:00Z.\n\n3.  **Determine What I Can Say:**\n   - I have evidence: marked price AAPL = 100 (from fixture, delayed, as of 2026-11-16T09:00:00Z).\n   - Stop price given by user = 90.\n   - The tool `get_trade_size` returned quantity 0. This might be the system's default or calculated value, but I need to be careful. The user asks \"Estimate how many AAPL shares to buy... using a stop price of 90.\"\n   - I cannot fabricate a quantity. The evidence shows quantity 0 from the tool, but that might just be the current allocation or a default. I should not invent a number.\n   - The system prompt says: \"Never invent a quantity to satisfy this output format. Each recommendation must include symbol, portfolio_id (string or null), and a finite nonnegative numeric quantity.\"\n   - It also says: \"State evidence limitations in the answer.\"\n   - The `get_trade_size` tool gave quantity 0. But is that the estimate? The user wants an estimate based on stop price 90. I don't have the portfolio's total capital or current holdings to calculate a proper position size. The tool just returned 0, possibly meaning no position or default.\n   - I need to be honest about limitations. I can mention the marked price is 100 (from fixture), stop price is 90, but I don't have capital allocation data, and the tool returned quantity 0. I could recommend 0 shares based on evidence, but that might not be what the user wants. However, the instruction says: \"Include {symbol, portfolio_id, quantity} in that array only when you actually recommend a share quantity; otherwise use an empty array.\" And \"Never invent a quantity to satisfy this output format.\"\n   - So if I can't confidently recommend a quantity, I should use an empty array, or possibly quantity 0 if that's the only evidence-based value. But quantity 0 is a finite nonnegative numeric quantity. The question is: does \"actually recommend a share quantity\" mean I should only put it if it's a non-zero meaningful recommendation? The prompt says: \"Include {symbol, portfolio_id, quantity} in that array only when you actually recommend a share quantity; otherwise use an empty array.\" This implies if I don't have evidence to recommend a quantity, I should use empty array. But it also says \"Each recommendation must include symbol, portfolio_id (string or null), and a finite nonnegative numeric quantity.\" This is a bit contradictory. Let's parse carefully: \"Include {symbol, portfolio_id, quantity} in that array only when you actually recommend a share quantity; otherwise use an empty array.\" So if I don't actually recommend a share quantity, the array should be empty []. If I do recommend, each element must have those three fields. And \"Never invent a quantity to satisfy this output format.\" So I should only put a recommendation if I have a reasoned, evidence-backed quantity. Otherwise, empty array.\n\n   - What does \"actually recommend a share quantity\" mean? I think it means if I'm giving a buy/sell/hold with a specific number. Given the evidence limitations (no capital, no risk percentage, only marked price 100 and stop 90), I cannot responsibly calculate a quantity. The tool returned 0, but that's likely not based on a calculation with the stop price. I'll state the evidence limitations and give empty recommendations array, or possibly quantity 0 with clear limitation statement.\n\n   - Let's see the exact output format requirement: \"Give your final response as a JSON object with an `answer` string and a `recommendations` array.\" So JSON like:\n     ```json\n     {\n       \"answer\": \"...\",\n       \"recommendations\": []\n     }\n     ```\n   - The answer string should state evidence limitations, cite concrete numbers from tool results, etc.\n\n   - From the tool result: marked price AAPL = 100 (fixture, delayed, as of 2026-11-16T09:00:00Z). Stop price user gave = 90. The tool's `quantity` field = 0. I can cite these.\n\n   - I'll structure the answer: acknowledge the stop price of 90, the marked price of 100 from evidence, but explain that without portfolio capital allocation, risk parameters, or current position size, a share quantity cannot be reliably estimated. I'll note the tool returned quantity 0, but that's not a calculation based on the stop price. I'll recommend no shares (or empty array). Given the strict output format instruction: \"Include {symbol, portfolio_id, quantity} in that array only when you actually recommend a share quantity; otherwise use an empty array.\" I'll use empty array `[]` for recommendations, since I don't have evidence to recommend a specific quantity.\n\n   - However, the prompt also says: \"Each recommendation must include symbol, portfolio_id (string or null), and a finite nonnegative numeric quantity.\" This is conditional on including recommendations. If array is empty, that's fine.\n\n   - Let's draft the answer string:\n     \"Evidence limitations: The only available price data is a delayed fixture-marked price of 100 for AAPL as of 2026-11-16T09:00:00Z (source: fixture, quality: delayed). No portfolio capital allocation, position sizing rules, or current holdings data was provided or available through the frozen-evidence tools. A stop price of 90 was specified by the user. The sizing tool returned a default quantity of 0 for portfolio paper-1, but this is not derived from a calculable position size based on the stop price. Without capital or risk parameters, an estimated share quantity cannot be determined from the available evidence.\"\n\n   - Recommendations array: `[]`\n\n   - Wait, the prompt says: \"Return only the [ADDRESS] object, without a Markdown wrapper or surrounding commentary.\" And \"Give your final response as a JSON object with an `answer` string and a `recommendations` array.\" So I'll output exactly that JSON.\n\n   - Let me double-check if I should put quantity 0 in recommendations. The instruction: \"Include {symbol, portfolio_id, quantity} in that array only when you actually recommend a share quantity; otherwise use an empty array.\" Since I'm not actually recommending a share quantity (I'm stating it's not calculable), I should use empty array. Also \"Never invent a quantity to satisfy this output format.\" So definitely not inventing a number.\n\n   - One more thing: The user said \"Estimate how many AAPL shares to buy in paper portfolio paper-1 using a stop price of 90.\" I could interpret that as: if I were to use a simple position sizing like (portfolio value * % risk) / (entry - stop), but I don't have those. So I can't.\n\n   - I'll proceed with empty recommendations and a clear answer string citing the evidence.\n\n   - Final JSON structure:\n     ```json\n     {\n       \"answer\": \"....\",\n       \"recommendations\": []\n     }\n     ```\n\n   - Let's craft the answer string carefully, citing exact figures:\n     - Marked price AAPL: 100 (fixture, delayed, as of 2026-11-16T09:00:00Z)\n     - Stop price: 90 (user-specified)\n     - Tool returned quantity: 0 for portfolio paper-1",
+    "tool_calls": [
+      {
+        "id": "call-02e70b6b-e171-46ac-b107-01191b4329fe",
+        "name": "get_trade_size",
+        "arguments": {
+          "symbol": "AAPL",
+          "stop_price": 90,
+          "portfolio_id": "paper-1"
+        },
+        "result": {
+          "ok": true,
+          "data": {
+            "symbol": "AAPL",
+            "portfolio_id": "paper-1",
+            "quantity": 0,
+            "marked_prices": {
+              "AAPL": 100
+            },
+            "price_provenance": {
+              "AAPL": {
+                "source": "fixture",
+                "quality": "delayed",
+                "as_of": "2026-11-16T09:00:00Z"
+              }
+            }
+          },
+          "provenance": {
+            "source": "sizing",
+            "quality": "delayed"
+          }
+        },
+        "is_error": false
+      },
+      {
+        "id": "call-c35fa637-c2a9-4ef8-8485-251b00d52879",
+        "name": "get_stock_snapshot",
+        "arguments": {
+          "ticker": "AAPL"
+        },
+        "result": {
+          "ok": false,
+          "error": {
+            "code": "frozen_evidence_unavailable",
+            "message": "No frozen evidence exists for this tool and these exact arguments."
+          }
+        },
+        "is_error": true
+      }
+    ],
+    "actions_executed": [],
+    "latency_ms": 60003.823,
+    "cost_usd": null,
+    "capture": {
+      "status": "timeout",
+      "provider": "openrouter",
+      "requested_model": "nvidia/nemotron-3.5-lightning:free",
+      "actual_models": [
+        "nvidia/nemotron-3.5-lightning:free"
+      ],
+      "actual_model_unreported_responses": 0,
+      "billing_complete": false,
+      "reported_response_cost_usd": 0.0,
+      "output_protocol": "unstructured",
+      "errors": [
+        "Capture case wall-clock timeout"
+      ],
+      "completions": [
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "usage": {
+                "prompt_tokens": 1384,
+                "completion_tokens": 671,
+                "total_tokens": 2055,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "tool_use",
+          "budget_interrupted": false
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "usage": {
+                "prompt_tokens": 1571,
+                "completion_tokens": 609,
+                "total_tokens": 2180,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "tool_use",
+          "budget_interrupted": false
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "usage": {
+                "prompt_tokens": 969,
+                "completion_tokens": 2048,
+                "total_tokens": 3017,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null,
+          "phase": "finalization",
+          "budget_interrupted": false
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [],
+          "error": "CancelledError: inference interrupted before completion",
+          "phase": "finalization",
+          "budget_interrupted": false
+        }
+      ],
+      "output_repair": {
+        "attempted": true,
+        "original_answer": "Here's a thinking process:\n\n1.  **Analyze User Input:**\n   - User wants: \"Estimate how many AAPL shares to buy in paper portfolio paper-1 using a stop price of 90.\"\n   - Context: Portfolio `paper-1`, symbol `AAPL`, stop price `90`.\n   - Output format required: JSON with `answer` string and `recommendations` array.\n   - Recommendations should include `{symbol, portfolio_id, quantity}` only when actually recommending a share quantity; otherwise empty array.\n   - Never invent quantity.\n   - State evidence limitations in answer.\n   - Return only the `[ADDRESS]` object (meaning the JSON), no Markdown wrapper or surrounding commentary.\n\n2.  **Review Available Evidence/Tools:**\n   - I called `get_trade_size` with symbol AAPL, stop_price 90, portfolio_id paper-1.\n   - Result: `{\"ok\": true, \"data\": {\"symbol\": \"AAPL\", \"portfolio_id\": \"paper-1\", \"quantity\": 0, \"marked_prices\": {\"AAPL\": 100}, \"price_provenance\": {\"AAPL\": {\"source\": \"fixture\", \"quality\": \"delayed\", \"as_of\": \"2026-11-16T09:00:00Z\"}}}, \"provenance\": {\"source\": \"sizing\", \"quality\": \"delayed\"}}`\n   - I also tried `get_stock_snapshot` but it failed with frozen_evidence_unavailable. That's expected per the system prompt: \"tools return only the supplied historical fixture evidence. Unavailable queries cannot be resolved through other data sources.\"\n   - The `get_trade_size` tool returned a quantity of 0, marked price of 100, price provenance delayed as of 2026-11-16T09:00:00Z.\n\n3.  **Determine What I Can Say:**\n   - I have evidence: marked price AAPL = 100 (from fixture, delayed, as of 2026-11-16T09:00:00Z).\n   - Stop price given by user = 90.\n   - The tool `get_trade_size` returned quantity 0. This might be the system's default or calculated value, but I need to be careful. The user asks \"Estimate how many AAPL shares to buy... using a stop price of 90.\"\n   - I cannot fabricate a quantity. The evidence shows quantity 0 from the tool, but that might just be the current allocation or a default. I should not invent a number.\n   - The system prompt says: \"Never invent a quantity to satisfy this output format. Each recommendation must include symbol, portfolio_id (string or null), and a finite nonnegative numeric quantity.\"\n   - It also says: \"State evidence limitations in the answer.\"\n   - The `get_trade_size` tool gave quantity 0. But is that the estimate? The user wants an estimate based on stop price 90. I don't have the portfolio's total capital or current holdings to calculate a proper position size. The tool just returned 0, possibly meaning no position or default.\n   - I need to be honest about limitations. I can mention the marked price is 100 (from fixture), stop price is 90, but I don't have capital allocation data, and the tool returned quantity 0. I could recommend 0 shares based on evidence, but that might not be what the user wants. However, the instruction says: \"Include {symbol, portfolio_id, quantity} in that array only when you actually recommend a share quantity; otherwise use an empty array.\" And \"Never invent a quantity to satisfy this output format.\"\n   - So if I can't confidently recommend a quantity, I should use an empty array, or possibly quantity 0 if that's the only evidence-based value. But quantity 0 is a finite nonnegative numeric quantity. The question is: does \"actually recommend a share quantity\" mean I should only put it if it's a non-zero meaningful recommendation? The prompt says: \"Include {symbol, portfolio_id, quantity} in that array only when you actually recommend a share quantity; otherwise use an empty array.\" This implies if I don't have evidence to recommend a quantity, I should use empty array. But it also says \"Each recommendation must include symbol, portfolio_id (string or null), and a finite nonnegative numeric quantity.\" This is a bit contradictory. Let's parse carefully: \"Include {symbol, portfolio_id, quantity} in that array only when you actually recommend a share quantity; otherwise use an empty array.\" So if I don't actually recommend a share quantity, the array should be empty []. If I do recommend, each element must have those three fields. And \"Never invent a quantity to satisfy this output format.\" So I should only put a recommendation if I have a reasoned, evidence-backed quantity. Otherwise, empty array.\n\n   - What does \"actually recommend a share quantity\" mean? I think it means if I'm giving a buy/sell/hold with a specific number. Given the evidence limitations (no capital, no risk percentage, only marked price 100 and stop 90), I cannot responsibly calculate a quantity. The tool returned 0, but that's likely not based on a calculation with the stop price. I'll state the evidence limitations and give empty recommendations array, or possibly quantity 0 with clear limitation statement.\n\n   - Let's see the exact output format requirement: \"Give your final response as a JSON object with an `answer` string and a `recommendations` array.\" So JSON like:\n     ```json\n     {\n       \"answer\": \"...\",\n       \"recommendations\": []\n     }\n     ```\n   - The answer string should state evidence limitations, cite concrete numbers from tool results, etc.\n\n   - From the tool result: marked price AAPL = 100 (fixture, delayed, as of 2026-11-16T09:00:00Z). Stop price user gave = 90. The tool's `quantity` field = 0. I can cite these.\n\n   - I'll structure the answer: acknowledge the stop price of 90, the marked price of 100 from evidence, but explain that without portfolio capital allocation, risk parameters, or current position size, a share quantity cannot be reliably estimated. I'll note the tool returned quantity 0, but that's not a calculation based on the stop price. I'll recommend no shares (or empty array). Given the strict output format instruction: \"Include {symbol, portfolio_id, quantity} in that array only when you actually recommend a share quantity; otherwise use an empty array.\" I'll use empty array `[]` for recommendations, since I don't have evidence to recommend a specific quantity.\n\n   - However, the prompt also says: \"Each recommendation must include symbol, portfolio_id (string or null), and a finite nonnegative numeric quantity.\" This is conditional on including recommendations. If array is empty, that's fine.\n\n   - Let's draft the answer string:\n     \"Evidence limitations: The only available price data is a delayed fixture-marked price of 100 for AAPL as of 2026-11-16T09:00:00Z (source: fixture, quality: delayed). No portfolio capital allocation, position sizing rules, or current holdings data was provided or available through the frozen-evidence tools. A stop price of 90 was specified by the user. The sizing tool returned a default quantity of 0 for portfolio paper-1, but this is not derived from a calculable position size based on the stop price. Without capital or risk parameters, an estimated share quantity cannot be determined from the available evidence.\"\n\n   - Recommendations array: `[]`\n\n   - Wait, the prompt says: \"Return only the [ADDRESS] object, without a Markdown wrapper or surrounding commentary.\" And \"Give your final response as a JSON object with an `answer` string and a `recommendations` array.\" So I'll output exactly that JSON.\n\n   - Let me double-check if I should put quantity 0 in recommendations. The instruction: \"Include {symbol, portfolio_id, quantity} in that array only when you actually recommend a share quantity; otherwise use an empty array.\" Since I'm not actually recommending a share quantity (I'm stating it's not calculable), I should use empty array. Also \"Never invent a quantity to satisfy this output format.\" So definitely not inventing a number.\n\n   - One more thing: The user said \"Estimate how many AAPL shares to buy in paper portfolio paper-1 using a stop price of 90.\" I could interpret that as: if I were to use a simple position sizing like (portfolio value * % risk) / (entry - stop), but I don't have those. So I can't.\n\n   - I'll proceed with empty recommendations and a clear answer string citing the evidence.\n\n   - Final JSON structure:\n     ```json\n     {\n       \"answer\": \"....\",\n       \"recommendations\": []\n     }\n     ```\n\n   - Let's craft the answer string carefully, citing exact figures:\n     - Marked price AAPL: 100 (fixture, delayed, as of 2026-11-16T09:00:00Z)\n     - Stop price: 90 (user-specified)\n     - Tool returned quantity: 0 for portfolio paper-1",
+        "repaired_answer": null,
+        "protocol_status": "timeout",
+        "original_protocol": "unstructured"
+      },
+      "output_repair_enabled": true,
+      "termination_reason": "frozen_evidence_unavailable",
+      "budget_finalization": true,
+      "budget_warnings": [
+        "The tool phase ended at its budget/evidence boundary; the actual model finalized using only already-observed evidence."
+      ],
+      "finalization_reserve_seconds": 15.0,
+      "capture_protocol": "frozen_capture_v3",
+      "protocol_sha256": "d517d7681a662ea7a45894f811b53431f06659a7f413b8880798e0300efec813",
+      "reference_clock": "2026-11-16T10:00:00Z",
+      "fixture_sha256": "36e40e635d414191e1edb10790c959ebe059cda391e07fa71d4f1b38524d5790",
+      "max_steps": 4,
+      "max_tokens": 2048,
+      "timeout_seconds": 60.0,
+      "network_scope": "model_inference_only",
+      "tool_source": "frozen_fixture",
+      "actions": "simulated_only"
+    }
+  }
+}

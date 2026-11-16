@@ -1,0 +1,274 @@
+{
+  "sizing_selection": {
+    "answer": "The sizing tool estimates 10 shares of AAPL for portfolio paper-1 with a stop price of 90, based on a marked price of $100. Data source: fixture, delayed as of 2026-11-16T09:00:00Z; quality marked as delayed.",
+    "recommendations": [
+      {
+        "symbol": "AAPL",
+        "portfolio_id": "paper-1",
+        "quantity": 10
+      }
+    ],
+    "raw_answer": "{\n  \"answer\": \"The sizing tool estimates 10 shares of AAPL for portfolio paper-1 with a stop price of 90, based on a marked price of $100. Data source: fixture, delayed as of 2026-11-16T09:00:00Z; quality marked as delayed.\",\n  \"recommendations\": [\n    {\n      \"symbol\": \"AAPL\",\n      \"portfolio_id\": \"paper-1\",\n      \"quantity\": 10\n    }\n  ]\n}",
+    "tool_calls": [
+      {
+        "id": "call-a106c1f9-80ce-472e-9111-b8d5a15ac86f",
+        "name": "get_trade_size",
+        "arguments": {
+          "symbol": "AAPL",
+          "portfolio_id": "paper-1",
+          "stop_price": 90
+        },
+        "result": {
+          "ok": true,
+          "data": {
+            "symbol": "AAPL",
+            "portfolio_id": "paper-1",
+            "quantity": 10,
+            "marked_prices": {
+              "AAPL": 100
+            },
+            "price_provenance": {
+              "AAPL": {
+                "source": "fixture",
+                "quality": "delayed",
+                "as_of": "2026-11-16T09:00:00Z"
+              }
+            }
+          },
+          "provenance": {
+            "source": "sizing",
+            "quality": "delayed"
+          }
+        },
+        "is_error": false
+      }
+    ],
+    "actions_executed": [],
+    "latency_ms": 16813.311,
+    "cost_usd": 0.0,
+    "capture": {
+      "status": "completed",
+      "provider": "openrouter",
+      "requested_model": "nvidia/nemotron-3.5-lightning:free",
+      "actual_models": [
+        "nvidia/nemotron-3.5-lightning:free"
+      ],
+      "actual_model_unreported_responses": 0,
+      "output_protocol": "json",
+      "errors": [],
+      "completions": [
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "usage": {
+                "prompt_tokens": 2060,
+                "completion_tokens": 498,
+                "total_tokens": 2558,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "usage": {
+                "prompt_tokens": 2248,
+                "completion_tokens": 365,
+                "total_tokens": 2613,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "usage": {
+                "prompt_tokens": 1542,
+                "completion_tokens": 1074,
+                "total_tokens": 2616,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null
+        }
+      ],
+      "protocol_sha256": "bed6855da632a98cb25a1d2607232f7ca07c890a59d179261810213c07020371",
+      "reference_clock": "2026-11-16T10:00:00Z",
+      "fixture_sha256": "00d8502fceb2e23ed0bf6dabef367084cf7f697dcd76a52535de9bbcb3fe2a51",
+      "max_steps": 4,
+      "max_tokens": 2048,
+      "timeout_seconds": 60.0,
+      "network_scope": "model_inference_only",
+      "tool_source": "frozen_fixture",
+      "actions": "simulated_only",
+      "billing_complete": true,
+      "reported_response_cost_usd": 0.0
+    }
+  },
+  "sizing_zero_no_action": {
+    "answer": "Verdict: 0 AAPL shares can be purchased in portfolio paper-1 with a $90 stop. \n- Trade size estimation returned 0 shares (source: get_trade_size, quality: delayed, fixture data). \n- Current marked price for AAPL is $100 (same source, as of 2026-11-16T09:00:00Z). \n- Stop price specified by user: $90. \n- No additional shares fit the portfolio's cash/risk constraints under the available delayed fixture data.",
+    "recommendations": [],
+    "raw_answer": "{\n  \"answer\": \"Verdict: 0 AAPL shares can be purchased in portfolio paper-1 with a $90 stop. \\n- Trade size estimation returned 0 shares (source: get_trade_size, quality: delayed, fixture data). \\n- Current marked price for AAPL is $100 (same source, as of 2026-11-16T09:00:00Z). \\n- Stop price specified by user: $90. \\n- No additional shares fit the portfolio's cash/risk constraints under the available delayed fixture data.\",\n  \"recommendations\": []\n}",
+    "tool_calls": [
+      {
+        "id": "call-48cd4300-5e83-458f-be28-a216aa7fa9d2",
+        "name": "get_trade_size",
+        "arguments": {
+          "symbol": "AAPL",
+          "portfolio_id": "paper-1",
+          "stop_price": 90
+        },
+        "result": {
+          "ok": true,
+          "data": {
+            "symbol": "AAPL",
+            "portfolio_id": "paper-1",
+            "quantity": 0,
+            "marked_prices": {
+              "AAPL": 100
+            },
+            "price_provenance": {
+              "AAPL": {
+                "source": "fixture",
+                "quality": "delayed",
+                "as_of": "2026-11-16T09:00:00Z"
+              }
+            }
+          },
+          "provenance": {
+            "source": "sizing",
+            "quality": "delayed"
+          }
+        },
+        "is_error": false
+      },
+      {
+        "id": "call-887a4c66-a710-4aa9-8d28-bc20d5be8e12",
+        "name": "get_stock_snapshot",
+        "arguments": {
+          "ticker": "AAPL"
+        },
+        "result": {
+          "ok": false,
+          "error": {
+            "code": "frozen_evidence_unavailable",
+            "message": "No frozen evidence exists for this tool and these exact arguments."
+          }
+        },
+        "is_error": true
+      }
+    ],
+    "actions_executed": [],
+    "latency_ms": 25128.011,
+    "cost_usd": 0.0,
+    "capture": {
+      "status": "completed",
+      "provider": "openrouter",
+      "requested_model": "nvidia/nemotron-3.5-lightning:free",
+      "actual_models": [
+        "nvidia/nemotron-3.5-lightning:free"
+      ],
+      "actual_model_unreported_responses": 0,
+      "output_protocol": "json",
+      "errors": [],
+      "completions": [
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "usage": {
+                "prompt_tokens": 2060,
+                "completion_tokens": 432,
+                "total_tokens": 2492,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "usage": {
+                "prompt_tokens": 2247,
+                "completion_tokens": 78,
+                "total_tokens": 2325,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "usage": {
+                "prompt_tokens": 2328,
+                "completion_tokens": 242,
+                "total_tokens": 2570,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null
+        },
+        {
+          "requested_model": "nvidia/nemotron-3.5-lightning:free",
+          "responses": [
+            {
+              "requested_model": "nvidia/nemotron-3.5-lightning:free",
+              "actual_model": "nvidia/nemotron-3.5-lightning:free",
+              "usage": {
+                "prompt_tokens": 1622,
+                "completion_tokens": 1871,
+                "total_tokens": 3493,
+                "cost": 0
+              },
+              "cost_usd": 0.0
+            }
+          ],
+          "error": null
+        }
+      ],
+      "protocol_sha256": "bed6855da632a98cb25a1d2607232f7ca07c890a59d179261810213c07020371",
+      "reference_clock": "2026-11-16T10:00:00Z",
+      "fixture_sha256": "36e40e635d414191e1edb10790c959ebe059cda391e07fa71d4f1b38524d5790",
+      "max_steps": 4,
+      "max_tokens": 2048,
+      "timeout_seconds": 60.0,
+      "network_scope": "model_inference_only",
+      "tool_source": "frozen_fixture",
+      "actions": "simulated_only",
+      "billing_complete": true,
+      "reported_response_cost_usd": 0.0
+    }
+  }
+}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import math
 
 from sqlalchemy import Integer, func, select
 from sqlalchemy.orm import Session
@@ -96,20 +97,53 @@ def persona_weights(db: Session, user_id: str) -> dict[str, float]:
     return weights
 
 
+def _utc_datetime(value: object) -> datetime:
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value)
+    if not isinstance(value, datetime):
+        raise ValueError("A dated timestamp is required")
+    # Historical naive timestamps in this table and the chart provider represent UTC.
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _horizon(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 365:
+        raise ValueError("horizon_days must be an integer from 1 to 365")
+    return value
+
+
+def _positive_price(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("A positive finite price is required")
+    price = float(value)
+    if not math.isfinite(price) or price <= 0:
+        raise ValueError("A positive finite price is required")
+    return price
+
+
 def _is_too_recent(signal: AgentSignal, horizon_days: int) -> bool:
-    if signal.created_at is None:
-        return False
+    """Malformed creation dates fail closed rather than becoming mature signals."""
     try:
-        created = datetime.fromisoformat(signal.created_at)
-    except (ValueError, TypeError):
-        return False
-    age = datetime.now(timezone.utc) - created
-    return age.days < horizon_days
+        return _utc_datetime(signal.created_at) + timedelta(days=_horizon(horizon_days)) > datetime.now(timezone.utc)
+    except (ValueError, TypeError, OverflowError):
+        return True
 
 
 async def evaluate_signals(db: Session, user_id: str, horizon_days: int = 10) -> dict:
+    """Settle against the first completed daily session at the stated horizon.
+
+    Horizons are calendar days in UTC. Allow up to seven subsequent calendar
+    days for weekends/holidays; never substitute a recent quote for a missing
+    historical observation. Current UTC-day bars are conservatively excluded
+    because this provider does not expose exchange session completion flags.
+    """
+    _horizon(horizon_days)
     evaluated = 0
     skipped = 0
+    now = datetime.now(timezone.utc)
+    completed_before = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
     signals = (
         db.query(AgentSignal)
@@ -121,28 +155,44 @@ async def evaluate_signals(db: Session, user_id: str, horizon_days: int = 10) ->
     )
 
     for sig in signals:
-        if _is_too_recent(sig, horizon_days):
-            skipped += 1
-            continue
-
-        price_at = sig.price_at_signal
-        if price_at is None or price_at == 0:
-            skipped += 1
-            continue
-
-        symbol = sig.symbol
         try:
+            horizon = _horizon(sig.horizon_days if sig.horizon_days is not None else horizon_days)
+            target = _utc_datetime(sig.created_at) + timedelta(days=horizon)
+            if target > now:
+                skipped += 1
+                continue
+            start = target.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = min(start + timedelta(days=8), completed_before)
+            if end <= start:
+                skipped += 1
+                continue
+            price_at = _positive_price(sig.price_at_signal)
             chart_provider = await get_chart_provider()
-            bars = await chart_provider.get_ohlcv(symbol, interval="1d", period="3mo")
-            if not bars:
+            bars = await chart_provider.get_ohlcv(sig.symbol, interval="1d", start=start, end=end)
+            candidates = []
+            for bar in bars or []:
+                try:
+                    timestamp = _utc_datetime(bar.timestamp)
+                    if start <= timestamp < end:
+                        candidates.append((timestamp, bar))
+                except (ValueError, TypeError, AttributeError, OverflowError):
+                    continue
+            if not candidates:
                 skipped += 1
                 continue
-            now_price = bars[-1].close
-            if now_price is None or now_price == 0:
-                skipped += 1
-                continue
-
+            # Invalid prices at the target observation must not silently move
+            # settlement to a later, more favorable trading day.
+            candidates.sort(key=lambda item: item[0])
+            now_price = _positive_price(candidates[0][1].close)
+            first_timestamp = candidates[0][0]
+            for timestamp, duplicate in candidates[1:]:
+                if timestamp != first_timestamp:
+                    break
+                if _positive_price(duplicate.close) != now_price:
+                    raise ValueError("Conflicting closes for the horizon observation")
             realized_return_pct = (now_price / price_at - 1) * 100
+            if not math.isfinite(realized_return_pct):
+                raise ValueError("Realized return is not finite")
 
             signal_dir = sig.signal
             if signal_dir == "bullish":
@@ -152,8 +202,8 @@ async def evaluate_signals(db: Session, user_id: str, horizon_days: int = 10) ->
             else:
                 correct = abs(realized_return_pct) < 2
 
-            sig.evaluated_at = datetime.now(timezone.utc).isoformat()
-            sig.horizon_days = horizon_days
+            sig.evaluated_at = now.isoformat()
+            sig.horizon_days = horizon
             sig.realized_return_pct = round(realized_return_pct, 4)
             sig.correct = correct
             evaluated += 1

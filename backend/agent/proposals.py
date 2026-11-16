@@ -129,7 +129,12 @@ async def confirm_proposal(
         elif p.type == "journal_entry":
             result = _confirm_journal_note(db, p)
         elif p.type == "rebalance":
-            result = await _confirm_rebalance(db, p)
+            from backend.agent.trade_preflight import get_risk_policy
+            if get_risk_policy(db, p.user_id)["enabled"] or p.payload.get("risk_preflight"):
+                from backend.agent.rebalance_preflight import execute_rebalance
+                result = await execute_rebalance(db, p, get_paper_engine())
+            else:
+                result = await _confirm_rebalance(db, p)
         elif p.type == "screener_alert":
             result = _confirm_screen_alert(db, p)
         else:
@@ -187,6 +192,10 @@ def expire_stale(db: Session) -> int:
 
 async def _confirm_paper_order(db: Session, p: AgentProposal) -> dict:
     from backend.models import VirtualOrder, VirtualOrderStatus, VirtualPortfolio
+    from backend.agent.trade_preflight import confirm_guarded_order, get_risk_policy
+
+    if get_risk_policy(db, p.user_id)["enabled"] or p.payload.get("preflight"):
+        return await confirm_guarded_order(db, p, get_paper_engine())
 
     payload = p.payload
     symbol = str(payload.get("symbol", "")).strip().upper()
@@ -316,6 +325,14 @@ async def _confirm_rebalance(db: Session, p: AgentProposal) -> dict:
     if len(set(symbols)) != len(symbols):
         raise ValueError("Duplicate rebalance symbols")
     prices, provenance = await _mark_prices(symbols)
+    book = db.query(VirtualPortfolio).filter_by(id=payload.get("portfolio_id"), user_id=p.user_id).first()
+    if book is None:
+        raise ValueError("Owned paper portfolio unavailable")
+    from decimal import Decimal
+    from backend.paper_trading.currency import convert_marked_prices
+    converted, fx = await convert_marked_prices({s: Decimal(str(v)) for s, v in prices.items()}, provenance,
+                         book.base_currency, 3600, _mark_prices)
+    prices = {s: float(v) for s, v in converted.items()}
     for leg in legs:
         symbol = str(leg.get("symbol", ""))
         price = prices.get(symbol)
@@ -361,7 +378,8 @@ async def _confirm_rebalance(db: Session, p: AgentProposal) -> dict:
                 quantity=qty, status="pending", slippage_bps=5.0, commission=commission,
                 signal_metadata={"agent_proposal_id": p.id, "valuation_provenance": provenance.get(symbol), "paper_only": True})
             db.add(order); db.flush()
-            get_paper_engine()._fill_order(db, order, prices[symbol])
+            from backend.agent.trade_preflight import checked_fill
+            checked_fill(db, order, get_paper_engine(), {"base_prices": prices, "fx": fx, "base_currency": book.base_currency})
             db.flush()
             if order.status != "filled":
                 raise ValueError("Paper rebalance cannot be fully funded after fees; no legs were executed")
@@ -467,6 +485,15 @@ def _fmt_watchlist_summary(payload: dict) -> dict:
     return f"Add {symbol} to watchlist"
 
 
+def _finite_number(value: object) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
 def proposal_tool_specs(
     user_id: str,
     run_id: str | None = None,
@@ -474,27 +501,57 @@ def proposal_tool_specs(
     """Return the three propose_* tool specs for *user_id*."""
 
     async def _propose_paper_order(args: dict) -> dict:
-        symbol = str(args.get("symbol", "")).strip().upper()
+        raw_symbol = args.get("symbol")
+        if not isinstance(raw_symbol, str) or not raw_symbol.strip() or len(raw_symbol.strip()) > 64:
+            return {"error": "symbol must be a non-empty string of at most 64 characters"}
+        symbol = raw_symbol.strip().upper()
         side = str(args.get("side", "buy")).strip().lower()
         if side not in ("buy", "sell"):
             return {"error": "side must be buy or sell"}
         quantity = args.get("quantity")
-        if not isinstance(quantity, (int, float)) or quantity <= 0:
-            return {"error": "quantity must be a positive number"}
+        if not _finite_number(quantity) or quantity <= 0:
+            return {"error": "quantity must be a positive finite number"}
+        order_type = args.get("order_type", "market")
+        if order_type not in ("market", "limit", "sl"):
+            return {"error": "order_type must be market, limit or sl"}
+        for field in ("limit_price", "sl_price", "slippage_bps", "commission"):
+            value = args.get(field)
+            if value is None:
+                if (field == "limit_price" and order_type == "limit") or (field == "sl_price" and order_type == "sl"):
+                    return {"error": f"{field} is required for {order_type} orders"}
+                continue
+            positive_required = field in ("limit_price", "sl_price")
+            if not _finite_number(value):
+                return {"error": f"{field} must be a finite number"}
+            if value < 0 or (positive_required and value == 0):
+                return {"error": f"{field} must be {'positive' if positive_required else 'non-negative'}"}
         rationale = str(args.get("rationale", ""))
         payload = {
             "symbol": symbol,
             "side": side,
             "quantity": float(quantity),
-            "order_type": str(args.get("order_type", "market")),
+            "order_type": order_type,
             "portfolio_id": args.get("portfolio_id"),
             "limit_price": args.get("limit_price"),
             "sl_price": args.get("sl_price"),
             "slippage_bps": args.get("slippage_bps", 5.0),
             "commission": args.get("commission", 0.0),
         }
+        if args.get("stop_price") is not None:
+            if not _finite_number(args["stop_price"]) or args["stop_price"] <= 0:
+                return {"error": "stop_price must be a positive finite number"}
+            payload["stop_price"] = args["stop_price"]
         db = SessionLocal()
         try:
+            from backend.agent.trade_preflight import build_preflight, get_risk_policy
+            if get_risk_policy(db, user_id)["enabled"]:
+                try:
+                    preview = await build_preflight(db, user_id, payload)
+                except (ValueError, TypeError, OverflowError) as exc:
+                    db.rollback()
+                    return {"error": str(exc)}
+                payload["portfolio_id"] = preview["portfolio_id"]
+                payload["preflight"] = preview
             summary = _fmt_paper_order_summary(payload)
             result = create_proposal(
                 db, user_id, run_id, "paper_order", payload, summary, rationale,
@@ -548,7 +605,10 @@ def proposal_tool_specs(
         ToolSpec(
             name="propose_paper_order",
             description="Propose a paper trade order. The order is NOT executed until the user confirms. "
-            "Returns a pending proposal with proposal_id. Always include a rationale.",
+            "Returns a pending proposal with proposal_id. Always include a rationale. "
+            "User-configured risk policies enforce cash, concentration and stop-risk checks "
+            "at proposal and confirmation. Supply stop_price for a guarded buy; it is a "
+            "hypothetical sizing assumption, not a placed stop order.",
             parameters={
                 "type": "object",
                 "properties": {
@@ -559,6 +619,7 @@ def proposal_tool_specs(
                     "portfolio_id": {"type": "string"},
                     "limit_price": {"type": "number"},
                     "sl_price": {"type": "number"},
+                    "stop_price": {"type": "number", "exclusiveMinimum": 0, "description": "Hypothetical long-buy risk stop; required when the user's risk policy requires it."},
                     "slippage_bps": {"type": "number", "default": 5.0},
                     "commission": {"type": "number", "default": 0.0},
                     "rationale": {"type": "string"},

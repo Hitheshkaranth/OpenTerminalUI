@@ -1,5 +1,22 @@
 import { api } from "./base";
-import type { GroundingReport } from "../agent/types";
+import type { GroundingReport, RunContext } from "../agent/types";
+
+export interface AgentRiskPolicy {
+  enabled: boolean;
+  max_position_pct: number;
+  risk_budget_pct: number;
+  require_stop: boolean;
+  max_quote_drift_pct: number;
+  max_quote_age_seconds: number;
+}
+
+export function getAgentRiskPolicy(): Promise<AgentRiskPolicy> {
+  return api.get("/agent/risk-policy").then((r) => r.data);
+}
+
+export function saveAgentRiskPolicy(policy: AgentRiskPolicy): Promise<AgentRiskPolicy> {
+  return api.put("/agent/risk-policy", policy).then((r) => r.data);
+}
 
 // ── C12: Threads ────────────────────────────────────────────────────────────
 
@@ -12,6 +29,7 @@ export interface ThreadItem {
 
 export interface ThreadDetail {
   thread_id: string;
+  context?: RunContext;
   messages: {
     id: string;
     role: "user" | "assistant";

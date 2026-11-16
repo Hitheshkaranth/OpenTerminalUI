@@ -274,6 +274,8 @@ class EnsembleOrchestrator:
         return _parse_signals(result.content or "", symbols_set)
 
     async def run(self, subject: str, *, screen_context: dict | None = None):
+        from backend.agent.historical import validate_historical_mode
+        validate_historical_mode("ensemble", screen_context or {})
         personas = PERSONAS
         persona_map = {p.id: p for p in personas}
         persona_list = [{"id": p.id, "label": p.label} for p in personas]

@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "sizing_selection",
+      "passed": false,
+      "tool_requirements": 1,
+      "tools_correct": 1,
+      "tool_correctness": 1.0,
+      "claims_checked": 0,
+      "unsupported_claims": 0,
+      "unsupported_claim_rate": null,
+      "contradicted_statements": 0,
+      "stale_sources": 0,
+      "staleness_disclosed": true,
+      "task_completed": false,
+      "forbidden_tools": [],
+      "unconfirmed_actions": 0,
+      "sizing_violations": [
+        {
+          "origin": "recommendations",
+          "reason": "missing_structured_recommendation"
+        }
+      ],
+      "capture_failed": true,
+      "latency_ms": 60002.13,
+      "cost_usd": null
+    },
+    {
+      "id": "sizing_zero_no_action",
+      "passed": false,
+      "tool_requirements": 1,
+      "tools_correct": 1,
+      "tool_correctness": 1.0,
+      "claims_checked": 0,
+      "unsupported_claims": 0,
+      "unsupported_claim_rate": null,
+      "contradicted_statements": 0,
+      "stale_sources": 0,
+      "staleness_disclosed": true,
+      "task_completed": false,
+      "forbidden_tools": [],
+      "unconfirmed_actions": 0,
+      "sizing_violations": [
+        {
+          "origin": "recommendations",
+          "reason": "missing_structured_recommendation"
+        }
+      ],
+      "capture_failed": true,
+      "latency_ms": 60002.934,
+      "cost_usd": null
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "passed": 0,
+    "task_completion_rate": 0.0,
+    "tool_correctness": 1.0,
+    "unsupported_claim_rate": null,
+    "sizing_violations": 2,
+    "mean_latency_ms": 60002.532,
+    "measured_cost_usd": null,
+    "latency_observation_count": 2,
+    "cost_observation_count": 0
+  },
+  "mode": "captured_frozen_evidence"
+}

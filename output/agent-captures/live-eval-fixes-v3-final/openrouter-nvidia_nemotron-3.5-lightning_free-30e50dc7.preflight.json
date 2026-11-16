@@ -1,0 +1,54 @@
+{
+  "ready": true,
+  "status": "ready",
+  "requested_model": "nvidia/nemotron-3.5-lightning:free",
+  "selected_model": "nvidia/nemotron-3.5-lightning:free",
+  "available_free_models": [
+    "baidu/ernie-5.5-flash-preview:free",
+    "cohere/north-mini-code:free",
+    "dots-studio/dots-3-note-preview:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "google/gemma-4-31b-it:free",
+    "inclusionai/ling-3.2-flash:free",
+    "liquid/lfm-3-1.7b:free",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "nvidia/nemotron-3.5-lightning:free",
+    "nvidia/nemotron-3.5-super-vl:free",
+    "particle-ai/particle-1:free",
+    "recursive/flint-v1.0:free",
+    "thinkingmachines/inkling-2-small:free"
+  ],
+  "advertised_tools": true,
+  "capabilities": {
+    "tool_calling": null,
+    "json_output": null
+  },
+  "errors": [],
+  "requests": [
+    {
+      "method": "GET",
+      "endpoint": "/key",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "endpoint": "/models",
+      "status": 200
+    }
+  ],
+  "inference_requests": 0,
+  "probe_billing": {
+    "cost_usd": null,
+    "billing_complete": false
+  },
+  "metadata": {
+    "checked_at": "2026-11-16T11:37:42.124545+00:00",
+    "catalog_source": "configured_provider_models_endpoint",
+    "no_paid_fallback": true,
+    "pricing_basis": "zero_token_catalog_and_zero_request_cap",
+    "probe_requested": false,
+    "latency_ms": 1442.724
+  },
+  "resolution": null
+}

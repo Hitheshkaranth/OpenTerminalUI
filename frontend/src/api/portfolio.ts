@@ -11,6 +11,7 @@ import type {
   PortfolioMutualFundsResponse,
   PaperPortfolio,
   PaperOrder,
+  PaperOrderResult,
   PaperTrade,
   PaperPosition,
   PaperPerformance,
@@ -145,7 +146,7 @@ export async function fetchPortfolioMutualFunds(): Promise<PortfolioMutualFundsR
   return data;
 }
 
-export async function createPaperPortfolio(payload: { name: string; initial_capital: number }): Promise<PaperPortfolio> {
+export async function createPaperPortfolio(payload: { name: string; initial_capital: number; base_currency?: string }): Promise<PaperPortfolio> {
   const { data } = await api.post<PaperPortfolio>("/paper/portfolios", payload);
   return data;
 }
@@ -169,8 +170,9 @@ export async function placePaperOrder(payload: {
   price?: number;
   limit_price?: number;
   sl_price?: number;
-}): Promise<PaperOrder> {
-  const { data } = await api.post<PaperOrder>("/paper/orders", payload);
+  stop_price?: number;
+}): Promise<PaperOrderResult> {
+  const { data } = await api.post<PaperOrderResult>("/paper/orders", payload);
   return data;
 }
 

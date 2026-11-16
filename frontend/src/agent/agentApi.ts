@@ -1,6 +1,6 @@
 import { api, getAccessToken } from "../api/base";
 import { parseSSEBuffer } from "./sse";
-import type { AgentEvent, RunRequest } from "./types";
+import type { AgentEvent, RunContext, RunRequest } from "./types";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || "/api";
 
@@ -28,6 +28,7 @@ export interface StoredAgentRun {
   prompt: string;
   final: string | null;
   status: "pending" | "running" | "done" | "error" | "cancelled" | "interrupted";
+  context?: RunContext;
 }
 
 export async function getRun(runId: string): Promise<StoredAgentRun> {

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Callable
 
 
 def now_utc() -> datetime:
@@ -52,6 +52,7 @@ async def call_with_failover(
     *args: Any,
     failure_threshold: int,
     cooldown_seconds: int,
+    on_success: Callable[[FailoverSlot], None] | None = None,
     **kwargs: Any,
 ) -> Any:
     if not chain:
@@ -66,11 +67,14 @@ async def call_with_failover(
             continue
         try:
             result = await fn(*args, **kwargs)
-            slot.mark_success()
-            return result
         except Exception as exc:
             slot.mark_failure(exc, threshold=failure_threshold, cooldown_seconds=cooldown_seconds)
             last_exc = exc
+            continue
+        slot.mark_success()
+        if on_success is not None:
+            on_success(slot)
+        return result
 
     if last_exc is not None:
         raise RuntimeError(f"All providers failed for method '{method}': {last_exc}") from last_exc

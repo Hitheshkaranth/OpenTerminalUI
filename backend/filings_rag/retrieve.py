@@ -13,6 +13,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sqlalchemy.orm import Session
 
 from backend.filings_rag.store import get_chunks
+from backend.filings_rag.availability import cutoff_utc, publication_time
 
 _KEYWORD_WEIGHT = 0.15
 _KEYWORD_LIMIT = 3
@@ -60,8 +61,15 @@ def search(
     periods: list[str] | None = None,
     hybrid: bool = False,
     reranker: Callable[[str, list[dict[str, Any]]], list[dict[str, Any]]] | None = None,
+    require_verified_availability: bool = False,
 ) -> list[dict[str, Any]]:
-    chunks = get_chunks(db, symbol, doc_types=doc_types)
+    if as_of is not None:
+        cutoff = cutoff_utc(as_of)
+        chunks = get_chunks(db, symbol, doc_types=doc_types, as_of=as_of,
+                            require_verified_availability=require_verified_availability)
+    else:
+        cutoff = None
+        chunks = get_chunks(db, symbol, doc_types=doc_types)
     # Exclude unknown publication dates for historical queries: ingest time is not publication time.
     def day(value):
         if isinstance(value, datetime):
@@ -78,7 +86,7 @@ def search(
     if before and after and after > before:
         raise ValueError("filed_after must not exceed as_of")
     chunks = [c for c in chunks if (not periods or c.get("period") in periods)
-              and (not before or (day(c.get("filed_at")) is not None and day(c.get("filed_at")) <= before))
+              and (cutoff is None or ((available := publication_time(c, verified=require_verified_availability)) is not None and available <= cutoff))
               and (not after or (day(c.get("filed_at")) is not None and day(c.get("filed_at")) >= after))]
     if not chunks or not query.strip() or k <= 0:
         return []

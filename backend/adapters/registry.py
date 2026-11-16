@@ -126,6 +126,26 @@ class AdapterRegistry:
         finally:
             yahoo_active_exchange.reset(token)
 
+    async def invoke_with_provider(self, exchange: str, method: str, *args: Any, **kwargs: Any) -> tuple[Any, DataAdapter, str]:
+        """Retain the actual successful instance, including a failover provider.
+
+        Ordinary invoke callers keep their existing payload contract. This
+        separate path lets historical evidence identify who actually served it.
+        """
+        token = yahoo_active_exchange.set(str(exchange or ""))
+        selected: list[FailoverSlot] = []
+        try:
+            result = await call_with_failover(
+                self._slots_for_exchange(exchange), method, *args,
+                failure_threshold=self.failure_threshold, cooldown_seconds=self.cooldown_seconds,
+                on_success=selected.append, **kwargs,
+            )
+            return result, selected[0].target, selected[0].name
+        except RuntimeError as exc:
+            raise RuntimeError(f"All adapters failed for {exchange}:{method}: {exc}") from exc
+        finally:
+            yahoo_active_exchange.reset(token)
+
     def health_snapshot(self) -> dict[str, dict[str, Any]]:
         snapshot: dict[str, dict[str, Any]] = {}
         keys = set(self._factory)

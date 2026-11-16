@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
@@ -9,6 +9,7 @@ import {
   placePaperOrder,
 } from "../../api/client";
 import type { PaperOrder, PaperPosition } from "../../types";
+import { extractApiErrorMessage } from "../../api/base";
 import { useQuotesStore } from "../../realtime/useQuotesStream";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useStockStore } from "../../store/stockStore";
@@ -92,6 +93,7 @@ export function HotKeyPanel({
   const queryClient = useQueryClient();
   const panelRef = useRef<HTMLDivElement | null>(null);
   const flashTimerRef = useRef<number | null>(null);
+  const maxHelpId = useId();
   const selectedMarket = useSettingsStore((state) => state.selectedMarket);
   const ticker = useStockStore((state) => state.ticker);
   const stock = useStockStore((state) => state.stock);
@@ -186,7 +188,7 @@ export function HotKeyPanel({
 
   const depthLast = depthQuery.data?.synthetic ? undefined : depthQuery.data?.last_price;
   const lastPrice = Number(
-    tick?.ltp ?? (Number.isFinite(snapshotPrice) ? snapshotPrice : undefined) ?? stock?.current_price ?? depthLast ?? activePosition?.mark_price ?? 0,
+    tick?.ltp ?? (Number.isFinite(snapshotPrice) ? snapshotPrice : undefined) ?? stock?.current_price ?? depthLast ?? 0,
   );
   // The quote stream coerces a missing change_pct to 0, so a tick reporting
   // 0 / 0 is treated as "unknown" and we fall through to the snapshot, then to
@@ -207,14 +209,22 @@ export function HotKeyPanel({
   const previousClose = changePct != null && changePct !== -100 && lastPrice > 0 ? lastPrice / (1 + changePct / 100) : null;
   const change: number | null = previousClose != null ? lastPrice - previousClose : null;
   const realDepth = depthQuery.data && !depthQuery.data.synthetic ? depthQuery.data : undefined;
-  const bestBid = Number(realDepth?.bids?.[0]?.price ?? (lastPrice > 0 ? lastPrice - Math.max(0.01, lastPrice * 0.0005) : 0));
-  const bestAsk = Number(realDepth?.asks?.[0]?.price ?? (lastPrice > 0 ? lastPrice + Math.max(0.01, lastPrice * 0.0005) : 0));
+  const bestBid = Number(realDepth?.bids?.[0]?.price ?? NaN);
+  const bestAsk = Number(realDepth?.asks?.[0]?.price ?? NaN);
+  const quoteCurrency = String(snapshotQuery.data?.currency || snapshotQuery.data?.classification?.currency ||
+    stock?.currency || stock?.classification?.currency || "").trim().toUpperCase();
+  const ledgerCurrency = String(selectedPortfolio?.base_currency || "").trim().toUpperCase();
+  const sameCurrency = !!quoteCurrency && !!ledgerCurrency && quoteCurrency === ledgerCurrency;
   const maxQty = useMemo(() => {
     const cash = Number(selectedPortfolio?.current_cash ?? 0);
     const basis = orderMode === "limit" && limitPrice > 0 ? limitPrice : lastPrice;
-    if (!Number.isFinite(cash) || !Number.isFinite(basis) || basis <= 0) return 0;
-    return Math.max(0, Math.floor(cash / basis));
-  }, [lastPrice, limitPrice, orderMode, selectedPortfolio?.current_cash]);
+    if (!sameCurrency || !Number.isFinite(cash) || !Number.isFinite(basis) || basis <= 0) return 0;
+    return Math.max(0, Math.floor(cash / (basis * 1.002)));
+  }, [lastPrice, limitPrice, orderMode, selectedPortfolio?.current_cash, sameCurrency]);
+  const maxHelp = !quoteCurrency || !ledgerCurrency ? "Max unavailable: quote and ledger currencies must be known."
+    : !sameCurrency ? `Max unavailable: ${quoteCurrency} quote and ${ledgerCurrency} ledger need a verified FX quote.`
+      : maxQty <= 0 ? "Max unavailable: usable price and spendable cash are required."
+        : "Max is a cash estimate with a 0.2% cost buffer; saved risk limits still apply.";
 
   const submitOrder = useMutation({
     mutationFn: async (payload: {
@@ -240,21 +250,30 @@ export function HotKeyPanel({
         queryClient.invalidateQueries({ queryKey: ["paper", "positions", selectedPortfolioId] }),
         queryClient.invalidateQueries({ queryKey: ["paper", "portfolios"] }),
       ]);
+      if (result.status === "rejected") {
+        emitToast(result.risk_rejection || "Paper order rejected by execution checks.", "danger");
+        return;
+      }
+      if (result.status !== "filled") {
+        emitToast(result.status === "pending" ? "Paper order pending. Awaiting a matching quote and execution checks."
+          : `Paper order status: ${result.status}. No fill confirmed.`, "info");
+        return;
+      }
       setFlash(variables.side);
       if (flashTimerRef.current != null) window.clearTimeout(flashTimerRef.current);
       flashTimerRef.current = window.setTimeout(() => setFlash(null), 450);
       emitToast(
-        `${variables.side === "buy" ? "Bought" : "Sold"} ${variables.quantity} ${activeTicker} @ ${formatPrice(result.fill_price ?? variables.limitPrice ?? lastPrice)}`,
+        `${variables.side === "buy" ? "Bought" : "Sold"} ${variables.quantity} ${activeTicker} @ ${result.base_currency || selectedPortfolio?.base_currency || "Currency unavailable"} ${formatPrice(result.fill_price)}`,
         "success",
       );
     },
     onError: (error) => {
-      emitToast(error instanceof Error ? error.message : "Failed to place paper order.", "danger");
+      emitToast(extractApiErrorMessage(error, "Failed to place paper order."), "danger");
     },
   });
 
   const handleSubmit = (side: "buy" | "sell", mode = orderMode) => {
-    void submitOrder.mutateAsync({
+    submitOrder.mutate({
       side,
       mode,
       quantity,
@@ -269,7 +288,7 @@ export function HotKeyPanel({
     }
     const positionQty = Math.abs(Number(activePosition.quantity));
     const side = Number(activePosition.quantity) > 0 ? "sell" : "buy";
-    void submitOrder.mutateAsync({
+    submitOrder.mutate({
       side,
       mode: "market",
       quantity: positionQty,
@@ -289,7 +308,7 @@ export function HotKeyPanel({
   const handleCancelDraft = () => {
     setOrderMode("market");
     setLimitPrice(lastPrice > 0 ? lastPrice : 0);
-    emitToast("Pending-order cancel is not available in the current paper API. Draft cleared instead.", "warning");
+    emitToast("Draft cleared. Cancel pending orders on the Paper Trading page.", "info");
   };
 
   useEffect(() => {
@@ -488,12 +507,15 @@ export function HotKeyPanel({
               ))}
               <button
                 type="button"
-                onClick={() => setQuantity(Math.max(1, maxQty))}
-                className="rounded-sm border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text"
+                onClick={() => setQuantity(maxQty)}
+                disabled={maxQty <= 0}
+                aria-describedby={maxHelpId}
+                className="rounded-sm border border-terminal-border px-2 py-1 text-[11px] text-terminal-muted hover:text-terminal-text disabled:opacity-50"
               >
                 Max
               </button>
             </div>
+            <p id={maxHelpId} className="text-[11px] text-terminal-text">{maxHelp}</p>
           </div>
           <div className="space-y-2">
             <div className="text-[10px] uppercase tracking-[0.18em] text-terminal-muted">Order Type</div>

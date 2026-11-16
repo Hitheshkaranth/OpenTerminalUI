@@ -41,8 +41,9 @@ def _query(engine_or_session, stmt):
 
 
 class FakeChartBar:
-    def __init__(self, close: float):
+    def __init__(self, close: float, timestamp: datetime | None = None):
         self.close = close
+        self.timestamp = timestamp
 
 
 class FakeChartProvider:
@@ -478,9 +479,9 @@ class ChartProviderTest:
     def __init__(self, price_map: dict[str, float]):
         self.price_map = price_map
 
-    async def get_ohlcv(self, symbol: str, interval: str = "1d", period: str = "3mo"):
+    async def get_ohlcv(self, symbol: str, interval: str = "1d", period: str = "3mo", start=None, end=None):
         price = self.price_map.get(symbol, 100.0)
-        return [FakeChartBar(close=price)]
+        return [FakeChartBar(close=price, timestamp=start)]
 
 
 @pytest.mark.asyncio

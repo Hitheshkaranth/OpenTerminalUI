@@ -20,6 +20,21 @@ from backend.models.agent_proposals import AgentProposal  # noqa: F401 — regis
 router = APIRouter(prefix="/agent", tags=["agent"])
 
 
+@router.get("/risk-policy")
+def read_agent_risk_policy(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict:
+    from backend.agent.trade_preflight import get_risk_policy
+    return get_risk_policy(db, current_user.id)
+
+
+@router.put("/risk-policy")
+def update_agent_risk_policy(policy: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict:
+    from backend.agent.trade_preflight import set_risk_policy
+    try:
+        return set_risk_policy(db, current_user.id, policy)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.get("/proposals")
 def list_agent_proposals(
     status: str | None = None,

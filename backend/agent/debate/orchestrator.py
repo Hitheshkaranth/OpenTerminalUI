@@ -92,6 +92,8 @@ class DebateOrchestrator:
         self, subject: str, *, screen_context: dict[str, Any] | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Yield a complete debate stream, containing one and only one final event."""
+        from backend.agent.historical import validate_historical_mode
+        validate_historical_mode("debate", screen_context or {})
         try:
             yield events.phase("analysts", "Analyst team")
             # Local servers and free tiers generally need serialized requests.

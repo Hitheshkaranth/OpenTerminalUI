@@ -1,0 +1,36 @@
+{
+  "ready": false,
+  "status": "authentication_failed",
+  "requested_model": "gemini-3.8-flash",
+  "selected_model": null,
+  "available_free_models": [],
+  "advertised_tools": null,
+  "capabilities": {
+    "tool_calling": null,
+    "json_output": null
+  },
+  "errors": [
+    "Provider authentication failed. Replace or authorize the configured key; no retries were attempted."
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "endpoint": "/models",
+      "status": 401
+    }
+  ],
+  "inference_requests": 0,
+  "probe_billing": {
+    "cost_usd": null,
+    "billing_complete": false
+  },
+  "metadata": {
+    "checked_at": "2026-11-16T11:27:43.978634+00:00",
+    "catalog_source": "configured_provider_models_endpoint",
+    "no_paid_fallback": true,
+    "pricing_basis": null,
+    "probe_requested": false,
+    "latency_ms": 214.561
+  },
+  "resolution": null
+}

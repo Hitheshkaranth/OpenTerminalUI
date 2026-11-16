@@ -448,6 +448,24 @@ async def test_screen_alert_rejects_unimplemented_fundamental_expression(monkeyp
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("raw_price", [True, False, 0, float("nan"), float("inf"), -1])
+async def test_mark_prices_rejects_invalid_provider_price(monkeypatch, raw_price):
+    from backend.agent.tools.action_tools import _mark_prices
+
+    class Fetcher:
+        async def fetch_stock_snapshot(self, symbol):
+            return {"current_price": raw_price, "price": 125,
+                    "provenance": {"quality": "live", "source": "fixture"}}
+
+    async def dependency():
+        return Fetcher()
+
+    monkeypatch.setattr("backend.api.deps.get_unified_fetcher", dependency)
+    prices, _ = await _mark_prices(["NSE:TCS"])
+    assert prices == {}
+
+
+@pytest.mark.asyncio
 async def test_mark_prices_rejects_legacy_synthetic_snapshot(monkeypatch):
     from backend.agent.tools.action_tools import _mark_prices
     class Fetcher:
