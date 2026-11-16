@@ -126,9 +126,25 @@ Tijori-style company research, blended into the Security Hub: operating KPIs ext
 
 A slide-over console (`Ctrl+J`) that researches on demand. It picks tools, fetches data, and writes the answer from the results, rendering snapshots and tables as cards. Modes include **multi-agent debate** (analyst team → bull vs bear → portfolio-manager decision), **Strategy Lab** (train → tune → test a frozen SMA winner on a chronological holdout), **screen membership** and **ensemble** analysis. The same tool registry is exposed as an authenticated **MCP server** for Claude Code, Claude Desktop and other MCP clients.
 
-The agent can estimate incremental long paper-trade sizes using marked portfolio equity, a user-specified stop, available cash and concentration limits. Enable **Paper risk limits** in the console to enforce saved limits for agent and manual paper orders, delayed fills and atomic rebalances, with dated FX conversion into each paper book's base currency. Agent actions still require confirmation. Strategy Lab reports chronological holdout and expanding walk-forward results with persistent repeated-test accounting. Historical research threads restrict tools to cutoff-eligible filings, verified news and released fundamentals; ensemble outcomes settle at their stated horizon. See the [roadmap implementation, model captures and limitations](docs/agent-roadmap-implementation.md) and [competitive comparison](docs/agent-competitive-analysis.md).
-
 <img src="assets/readme/agent.jpg" alt="AI agent comparing MSFT and GOOGL using live tool calls" width="100%" />
+
+**Size a paper trade before proposing it.** Supply a hypothetical stop and the agent estimates an incremental long-buy allowance from marked portfolio equity, available cash, concentration and stop-risk limits. A zero allowance means no additional shares fit. Research and sizing requests do not authorize an order proposal; agent actions still require confirmation.
+
+**Enforce saved paper risk limits.** Open **Paper risk limits** in the console to enable concentration, stop-risk, quote-age and price-drift checks. Limits apply to agent and manual paper orders, repeat at confirmation and delayed fills, and account for reserved capacity. Atomic rebalances check their buy stops and portfolio exposure; foreign quotes require dated FX conversion into the paper book's base currency.
+
+<img src="assets/readme/agent-paper-risk-limits.png" alt="Current agent console with paper risk enforcement enabled, position and stop-risk budgets, quote limits and pending-capacity rules" width="640" />
+
+**Research with a historical cutoff.** Historical threads restrict tools to cutoff-eligible filings, verified news and released fundamentals. Current notes and incompatible modes are disabled so they cannot silently enter the historical evidence. Start a new thread to change its cutoff.
+
+<img src="assets/readme/agent-historical-evidence.png" alt="Agent console with a historical evidence cutoff and incompatible analysis modes disabled" width="640" />
+
+**Keep strategy testing separate from tuning.** Strategy Lab freezes the selected SMA strategy before chronological holdout and expanding walk-forward tests, and persists repeated-test accounting. Ensemble outcomes settle at their stated horizon. These are simulated research results, not actual investment returns.
+
+<img src="assets/readme/paper-risk-order-entry.png" alt="Paper order entry showing the USD ledger, order-trigger price and a separate hypothetical risk-stop field" width="100%" />
+
+**Paper order entry:** the order trigger and hypothetical risk stop are separate inputs. A hypothetical stop supports sizing and risk checks; it does not place a protective stop order or guarantee a fill price. The three feature screenshots above use the current UI with illustrative, mocked API responses; no order was submitted.
+
+Frozen-evidence model evaluation records actual tool calls, final responses, latency and reported billing, with provider checks, bounded recovery and preserved failures. See the [evaluation guide](backend/evaluation/README.md), [live-model results and remaining limitations](docs/live-model-evaluation-fixes.md), [roadmap implementation](docs/agent-roadmap-implementation.md) and [competitive comparison](docs/agent-competitive-analysis.md).
 
 ### Markets, charts and discovery
 
@@ -213,6 +229,9 @@ The agent can estimate incremental long paper-trade sizes using marked portfolio
 | **Map a company's ecosystem** | **Peers → Value chain**: customers and suppliers from filings, resolved to tickers, plus competitors and raw materials |
 | **Know when a commodity move matters** | **Commodities → Linked companies**: who gains and who loses when crude, steel or copper moves |
 | **Get a second opinion** | Agent console: "Is NVDA above its 52-week midpoint, and how does its P/E compare with AMD?" Or run a **debate** for a bull / bear / PM decision |
+| **Size a paper trade** | Ask the agent for an estimate with a symbol, paper portfolio and hypothetical stop; review the allowance before requesting an order proposal |
+| **Enforce paper risk limits** | Agent console → **Paper risk limits** → enable and save position, stop-risk and quote limits for agent and manual paper orders |
+| **Research as of a date** | Start a new agent thread, set **Evidence cutoff (UTC)** and use only the available cutoff-eligible sources |
 | **Generate ideas** | Ideas board, guru screens, thematic indices, hotlists, and filings-based screener fields (e.g. strong order-book signal) |
 | **Test before you trade** | Backtest a strategy, validate it walk-forward and with Monte Carlo, then paper trade it |
 | **Watch for change** | Filings watch flags new warning letters, guidance cuts or big order wins; alerts fire actions automatically |
