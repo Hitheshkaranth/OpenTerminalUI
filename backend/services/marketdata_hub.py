@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 import time
 import uuid
@@ -71,11 +72,67 @@ def _parse_symbol_token(token: str) -> tuple[str, str] | None:
     return m.group(1), m.group(2)
 
 
+def _env_int(name: str, default: int) -> int:
+    try:
+        value = int(str(os.getenv(name, "")).strip() or default)
+        return value if value > 0 else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _socket_user_id(websocket: Any) -> str | None:
+    state = getattr(websocket, "state", None)
+    value = getattr(state, "user_id", None) if state is not None else None
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+CLIENT_SEND_QUEUE_MAXSIZE = 500
+PARTIAL_CANDLE_MIN_INTERVAL_SECONDS = 1.0
+FINNHUB_POLL_CONCURRENCY = 8
+
+
+class _ClientChannel:
+    """Bounded per-socket outbox drained by one writer task.
+
+    Producers never await the socket: they enqueue and move on. When the queue is
+    full the oldest frame is dropped (and counted) so a slow client can never block
+    the hub or other clients.
+    """
+
+    __slots__ = ("websocket", "user_id", "queue", "dropped", "task")
+
+    def __init__(self, websocket: Any, user_id: str | None, maxsize: int = CLIENT_SEND_QUEUE_MAXSIZE) -> None:
+        self.websocket = websocket
+        self.user_id = user_id
+        self.queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=maxsize)
+        self.dropped = 0
+        self.task: asyncio.Task | None = None
+
+    def enqueue(self, message: dict[str, Any]) -> None:
+        while True:
+            try:
+                self.queue.put_nowait(message)
+                return
+            except asyncio.QueueFull:
+                try:
+                    self.queue.get_nowait()
+                    self.dropped += 1
+                except asyncio.QueueEmpty:  # pragma: no cover - race-free in a single loop
+                    pass
+
+
 class MarketDataHub:
     def __init__(self, poll_interval_seconds: float = 2.0) -> None:
         self.poll_interval_seconds = poll_interval_seconds
         self._lock = asyncio.Lock()
         self._connections: dict[WebSocket, set[str]] = {}
+        self._clients: dict[Any, _ClientChannel] = {}
+        self._max_symbols_per_conn = _env_int("WS_MAX_SYMBOLS_PER_CONN", 100)
+        self._max_total_symbols = _env_int("WS_MAX_TOTAL_SYMBOLS", 2000)
+        self._partial_candle_last_emit: dict[tuple[str, str], float] = {}
         self._poll_task: asyncio.Task | None = None
         self._running = False
         self._instance_id = str(uuid.uuid4())
@@ -184,8 +241,11 @@ class MarketDataHub:
             self._market_status_task = None
             sockets = list(self._connections.keys())
             alert_sockets = list(self._alert_connections)
+            channels = list(self._clients.values())
             self._connections.clear()
             self._alert_connections.clear()
+            self._clients.clear()
+            self._partial_candle_last_emit.clear()
             self._stream_symbols_to_token.clear()
             self._stream_token_to_symbol.clear()
             self._nfo_chain_last_fetch.clear()
@@ -213,6 +273,12 @@ class MarketDataHub:
             except asyncio.CancelledError:
                 pass
 
+        writer_tasks = [ch.task for ch in channels if ch.task is not None and not ch.task.done()]
+        for writer in writer_tasks:
+            writer.cancel()
+        if writer_tasks:
+            await asyncio.gather(*writer_tasks, return_exceptions=True)
+
         await self._bus.disconnect()
 
         if self._kite_stream:
@@ -234,32 +300,119 @@ class MarketDataHub:
 
         logger.info("MarketDataHub stopped")
 
-    async def register(self, websocket: WebSocket) -> None:
+    # ------------------------------------------------------------------
+    # Per-socket outbox (SCALE-4) and user binding (SEC-2)
+    # ------------------------------------------------------------------
+    def _channel_for(self, websocket: Any, user_id: str | None = None) -> _ClientChannel:
+        channel = self._clients.get(websocket)
+        if channel is None:
+            channel = _ClientChannel(websocket, user_id if user_id is not None else _socket_user_id(websocket))
+            self._clients[websocket] = channel
+        elif user_id is not None:
+            channel.user_id = user_id
+        if channel.task is None:
+            channel.task = asyncio.create_task(self._writer_loop(channel), name="marketdata-hub-ws-writer")
+        return channel
+
+    def _deliver(self, websocket: Any, message: dict[str, Any]) -> None:
+        self._channel_for(websocket).enqueue(message)
+
+    async def _writer_loop(self, channel: _ClientChannel) -> None:
+        websocket = channel.websocket
+        try:
+            while True:
+                message = await channel.queue.get()
+                try:
+                    await websocket.send_json(message)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    break
+        except asyncio.CancelledError:
+            return
+        # Send failed: the client is gone. Forget it without blocking anyone else.
+        await self._drop_client(websocket, channel)
+
+    async def _drop_client(self, websocket: Any, channel: _ClientChannel) -> None:
+        async with self._lock:
+            if self._clients.get(websocket) is channel:
+                self._clients.pop(websocket, None)
+            had_subscriptions = self._connections.pop(websocket, None) is not None
+            self._alert_connections.discard(websocket)
+        logger.debug("Dropped stale WS client (dropped_frames=%s)", channel.dropped)
+        if had_subscriptions:
+            await self._sync_stream_subscriptions()
+
+    async def _release_channel(self, websocket: Any) -> None:
+        channel = self._clients.pop(websocket, None)
+        if channel is None or channel.task is None:
+            return
+        task = channel.task
+        if task is asyncio.current_task() or task.done():
+            return
+        task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    def dropped_frames(self) -> int:
+        return sum(ch.dropped for ch in self._clients.values())
+
+    async def register(self, websocket: WebSocket, user_id: str | None = None) -> None:
         await self.start()
         async with self._lock:
             self._connections.setdefault(websocket, set())
+            self._channel_for(websocket, user_id)
             logger.info("WS client connected: total=%s", len(self._connections))
 
     async def unregister(self, websocket: WebSocket) -> None:
         async with self._lock:
             self._connections.pop(websocket, None)
             logger.info("WS client disconnected: total=%s", len(self._connections))
+        await self._release_channel(websocket)
         await self._sync_stream_subscriptions()
 
     async def subscribe(self, websocket: WebSocket, symbols: list[str]) -> list[str]:
         accepted: list[str] = []
+        rejected: list[str] = []
         async with self._lock:
             if websocket not in self._connections:
                 return accepted
             bucket = self._connections[websocket]
+            hub_symbols: set[str] | None = None
             for raw in symbols:
                 parsed = _parse_symbol_token(raw)
                 if not parsed:
                     continue
                 market, symbol = parsed
                 token = f"{market}:{symbol}"
+                if token in bucket:
+                    accepted.append(token)
+                    continue
+                if len(bucket) >= self._max_symbols_per_conn:
+                    rejected.append(token)
+                    continue
+                if hub_symbols is None:
+                    hub_symbols = set().union(*self._connections.values())
+                if token not in hub_symbols and len(hub_symbols) >= self._max_total_symbols:
+                    rejected.append(token)
+                    continue
                 bucket.add(token)
+                hub_symbols.add(token)
                 accepted.append(token)
+        if rejected:
+            self._deliver(
+                websocket,
+                {
+                    "type": "error",
+                    "code": "symbol_limit",
+                    "message": "Subscription limit reached; some symbols were not subscribed",
+                    "rejected": rejected,
+                    "max_symbols_per_connection": self._max_symbols_per_conn,
+                    "max_total_symbols": self._max_total_symbols,
+                },
+            )
         await self._sync_stream_subscriptions()
         return accepted
 
@@ -295,41 +448,29 @@ class MarketDataHub:
             return
 
         async with self._lock:
-            targets = [(ws, subs) for ws, subs in self._connections.items() if symbol_token in subs]
+            targets = [ws for ws, subs in self._connections.items() if symbol_token in subs]
 
-        if not targets:
-            return
-
-        stale: list[WebSocket] = []
-        for ws, _ in targets:
-            try:
-                await ws.send_json(payload)
-            except Exception:
-                stale.append(ws)
-
-        if stale:
-            async with self._lock:
-                for ws in stale:
-                    self._connections.pop(ws, None)
-            logger.debug("Dropped %s stale WS clients", len(stale))
-            await self._sync_stream_subscriptions()
+        # Enqueue only: each socket's writer task does the (possibly slow) send.
+        for ws in targets:
+            self._deliver(ws, payload)
 
     async def broadcast_to_all(self, payload: dict[str, Any]) -> None:
         async with self._lock:
             sockets = list(self._connections.keys())
-        if not sockets:
-            return
-        stale: list[WebSocket] = []
         for ws in sockets:
-            try:
-                await ws.send_json(payload)
-            except Exception:
-                stale.append(ws)
-        if stale:
-            async with self._lock:
-                for ws in stale:
-                    self._connections.pop(ws, None)
-            await self._sync_stream_subscriptions()
+            self._deliver(ws, payload)
+
+    async def send_to_user(self, user_id: str, message: dict[str, Any]) -> None:
+        """Contract C3: deliver ``message`` to every quote/alert socket of ``user_id``."""
+        uid = str(user_id or "").strip()
+        if not uid:
+            return
+        async with self._lock:
+            sockets = list(dict.fromkeys([*self._connections.keys(), *self._alert_connections]))
+        for ws in sockets:
+            channel = self._channel_for(ws)
+            if channel.user_id == uid:
+                channel.enqueue(message)
 
     async def _market_status_loop(self) -> None:
         from backend.reports.routes import market_status
@@ -359,28 +500,29 @@ class MarketDataHub:
             },
         )
 
-    async def register_alert_socket(self, websocket: WebSocket) -> None:
+    async def register_alert_socket(self, websocket: WebSocket, user_id: str | None = None) -> None:
         await self.start()
         async with self._lock:
             self._alert_connections.add(websocket)
+            self._channel_for(websocket, user_id)
 
     async def unregister_alert_socket(self, websocket: WebSocket) -> None:
         async with self._lock:
             self._alert_connections.discard(websocket)
+        await self._release_channel(websocket)
 
     async def broadcast_alert(self, payload: dict[str, Any]) -> None:
+        """Contract C2: a payload with ``user_id`` goes only to that user's alert
+        sockets; ``user_id`` None/missing (system alerts) goes to every socket."""
+        raw_uid = payload.get("user_id") if isinstance(payload, dict) else None
+        target_uid = str(raw_uid).strip() if raw_uid is not None else ""
         async with self._lock:
             sockets = list(self._alert_connections)
-        stale: list[WebSocket] = []
         for ws in sockets:
-            try:
-                await ws.send_json(payload)
-            except Exception:
-                stale.append(ws)
-        if stale:
-            async with self._lock:
-                for ws in stale:
-                    self._alert_connections.discard(ws)
+            channel = self._channel_for(ws)
+            if target_uid and channel.user_id != target_uid:
+                continue
+            channel.enqueue(payload)
 
     def register_tick_listener(self, callback) -> None:
         if callback in self._tick_listeners:
@@ -552,7 +694,15 @@ class MarketDataHub:
                 }
                 await self._bus.publish_bar(market, interval, bar_payload)
 
+        # Partial (in-progress) candles: at most one emission per symbol per interval
+        # per second, however fast ticks arrive. Closed candles are never throttled.
+        now_mono = time.monotonic()
         for sym, interval, candle in self._candle_aggregator.current_candles(symbol):
+            key = (sym, interval)
+            last = self._partial_candle_last_emit.get(key)
+            if last is not None and now_mono - last < PARTIAL_CANDLE_MIN_INTERVAL_SECONDS:
+                continue
+            self._partial_candle_last_emit[key] = now_mono
             await self._broadcast_candle(sym, interval, candle, status="partial")
 
     async def _fetch_ticks(self, tokens: list[str]) -> dict[str, dict[str, Any]]:
@@ -593,8 +743,16 @@ class MarketDataHub:
             return []
 
         if market in US_MARKETS and fetcher.finnhub.api_key:
+            # Bound the per-poll fan-out so hundreds of subscribed US symbols don't
+            # open hundreds of concurrent upstream requests.
+            semaphore = asyncio.Semaphore(FINNHUB_POLL_CONCURRENCY)
+
+            async def _bounded_quote(sym: str) -> Any:
+                async with semaphore:
+                    return await fetcher.finnhub.get_quote(sym)
+
             payloads = await asyncio.gather(
-                *(fetcher.finnhub.get_quote(symbol) for symbol in symbol_list),
+                *(_bounded_quote(symbol) for symbol in symbol_list),
                 return_exceptions=True,
             )
             quotes: list[dict[str, Any]] = []

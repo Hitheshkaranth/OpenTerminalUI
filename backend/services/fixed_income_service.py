@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 from backend.config.settings import get_settings
 from backend.shared.cache import cache
+from backend.shared.http_client import shared_session
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +179,7 @@ class FixedIncomeService:
                 "sort_order": "desc"
             }
 
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with shared_session(timeout=10.0) as client:
                 resp = await client.get(url, params=params)
                 resp.raise_for_status()
                 data = resp.json()
@@ -248,7 +249,7 @@ class FixedIncomeService:
                 "sort_order": "desc"
             }
 
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with shared_session(timeout=10.0) as client:
                 resp = await client.get(url, params=params)
                 resp.raise_for_status()
                 data = resp.json()
@@ -309,7 +310,7 @@ class FixedIncomeService:
                 "sort_order": "asc"
             }
 
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with shared_session(timeout=10.0) as client:
                 resp = await client.get(url, params=params)
                 resp.raise_for_status()
                 data = resp.json()
@@ -328,7 +329,7 @@ class FixedIncomeService:
             return response
         except Exception as e:
             logger.error(f"Error fetching 2s10s history: {e}")
-            return {"error": str(e)}
+            return {"error": "2s10s history unavailable"}
 
     def _get_mock_yield_curve(self, date_str: Optional[str] = None) -> Dict[str, Any]:
         """Generate mock yield curve data."""

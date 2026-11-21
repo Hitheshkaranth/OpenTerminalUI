@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import asyncio
 from datetime import datetime, timedelta
 
@@ -20,6 +22,7 @@ from backend.core.statlab import (
 )
 
 router = APIRouter(prefix="/api/statlab", tags=["statlab"])
+logger = logging.getLogger(__name__)
 
 
 class ForecastRequest(BaseModel):
@@ -135,7 +138,8 @@ async def post_forecast(req: ForecastRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Statlab failed: {e}")
+        logger.exception("Statlab analysis failed")
+        raise HTTPException(status_code=500, detail="Statlab failed") from e
 
 
 @router.post("/cointegration")
@@ -168,7 +172,8 @@ async def post_cointegration(req: CointegrationRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Statlab failed: {e}")
+        logger.exception("Statlab analysis failed")
+        raise HTTPException(status_code=500, detail="Statlab failed") from e
 
 
 @router.post("/stationarity")
@@ -180,7 +185,8 @@ async def post_stationarity(req: StationarityRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Statlab failed: {e}")
+        logger.exception("Statlab analysis failed")
+        raise HTTPException(status_code=500, detail="Statlab failed") from e
 
 
 @router.post("/decomposition")
@@ -192,7 +198,8 @@ async def post_decomposition(req: DecompositionRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Statlab failed: {e}")
+        logger.exception("Statlab analysis failed")
+        raise HTTPException(status_code=500, detail="Statlab failed") from e
 
 
 @router.post("/regression")
@@ -206,7 +213,8 @@ async def post_regression(req: RegressionRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Statlab failed: {e}")
+        logger.exception("Statlab analysis failed")
+        raise HTTPException(status_code=500, detail="Statlab failed") from e
 
 
 @router.post("/autocorrelation")
@@ -220,7 +228,8 @@ async def post_autocorrelation(req: AutocorrRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Statlab failed: {e}")
+        logger.exception("Statlab analysis failed")
+        raise HTTPException(status_code=500, detail="Statlab failed") from e
 
 
 @router.post("/causality")
@@ -234,7 +243,8 @@ async def post_causality(req: CausalityRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Statlab failed: {e}")
+        logger.exception("Statlab analysis failed")
+        raise HTTPException(status_code=500, detail="Statlab failed") from e
 
 
 @router.post("/regimes")
@@ -246,4 +256,5 @@ async def post_regimes(req: RegimeRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Statlab failed: {e}")
+        logger.exception("Statlab analysis failed")
+        raise HTTPException(status_code=500, detail="Statlab failed") from e

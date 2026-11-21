@@ -186,13 +186,13 @@ def _read_watchlist(rid: str | None, user_id: str) -> dict[str, Any]:
 def _read_portfolio(rid: str | None, user_id: str) -> dict[str, Any]:
     from backend.db.models import Holding
 
-    # Legacy holdings table has no user_id column — mirrors
-    # backend.agent.tools.portfolio_tools._holdings_snapshot's scoping.
+    # Scoped to the API key owner, mirroring
+    # backend.agent.tools.portfolio_tools._holdings_snapshot.
     del rid  # only "default" is meaningful; anything else resolves the same snapshot
 
     db = SessionLocal()
     try:
-        holdings = db.query(Holding).all()
+        holdings = db.query(Holding).filter(Holding.user_id == user_id).all() if user_id else []
         total_cost = 0.0
         total_value = 0.0
         rows = []

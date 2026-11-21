@@ -7,6 +7,8 @@ from typing import Any, Awaitable, Callable
 
 import httpx
 
+from backend.shared.http_client import get_http_client
+
 # Async callback used to surface transient progress (model attempts, rate-limit
 # backoffs) to the agent event stream while a single completion is in flight.
 StatusCallback = Callable[[str], Awaitable[None]]
@@ -143,12 +145,9 @@ class OpenAICompatibleProvider:
             )
             for attempt in range(self.max_attempts):
                 try:
-                    async with httpx.AsyncClient(
-                        timeout=self.timeout, trust_env=False, transport=self._transport
-                    ) as client:
-                        resp = await client.post(url, json=payload, headers=self._headers())
-                        resp.raise_for_status()
-                        return self._parse(resp.json(), model=model)
+                    resp = await self._post(url, payload)
+                    resp.raise_for_status()
+                    return self._parse(resp.json(), model=model)
                 except httpx.HTTPStatusError as exc:
                     status = exc.response.status_code if exc.response is not None else 0
                     # Keep a slice of the body: 4xx from a local server usually says exactly
@@ -179,6 +178,12 @@ class OpenAICompatibleProvider:
                         continue
                     break
         raise last_exc or LLMError("LLM request failed")
+
+    async def _post(self, url: str, payload: dict[str, Any]) -> httpx.Response:
+        if self._transport is not None:  # test-injected transport needs its own client
+            async with httpx.AsyncClient(timeout=self.timeout, trust_env=False, transport=self._transport) as client:
+                return await client.post(url, json=payload, headers=self._headers())
+        return await get_http_client().post(url, json=payload, headers=self._headers(), timeout=self.timeout)
 
     @staticmethod
     def _parse(data: dict[str, Any], *, model: str | None = None) -> AssistantMessage:

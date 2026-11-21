@@ -469,6 +469,7 @@ class PortfolioAnalyticsService:
         portfolio_id: str,
         period: str,
         benchmark: str,
+        user_id: str | None = None,
     ) -> dict[str, Any]:
         period_label = _normalize_period(period)
         range_str = PORTFOLIO_PERIOD_RANGE_MAP[period_label]
@@ -476,7 +477,10 @@ class PortfolioAnalyticsService:
 
         portfolio_key = str(portfolio_id or "").strip()
         if portfolio_key.lower() in {"", "current", "legacy", "default"}:
-            holdings_rows = list(db.query(Holding).all())
+            holdings_query = db.query(Holding)
+            if user_id is not None:
+                holdings_query = holdings_query.filter(Holding.user_id == user_id)
+            holdings_rows = list(holdings_query.all())
             if not holdings_rows:
                 return {
                     "portfolio_id": "current",
@@ -542,11 +546,17 @@ class PortfolioAnalyticsService:
                 "benchmark_return": benchmark_return,
             }
 
+        def _portfolio_query():
+            query = db.query(PortfolioORM).filter(PortfolioORM.id == portfolio_key)
+            if user_id is not None:
+                query = query.filter(PortfolioORM.user_id == user_id)
+            return query.first()
+
         try:
-            portfolio = db.query(PortfolioORM).filter(PortfolioORM.id == portfolio_key).first()
+            portfolio = _portfolio_query()
         except OperationalError:
             init_db()
-            portfolio = db.query(PortfolioORM).filter(PortfolioORM.id == portfolio_key).first()
+            portfolio = _portfolio_query()
         if portfolio is None:
             raise ValueError("Portfolio not found")
 
@@ -618,8 +628,10 @@ class PortfolioAnalyticsService:
         portfolio_id: str,
         period: str = "1M",
         benchmark: str = "NIFTY50",
+        user_id: str | None = None,
     ) -> dict[str, Any]:
-        context = await self._load_portfolio_attribution_context(db, portfolio_id, period, benchmark)
+        scope = {"user_id": user_id} if user_id is not None else {}
+        context = await self._load_portfolio_attribution_context(db, portfolio_id, period, benchmark, **scope)
         holdings = list(context.get("holdings") or [])
         portfolio_total_return = float(context.get("portfolio_return") or 0.0)
         benchmark_total_return = float(context.get("benchmark_return") or 0.0)
@@ -734,21 +746,32 @@ class PortfolioAnalyticsService:
             "factors": factors,
         }
 
-    def list_tax_lots(self, db: Session, ticker: str | None = None) -> list[TaxLot]:
-        try:
+    def list_tax_lots(self, db: Session, ticker: str | None = None, user_id: str | None = None) -> list[TaxLot]:
+        def _query() -> list[TaxLot]:
             q = db.query(TaxLot)
-            if ticker:
-                q = q.filter(TaxLot.ticker == ticker.strip().upper())
-            return q.order_by(TaxLot.buy_date.asc(), TaxLot.id.asc()).all()
-        except OperationalError:
-            init_db()
-            q = db.query(TaxLot)
+            if user_id is not None:
+                q = q.filter(TaxLot.user_id == user_id)
             if ticker:
                 q = q.filter(TaxLot.ticker == ticker.strip().upper())
             return q.order_by(TaxLot.buy_date.asc(), TaxLot.id.asc()).all()
 
-    def add_tax_lot(self, db: Session, ticker: str, quantity: float, buy_price: float, buy_date: str) -> TaxLot:
+        try:
+            return _query()
+        except OperationalError:
+            init_db()
+            return _query()
+
+    def add_tax_lot(
+        self,
+        db: Session,
+        ticker: str,
+        quantity: float,
+        buy_price: float,
+        buy_date: str,
+        user_id: str | None = None,
+    ) -> TaxLot:
         row = TaxLot(
+            user_id=user_id,
             ticker=ticker.strip().upper(),
             quantity=float(quantity),
             remaining_quantity=float(quantity),
@@ -790,9 +813,10 @@ class PortfolioAnalyticsService:
         sell_date: str,
         method: str,
         specific_lot_ids: list[int] | None = None,
+        user_id: str | None = None,
     ) -> dict[str, Any]:
         symbol = ticker.strip().upper()
-        lots = self.list_tax_lots(db, symbol)
+        lots = self.list_tax_lots(db, symbol, user_id=user_id)
         ordered = self._ordered_lots(lots, method, specific_lot_ids)
         remaining = float(sell_quantity)
         sell_dt = datetime.fromisoformat(sell_date).date() if "T" in sell_date else date.fromisoformat(sell_date)
@@ -845,8 +869,8 @@ class PortfolioAnalyticsService:
             "long_term_gain": ltcg,
         }
 
-    async def tax_lot_summary(self, db: Session, ticker: str | None = None) -> dict[str, Any]:
-        lots = self.list_tax_lots(db, ticker)
+    async def tax_lot_summary(self, db: Session, ticker: str | None = None, user_id: str | None = None) -> dict[str, Any]:
+        lots = self.list_tax_lots(db, ticker, user_id=user_id)
         symbols = sorted({x.ticker for x in lots})
         current_prices: dict[str, float] = {}
         for s in symbols:

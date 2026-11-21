@@ -7,7 +7,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from types import SimpleNamespace
+
 from backend.api.deps import get_db
+from backend.auth.deps import get_current_user
 from backend.experiments import service
 from backend.experiments.models import Experiment
 from backend.experiments.routes import router
@@ -27,6 +30,8 @@ def registry():
         yield session
 
     app.dependency_overrides[get_db] = database
+    # Legacy rows predate ownership (owner_id NULL); only admins can reach them.
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id="admin-1", role="admin")
     with TestClient(app) as client:
         yield client, session
     session.close()

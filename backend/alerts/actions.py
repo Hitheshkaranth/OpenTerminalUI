@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import httpx
 from sqlalchemy.orm import Session
 
+from backend.alerts import delivery as _delivery
 from backend.models import AlertORM, VirtualOrder, VirtualOrderStatus, VirtualPortfolio, WatchlistORM
 from backend.paper_trading import get_paper_engine
 
@@ -80,6 +80,10 @@ def validate_actions(raw: Any) -> list[dict[str, Any]]:
             url = str(item.get("url") or "").strip()
             if not url.startswith("http://") and not url.startswith("https://"):
                 raise ActionValidationError("webhook: url must start with http:// or https://")
+            try:
+                _delivery.check_outbound_url_static(url)
+            except _delivery.OutboundURLError as exc:
+                raise ActionValidationError(f"webhook: {exc}") from exc
             payload = item.get("payload")
             if payload is not None and not isinstance(payload, dict):
                 raise ActionValidationError("webhook: payload must be a dict or null")
@@ -115,12 +119,12 @@ async def run_actions(
             else:
                 result = {"type": action_type, "ok": False, "detail": f"unsupported action type: {action_type}"}
             results.append(result)
-        except Exception as exc:
+        except Exception:
             logger.exception("Action %s failed for alert %s", action.get("type"), alert.id)
             results.append({
                 "type": action.get("type", "unknown"),
                 "ok": False,
-                "detail": str(exc)[:200],
+                "detail": "action failed",
             })
 
     return results
@@ -176,6 +180,8 @@ async def _run_paper_order(
     db.commit()
     db.refresh(row)
 
+    # The engine claims the order atomically (pending -> filling), so a tick
+    # worker racing this call cannot fill it a second time.
     await get_paper_engine().maybe_fill_market_order_now(db, row)
     db.commit()
     db.refresh(row)
@@ -240,13 +246,11 @@ async def _run_webhook(
         body.update(payload)
 
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(url, json=body)
-        ok = 200 <= resp.status_code < 300
-        return {
-            "type": "webhook",
-            "ok": ok,
-            "detail": f"status {resp.status_code}" if ok else f"status {resp.status_code}: {resp.text[:200]}",
-        }
-    except Exception as exc:
-        return {"type": "webhook", "ok": False, "detail": str(exc)[:200]}
+        resp = await _delivery.post_json_pinned(url, body, timeout_seconds=10.0)
+    except _delivery.OutboundURLError as exc:
+        return {"type": "webhook", "ok": False, "detail": str(exc)}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Webhook action failed for alert %s: %s", alert.id, type(exc).__name__)
+        return {"type": "webhook", "ok": False, "detail": f"request failed: {type(exc).__name__}"}
+    ok = 200 <= resp.status_code < 300
+    return {"type": "webhook", "ok": ok, "detail": f"status {resp.status_code}"}

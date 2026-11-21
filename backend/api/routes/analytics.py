@@ -64,7 +64,7 @@ async def run_stress_test(
     Calculates impact on portfolio beta, VaR, and projected P&L.
     """
     # 1. Resolve Holdings
-    holdings = db.query(Holding).all() # Simplified: get all for 'current'
+    holdings = db.query(Holding).filter(Holding.user_id == user.id).all()
     if not holdings:
         raise HTTPException(status_code=404, detail="No holdings found")
 

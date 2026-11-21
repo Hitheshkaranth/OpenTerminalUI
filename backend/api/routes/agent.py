@@ -290,7 +290,7 @@ async def _run_durable(run_id: str, spec: dict, lease_id: str):
         raise
     except Exception as exc:
         logger.exception("Agent run failed")
-        execution.append_event(run_id, {"type": "error", "message": str(exc)})
+        execution.append_event(run_id, {"type": "error", "message": "Agent run failed unexpectedly"})
         execution.set_state(run_id, "error", lease_id)
     finally:
         heartbeat_task.cancel()

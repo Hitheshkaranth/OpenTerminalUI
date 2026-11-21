@@ -71,7 +71,7 @@ def test_pre_trade_check_order_over_limit(monkeypatch) -> None:
 
 
 def test_pre_trade_check_zero_price(monkeypatch) -> None:
-    """Pre-trade: zero-price orders are rejected at the route level."""
+    """Pre-trade: with no market price the order is refused (503), never filled at a client price."""
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     Base.metadata.create_all(bind=engine)
@@ -99,7 +99,7 @@ def test_pre_trade_check_zero_price(monkeypatch) -> None:
 
     client = TestClient(app)
     resp = client.post("/api/oms/order", json={"symbol": "AAPL", "side": "buy", "quantity": 10})
-    assert resp.status_code == 400
+    assert resp.status_code == 503
 
 
 def test_pre_trade_check_adv_participation(monkeypatch) -> None:

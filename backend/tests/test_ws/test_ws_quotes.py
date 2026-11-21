@@ -6,6 +6,14 @@ from fastapi.testclient import TestClient
 from backend.api.routes import stream
 
 
+def _ws_auth(monkeypatch) -> dict[str, str]:  # noqa: ANN001
+    """WebSockets require an access token (SEC-2)."""
+    from backend.auth.jwt import create_access_token
+
+    monkeypatch.setenv("JWT_SECRET_KEY", "ws-test-secret-key-0123456789abcdef")
+    return {"Authorization": f"Bearer {create_access_token('ws-test-user', 'ws@example.com', 'trader')}"}
+
+
 def test_ws_quotes_route_registered() -> None:
     assert stream.router is not None
 
@@ -64,7 +72,7 @@ def test_ws_quotes_subscribe_receives_tick_and_candle(monkeypatch) -> None:
     monkeypatch.setattr(stream, "get_marketdata_hub", lambda: fake_hub)
 
     with TestClient(app) as client:
-        with client.websocket_connect("/ws/quotes") as ws:
+        with client.websocket_connect("/ws/quotes", headers=_ws_auth(monkeypatch)) as ws:
             ws.send_json({"op": "subscribe", "symbols": ["nse:infy"]})
             tick = ws.receive_json()
             candle = ws.receive_json()

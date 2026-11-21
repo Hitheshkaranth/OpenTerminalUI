@@ -345,7 +345,7 @@ function EquityRightRail() {
               ) : (
                 <>
                   <div className="flex justify-between"><span className="text-terminal-muted">EWMA Vol</span><span>{Number(riskSummary.ewma_vol || 0).toFixed(4)}</span></div>
-                  <div className="flex justify-between"><span className="text-terminal-muted">Beta</span><span>{Number(riskSummary.beta || 0).toFixed(4)}</span></div>
+                  <div className="flex justify-between"><span className="text-terminal-muted">Beta</span><span>{riskSummary.beta == null ? "N/A" : Number(riskSummary.beta).toFixed(4)}</span></div>
                   <div className="flex justify-between"><span className="text-terminal-muted">MCR Assets</span><span>{Object.keys((riskSummary.marginal_contribution as Record<string, unknown>) || {}).length}</span></div>
                 </>
               )}

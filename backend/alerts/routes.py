@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime
 from typing import Any
@@ -10,12 +11,16 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from backend.alerts.actions import ActionValidationError, run_actions, validate_actions
-from backend.alerts.delivery import deliver_alert
+from backend.alerts.delivery import OutboundURLError, deliver_alert, validate_outbound_url_for_storage
 from backend.api.deps import get_db
 from backend.auth.deps import get_current_user
 from backend.models import AlertConditionType, AlertORM, AlertStatus, AlertTriggerORM, User
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+_LIST_LIMIT_DEFAULT = 200
+_LIST_LIMIT_MAX = 1000
 
 SUPPORTED_DELIVERY_CHANNELS = {
     "in_app": {"label": "In-App", "required_config": []},
@@ -150,6 +155,29 @@ def _ensure_configured_channels(channels: list[str], config: dict[str, Any]) -> 
             f"{', '.join(errors)}. Remove those channels or add the required channel settings."
         ),
     )
+
+
+def _validate_outbound_targets(config: dict[str, Any]) -> None:
+    """SEC-7: reject webhook destinations that are not public https endpoints (422)."""
+    targets: list[tuple[str, bool]] = []
+    if str(config.get("webhook_url") or "").strip():
+        targets.append((str(config["webhook_url"]), False))
+    if str(config.get("discord_webhook_url") or "").strip():
+        targets.append((str(config["discord_webhook_url"]), True))
+    for action in config.get("actions") or []:
+        if isinstance(action, dict) and action.get("type") == "webhook" and action.get("url"):
+            targets.append((str(action["url"]), False))
+    for url, discord in targets:
+        try:
+            validate_outbound_url_for_storage(url, discord=discord)
+        except OutboundURLError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _refresh_alert_index() -> None:
+    from backend.alerts.service import get_alert_evaluator_service
+
+    get_alert_evaluator_service().invalidate_alert_index()
 
 
 def _normalize_logic(value: str | None) -> str:
@@ -302,6 +330,7 @@ def create_alert(
                 config.pop("actions", None)
         except ActionValidationError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
+    _validate_outbound_targets(config)
     status = str(payload.status or AlertStatus.ACTIVE.value).strip().lower()
     if status not in {x.value for x in AlertStatus}:
         raise HTTPException(status_code=400, detail="Invalid status")
@@ -324,6 +353,7 @@ def create_alert(
     db.add(alert)
     db.commit()
     db.refresh(alert)
+    _refresh_alert_index()
     return {"status": "created", "alert": _serialize_alert(alert)}
 
 
@@ -331,6 +361,8 @@ def create_alert(
 def list_alerts(
     status: str | None = Query(default=None),
     symbol: str | None = Query(default=None),
+    limit: int = Query(default=_LIST_LIMIT_DEFAULT, ge=1, le=_LIST_LIMIT_MAX),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, list[dict[str, Any]]]:
@@ -347,7 +379,7 @@ def list_alerts(
                 AlertORM.symbol.like(f"%:{suffix}"),
             )
         )
-    rows = query.order_by(AlertORM.created_at.desc()).all()
+    rows = query.order_by(AlertORM.created_at.desc(), AlertORM.id.desc()).offset(offset).limit(limit).all()
     return {"alerts": [_serialize_alert(row) for row in rows]}
 
 
@@ -449,9 +481,12 @@ def update_alert(
             row.delivery_config = config
         except ActionValidationError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
+    if payload.delivery_config is not None or payload.parameters is not None:
+        _validate_outbound_targets(row.delivery_config if isinstance(row.delivery_config, dict) else {})
 
     db.commit()
     db.refresh(row)
+    _refresh_alert_index()
     alert = _serialize_alert(row)
     return {"status": "updated", "id": row.id, "channels": alert["channels"], "channel_status": alert["channel_status"], "alert": alert}
 
@@ -467,6 +502,7 @@ def delete_alert(
         raise HTTPException(status_code=404, detail="Alert not found")
     row.status = AlertStatus.DELETED.value
     db.commit()
+    _refresh_alert_index()
     return {"status": "deleted", "id": alert_id}
 
 

@@ -740,22 +740,13 @@ def test_non_openrouter_provider_ignores_routed_model_chain(monkeypatch):
             return None
 
     class FakeClient:
-        def __init__(self, *a, **k):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-        async def post(self, url, json=None, headers=None):
+        async def post(self, url, json=None, headers=None, **k):
             seen["model"] = json["model"]
             return FakeResp()
 
     import backend.services.llm.openai_compatible as mod
 
-    monkeypatch.setattr(mod.httpx, "AsyncClient", FakeClient)
+    monkeypatch.setattr(mod, "get_http_client", lambda: FakeClient())
     p = OpenAICompatibleProvider(base_url="http://100.0.0.1:8000/v1", api_key="x", model="local/qwen", honor_model_chain=False)
     out = asyncio.run(p.complete([mod.LLMMessage(role="user", content="hi")], models=["meta-llama/llama:free"]))
     assert seen["model"] == "local/qwen" and out.content == "ok"

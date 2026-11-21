@@ -220,7 +220,7 @@ class Orchestrator:
                 return
             except Exception as exc:  # unexpected provider error: don't crash the stream
                 logger.exception("Unexpected provider error")
-                yield events.error(str(exc))
+                yield events.error(f"Unexpected provider error ({type(exc).__name__})")
                 yield events.final("The model request failed unexpectedly; please try again.")
                 return
 
@@ -294,8 +294,8 @@ class Orchestrator:
                             else:
                                 force_final_reason = "frozen_evidence_unavailable"
                 except Exception as exc:  # tool failures are fed back, not raised
-                    logger.warning("Tool %s failed: %s", call.name, exc)
-                    result = {"error": str(exc)}
+                    logger.warning("Tool %s failed", call.name, exc_info=True)
+                    result = {"error": f"Tool {call.name} failed ({type(exc).__name__})"}
                     is_error = True
 
                 yield events.tool_result(call.id, call.name, result, is_error=is_error)

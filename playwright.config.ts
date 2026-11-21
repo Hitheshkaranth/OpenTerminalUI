@@ -43,6 +43,8 @@ export default defineConfig({
       timeout: 120_000,
       env: {
         ...process.env,
+        // Dev-only auth bypasses below are ignored unless the backend runs in development.
+        OPENTERMINALUI_ENV: "development",
         AUTH_MIDDLEWARE_ENABLED: "0",
         E2E_DEV_AUTH: "1",
         OPENTERMINALUI_CORS_ORIGINS: `http://127.0.0.1:${E2E_FRONTEND_PORT},http://localhost:${E2E_FRONTEND_PORT}`,

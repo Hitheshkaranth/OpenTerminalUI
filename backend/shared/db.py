@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import os
 import sqlite3
 
 from sqlalchemy import event
@@ -11,13 +13,30 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from backend.db.base import get_sync_database_url
 from backend.shared.sqlite_utils import configure_sqlite_connection
 
+logger = logging.getLogger(__name__)
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, "").strip() or default)
+    except ValueError:
+        return default
+
+
+def _engine_kwargs(url: str) -> dict:
+    if url.startswith("sqlite"):
+        # SQLite keeps its single-file settings (WAL pragmas are applied on connect).
+        return {"connect_args": {"check_same_thread": False, "timeout": 15}, "pool_pre_ping": True}
+    return {
+        "pool_size": _env_int("DB_POOL_SIZE", 10),
+        "max_overflow": _env_int("DB_MAX_OVERFLOW", 20),
+        "pool_recycle": _env_int("DB_POOL_RECYCLE", 1800),
+        "pool_pre_ping": os.getenv("DB_POOL_PRE_PING", "1").strip() != "0",
+    }
+
+
 database_url = get_sync_database_url()
-connect_args = {"check_same_thread": False, "timeout": 15} if database_url.startswith("sqlite") else {}
-engine = create_engine(
-    database_url,
-    connect_args=connect_args,
-    pool_pre_ping=True,
-)
+engine = create_engine(database_url, **_engine_kwargs(database_url))
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -28,7 +47,18 @@ def _set_sqlite_pragmas(dbapi_connection: object, connection_record: object) -> 
         configure_sqlite_connection(dbapi_connection)
 
 
+def auto_schema_enabled() -> bool:
+    """Schema is owned by Alembic; create_all/ALTER shims only run in dev or when opted in."""
+    from backend.config.security import is_development_env
+
+    return is_development_env() or os.getenv("OPENTERMINALUI_AUTO_SCHEMA", "").strip() == "1"
+
+
 def init_db() -> None:
+    if not auto_schema_enabled():
+        # Production: `alembic upgrade head` (backend/entrypoint.sh) owns the schema.
+        return
+
     from backend.db import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
@@ -39,6 +69,45 @@ def init_db() -> None:
     _ensure_alerts_columns()
     _ensure_agent_run_columns()
     _ensure_paper_currency_column()
+    _ensure_tenant_columns()
+
+
+_TENANT_COLUMNS = {
+    "holdings": "user_id",
+    "tax_lots": "user_id",
+    "watchlist_items": "user_id",
+    "model_experiments": "owner_id",
+    "portfolio_definitions": "owner_id",
+    "strategy_blends": "owner_id",
+    "experiments": "owner_id",
+}
+
+
+def _ensure_tenant_columns() -> None:
+    """Dev-only mirror of migration 0020 for databases bootstrapped by create_all."""
+    inspector = inspect(engine)
+    added: list[tuple[str, str]] = []
+    with engine.begin() as conn:
+        for table, column in _TENANT_COLUMNS.items():
+            if not inspector.has_table(table):
+                continue
+            existing = {str(c["name"]) for c in inspector.get_columns(table)}
+            if column not in existing:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} VARCHAR(36)"))
+                added.append((table, column))
+            conn.execute(text(f"CREATE INDEX IF NOT EXISTS ix_{table}_{column} ON {table} ({column})"))
+        for table in ("alerts", "virtual_orders"):
+            if inspector.has_table(table):
+                conn.execute(text(f"CREATE INDEX IF NOT EXISTS ix_{table}_symbol_status ON {table} (symbol, status)"))
+        if not added or not inspector.has_table("users"):
+            return
+        owner = conn.execute(
+            text("SELECT id FROM users WHERE UPPER(CAST(role AS VARCHAR(16))) = 'ADMIN' ORDER BY created_at ASC, id ASC LIMIT 1")
+        ).first() or conn.execute(text("SELECT id FROM users ORDER BY created_at ASC, id ASC LIMIT 1")).first()
+        if owner is None:
+            return
+        for table, column in added:
+            conn.execute(text(f"UPDATE {table} SET {column} = :owner WHERE {column} IS NULL"), {"owner": str(owner[0])})
 
 
 def _ensure_paper_currency_column() -> None:

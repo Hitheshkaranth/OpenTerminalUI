@@ -1,6 +1,13 @@
 from __future__ import annotations
 
 import os
+
+# Unset OPENTERMINALUI_ENV now means production (fail closed). The suite runs as a
+# development-class "test" env so ephemeral secrets and dev-only toggles behave as
+# before. Must happen before any `backend` import.
+os.environ.setdefault("OPENTERMINALUI_ENV", "test")
+os.environ.setdefault("RUN_BACKGROUND_SERVICES", "0")
+
 import sys
 from pathlib import Path
 
@@ -45,6 +52,20 @@ def _test_db_schema():
 
     init_db()
     yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_auth_process_state():
+    """Auth keeps small process-wide caches (user lookup TTL cache, login lockout).
+
+    Clear them per test so one test's users/failures never leak into another.
+    """
+    yield
+    from backend.auth.middleware import invalidate_user_cache
+    from backend.equity.routes.auth import _reset_login_lockouts
+
+    invalidate_user_cache()
+    _reset_login_lockouts()
 
 
 @pytest.fixture

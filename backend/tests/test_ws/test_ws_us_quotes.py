@@ -6,6 +6,14 @@ from fastapi.testclient import TestClient
 from backend.api.routes import stream
 
 
+def _ws_auth(monkeypatch) -> dict[str, str]:  # noqa: ANN001
+    """WebSockets require an access token (SEC-2)."""
+    from backend.auth.jwt import create_access_token
+
+    monkeypatch.setenv("JWT_SECRET_KEY", "ws-test-secret-key-0123456789abcdef")
+    return {"Authorization": f"Bearer {create_access_token('ws-test-user', 'ws@example.com', 'trader')}"}
+
+
 class _FakeUSTickStreamService:
     def __init__(self) -> None:
         self.registered: list[WebSocket] = []
@@ -98,7 +106,7 @@ def test_ws_us_quotes_subscribe_emits_expected_frame_shapes(monkeypatch) -> None
     monkeypatch.setattr(stream, "get_us_tick_stream_service", lambda: fake_service)
 
     with TestClient(app) as client:
-        with client.websocket_connect("/ws/us-quotes") as ws:
+        with client.websocket_connect("/ws/us-quotes", headers=_ws_auth(monkeypatch)) as ws:
             ready = ws.receive_json()
             assert ready["type"] == "ready"
             assert set(ready["channels"]) == {"bars", "trades"}

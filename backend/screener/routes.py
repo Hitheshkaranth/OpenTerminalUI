@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -21,6 +23,7 @@ from backend.scanner_engine.schemas import (
 from . import persistence
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class ScannerRuleCreateRequest(BaseModel):
@@ -115,8 +118,9 @@ async def run_screener_v1(
         persistence.finalize_run(db, run.id, "completed", bundle.summary)
     except Exception as exc:
         db.rollback()  # a failed save_results leaves the session unusable for finalize_run
-        persistence.finalize_run(db, run.id, "failed", {"error": str(exc)})
-        raise HTTPException(status_code=500, detail=f"Scan failed: {exc}") from exc
+        logger.exception("Scan run %s failed", run.id)
+        persistence.finalize_run(db, run.id, "failed", {"error": f"Scan failed ({type(exc).__name__})"})
+        raise HTTPException(status_code=500, detail="Scan failed") from exc
 
     page_rows = all_rows[payload.offset : payload.offset + payload.limit]
     return {"run_id": run.id, "count": len(all_rows), "rows": page_rows, "summary": bundle.summary}

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import time
 import asyncio
 from typing import Any
@@ -9,6 +11,7 @@ from fastapi import APIRouter
 from backend.api.deps import get_unified_fetcher
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 async def _probe(name: str, coro) -> dict[str, Any]:
     started = time.perf_counter()
@@ -21,11 +24,12 @@ async def _probe(name: str, coro) -> dict[str, Any]:
             "latency_ms": round((time.perf_counter() - started) * 1000, 1)
         }
     except Exception as exc:
+        logger.warning("Datasource probe %s failed", name, exc_info=True)
         return {
             "name": name,
             "status": "down",
             "latency_ms": round((time.perf_counter() - started) * 1000, 1),
-            "error": str(exc),
+            "error": type(exc).__name__,
         }
 
 @router.get("/health/datasources")

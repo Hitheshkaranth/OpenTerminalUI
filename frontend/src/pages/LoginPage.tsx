@@ -89,8 +89,15 @@ export function LoginPage() {
       const redirectParam = new URLSearchParams(location.search).get("redirect");
       const fallback = (location.state as { from?: string } | undefined)?.from || "/home";
       navigate(redirectParam || fallback, { replace: true });
-    } catch {
-      setError("AUTHENTICATION FAILED");
+    } catch (err) {
+      const status = (err as { response?: { status?: number } } | null)?.response?.status;
+      if (status === 423) {
+        setError("ACCOUNT LOCKED - TOO MANY FAILED ATTEMPTS. TRY AGAIN IN 15 MINUTES");
+      } else if (status === 429) {
+        setError("TOO MANY ATTEMPTS - SLOW DOWN AND RETRY SHORTLY");
+      } else {
+        setError("AUTHENTICATION FAILED");
+      }
       triggerInputFlash();
     } finally {
       setAuthenticating(false);

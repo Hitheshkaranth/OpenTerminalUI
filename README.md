@@ -332,13 +332,14 @@ The installer detects your OS, creates `.env` with strong generated secrets, see
 
 **Prerequisites:** Docker, *or* Python 3.11+ and Node 20+. All API keys are optional; the app runs on free fallback sources.
 
+**Security & deployment:** an unset `OPENTERMINALUI_ENV` now means production (required secrets, Postgres, migrations, WebSocket tokens). If you are upgrading an existing install, read [docs/UPGRADING-security-rehaul.md](docs/UPGRADING-security-rehaul.md) first.
+
 <details>
 <summary><b>Docker by hand</b></summary>
 
 ```bash
-cp .env.example .env
-docker compose up --build                       # backend + frontend + Redis (SQLite)
-docker compose --profile postgres up --build    # with PostgreSQL
+cp .env.example .env    # set OPENTERMINALUI_ENV, JWT_SECRET_KEY, CACHE_SIGNING_KEY, REDIS_PASSWORD, POSTGRES_PASSWORD
+docker compose up --build                       # backend + frontend + Redis + PostgreSQL
 ```
 </details>
 

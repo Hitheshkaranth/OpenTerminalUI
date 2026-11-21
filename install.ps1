@@ -5,9 +5,11 @@
 #   $env:OTUI_MODE="docker"; ./install.ps1
 #   $env:OTUI_MODE="local";  ./install.ps1
 #
-# Mirrors install.sh: creates a single .env, auto-generates secrets + a unique
-# admin password, seeds the admin account, builds & launches at
-# http://localhost:8000, and prints the credentials.
+# Mirrors install.sh: creates a single .env, auto-generates secrets (JWT, cache,
+# REDIS_PASSWORD, POSTGRES_PASSWORD) + a unique admin password, seeds the admin
+# account, builds & launches at http://localhost:8000, and prints the
+# credentials. Local (non-Docker) mode sets OPENTERMINALUI_ENV=development
+# (unset now means production, which requires Postgres).
 # ============================================================================
 $ErrorActionPreference = "Stop"
 
@@ -70,6 +72,8 @@ if (-not (Test-Path $EnvFile)) {
 # --- 2. Auto-fill secrets + admin -----------------------------------------
 Initialize-EnvVar "JWT_SECRET_KEY"    (New-Secret)
 Initialize-EnvVar "CACHE_SIGNING_KEY" (New-Secret)
+Initialize-EnvVar "REDIS_PASSWORD"    (New-Secret)
+Initialize-EnvVar "POSTGRES_PASSWORD" (New-Secret)
 Initialize-EnvVar "BOOTSTRAP_ADMIN_EMAIL" "admin@openterminal.local"
 
 $AdminPass = Get-EnvVar "BOOTSTRAP_ADMIN_PASSWORD"
@@ -94,6 +98,11 @@ if ($Mode -eq "auto") {
   $Mode = if ($dockerCli -and $daemonUp) { "docker" } else { "local" }
 }
 Write-Cyan "==> install mode: $Mode"
+
+if ($Mode -eq "local") {
+  # Local single-user install runs on SQLite; production mode would refuse it.
+  Initialize-EnvVar "OPENTERMINALUI_ENV" "development"
+}
 
 function Show-Credentials {
   Write-Host ""

@@ -16,12 +16,13 @@ PATCH).  Safe methods (GET, HEAD, OPTIONS) are not checked.
 from __future__ import annotations
 
 import logging
-import os
 import secrets
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+
+from backend.config.security import is_development_env
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ _CSRF_EXEMPT_PATHS = frozenset(
         "/api/auth/register",
         "/api/auth/refresh",
         "/api/auth/forgot-access",
+        "/api/auth/reset-password",
         "/ws/quotes",
         "/ws/alerts",
         "/ws/us-quotes",
@@ -111,7 +113,7 @@ class CsrfProtectMiddleware(BaseHTTPMiddleware):
                 httponly=True,
                 samesite="strict",
                 max_age=self._COOKIE_MAX_AGE,
-                secure=os.getenv("OPENTERMINALUI_ENV", "").strip().lower() not in {"dev", "development", "local", "test", "testing"},
+                secure=not is_development_env(),
             )
 
         return response

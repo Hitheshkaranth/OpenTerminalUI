@@ -4,7 +4,7 @@ import enum
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.shared.db import Base
@@ -18,6 +18,7 @@ class Holding(Base):
     quantity: Mapped[float] = mapped_column(Float)
     avg_buy_price: Mapped[float] = mapped_column(Float)
     buy_date: Mapped[str] = mapped_column(String(16))
+    user_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=True)
 
 
 class TaxLot(Base):
@@ -29,6 +30,7 @@ class TaxLot(Base):
     remaining_quantity: Mapped[float] = mapped_column(Float)
     buy_price: Mapped[float] = mapped_column(Float)
     buy_date: Mapped[str] = mapped_column(String(16), index=True)
+    user_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=True)
 
 
 class WatchlistORM(Base):
@@ -48,6 +50,7 @@ class WatchlistItem(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     watchlist_name: Mapped[str] = mapped_column(String(64), index=True)
     ticker: Mapped[str] = mapped_column(String(32), index=True)
+    user_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=True)
 
 class InsiderTrade(Base):
     __tablename__ = "insider_trades"
@@ -158,6 +161,7 @@ class ModelExperiment(Base):
     end_date: Mapped[str] = mapped_column(String(16), index=True)
     cost_model_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.now(timezone.utc).isoformat(), index=True)
+    owner_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
 
 
 class ModelRun(Base):
@@ -221,6 +225,7 @@ class PortfolioDefinition(Base):
     weighting_method: Mapped[str] = mapped_column(String(16), default=WeightingMethod.EQUAL.value, index=True)
     constraints_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.now(timezone.utc).isoformat(), index=True)
+    owner_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
 
 
 class StrategyBlend(Base):
@@ -231,6 +236,7 @@ class StrategyBlend(Base):
     strategies_json: Mapped[list] = mapped_column(JSON, default=list)
     blend_method: Mapped[str] = mapped_column(String(32), default=BlendMethod.WEIGHTED_SUM_RETURNS.value, index=True)
     created_at: Mapped[str] = mapped_column(String(40), default=lambda: datetime.now(timezone.utc).isoformat(), index=True)
+    owner_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
 
 
 class PortfolioRun(Base):
@@ -325,6 +331,7 @@ class AlertStatus(str, enum.Enum):
 
 class AlertORM(Base):
     __tablename__ = "alerts"
+    __table_args__ = (Index("ix_alerts_symbol_status", "symbol", "status"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
@@ -650,6 +657,7 @@ class VirtualPosition(Base):
 
 class VirtualOrder(Base):
     __tablename__ = "virtual_orders"
+    __table_args__ = (Index("ix_virtual_orders_symbol_status", "symbol", "status"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     portfolio_id: Mapped[str] = mapped_column(String(36), ForeignKey("virtual_portfolios.id", ondelete="CASCADE"), index=True)

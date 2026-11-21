@@ -48,11 +48,12 @@ class ModelLabService:
     def _report_cache_key(run_id: str) -> str:
         return f"model-lab:report:{run_id}"
 
-    async def create_experiment(self, payload: ExperimentCreate) -> dict:
+    async def create_experiment(self, payload: ExperimentCreate, owner_id: str | None = None) -> dict:
         db = next(get_db())
         try:
             row = ModelExperiment(
                 id=str(uuid4()),
+                owner_id=owner_id,
                 name=payload.name,
                 description=payload.description,
                 tags=payload.tags,
@@ -71,10 +72,19 @@ class ModelLabService:
         finally:
             db.close()
 
-    async def list_experiments(self, tag: str | None, model_key: str | None, start_date: str | None, end_date: str | None) -> list[dict]:
+    async def list_experiments(
+        self,
+        tag: str | None,
+        model_key: str | None,
+        start_date: str | None,
+        end_date: str | None,
+        owner_id: str | None = None,
+    ) -> list[dict]:
         db = next(get_db())
         try:
             query = db.query(ModelExperiment)
+            if owner_id is not None:
+                query = query.filter(ModelExperiment.owner_id == owner_id)
             if model_key:
                 query = query.filter(ModelExperiment.model_key == model_key)
             if start_date:
@@ -172,7 +182,8 @@ class ModelLabService:
                     strategy=strategy,
                     context=experiment.params_json or {},
                     config=config,
-                )
+                ),
+                user_id=experiment.owner_id,
             )
 
             row = ModelRun(
@@ -445,7 +456,8 @@ class ModelLabService:
                             "slippage_bps": 0.0,
                             "position_fraction": 1.0,
                         },
-                    )
+                    ),
+                    user_id=experiment.owner_id,
                 )
                 result = await self._wait_for_backtest(backtest_run_id)
                 status = str(result.get("status"))
@@ -481,16 +493,22 @@ class ModelLabService:
         finally:
             db.close()
 
-    async def leaderboard(self, sort_by: str = "sharpe", descending: bool = True, limit: int = 50) -> dict:
+    async def leaderboard(
+        self, sort_by: str = "sharpe", descending: bool = True, limit: int = 50, owner_id: str | None = None
+    ) -> dict:
         allowed = {"sharpe", "cagr", "max_drawdown", "turnover", "stability", "recency", "governance_state"}
         sort_key = sort_by if sort_by in allowed else "sharpe"
         db = next(get_db())
         try:
-            rows = (
+            query = (
                 db.query(ModelRun, ModelExperiment, ModelRunMetrics)
                 .join(ModelExperiment, ModelRun.experiment_id == ModelExperiment.id)
                 .outerjoin(ModelRunMetrics, ModelRunMetrics.run_id == ModelRun.id)
-                .order_by(ModelRun.started_at.desc())
+            )
+            if owner_id is not None:
+                query = query.filter(ModelExperiment.owner_id == owner_id)
+            rows = (
+                query.order_by(ModelRun.started_at.desc())
                 .limit(max(limit * 4, limit))
                 .all()
             )

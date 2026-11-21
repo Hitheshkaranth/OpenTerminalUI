@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.auth.deps import require_role
@@ -7,6 +9,7 @@ from backend.auth.deps import require_role
 from backend.plugins.loader import plugin_loader
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/plugins")
@@ -37,7 +40,8 @@ async def enable_plugin(plugin_id: str, _auth=Depends(require_role("admin"))) ->
     except KeyError:
         raise HTTPException(status_code=404, detail="Plugin not found")
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Failed to enable plugin: {exc}")
+        logger.exception("Failed to enable plugin %s", plugin_id)
+        raise HTTPException(status_code=400, detail="Failed to enable plugin") from exc
     return {"id": rec.id, "enabled": rec.enabled}
 
 
@@ -59,5 +63,6 @@ async def reload_plugin(plugin_id: str, _auth=Depends(require_role("admin"))) ->
     except KeyError:
         raise HTTPException(status_code=404, detail="Plugin not found")
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Failed to reload plugin: {exc}")
+        logger.exception("Failed to reload plugin %s", plugin_id)
+        raise HTTPException(status_code=400, detail="Failed to reload plugin") from exc
     return {"id": rec.id, "enabled": rec.enabled}

@@ -176,20 +176,15 @@ def test_lm_studio_client_sends_key_and_disables_thinking(monkeypatch):
             return {"choices": [{"message": {"content": "{}"}}]}
 
     class _Client:
-        def __init__(self, *a, headers=None, **k):
+        # Stands in for the shared outbound client (backend.shared.http_client).
+        async def request(self, method, url, json=None, headers=None, **k):
             seen["headers"] = headers or {}
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-        async def post(self, url, json=None):
             seen["payload"] = json
             return _Resp()
 
-    monkeypatch.setattr(httpx, "AsyncClient", _Client)
+    from backend.shared import http_client
+
+    monkeypatch.setattr(http_client, "get_http_client", lambda: _Client())
     client = lsc.LMStudioClient(base_url="http://gw:8080/v1", model="m")
     client._headers = {"Authorization": "Bearer k"}
     asyncio.run(client.chat([{"role": "user", "content": "hi"}]))

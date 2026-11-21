@@ -56,10 +56,10 @@ def _build_app(seed_portfolio: bool = True) -> tuple[TestClient, sessionmaker]:
             db.add(portfolio)
             db.add_all(
                 [
-                    Holding(ticker="RELIANCE.NS", quantity=120, avg_buy_price=2800.0, buy_date="2025-01-15"),
-                    Holding(ticker="AAPL", quantity=50, avg_buy_price=180.0, buy_date="2025-02-01"),
-                    Holding(ticker="JPM", quantity=80, avg_buy_price=160.0, buy_date="2025-03-03"),
-                    Holding(ticker="XOM", quantity=90, avg_buy_price=115.0, buy_date="2025-04-10"),
+                    Holding(user_id="u_test", ticker="RELIANCE.NS", quantity=120, avg_buy_price=2800.0, buy_date="2025-01-15"),
+                    Holding(user_id="u_test", ticker="AAPL", quantity=50, avg_buy_price=180.0, buy_date="2025-02-01"),
+                    Holding(user_id="u_test", ticker="JPM", quantity=80, avg_buy_price=160.0, buy_date="2025-03-03"),
+                    Holding(user_id="u_test", ticker="XOM", quantity=90, avg_buy_price=115.0, buy_date="2025-04-10"),
                 ]
             )
             db.commit()

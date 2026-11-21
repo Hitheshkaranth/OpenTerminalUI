@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAlertsStore } from "../store/alertsStore";
+import { withWsAuth } from "../realtime/wsAuth";
 
 export type AlertSocketEvent = {
   type: "alert_triggered";
@@ -60,10 +61,11 @@ export function alertsWsUrl(): string {
     const url = new URL(base);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     url.pathname = `${url.pathname.replace(/\/+$/, "")}/ws/alerts`;
-    return url.toString();
+    url.search = "";
+    return withWsAuth(url.toString());
   }
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${window.location.host}${base.replace(/\/+$/, "")}/ws/alerts`;
+  return withWsAuth(`${protocol}//${window.location.host}${base.replace(/\/+$/, "")}/ws/alerts`);
 }
 
 export function parseAlertSocketEvent(raw: unknown): AlertSocketEvent | null {

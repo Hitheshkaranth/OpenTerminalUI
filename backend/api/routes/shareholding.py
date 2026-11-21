@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.equity.services.shareholding import ShareholdingService
 
 router = APIRouter(prefix="/shareholding", tags=["shareholding"])
+logger = logging.getLogger(__name__)
 service = ShareholdingService()
 
 
@@ -25,7 +28,8 @@ async def get_shareholding_pattern(symbol: str):
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Shareholding fetch failed: {exc}") from exc
+        logger.exception("Shareholding fetch failed for %s", symbol_clean)
+        raise HTTPException(status_code=502, detail="Shareholding fetch failed") from exc
 
 
 @router.get("/{symbol}/trend")
@@ -39,4 +43,5 @@ async def get_shareholding_trend(symbol: str, quarters: int = Query(default=8, g
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Shareholding trend fetch failed: {exc}") from exc
+        logger.exception("Shareholding trend fetch failed for %s", symbol_clean)
+        raise HTTPException(status_code=502, detail="Shareholding trend fetch failed") from exc

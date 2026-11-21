@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from datetime import date, datetime, timezone
 
@@ -10,11 +11,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from backend.api.deps import fetch_stock_snapshot_coalesced, get_db
+from backend.auth.deps import get_current_user
 from backend.db.models import Holding, WatchlistItem
+from backend.models.user import User
 from backend.services.portfolio_analytics import portfolio_analytics_service
 from backend.shared.market_classifier import market_classifier
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _user_holdings(db: Session, user: User) -> list[Holding]:
+    return db.query(Holding).filter(Holding.user_id == user.id).all()
 
 
 class HoldingCreate(BaseModel):
@@ -60,8 +68,11 @@ class PortfolioImportRequest(BaseModel):
 
 
 @router.get("/portfolio")
-async def get_portfolio(db: Session = Depends(get_db)) -> dict[str, object]:
-    holdings = db.query(Holding).all()
+async def get_portfolio(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    holdings = _user_holdings(db, current_user)
     sem = asyncio.Semaphore(32)
     # Bound per-holding live-quote enrichment so a single slow/blocked upstream
     # (e.g. NSE returning 403 for cloud IPs) cannot stall the whole endpoint past
@@ -130,8 +141,11 @@ async def get_portfolio(db: Session = Depends(get_db)) -> dict[str, object]:
 
 
 @router.get("/portfolio/analytics/sector-allocation")
-async def get_sector_allocation(db: Session = Depends(get_db)) -> dict[str, object]:
-    holdings = db.query(Holding).all()
+async def get_sector_allocation(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    holdings = _user_holdings(db, current_user)
     return await portfolio_analytics_service.sector_allocation(holdings)
 
 
@@ -140,8 +154,9 @@ async def get_risk_metrics(
     risk_free_rate: float = Query(default=0.06, ge=0, le=0.25),
     benchmark: str = Query(default="NIFTY50"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, object]:
-    holdings = db.query(Holding).all()
+    holdings = _user_holdings(db, current_user)
     return await portfolio_analytics_service.risk_metrics(holdings, risk_free_rate=risk_free_rate, benchmark=benchmark)
 
 
@@ -149,8 +164,9 @@ async def get_risk_metrics(
 async def get_correlation_matrix(
     window: int = Query(default=60, ge=10, le=252),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, object]:
-    holdings = db.query(Holding).all()
+    holdings = _user_holdings(db, current_user)
     return await portfolio_analytics_service.correlation_matrix(holdings, window=window)
 
 
@@ -158,8 +174,9 @@ async def get_correlation_matrix(
 async def get_dividend_tracker(
     days: int = Query(default=180, ge=1, le=730),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, object]:
-    holdings = db.query(Holding).all()
+    holdings = _user_holdings(db, current_user)
     return await portfolio_analytics_service.dividend_tracker(holdings, days=days)
 
 
@@ -167,8 +184,9 @@ async def get_dividend_tracker(
 async def get_benchmark_overlay(
     benchmark: str = Query(default="NIFTY50"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, object]:
-    holdings = db.query(Holding).all()
+    holdings = _user_holdings(db, current_user)
     return await portfolio_analytics_service.benchmark_overlay(holdings, benchmark=benchmark)
 
 
@@ -178,6 +196,7 @@ async def get_portfolio_attribution(
     period: str = Query(default="1M"),
     benchmark: str = Query(default="NIFTY50"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, object]:
     try:
         return await portfolio_analytics_service.portfolio_attribution(
@@ -185,17 +204,24 @@ async def get_portfolio_attribution(
             portfolio_id=portfolio_id,
             period=period,
             benchmark=benchmark,
+            user_id=current_user.id,
         )
     except ValueError as exc:
         message = str(exc)
         if "not found" in message.lower():
-            raise HTTPException(status_code=404, detail=message)
-        raise HTTPException(status_code=400, detail=message)
+            raise HTTPException(status_code=404, detail="Portfolio not found")
+        logger.warning("portfolio attribution rejected: %s", message)
+        raise HTTPException(status_code=400, detail="Invalid attribution request")
 
 
 @router.post("/portfolio/holdings")
-def add_holding(payload: HoldingCreate, db: Session = Depends(get_db)) -> dict[str, object]:
+def add_holding(
+    payload: HoldingCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, object]:
     row = Holding(
+        user_id=current_user.id,
         ticker=payload.ticker.strip().upper(),
         quantity=float(payload.quantity),
         avg_buy_price=float(payload.avg_buy_price),
@@ -214,6 +240,7 @@ _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 def import_holdings(
     payload: PortfolioImportRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, object]:
     if len(payload.rows) > 2000:
         raise HTTPException(status_code=413, detail="Too many rows: maximum 2000")
@@ -258,10 +285,13 @@ def import_holdings(
         else:
             buy_date = today
 
-        valid_rows.append(Holding(ticker=ticker, quantity=float(qty), avg_buy_price=float(avg), buy_date=buy_date))
+        valid_rows.append(
+            Holding(user_id=current_user.id, ticker=ticker, quantity=float(qty), avg_buy_price=float(avg), buy_date=buy_date)
+        )
 
     if payload.mode == "replace":
-        db.query(Holding).delete()
+        # Only the caller's own holdings are replaced.
+        db.query(Holding).filter(Holding.user_id == current_user.id).delete(synchronize_session=False)
 
     for h in valid_rows:
         db.add(h)
@@ -270,6 +300,7 @@ def import_holdings(
         db.commit()
     except Exception:
         db.rollback()
+        logger.exception("portfolio import failed")
         raise HTTPException(status_code=500, detail="Import failed")
 
     return {
@@ -281,8 +312,12 @@ def import_holdings(
 
 
 @router.delete("/portfolio/holdings/{holding_id}")
-def delete_holding(holding_id: int, db: Session = Depends(get_db)) -> dict[str, object]:
-    row = db.query(Holding).filter(Holding.id == holding_id).first()
+def delete_holding(
+    holding_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    row = db.query(Holding).filter(Holding.id == holding_id, Holding.user_id == current_user.id).first()
     if row is None:
         raise HTTPException(status_code=404, detail="Holding not found")
     db.delete(row)
@@ -294,14 +329,20 @@ def delete_holding(holding_id: int, db: Session = Depends(get_db)) -> dict[str, 
 async def get_tax_lots(
     ticker: str | None = Query(default=None),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, object]:
-    return await portfolio_analytics_service.tax_lot_summary(db, ticker=ticker)
+    return await portfolio_analytics_service.tax_lot_summary(db, ticker=ticker, user_id=current_user.id)
 
 
 @router.post("/portfolio/tax-lots")
-def create_tax_lot(payload: TaxLotCreate, db: Session = Depends(get_db)) -> dict[str, object]:
+def create_tax_lot(
+    payload: TaxLotCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, object]:
     row = portfolio_analytics_service.add_tax_lot(
         db=db,
+        user_id=current_user.id,
         ticker=payload.ticker,
         quantity=payload.quantity,
         buy_price=payload.buy_price,
@@ -311,10 +352,15 @@ def create_tax_lot(payload: TaxLotCreate, db: Session = Depends(get_db)) -> dict
 
 
 @router.post("/portfolio/tax-lots/realize")
-def realize_tax_lot(payload: TaxLotRealizeRequest, db: Session = Depends(get_db)) -> dict[str, object]:
+def realize_tax_lot(
+    payload: TaxLotRealizeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, object]:
     try:
         return portfolio_analytics_service.realize_tax_lots(
             db=db,
+            user_id=current_user.id,
             ticker=payload.ticker,
             sell_quantity=payload.quantity,
             sell_price=payload.sell_price,
@@ -323,13 +369,18 @@ def realize_tax_lot(payload: TaxLotRealizeRequest, db: Session = Depends(get_db)
             specific_lot_ids=payload.specific_lot_ids,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        logger.info("tax lot realization rejected: %s", exc)
+        detail = "Insufficient lot quantity for requested sale" if "insufficient" in str(exc).lower() else "Invalid realization request"
+        raise HTTPException(status_code=400, detail=detail)
 
 
 @router.get("/watchlist")  # singular alias: the multi-watchlist router owns /api/watchlists
 @router.get("/watchlists")
-async def get_watchlists(db: Session = Depends(get_db)) -> dict[str, list[dict[str, object]]]:
-    items = db.query(WatchlistItem).all()
+async def get_watchlists(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, list[dict[str, object]]]:
+    items = db.query(WatchlistItem).filter(WatchlistItem.user_id == current_user.id).all()
     sem = asyncio.Semaphore(16)
 
     async def _classify(ticker: str) -> dict[str, object]:
@@ -359,8 +410,16 @@ async def get_watchlists(db: Session = Depends(get_db)) -> dict[str, list[dict[s
 
 
 @router.post("/watchlists/items")
-def add_watchlist_item(payload: WatchlistCreate, db: Session = Depends(get_db)) -> dict[str, object]:
-    row = WatchlistItem(watchlist_name=payload.watchlist_name.strip(), ticker=payload.ticker.strip().upper())
+def add_watchlist_item(
+    payload: WatchlistCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    row = WatchlistItem(
+        user_id=current_user.id,
+        watchlist_name=payload.watchlist_name.strip(),
+        ticker=payload.ticker.strip().upper(),
+    )
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -368,8 +427,12 @@ def add_watchlist_item(payload: WatchlistCreate, db: Session = Depends(get_db)) 
 
 
 @router.delete("/watchlists/items/{item_id}")
-def delete_watchlist_item(item_id: int, db: Session = Depends(get_db)) -> dict[str, object]:
-    row = db.query(WatchlistItem).filter(WatchlistItem.id == item_id).first()
+def delete_watchlist_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    row = db.query(WatchlistItem).filter(WatchlistItem.id == item_id, WatchlistItem.user_id == current_user.id).first()
     if row is None:
         raise HTTPException(status_code=404, detail="Watchlist item not found")
     db.delete(row)

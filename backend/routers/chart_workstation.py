@@ -98,9 +98,9 @@ async def batch_chart_data(request: BatchChartRequest) -> dict[str, Any]:
                 "ticker": item.symbol.upper(),
                 "interval": item.timeframe,
                 "currency": "INR" if item.market.upper() in {"NSE", "BSE", "NFO"} else "USD",
-                "error": str(exc),
+                "error": "Chart data unavailable",
                 "data": [],
-                "meta": {"warnings": [{"code": "batch_chart_error", "message": str(exc)}]},
+                "meta": {"warnings": [{"code": "batch_chart_error", "message": "Chart data unavailable"}]},
             }
 
     tasks = [fetch_one(item) for item in request.tickers]

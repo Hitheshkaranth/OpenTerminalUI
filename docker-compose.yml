@@ -7,20 +7,22 @@ services:
     ports:
       - "${APP_PORT:-8000}:8000"
     environment:
-      OPENTERMINALUI_ENV: "${OPENTERMINALUI_ENV:-development}"
+      # Fail closed: production unless explicitly overridden (see .env.example).
+      OPENTERMINALUI_ENV: "${OPENTERMINALUI_ENV:-production}"
       FMP_API_KEY: "${FMP_API_KEY:-}"
       FINNHUB_API_KEY: "${FINNHUB_API_KEY:-}"
-      JWT_SECRET_KEY: "${JWT_SECRET_KEY:-}"
-      CACHE_SIGNING_KEY: "${CACHE_SIGNING_KEY:-}"
+      JWT_SECRET_KEY: "${JWT_SECRET_KEY:?set JWT_SECRET_KEY in .env (openssl rand -hex 32)}"
+      CACHE_SIGNING_KEY: "${CACHE_SIGNING_KEY:?set CACHE_SIGNING_KEY in .env (openssl rand -hex 32)}"
       BOOTSTRAP_ADMIN_EMAIL: "${BOOTSTRAP_ADMIN_EMAIL:-}"
       BOOTSTRAP_ADMIN_PASSWORD: "${BOOTSTRAP_ADMIN_PASSWORD:-}"
-      DATABASE_URL: "${DATABASE_URL:-sqlite+aiosqlite:////data/openterminal.db}"
+      # The single DB setting the app reads (OPENTERMINALUI_SQLITE_URL is only a dev fallback).
+      # SQLite is refused outside development, so the default is the bundled Postgres.
+      DATABASE_URL: "${DATABASE_URL:-postgresql://${POSTGRES_USER:-openterminalui}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-openterminalui}}"
       KITE_API_KEY: "${KITE_API_KEY:-}"
       KITE_API_SECRET: "${KITE_API_SECRET:-}"
       KITE_ACCESS_TOKEN: "${KITE_ACCESS_TOKEN:-}"
-      REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (openssl rand -hex 32)}@redis:6379/0"
       OPENTERMINALUI_PREFETCH_ENABLED: "${OPENTERMINALUI_PREFETCH_ENABLED:-${OPENSCREENS_PREFETCH_ENABLED:-0}}"
-      OPENTERMINALUI_SQLITE_URL: "${OPENTERMINALUI_SQLITE_URL:-${OPENSCREENS_SQLITE_URL:-sqlite:////data/openterminalui.db}}"
       OPENTERMINALUI_CORS_ORIGINS: "${OPENTERMINALUI_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}"
       LM_STUDIO_BASE_URL: "${LM_STUDIO_BASE_URL:-http://host.docker.internal:1234/v1}"
       LM_STUDIO_MODEL: "${LM_STUDIO_MODEL:-google/gemma-4-26b-a4b}"
@@ -37,8 +39,24 @@ services:
       AGENT_FALLBACK_MODELS: "${AGENT_FALLBACK_MODELS:-openai/gpt-oss-20b:free,qwen/qwen3-coder:free,meta-llama/llama-3.3-70b-instruct:free}"
       AGENT_DEBATE_ENABLED: "${AGENT_DEBATE_ENABLED:-true}"
       AGENT_STRATEGY_LOOP_ENABLED: "${AGENT_STRATEGY_LOOP_ENABLED:-true}"
+      # Process / scaling knobs (see .env.example).
+      RUN_MIGRATIONS: "${RUN_MIGRATIONS:-1}"
+      RUN_BACKGROUND_SERVICES: "${RUN_BACKGROUND_SERVICES:-1}"
+      WEB_CONCURRENCY: "${WEB_CONCURRENCY:-1}"
+      FORWARDED_ALLOW_IPS: "${FORWARDED_ALLOW_IPS:-127.0.0.1}"
+      TRUST_PROXY_HEADERS: "${TRUST_PROXY_HEADERS:-0}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=4).read()"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -61,19 +79,30 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # No host port: only the backend (on the compose network) talks to Redis.
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}"]
+    environment:
+      REDISCLI_AUTH: "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
 
   postgres:
     image: postgres:16-alpine
-    profiles: ["postgres"]
     environment:
       POSTGRES_DB: "${POSTGRES_DB:-openterminalui}"
       POSTGRES_USER: "${POSTGRES_USER:-openterminalui}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-openterminalui}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}"
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     volumes:
       - openterminalui_postgres_data:/var/lib/postgresql/data
     restart: unless-stopped

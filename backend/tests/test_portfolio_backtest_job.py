@@ -11,6 +11,8 @@ from sqlalchemy.pool import StaticPool
 from backend.main import app
 from backend.shared.db import Base
 from backend.api.deps import get_db
+from backend.auth.deps import get_current_user
+from types import SimpleNamespace
 
 _engine = create_engine(
     "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
@@ -30,8 +32,11 @@ def _override_get_db():
 @pytest.fixture(scope="module")
 def client():
     app.dependency_overrides[get_db] = _override_get_db
+    # Job routes are owner-scoped and require an authenticated user.
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id="portfolio-job-user")
     yield TestClient(app)
     app.dependency_overrides.pop(get_db, None)
+    app.dependency_overrides.pop(get_current_user, None)
 
 
 def test_portfolio_backtest_job_flow(client):

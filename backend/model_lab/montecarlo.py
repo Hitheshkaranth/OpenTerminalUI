@@ -145,9 +145,24 @@ def run_monte_carlo(
     }
 
 
+_MAX_JOBS = 200
+
+
+def _evict_old_jobs() -> None:
+    """Keep the in-memory job registry bounded: evict the oldest finished jobs first."""
+    overflow = len(_jobs) - _MAX_JOBS
+    if overflow <= 0:
+        return
+    # dicts preserve insertion order, so iteration order is oldest-first.
+    finished = [jid for jid, job in _jobs.items() if job.status in {"succeeded", "failed"}]
+    for jid in finished[:overflow]:
+        _jobs.pop(jid, None)
+
+
 def create_monte_carlo_job(run_id: str) -> MonteCarloJob:
     job = MonteCarloJob(id=f"mc_{uuid4().hex[:12]}", run_id=run_id)
     _jobs[job.id] = job
+    _evict_old_jobs()
     return job
 
 
@@ -179,3 +194,4 @@ async def execute_monte_carlo_job(job_id: str, report: dict[str, Any], options: 
         job.error = str(exc)
     finally:
         job.finished_at = datetime.now(timezone.utc).isoformat()
+        _evict_old_jobs()

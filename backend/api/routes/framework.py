@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import logging
 from datetime import datetime, timedelta
 from typing import Any
 import asyncio
@@ -11,6 +13,7 @@ from backend.core.framework.registry import list_models
 from backend.core.framework.engine import FrameworkConfig, run_framework_backtest
 
 router = APIRouter(prefix="/api/framework", tags=["framework"])
+logger = logging.getLogger(__name__)
 
 class ModelSpec(BaseModel):
     id: str
@@ -64,4 +67,5 @@ async def run_backtest(req: FrameworkBacktestRequest) -> dict:
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Framework backtest failed: {e}")
+        logger.exception("Framework backtest failed")
+        raise HTTPException(status_code=500, detail="Framework backtest failed") from e

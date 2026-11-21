@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-import ast
-import contextlib
-import io
-import types
+import json
+import math
+import os
+import pickle
+import signal
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -14,6 +18,17 @@ import pandas as pd
 from backend.pure_jump_vol.signals import generate_pjv_signals
 from backend.core.single_asset_backtest import generate_sma_crossover_signals
 from backend.core.execution_model import ExecutionModelConfig, parse_execution_config
+from backend.core.python_execution_worker import child_resource_limiter
+from backend.core.strategy_sandbox_worker import (
+    ALLOWED_STRATEGY_MODULES,
+    BLOCKED_STRATEGY_ATTRS,
+    MAX_STREAM_CHARS,
+    SAFE_STRATEGY_BUILTINS,
+    AttributeGuard,
+    run_inline_strategy,
+    sandbox_getattr,
+    validate_inline_strategy,
+)
 
 
 @dataclass(frozen=True)
@@ -602,78 +617,26 @@ EXAMPLE_STRATEGY_MAP: dict[str, Any] = {
 }
 
 
-# Builtins available to inline strategies. This is both the execution environment
-# and the set of names inline code is allowed to call, so the two cannot drift.
-_SAFE_STRATEGY_BUILTINS: dict[str, Any] = {
-    "abs": abs,
-    "all": all,
-    "any": any,
-    "bool": bool,
-    "dict": dict,
-    "enumerate": enumerate,
-    "filter": filter,
-    "float": float,
-    "int": int,
-    "isinstance": isinstance,
-    "len": len,
-    "list": list,
-    "map": map,
-    "max": max,
-    "min": min,
-    "print": print,
-    "range": range,
-    "reversed": reversed,
-    "round": round,
-    "set": set,
-    "sorted": sorted,
-    "str": str,
-    "sum": sum,
-    "tuple": tuple,
-    "zip": zip,
+# The inline-strategy sandbox (AST checks, attribute guard, builtin allow-list)
+# lives in strategy_sandbox_worker so the same code runs in the child process.
+# Aliases keep the historical private names importable.
+_SAFE_STRATEGY_BUILTINS = SAFE_STRATEGY_BUILTINS
+_BLOCKED_STRATEGY_ATTRS = BLOCKED_STRATEGY_ATTRS
+_ALLOWED_STRATEGY_MODULES = ALLOWED_STRATEGY_MODULES
+_sandbox_getattr = sandbox_getattr
+_AttributeGuard = AttributeGuard
+
+_SANDBOX_WORKER_PATH = Path(__file__).resolve().with_name("strategy_sandbox_worker.py")
+# Wall-clock allowance for the child interpreter to import pandas/numpy before
+# the user-code timer starts; the child enforces the user timeout itself.
+_SANDBOX_STARTUP_GRACE_SECONDS = 3.0
+_SANDBOX_ENV_KEYS = ("PATH", "SYSTEMROOT", "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL")
+_SANDBOX_ERROR_TYPES: dict[str, type[BaseException]] = {
+    cls.__name__: cls
+    for cls in (ValueError, TypeError, KeyError, IndexError, ZeroDivisionError, AttributeError,
+                NameError, ArithmeticError, OverflowError, RuntimeError, MemoryError,
+                RecursionError, TimeoutError, UnboundLocalError, StopIteration, AssertionError)
 }
-
-
-# Attribute names inline code may never touch: pandas/numpy file I/O, string
-# evaluators/formatters, and frame/generator introspection (frame.f_globals escapes scope).
-_BLOCKED_STRATEGY_ATTRS: frozenset[str] = frozenset({
-    "to_csv", "to_pickle", "to_parquet", "to_excel", "to_hdf", "to_sql", "to_feather",
-    "to_stata", "to_json", "to_html", "to_latex", "to_markdown", "to_clipboard", "to_xml",
-    "to_orc", "to_string", "tofile", "save", "savez", "savez_compressed", "savetxt",
-    "load", "loadtxt", "genfromtxt", "fromfile", "fromregex", "memmap", "DataSource",
-    "ExcelWriter", "ExcelFile", "HDFStore", "eval", "query", "dump",
-    # str.format/format_map walk attributes and keys inside the format string
-    # ("{0.__init__.__globals__[sys].modules[os].environ}"), bypassing the AST checks.
-    "format", "format_map",
-    "gi_frame", "gi_code", "cr_frame", "cr_code", "ag_frame", "ag_code",
-    "f_back", "f_globals", "f_locals", "f_builtins", "f_code", "tb_frame", "tb_next",
-})
-# Submodules reachable by attribute access; any other module (e.g. pd.io.common.os)
-# is refused at runtime.
-_ALLOWED_STRATEGY_MODULES: frozenset[str] = frozenset({"numpy.random", "numpy.linalg", "numpy.fft"})
-
-
-def _sandbox_getattr(obj: Any, name: str) -> Any:
-    value = getattr(obj, name)
-    if isinstance(value, types.ModuleType) and value.__name__ not in _ALLOWED_STRATEGY_MODULES:
-        raise ValueError(f"Inline strategy blocked module access: {name}")
-    return value
-
-
-class _AttributeGuard(ast.NodeTransformer):
-    """Route every attribute read through _sandbox_getattr."""
-
-    def visit_Attribute(self, node: ast.Attribute) -> ast.AST:
-        self.generic_visit(node)
-        if not isinstance(node.ctx, ast.Load):
-            return node
-        return ast.copy_location(
-            ast.Call(
-                func=ast.Name(id="_sandbox_getattr", ctx=ast.Load()),
-                args=[node.value, ast.Constant(value=node.attr)],
-                keywords=[],
-            ),
-            node,
-        )
 
 
 def _run_inline_strategy(
@@ -681,50 +644,92 @@ def _run_inline_strategy(
     frame: pd.DataFrame,
     context: dict[str, Any],
 ) -> tuple[pd.Series | list[int], str, str]:
-    """Run inline strategy code in a restricted sandbox.
+    """Run inline strategy code in-process (restricted sandbox, no isolation).
 
-    Security measures:
-    - AST-level validation blocks all imports, function calls (except safe builtins),
-      dunder attribute access, and dunder names.
-    - Only whitelisted builtins and pandas/numpy are available.
-    - No access to os, sys, subprocess, socket, or any file-system operations.
-    - Timeout enforced by the caller (StrategyRunner).
+    Only used as a fallback when the sandbox subprocess cannot be launched
+    (e.g. packaged/frozen builds). StrategyRunner prefers the subprocess.
     """
-    tree = ast.parse(code, mode="exec")
-    # Validate AST before execution
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            raise ValueError("Inline strategy imports are disabled")
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in {"open", "exec", "eval", "compile", "__import__"}:
-            raise ValueError(f"Inline strategy blocked call: {node.func.id}")
-        # Block dunder traversal (e.g. ().__class__.__base__.__subclasses__()),
-        # which reaches arbitrary loaded classes and escapes the sandbox -> RCE.
-        if isinstance(node, ast.Attribute) and ("__" in node.attr or node.attr.startswith("read_") or node.attr in _BLOCKED_STRATEGY_ATTRS):
-            raise ValueError(f"Inline strategy blocked attribute access: {node.attr}")
-        if isinstance(node, ast.Name) and "__" in node.id:
-            raise ValueError(f"Inline strategy blocked name: {node.id}")
-        # Block ALL function calls except the builtins actually exposed below,
-        # which excludes globals()/locals() and every context-leaking name.
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-            if node.func.id not in _SAFE_STRATEGY_BUILTINS:
-                raise ValueError(f"Inline strategy blocked call: {node.func.id}")
-    # Only expose pandas, numpy, and the safe builtins - nothing else.
-    tree = ast.fix_missing_locations(_AttributeGuard().visit(tree))
-    scope: dict[str, Any] = {
-        "pd": pd,
-        "np": np,
-        "_sandbox_getattr": _sandbox_getattr,
-        "__builtins__": dict(_SAFE_STRATEGY_BUILTINS),
-    }
-    out = io.StringIO()
-    err = io.StringIO()
-    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        exec(compile(tree, "<inline_strategy>", "exec"), scope, scope)
-        fn = scope.get("generate_signals")
-        if not callable(fn):
-            raise ValueError("Inline strategy must define callable generate_signals(df, context)")
-        raw_signals = fn(frame.copy(), context.copy())
-    return raw_signals, out.getvalue(), err.getvalue()
+    return run_inline_strategy(code, frame, context)
+
+
+def _sandbox_env() -> dict[str, str]:
+    env = {key: os.environ[key] for key in _SANDBOX_ENV_KEYS if key in os.environ}
+    # Keep BLAS/OpenMP single-threaded so the child fits under RLIMIT_AS.
+    env.update({"OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"})
+    return env
+
+
+def _run_inline_strategy_subprocess(
+    code: str,
+    frame: pd.DataFrame,
+    context: dict[str, Any],
+    timeout_seconds: float,
+) -> tuple[list[int], str, str]:
+    """Execute inline strategy code in an isolated, resource-limited child process.
+
+    The child enforces ``timeout_seconds`` with an interval timer; the parent
+    hard-kills it at timeout + startup grace (subprocess.run kills and reaps on
+    TimeoutExpired), so no runaway code survives the call.
+    """
+    payload = pickle.dumps(
+        {"code": code, "frame": frame, "context": dict(context), "timeout": float(timeout_seconds)},
+        protocol=pickle.HIGHEST_PROTOCOL,
+    )
+    timeout_message = f"Strategy execution exceeded timeout of {timeout_seconds}s"
+    cpu_limit = int(math.ceil(timeout_seconds + _SANDBOX_STARTUP_GRACE_SECONDS)) + 1
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-I", str(_SANDBOX_WORKER_PATH)],
+            input=payload,
+            capture_output=True,
+            timeout=float(timeout_seconds) + _SANDBOX_STARTUP_GRACE_SECONDS,
+            check=False,
+            env=_sandbox_env(),
+            preexec_fn=child_resource_limiter(cpu_limit),
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise TimeoutError(timeout_message) from exc
+    if completed.returncode != 0:
+        if completed.returncode in (-getattr(signal, "SIGXCPU", 24), -signal.SIGKILL):
+            raise TimeoutError(timeout_message)
+        raise RuntimeError(f"Strategy sandbox worker failed (exit code {completed.returncode})")
+    if len(completed.stdout) > 16 * MAX_STREAM_CHARS:
+        raise ValueError("Strategy output exceeded the size limit")
+    try:
+        response = json.loads(completed.stdout.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise RuntimeError("Strategy sandbox worker returned an invalid result") from exc
+    stdout = str(response.get("stdout") or "")
+    stderr = str(response.get("stderr") or "")
+    if not response.get("ok"):
+        error_cls = _SANDBOX_ERROR_TYPES.get(str(response.get("error_type")))
+        message = str(response.get("error") or "Inline strategy failed")
+        if error_cls is None:
+            raise RuntimeError(f"{response.get('error_type')}: {message}")
+        raise error_cls(message)
+    signals = response.get("signals")
+    if not isinstance(signals, list):
+        raise ValueError("Signals must be a list[int] or pandas.Series")
+    return signals, stdout, stderr
+
+
+def _run_inline_strategy_in_thread(
+    code: str,
+    frame: pd.DataFrame,
+    context: dict[str, Any],
+    timeout_seconds: float,
+) -> tuple[pd.Series | list[int], str, str]:
+    """Fallback without process isolation. Never waits on a runaway thread."""
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        fut = pool.submit(_run_inline_strategy, code, frame, context)
+        try:
+            return fut.result(timeout=timeout_seconds)
+        except FuturesTimeoutError as exc:
+            fut.cancel()
+            raise TimeoutError(f"Strategy execution exceeded timeout of {timeout_seconds}s") from exc
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
 
 class StrategyRunner:
@@ -799,13 +804,13 @@ class StrategyRunner:
                 return StrategyRunOutput(signals=self._validate_signals(signals, frame), stdout="", stderr="")
             raise ValueError(f"Unknown example strategy: {name}")
 
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            fut = pool.submit(_run_inline_strategy, strategy, frame, ctx)
-            try:
-                raw_signals, stdout, stderr = fut.result(timeout=self.timeout_seconds)
-            except FuturesTimeoutError as exc:
-                fut.cancel()
-                raise TimeoutError(f"Strategy execution exceeded timeout of {self.timeout_seconds}s") from exc
+        # First layer: reject disallowed code in-process before spawning anything.
+        validate_inline_strategy(strategy)
+        if getattr(sys, "frozen", False):
+            # Packaged builds have no standalone interpreter to run the worker.
+            raw_signals, stdout, stderr = _run_inline_strategy_in_thread(strategy, frame, ctx, self.timeout_seconds)
+        else:
+            raw_signals, stdout, stderr = _run_inline_strategy_subprocess(strategy, frame, ctx, self.timeout_seconds)
         return StrategyRunOutput(
             signals=self._validate_signals(raw_signals, frame),
             stdout=stdout,

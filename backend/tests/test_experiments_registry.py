@@ -9,7 +9,10 @@ from sqlalchemy.pool import StaticPool
 
 from backend.main import app
 from backend.shared.db import Base
+from types import SimpleNamespace
+
 from backend.api.deps import get_db
+from backend.auth.deps import get_current_user
 
 _engine = create_engine(
     "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
@@ -29,8 +32,10 @@ def _override_get_db():
 @pytest.fixture(scope="module")
 def client():
     app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id="user-1", role="trader")
     yield TestClient(app)
     app.dependency_overrides.pop(get_db, None)
+    app.dependency_overrides.pop(get_current_user, None)
 
 
 def test_experiments_registry_flow(client):

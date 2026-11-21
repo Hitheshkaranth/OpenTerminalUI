@@ -56,10 +56,10 @@ def _build_app() -> TestClient:
         )
         db.add_all(
             [
-                Holding(ticker="AAPL", quantity=100, avg_buy_price=180.0, buy_date="2025-01-15"),
-                Holding(ticker="JPM", quantity=80, avg_buy_price=160.0, buy_date="2025-02-10"),
-                Holding(ticker="RELIANCE.NS", quantity=120, avg_buy_price=2800.0, buy_date="2025-03-20"),
-                Holding(ticker="XOM", quantity=90, avg_buy_price=115.0, buy_date="2025-04-05"),
+                Holding(user_id="u_test", ticker="AAPL", quantity=100, avg_buy_price=180.0, buy_date="2025-01-15"),
+                Holding(user_id="u_test", ticker="JPM", quantity=80, avg_buy_price=160.0, buy_date="2025-02-10"),
+                Holding(user_id="u_test", ticker="RELIANCE.NS", quantity=120, avg_buy_price=2800.0, buy_date="2025-03-20"),
+                Holding(user_id="u_test", ticker="XOM", quantity=90, avg_buy_price=115.0, buy_date="2025-04-05"),
             ]
         )
         db.commit()

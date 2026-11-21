@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 import yfinance as yf
 from backend.config.settings import get_settings
+from backend.shared.http_client import shared_session
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ class USOptionsAdapter:
         chain_data = None
         if self.fmp_key:
             try:
-                async with httpx.AsyncClient(timeout=15.0) as client:
+                async with shared_session(timeout=15.0) as client:
                     url = f"https://financialmodelingprep.com/api/v4/option-chain/{symbol}"
                     resp = await client.get(url, params={"apikey": self.fmp_key})
                     if resp.status_code == 200:

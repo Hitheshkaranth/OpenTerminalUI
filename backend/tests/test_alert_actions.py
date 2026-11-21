@@ -118,6 +118,26 @@ def _seed_alert(
     return a
 
 
+def _patch_outbound(mock_client):
+    """Route webhook actions to `mock_client` with a pinned public address (no real DNS/network)."""
+    from contextlib import asynccontextmanager, ExitStack
+
+    import httpx
+
+    @asynccontextmanager
+    async def _client():
+        yield mock_client
+
+    async def _resolve(url, **_kwargs):
+        parsed = httpx.URL(url)
+        return parsed.copy_with(host="93.184.216.34"), parsed.host, parsed.host
+
+    stack = ExitStack()
+    stack.enter_context(patch("backend.alerts.delivery._outbound_client", _client))
+    stack.enter_context(patch("backend.alerts.delivery.resolve_public_target", _resolve))
+    return stack
+
+
 # ── validate_actions ──────────────────────────────────────────────────
 
 class TestValidateActions:
@@ -373,7 +393,7 @@ class TestRunActions:
             db.commit()
             db.refresh(alert)
 
-            with patch("backend.alerts.actions.httpx.AsyncClient", return_value=mock_client):
+            with _patch_outbound(mock_client):
                 results = asyncio.run(run_actions(db, alert, {"message": "triggered msg"}))
 
             assert len(results) == 1
@@ -414,7 +434,7 @@ class TestRunActions:
             db.commit()
             db.refresh(alert)
 
-            with patch("backend.alerts.actions.httpx.AsyncClient", return_value=mock_client):
+            with _patch_outbound(mock_client):
                 results = asyncio.run(run_actions(db, alert, {"message": "triggered"}))
 
             assert results[0]["ok"] is False
@@ -444,11 +464,13 @@ class TestRunActions:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("backend.alerts.actions.httpx.AsyncClient", return_value=mock_client):
+        mock_client.post = AsyncMock(side_effect=ConnectionError("connection failed"))
+        with _patch_outbound(mock_client):
             results = asyncio.run(run_actions(None, alert, {"message": "test"}))  # db=None, webhook doesn't use it
 
         assert results[0]["ok"] is False
-        assert "connection failed" in results[0]["detail"]
+        # Exception text is not echoed back (it can embed secrets); the type is.
+        assert "ConnectionError" in results[0]["detail"]
 
     def test_dry_run_creates_nothing(self):
         """dry_run=True returns ok=True detail but creates no VirtualOrder."""
@@ -495,11 +517,12 @@ class TestRunActions:
 
         from backend.alerts.actions import run_actions
 
-        with patch("backend.alerts.actions.httpx.AsyncClient") as mock_cls:
+        mock_client = AsyncMock()
+        with _patch_outbound(mock_client):
             results = asyncio.run(run_actions(None, alert, {"message": "dry"}, dry_run=True))
 
         assert results[0]["ok"] is True
-        mock_cls.assert_not_called()
+        mock_client.post.assert_not_called()
 
     def test_multiple_actions_independent(self):
         """One action fails, the next still runs."""

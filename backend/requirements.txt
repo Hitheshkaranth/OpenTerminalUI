@@ -1,53 +1,55 @@
-fastapi
-uvicorn
-slowapi
-pandas
-numpy
-yfinance
-sqlalchemy
-sqlalchemy[asyncio]
-pydantic
-PyYAML
-requests
-httpx
-aiohttp>=3.14.4
-h2>=4.4.1
-redis
-apscheduler
-kiteconnect>=5.2.2
-nsepython>=2.97
-nsetools>=1.0.10
-mibian>=0.1.3
-PyJWT>=2.15.0
-passlib[bcrypt]
+# Runtime dependencies only (test/dev tooling lives in requirements-dev.txt).
+# Pinned to the versions verified in the project venv (.venv311). Upgrade deliberately.
+fastapi==0.135.2
+uvicorn==0.42.0
+slowapi==0.1.10
+pandas==3.0.1
+numpy==2.4.3
+yfinance==1.2.0
+sqlalchemy[asyncio]==2.0.48
+pydantic==2.12.5
+PyYAML==6.0.3
+requests==2.33.0
+httpx==0.28.1
+redis==7.4.0
+apscheduler==3.11.2
+nsepython==2.97
+nsetools==2.0.1
+mibian==0.1.3
+passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
-alembic
-aiosqlite
-asyncpg
-psycopg[binary]
-pytest-cov
-pytest-asyncio
-openpyxl
-reportlab
-empyrical
-pyarrow
-hmmlearn
-optuna
-statsmodels
-xgboost
-polygon-api-client
-websockets>=12.0
-python-multipart
-scipy
-scikit-learn
-pypdf>=6.21.4
-beautifulsoup4
-lxml
-mcp>=1.30.0,<2
+alembic==1.18.4
+aiosqlite==0.22.1
+asyncpg==0.31.0
+psycopg[binary]==3.3.3
+openpyxl==3.1.5
+reportlab==4.4.10
+empyrical==0.5.5
+pyarrow==23.0.1
+hmmlearn==0.3.3
+optuna==4.8.0
+statsmodels==0.14.6
+xgboost==3.2.0
+polygon-api-client==1.16.3
+websockets==16.0
+python-multipart==0.0.24
+scipy==1.17.1
+scikit-learn==1.8.0
+beautifulsoup4==4.14.3
+lxml==6.0.2
 
 fxmacrodata-public-client @ https://github.com/fxmacrodata/fxmacrodata-public-client/releases/download/v0.1.0/fxmacrodata_public_client-0.1.0-py3-none-any.whl#sha256=5c60ff217243ff4001f178d4fdd8c3c8ce29001ad1ea0a170ed96606f0dd07c8
 
-# Security floors for transitive runtime dependencies.
+# Security floors. The local .venv311 is still BELOW these, so they cannot be pinned
+# to a "verified installed" version yet: upgrade the venv, run the suite, then pin.
+aiohttp>=3.14.4
+h2>=4.4.1
+kiteconnect>=5.2.2
+PyJWT>=2.15.0
+pypdf>=6.21.4
+mcp>=1.30.0,<2
+
+# Security floors for transitive runtime dependencies (same caveat as above).
 certifi>=2026.10.18
 cryptography>=50.0.0
 multidict>=6.9.1

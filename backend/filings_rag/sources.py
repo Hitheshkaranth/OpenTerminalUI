@@ -8,6 +8,7 @@ from typing import Any
 import logging
 
 import httpx
+from backend.shared.http_client import shared_session
 
 SEC_USER_AGENT = "OpenTerminalUI research <contact@openterminalui.local>"
 MAX_FILE_BYTES = 25 * 1024 * 1024
@@ -60,8 +61,8 @@ async def _get(
     try:
         # httpx takes follow_redirects; the old allow_redirects= kwarg raised TypeError, which the
         # blanket except turned into None — so every SEC/NSE download silently "failed".
-        async with httpx.AsyncClient(timeout=timeout, headers=headers or {}, trust_env=False,
-                                     follow_redirects=allow_redirects) as client:
+        async with shared_session(timeout=timeout, headers=headers or {},
+                                  follow_redirects=allow_redirects) as client:
             resp = await client.get(url, params=params)
             resp.raise_for_status()
             return resp

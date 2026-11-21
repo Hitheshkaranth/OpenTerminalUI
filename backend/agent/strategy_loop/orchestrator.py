@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import math
 import re
 import time
@@ -15,6 +16,20 @@ from backend.agent.strategy_loop.walkforward import PROTOCOL_VERSION, protocol_m
 from backend.config.settings import get_settings
 from backend.services.llm.base import LLMMessage
 from backend.services.llm.model_router import TaskProfile, select_chain
+
+logger = logging.getLogger(__name__)
+
+# Domain errors raised by our own code carry user-safe messages (e.g. experiment
+# accounting refusals, wall-clock timeouts); anything else is an internal failure
+# whose text may leak library/provider internals, so it is logged, not streamed.
+_SAFE_ERROR_TYPES = (ValueError, LookupError, TimeoutError)
+
+
+def _safe_error(exc: BaseException) -> str:
+    if isinstance(exc, _SAFE_ERROR_TYPES):
+        return str(exc) or type(exc).__name__
+    logger.warning("Strategy loop step failed", exc_info=exc)
+    return f"internal error ({type(exc).__name__})"
 
 
 class StrategyLoopOrchestrator:
@@ -264,8 +279,9 @@ class StrategyLoopOrchestrator:
                                                        saved["selection_count"], saved["walk_forward"], metadata))
                         return
                 except Exception as exc:
-                    yield events.error(f"Experiment accounting unavailable: {exc}")
-                    yield events.final(f"## Strategy Lab result\n\nExperiment accounting blocked this run: {exc}. No tests were recomputed or opened.")
+                    reason = _safe_error(exc)
+                    yield events.error(f"Experiment accounting unavailable: {reason}")
+                    yield events.final(f"## Strategy Lab result\n\nExperiment accounting blocked this run: {reason}. No tests were recomputed or opened.")
                     return
             ticker = self._ticker(subject, screen_context)
             if self.holdout_loader is not None:
@@ -273,7 +289,7 @@ class StrategyLoopOrchestrator:
                 try:
                     session = await self._within_deadline(self.holdout_loader(ticker), deadline)
                 except Exception as exc:
-                    session_error = str(exc)
+                    session_error = _safe_error(exc)
                     yield events.error(f"Chronological history unavailable: {session_error}")
             if session is not None and self.user_id:
                 try:
@@ -293,8 +309,9 @@ class StrategyLoopOrchestrator:
                                                        saved["selection_count"], saved["walk_forward"], metadata))
                         return
                 except Exception as exc:
-                    yield events.error(f"Experiment accounting unavailable: {exc}")
-                    yield events.final(f"## Strategy Lab result\n\nExperiment accounting blocked this run: {exc}. No tests were recomputed or opened.")
+                    reason = _safe_error(exc)
+                    yield events.error(f"Experiment accounting unavailable: {reason}")
+                    yield events.final(f"## Strategy Lab result\n\nExperiment accounting blocked this run: {reason}. No tests were recomputed or opened.")
                     return
             yield events.phase("propose", "Propose strategy")
             proposal_prompt = (
@@ -311,7 +328,7 @@ class StrategyLoopOrchestrator:
                 yield events.role_message("strategy_researcher", narration or "Using a bounded default SMA hypothesis.")
                 params = self._normalise(self._json_object(narration), ticker)
             except Exception as exc:
-                yield events.error(str(exc))
+                yield events.error(_safe_error(exc))
                 params = self._normalise(None, ticker)
 
             if params["strategy"] == "sma_crossover":
@@ -340,7 +357,7 @@ class StrategyLoopOrchestrator:
                         result = await self._within_deadline(self.registry.execute(tool_name, params), deadline)
                     is_error = False
                 except Exception as exc:
-                    result, is_error = {"error": str(exc)}, True
+                    result, is_error = {"error": _safe_error(exc)}, True
                 yield events.tool_result(call_id, tool_name, result, is_error=is_error)
                 if is_error or not isinstance(result, dict):
                     break
@@ -372,7 +389,7 @@ class StrategyLoopOrchestrator:
                         break
                     params = candidate
                 except Exception as exc:
-                    yield events.error(str(exc))
+                    yield events.error(_safe_error(exc))
                     break
 
             yield events.phase("validate", "Check in-sample robustness")
@@ -384,7 +401,7 @@ class StrategyLoopOrchestrator:
                     validation = await self._within_deadline(self.registry.execute("validate_backtest", validation_args), deadline)
                     is_error = False
                 except Exception as exc:
-                    validation, is_error = {"verdict": "Unable to validate backtest", "error": str(exc)}, True
+                    validation, is_error = {"verdict": "Unable to validate backtest", "error": _safe_error(exc)}, True
                 yield events.tool_result(call_id, "validate_backtest", validation, is_error=is_error)
             # No model call follows opening the holdout. The winner is frozen.
             if best is not None and best[0]["strategy"] == "sma_crossover" and session is not None:
@@ -395,8 +412,9 @@ class StrategyLoopOrchestrator:
                             selection={"winner": best[0], "training_candidates": attempts, "selection_count": selection_count},
                         ), deadline)
                     except Exception as exc:
-                        yield events.error(f"Cannot reserve test exposure: {exc}")
-                        yield events.final(self._report(best, validation, {"error": f"Tests were not opened: {exc}"}, selection_count,
+                        reason = _safe_error(exc)
+                        yield events.error(f"Cannot reserve test exposure: {reason}")
+                        yield events.final(self._report(best, validation, {"error": f"Tests were not opened: {reason}"}, selection_count,
                                                        experiment=experiment))
                         return
                 else:
@@ -408,7 +426,7 @@ class StrategyLoopOrchestrator:
                     holdout = await self._within_deadline(asyncio.to_thread(session.evaluate_holdout, best[0]), deadline)
                     is_error = False
                 except Exception as exc:
-                    holdout, is_error = {"error": str(exc)}, True
+                    holdout, is_error = {"error": _safe_error(exc)}, True
                 yield events.tool_result(call_id, "evaluate_strategy_holdout", holdout, is_error=is_error)
                 yield events.phase("walk_forward", "Expanding train/next-window tests")
                 call_id = f"walkforward-{uuid.uuid4().hex[:8]}"
@@ -417,7 +435,7 @@ class StrategyLoopOrchestrator:
                     walk_forward = await self._within_deadline(asyncio.to_thread(session.walk_forward, deadline=deadline), deadline)
                     is_error = walk_forward.get("status") != "completed"
                 except Exception as exc:
-                    walk_forward, is_error = {"status": "unavailable", "error": str(exc)}, True
+                    walk_forward, is_error = {"status": "unavailable", "error": _safe_error(exc)}, True
                 yield events.tool_result(call_id, "evaluate_strategy_walk_forward", walk_forward, is_error=is_error)
                 if self.user_id:
                     try:
@@ -427,14 +445,16 @@ class StrategyLoopOrchestrator:
                                      "selection_count": selection_count, "experiment": experiment},
                         ), deadline)
                     except Exception as exc:
-                        experiment = {**experiment, "persistence_error": str(exc)}
-                        yield events.error(f"Experiment result snapshot could not be saved: {exc}")
+                        reason = _safe_error(exc)
+                        experiment = {**experiment, "persistence_error": reason}
+                        yield events.error(f"Experiment result snapshot could not be saved: {reason}")
                 yield events.artifact("strategy_experiment", "Experiment accounting", experiment)
             yield events.phase("decision", "Result")
             yield events.final(self._report(best, validation, holdout, selection_count, walk_forward, experiment))
         except Exception as exc:
             # The outer boundary deliberately owns the only final event.
-            yield events.error(str(exc))
+            reason = _safe_error(exc)
+            yield events.error(reason)
             if best is None:
-                holdout = {"error": str(exc)}
+                holdout = {"error": reason}
             yield events.final(self._report(best, validation, holdout, selection_count, walk_forward, experiment))

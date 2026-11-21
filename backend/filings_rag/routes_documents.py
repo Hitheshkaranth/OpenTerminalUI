@@ -1,19 +1,67 @@
 from __future__ import annotations
 
 # OWNER: agent A
+import logging
 import os
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request
+from starlette.datastructures import UploadFile as StarletteUploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend.api.deps import get_db
+from backend.auth.deps import require_role
 from backend.filings_rag import parse, sources, store
 from backend.filings_rag.sources import MAX_FILE_BYTES
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _UPLOAD_EXTENSIONS = {".pdf", ".html", ".htm", ".txt"}
+_UPLOAD_CHUNK_BYTES = 1024 * 1024
+# Multipart framing + form fields on top of the file itself.
+_MULTIPART_OVERHEAD_BYTES = 64 * 1024
+_TOO_LARGE = "File exceeds 25MB limit"
+
+
+def _capped_request(request: Request, limit: int) -> Request:
+    """Return a view of ``request`` whose body stream aborts with 413 once ``limit`` bytes arrive.
+
+    A declared Content-Length over the limit is rejected before anything is read; chunked
+    bodies are cut off as soon as they cross it, so an oversized upload is never fully read.
+    """
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > limit:
+        raise HTTPException(status_code=413, detail=_TOO_LARGE)
+    received = 0
+    upstream = request.receive
+
+    async def receive():
+        nonlocal received
+        message = await upstream()
+        if message.get("type") == "http.request":
+            received += len(message.get("body", b""))
+            if received > limit:
+                raise HTTPException(status_code=413, detail=_TOO_LARGE)
+        return message
+
+    return Request(request.scope, receive=receive)
+
+
+def _form_text(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
+async def _read_capped(file: StarletteUploadFile, limit: int = MAX_FILE_BYTES) -> bytes:
+    """Read the upload in chunks, aborting as soon as it exceeds ``limit`` bytes."""
+    buf = bytearray()
+    while True:
+        chunk = await file.read(_UPLOAD_CHUNK_BYTES)
+        if not chunk:
+            return bytes(buf)
+        if len(buf) + len(chunk) > limit:
+            raise HTTPException(status_code=413, detail=_TOO_LARGE)
+        buf.extend(chunk)
 
 
 class FetchRequest(BaseModel):
@@ -66,21 +114,29 @@ def list_documents(symbol: str, db: Session = Depends(get_db)) -> dict[str, obje
     return {"symbol": symbol, "documents": store.list_documents(db, symbol)}
 
 
-@router.post("/{symbol}/documents/upload")
+@router.post("/{symbol}/documents/upload", dependencies=[Depends(require_role("admin"))])
 async def upload_document(
     symbol: str,
+    request: Request,
     db: Session = Depends(get_db),
-    file: UploadFile = File(...),
-    doc_type: str | None = Form(None),
-    title: str | None = Form(None),
-    period: str | None = Form(None),
 ) -> dict[str, object]:
-    data = await file.read()
-    if len(data) > MAX_FILE_BYTES:
-        raise HTTPException(status_code=422, detail="File exceeds 25MB limit")
+    # The multipart body is parsed here (not via File()/Form() params) so the size cap and
+    # the admin check both run before the body is consumed.
+    form = await _capped_request(request, MAX_FILE_BYTES + _MULTIPART_OVERHEAD_BYTES).form()
+    try:
+        file = form.get("file")
+        if not isinstance(file, StarletteUploadFile):
+            raise HTTPException(status_code=422, detail="A file upload is required")
+        doc_type = _form_text(form.get("doc_type"))
+        title = _form_text(form.get("title"))
+        period = _form_text(form.get("period"))
+        filename, content_type = file.filename, file.content_type
+        data = await _read_capped(file)
+    finally:
+        await form.close()
 
     try:
-        pages = _pages_from_upload(file.filename, file.content_type, data)
+        pages = _pages_from_upload(filename, content_type, data)
     except ValueError:
         raise HTTPException(status_code=422, detail="Could not read the file (corrupt, encrypted or not a valid document)")
     if pages is None:
@@ -92,7 +148,7 @@ async def upload_document(
             symbol=symbol,
             market=_market(symbol),
             doc_type=doc_type or "other",
-            title=title or (file.filename or "Document"),
+            title=title or (filename or "Document"),
             period=period,
             source="upload",
             source_url=None,
@@ -108,7 +164,7 @@ async def upload_document(
     return doc
 
 
-@router.post("/{symbol}/documents/fetch")
+@router.post("/{symbol}/documents/fetch", dependencies=[Depends(require_role("admin"))])
 async def fetch_documents(symbol: str, payload: FetchRequest, db: Session = Depends(get_db)) -> dict[str, object]:
     sources_list = [source.lower() for source in payload.sources]
     if not sources_list:
@@ -120,8 +176,9 @@ async def fetch_documents(symbol: str, payload: FetchRequest, db: Session = Depe
     for source in sources_list:
         try:
             fetched = await _invoke_source(source, symbol, payload.limit)
-        except Exception as exc:  # network / parsing failure for the whole source
-            skipped.append({"title": source, "reason": "download failed", "error": str(exc)})
+        except Exception:  # network / parsing failure for the whole source
+            logger.warning("filings fetch from %s failed for %s", source, symbol, exc_info=True)
+            skipped.append({"title": source, "reason": "download failed"})
             continue
         if not isinstance(fetched, list):
             continue
@@ -161,7 +218,7 @@ async def fetch_documents(symbol: str, payload: FetchRequest, db: Session = Depe
     return {"symbol": symbol, "imported": imported, "skipped": skipped}
 
 
-@router.delete("/{symbol}/documents/{doc_id}")
+@router.delete("/{symbol}/documents/{doc_id}", dependencies=[Depends(require_role("admin"))])
 def delete_document(symbol: str, doc_id: int, db: Session = Depends(get_db)) -> dict[str, object]:
     if not store.delete_document(db, symbol, doc_id):
         raise HTTPException(status_code=404, detail="Document not found")

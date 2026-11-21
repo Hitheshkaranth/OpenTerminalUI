@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-
 from backend.config.env import load_local_env
 from backend.config.settings import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 def _ensure_sqlite_parent(url: str) -> None:
@@ -50,17 +51,31 @@ def _raw_database_url() -> str:
     return raw
 
 
-def _runtime_env() -> str:
-    """Determine the current runtime environment."""
-    return (
-        os.getenv("OPENTERMINALUI_ENV")
-        or os.getenv("APP_ENV")
-        or os.getenv("ENV")
-        or "development"
-    ).strip().lower()
+def _guard_sqlite(raw: str) -> None:
+    """SQLite outside development needs an explicit single-node opt-in (fail closed)."""
+    from backend.config.security import get_app_env, is_development_env
+
+    if not raw.startswith("sqlite") or is_development_env():
+        return
+    if os.getenv("ALLOW_SQLITE_IN_PRODUCTION", "").strip() == "1":
+        global _sqlite_prod_warned
+        if not _sqlite_prod_warned:
+            _sqlite_prod_warned = True
+            logger.warning(
+                "Running on SQLite in %r environment (ALLOW_SQLITE_IN_PRODUCTION=1). "
+                "Supported for single-node self-hosting only; use PostgreSQL for multi-worker deployments.",
+                get_app_env(),
+            )
+        return
+    raise RuntimeError(
+        f"SQLite is not permitted in {get_app_env()!r} environment. "
+        "Set DATABASE_URL to a PostgreSQL connection string (e.g. "
+        "postgresql+asyncpg://user:pass@host:5432/dbname), set OPENTERMINALUI_ENV=development "
+        "for local use, or set ALLOW_SQLITE_IN_PRODUCTION=1 for single-node self-hosting."
+    )
 
 
-_DEV_ENVS = {"dev", "development", "local", "test", "testing"}
+_sqlite_prod_warned = False
 
 
 def get_database_url() -> str:
@@ -68,15 +83,8 @@ def get_database_url() -> str:
     # Otherwise use settings.sqlite_url (which already handles OPENTERMINALUI_SQLITE_URL)
     raw = _raw_database_url()
 
-    # SECURITY: SQLite is only allowed in development environments.
-    # Production must use PostgreSQL to ensure data integrity, concurrency,
-    # and proper security controls (row-level security, TLS, etc.).
-    if raw.startswith("sqlite") and _runtime_env() not in _DEV_ENVS:
-        raise RuntimeError(
-            f"SQLite is not permitted in {_runtime_env()!r} environment. "
-            "Set DATABASE_URL to a PostgreSQL connection string (e.g. "
-            "postgresql+asyncpg://user:pass@host:5432/dbname)."
-        )
+    # SECURITY: SQLite is only allowed in development unless explicitly opted in.
+    _guard_sqlite(raw)
 
     if raw.startswith("postgresql://"):
         return raw.replace("postgresql://", "postgresql+asyncpg://", 1)
@@ -93,6 +101,7 @@ def get_database_url() -> str:
 
 def get_sync_database_url() -> str:
     raw = _raw_database_url()
+    _guard_sqlite(raw)
 
     if raw.startswith("postgresql+asyncpg://"):
         return raw.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
@@ -106,7 +115,3 @@ def get_sync_database_url() -> str:
 
     _ensure_sqlite_parent(raw)
     return raw
-
-
-def create_engine_async() -> AsyncEngine:
-    return create_async_engine(get_database_url(), future=True, pool_pre_ping=True)

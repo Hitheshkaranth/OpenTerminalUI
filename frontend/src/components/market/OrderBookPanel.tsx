@@ -4,6 +4,7 @@ import { fetchDepth } from "../../api/client";
 import { useStock } from "../../hooks/useStocks";
 import { useQuotesStore, useQuotesStream } from "../../realtime/useQuotesStream";
 import { isUSMarketCode, useUSQuotesStore, useUSQuotesStream } from "../../realtime/useUsQuotesStream";
+import { withWsAuth } from "../../realtime/wsAuth";
 
 import { DepthChart, type DepthLevel } from "./DepthChart";
 import { TimeSalesTape, type TimeSalesRow } from "./TimeSalesTape";
@@ -326,7 +327,7 @@ export function OrderBookPanel({
     const connect = () => {
       clearReconnect();
       setDepthConnectionState("connecting");
-      socket = new WebSocket(buildDepthWsUrl());
+      socket = new WebSocket(withWsAuth(buildDepthWsUrl()));
       socket.onopen = () => {
         reconnectAttemptRef.current = 0;
         setDepthConnectionState("connected");

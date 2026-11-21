@@ -1,23 +1,31 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
 
 from backend.api.routes import backtests
 
+_USER = SimpleNamespace(id=7)
+
 
 class _FakeBacktestService:
-    async def submit(self, req):  # noqa: ANN001
+    calls: list[tuple[str, str | None]] = []
+
+    async def submit(self, req, user_id=None):  # noqa: ANN001
+        _FakeBacktestService.calls.append(("submit", user_id))
         return "bt_test_1"
 
-    async def get_status(self, run_id: str):
+    async def get_status(self, run_id: str, user_id=None):  # noqa: ANN001
+        _FakeBacktestService.calls.append(("status", user_id))
         if run_id == "missing":
             return {"run_id": run_id, "status": "not_found"}
         return {"run_id": run_id, "status": "running"}
 
-    async def get_result(self, run_id: str):
+    async def get_result(self, run_id: str, user_id=None):  # noqa: ANN001
+        _FakeBacktestService.calls.append(("result", user_id))
         if run_id == "missing":
             return {"run_id": run_id, "status": "not_found"}
         return {
@@ -37,7 +45,7 @@ class _FakeBacktestService:
 def test_submit_backtest_returns_run_id(monkeypatch) -> None:
     monkeypatch.setattr(backtests, "get_backtest_job_service", lambda: _FakeBacktestService())
     payload = backtests.BacktestSubmitPayload(symbol="RELIANCE", strategy="example:sma_crossover")
-    result = asyncio.run(backtests.submit_backtest(payload))
+    result = asyncio.run(backtests.submit_backtest(payload, _USER))
     assert result["run_id"] == "bt_test_1"
     assert result["status"] == "queued"
 
@@ -45,12 +53,12 @@ def test_submit_backtest_returns_run_id(monkeypatch) -> None:
 def test_status_not_found_raises(monkeypatch) -> None:
     monkeypatch.setattr(backtests, "get_backtest_job_service", lambda: _FakeBacktestService())
     with pytest.raises(HTTPException):
-        asyncio.run(backtests.backtest_status("missing"))
+        asyncio.run(backtests.backtest_status("missing", _USER))
 
 
 def test_result_returns_payload(monkeypatch) -> None:
     monkeypatch.setattr(backtests, "get_backtest_job_service", lambda: _FakeBacktestService())
-    result = asyncio.run(backtests.backtest_result("bt_test_1"))
+    result = asyncio.run(backtests.backtest_result("bt_test_1", _USER))
     assert result["status"] == "done"
     assert result["result"]["symbol"] == "RELIANCE"
 
@@ -58,7 +66,7 @@ def test_result_returns_payload(monkeypatch) -> None:
 def test_v1_submit_adapts_legacy_submit(monkeypatch) -> None:
     monkeypatch.setattr(backtests, "get_backtest_job_service", lambda: _FakeBacktestService())
     payload = backtests.BacktestSubmitPayload(symbol="RELIANCE", strategy="example:sma_crossover")
-    result = asyncio.run(backtests.v1_submit_backtest(payload))
+    result = asyncio.run(backtests.v1_submit_backtest(payload, _USER))
     assert result.run_id == "bt_test_1"
     assert result.status == "queued"
 
@@ -66,7 +74,7 @@ def test_v1_submit_adapts_legacy_submit(monkeypatch) -> None:
 def test_v1_walkforward_works(monkeypatch) -> None:
     monkeypatch.setattr(backtests, "get_backtest_job_service", lambda: _FakeBacktestService())
     payload = backtests.WalkForwardPayload(run_id="bt_test_1", folds=2, in_sample_ratio=0.7)
-    result = asyncio.run(backtests.v1_validate_walkforward(payload))
+    result = asyncio.run(backtests.v1_validate_walkforward(payload, _USER))
     assert result["run_id"] == "bt_test_1"
     assert "validation" in result
 
@@ -74,14 +82,14 @@ def test_v1_walkforward_works(monkeypatch) -> None:
 def test_v1_monte_carlo_works(monkeypatch) -> None:
     monkeypatch.setattr(backtests, "get_backtest_job_service", lambda: _FakeBacktestService())
     payload = backtests.MonteCarloPayload(run_id="bt_test_1", simulations=20, horizon_days=10, seed=7)
-    result = asyncio.run(backtests.v1_simulate_montecarlo(payload))
+    result = asyncio.run(backtests.v1_simulate_montecarlo(payload, _USER))
     assert result["run_id"] == "bt_test_1"
     assert result["simulation"]["simulations"] == 20
 
 
 def test_v1_monte_carlo_initial_equity_fallback(monkeypatch) -> None:
     class _NoInitialCashService(_FakeBacktestService):
-        async def get_result(self, run_id: str):
+        async def get_result(self, run_id: str, user_id=None):  # noqa: ANN001
             if run_id == "missing":
                 return {"run_id": run_id, "status": "not_found"}
             return {
@@ -104,7 +112,7 @@ def test_v1_monte_carlo_initial_equity_fallback(monkeypatch) -> None:
     monkeypatch.setattr(backtests, "get_backtest_job_service", lambda: _NoInitialCashService())
     monkeypatch.setattr(backtests, "run_monte_carlo_simulation", _fake_mc)
     payload = backtests.MonteCarloPayload(run_id="bt_test_1", simulations=20, horizon_days=10, seed=7)
-    result = asyncio.run(backtests.v1_simulate_montecarlo(payload))
+    result = asyncio.run(backtests.v1_simulate_montecarlo(payload, _USER))
     assert result["simulation"]["simulations"] == 20
     assert captured["initial_equity"] == 250000.0
 
@@ -140,7 +148,7 @@ def test_v1_portfolio_submit_works(monkeypatch) -> None:
 def test_v1_factor_decompose_works(monkeypatch) -> None:
     monkeypatch.setattr(backtests, "get_backtest_job_service", lambda: _FakeBacktestService())
     payload = backtests.FactorPayload(run_id="bt_test_1")
-    result = asyncio.run(backtests.v1_factor_decompose(payload))
+    result = asyncio.run(backtests.v1_factor_decompose(payload, _USER))
     assert result["run_id"] == "bt_test_1"
     assert "factor_analysis" in result
 
@@ -149,3 +157,18 @@ def test_v1_data_catalog_works(monkeypatch) -> None:
     monkeypatch.setattr(backtests, "list_store_items", lambda: [{"name": "bt_test.parquet", "bytes": 123}])
     result = asyncio.run(backtests.v1_data_catalog())
     assert len(result["items"]) == 1
+
+
+def test_routes_forward_owner_user_id(monkeypatch) -> None:
+    _FakeBacktestService.calls = []
+    monkeypatch.setattr(backtests, "get_backtest_job_service", lambda: _FakeBacktestService())
+    payload = backtests.BacktestSubmitPayload(symbol="RELIANCE", strategy="example:sma_crossover")
+    asyncio.run(backtests.submit_backtest(payload, _USER))
+    asyncio.run(backtests.backtest_status("bt_test_1", _USER))
+    asyncio.run(backtests.backtest_result("bt_test_1", _USER))
+    asyncio.run(backtests.backtest_analytics("bt_test_1", 60, 50, _USER))
+    compare = backtests.ComparePayload(symbol="RELIANCE", strategies=["sma_crossover"])
+    asyncio.run(backtests.compare_strategies(compare, _USER))
+    assert _FakeBacktestService.calls
+    assert all(user_id == "7" for _, user_id in _FakeBacktestService.calls)
+    assert {kind for kind, _ in _FakeBacktestService.calls} == {"submit", "status", "result"}

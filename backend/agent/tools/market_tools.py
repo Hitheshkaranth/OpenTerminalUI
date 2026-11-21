@@ -779,7 +779,7 @@ def build_default_registry(user_id: str | None = None) -> ToolRegistry:
     reg.register_many([
         *derivatives_tool_specs(),
         *macro_tool_specs(),
-        *analytics_tool_specs(),
+        *analytics_tool_specs(user_id),
         *filings_tool_specs(),
     ])
     reg.register(ToolSpec(

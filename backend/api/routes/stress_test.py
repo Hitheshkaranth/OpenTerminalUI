@@ -48,9 +48,9 @@ def _infer_sector(ticker: str) -> str:
     return scenario_engine._infer_sector(ticker).replace("_", " ").title()  # noqa: SLF001
 
 
-def _load_holdings(db: Session, portfolio_id: str) -> list[dict[str, Any]]:
+def _load_holdings(db: Session, portfolio_id: str, user_id: str) -> list[dict[str, Any]]:
     _validate_portfolio_id(db, portfolio_id)
-    rows = db.query(Holding).all()
+    rows = db.query(Holding).filter(Holding.user_id == user_id).all()
     if not rows:
         raise HTTPException(status_code=404, detail="No holdings available")
     holdings: list[dict[str, Any]] = []
@@ -90,9 +90,9 @@ def get_predefined_scenarios(_: User = Depends(get_current_user)) -> list[dict[s
 def run_scenario(
     payload: ScenarioRunRequest,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    holdings = _load_holdings(db, payload.portfolio_id)
+    holdings = _load_holdings(db, payload.portfolio_id, current_user.id)
 
     if payload.custom_shocks:
         scenario_name = "Custom Scenario"
@@ -113,9 +113,9 @@ def run_scenario(
 def run_monte_carlo(
     payload: MonteCarloRequest,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    holdings = _load_holdings(db, payload.portfolio_id)
+    holdings = _load_holdings(db, payload.portfolio_id, current_user.id)
     return scenario_engine.run_monte_carlo_stress(holdings, n_simulations=payload.n_simulations)
 
 

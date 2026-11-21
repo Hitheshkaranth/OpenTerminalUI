@@ -54,5 +54,7 @@ class UserScript(BaseModel):
     compiled_ast: dict[str, Any] = Field(default_factory=dict)
     outputs: list[dict[str, Any]] = Field(default_factory=list)
     is_public: bool = False
+    # Id of the user who created the script; every route scopes access by it.
+    owner_id: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

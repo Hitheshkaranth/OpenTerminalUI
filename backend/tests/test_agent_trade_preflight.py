@@ -508,3 +508,32 @@ def test_risk_policy_http_api_scopes_changes_to_authenticated_user(book, monkeyp
         monkeypatch.setenv("E2E_DEV_AUTH", "0")
         assert client.get("/api/agent/risk-policy").status_code == 401
         assert client.put("/api/agent/risk-policy", json={"enabled": False}).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_confirmed_resting_guarded_order_is_tracked_after_commit(book, monkeypatch):
+    from backend.agent import proposals
+    from backend.models import VirtualOrder
+
+    tracked: list[tuple[str, str]] = []
+
+    class Engine:
+        def track_order(self, order):  # noqa: ANN001
+            # The order must already be committed: a fresh session can see it.
+            other = book[1]()
+            try:
+                assert other.get(VirtualOrder, order.id).status == "pending"
+            finally:
+                other.close()
+            tracked.append((order.id, order.status))
+
+        def invalidate_order_index(self) -> None:
+            pass
+
+    proposed = await propose(order_type="limit", limit_price=95, stop_price=90)
+    assert proposed["status"] == "pending", proposed
+    monkeypatch.setattr(proposals, "get_paper_engine", lambda: Engine())
+    result = await proposals.confirm_proposal(book[0], "owner", proposed["proposal_id"])
+    assert result["status"] == "confirmed", result
+    assert result["result"]["status"] == "pending"
+    assert tracked == [(result["result"]["order_id"], "pending")]

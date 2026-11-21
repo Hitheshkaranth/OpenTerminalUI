@@ -1,15 +1,21 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from backend.api.deps import fetch_stock_snapshot_coalesced, get_unified_fetcher
 from backend.db.models import Holding
 
+logger = logging.getLogger(__name__)
+
 
 class PluginContextImpl:
-    def __init__(self, db_factory, permissions: set[str]) -> None:
+    def __init__(self, db_factory, permissions: set[str], user_id: str | None = None) -> None:
         self.permissions = permissions
         self._db_factory = db_factory
+        # Owner whose holdings read_portfolio exposes. Plugins are loaded globally (no
+        # requesting user), so this is usually None and read_portfolio returns nothing.
+        self.user_id = user_id
 
     def _check(self, perm: str) -> None:
         if perm not in self.permissions:
@@ -30,9 +36,11 @@ class PluginContextImpl:
 
     async def read_portfolio(self) -> dict[str, Any]:
         self._check("read_portfolio")
+        if not self.user_id:
+            return {"items": []}
         db = self._db_factory()
         try:
-            rows = db.query(Holding).all()
+            rows = db.query(Holding).filter(Holding.user_id == self.user_id).all()
             return {
                 "items": [
                     {
@@ -49,4 +57,4 @@ class PluginContextImpl:
             db.close()
 
     def log(self, message: str) -> None:
-        print(f"[plugin] {message}")
+        logger.info("[plugin] %s", message)

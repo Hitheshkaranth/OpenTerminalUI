@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import ast
 import logging
+import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from statistics import mean
+from types import SimpleNamespace
 from typing import Any
 
 from backend.alerts.actions import run_actions
@@ -16,6 +18,10 @@ from backend.models import AlertConditionType, AlertORM, AlertStatus, AlertTrigg
 from backend.services.marketdata_hub import MarketDataHub, get_marketdata_hub
 
 logger = logging.getLogger(__name__)
+
+_INDEX_TTL_SECONDS = 30.0
+_MAX_COALESCED_SYMBOLS = 5000
+_DROP_LOG_INTERVAL_SECONDS = 60.0
 
 
 def _utcnow() -> datetime:
@@ -288,16 +294,25 @@ def _eval_ast_node(node: ast.AST, globals_: dict[str, Any], locals_: dict[str, A
 class AlertEvaluatorService:
     def __init__(self) -> None:
         self._started = False
-        self._queue: asyncio.Queue[dict[str, Any]] | None = None
+        # Latest tick per symbol (coalesced) instead of a FIFO that drops on overflow.
+        self._latest_ticks: dict[str, dict[str, Any]] = {}
+        self._tick_event: asyncio.Event | None = None
+        self._ticks_coalesced = 0
+        self._ticks_dropped = 0
+        self._last_drop_log = 0.0
         self._worker_task: asyncio.Task | None = None
         self._volume_cache: dict[str, deque[float]] = defaultdict(lambda: deque(maxlen=256))
         self._price_cache: dict[str, deque[float]] = defaultdict(lambda: deque(maxlen=256))
         self._hub: MarketDataHub | None = None
+        # {symbol: {active alert ids}}; refreshed on CRUD and every 30s.
+        self._alert_index: dict[str, set[str]] = {}
+        self._index_loaded_at: float | None = None
 
     def start(self, hub: MarketDataHub | None = None) -> None:
         if self._started:
             return
-        self._queue = asyncio.Queue(maxsize=5000)
+        self._tick_event = asyncio.Event()
+        self._latest_ticks = {}
         self._started = True
         self._hub = hub or get_marketdata_hub()
         self._hub.register_tick_listener(self._on_tick)
@@ -307,29 +322,74 @@ class AlertEvaluatorService:
         self._started = False
         task = self._worker_task
         self._worker_task = None
-        self._queue = None
+        self._latest_ticks = {}
+        if self._tick_event is not None:
+            self._tick_event.set()
         if task is not None:
             task.cancel()
 
     def _on_tick(self, tick: dict[str, Any]) -> None:
-        if not self._started or self._queue is None:
+        if not self._started or self._tick_event is None:
             return
-        try:
-            self._queue.put_nowait(tick)
-        except asyncio.QueueFull:
+        symbol = str(tick.get("symbol") or "").strip().upper()
+        if not symbol:
             return
+        if symbol in self._latest_ticks:
+            self._ticks_coalesced += 1
+        elif len(self._latest_ticks) >= _MAX_COALESCED_SYMBOLS:
+            self._ticks_dropped += 1
+            now = time.monotonic()
+            if now - self._last_drop_log >= _DROP_LOG_INTERVAL_SECONDS:
+                self._last_drop_log = now
+                logger.warning(
+                    "Alert evaluator tick backlog: %d ticks dropped, %d coalesced (symbol cap %d)",
+                    self._ticks_dropped, self._ticks_coalesced, _MAX_COALESCED_SYMBOLS,
+                )
+            return
+        self._latest_ticks[symbol] = tick
+        self._tick_event.set()
 
     async def _worker(self) -> None:
         while self._started:
-            try:
-                tick = await self._queue.get()
-            except (asyncio.CancelledError, RuntimeError):
+            event = self._tick_event
+            if event is None:
                 break
             try:
-                await self._process_tick(tick)
-            except Exception:
-                # Keep evaluator resilient.
-                continue
+                await event.wait()
+            except (asyncio.CancelledError, RuntimeError):
+                break
+            event.clear()
+            batch, self._latest_ticks = self._latest_ticks, {}
+            for symbol, tick in batch.items():
+                try:
+                    await self._process_tick(tick)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    logger.exception("Alert evaluation failed for tick on %s", symbol)
+
+    # ── active-alert index (SCALE-5) ────────────────────────────────────
+    def invalidate_alert_index(self) -> None:
+        self._index_loaded_at = None
+
+    @staticmethod
+    def _load_alert_index() -> dict[str, set[str]]:
+        db = SessionLocal()
+        try:
+            rows = db.query(AlertORM.id, AlertORM.symbol).filter(AlertORM.status == AlertStatus.ACTIVE.value).all()
+        finally:
+            db.close()
+        index: dict[str, set[str]] = {}
+        for alert_id, symbol in rows:
+            index.setdefault(str(symbol or "").strip().upper(), set()).add(str(alert_id))
+        return index
+
+    async def _symbol_has_candidates(self, symbol: str) -> bool:
+        loaded = self._index_loaded_at
+        if loaded is None or time.monotonic() - loaded > _INDEX_TTL_SECONDS:
+            self._alert_index = await asyncio.to_thread(self._load_alert_index)
+            self._index_loaded_at = time.monotonic()
+        return bool(self._alert_index.get(symbol))
 
     async def _process_tick(self, tick: dict[str, Any]) -> None:
         symbol = str(tick.get("symbol") or "").strip().upper()
@@ -343,63 +403,131 @@ class AlertEvaluatorService:
             self._volume_cache[symbol].append(volume)
         self._price_cache[symbol].append(ltp)
 
+        if await self._symbol_has_candidates(symbol):
+            fired, active_ids = await asyncio.to_thread(self._evaluate_symbol_sync, symbol, tick)
+            if active_ids:
+                self._alert_index[symbol] = active_ids
+            else:
+                self._alert_index.pop(symbol, None)
+            # Network delivery runs with no DB session/transaction held.
+            for item in fired:
+                try:
+                    await self._dispatch_triggered(item)
+                except Exception:
+                    logger.exception("Alert dispatch failed for alert %s (%s)", item["alert"].id, symbol)
+        if self._hub is not None:
+            db = SessionLocal()
+            try:
+                await process_scanner_tick(db, self._hub, tick)
+            finally:
+                db.close()
+
+    @staticmethod
+    def _snapshot(alert: AlertORM) -> SimpleNamespace:
+        """Detached, read-only view of an alert for delivery after its session closes."""
+        return SimpleNamespace(
+            id=alert.id,
+            user_id=alert.user_id,
+            symbol=alert.symbol,
+            condition_type=alert.condition_type,
+            conditions=list(alert.conditions) if isinstance(alert.conditions, list) else alert.conditions,
+            logic=alert.logic,
+            parameters=dict(alert.parameters) if isinstance(alert.parameters, dict) else alert.parameters,
+            delivery_channels=list(alert.delivery_channels) if isinstance(alert.delivery_channels, list) else alert.delivery_channels,
+            delivery_config=dict(alert.delivery_config) if isinstance(alert.delivery_config, dict) else alert.delivery_config,
+        )
+
+    def _evaluate_one(self, db: Any, alert: AlertORM, tick: dict[str, Any]) -> dict[str, Any] | None:
+        now = _utcnow()
+        if self._should_expire(alert, now) or self._max_triggers_reached(alert):
+            alert.status = AlertStatus.EXPIRED.value
+            return None
+        if not self._cooldown_ready(alert):
+            return None
+        ok, triggered_value = self._evaluate(alert, tick)
+        if not ok:
+            return None
+        trigger_context = self._build_trigger_context(alert, tick, triggered_value)
+        alert.triggered_at = now
+        alert.last_triggered_at = now
+        alert.last_triggered_value = triggered_value
+        alert.trigger_count = int(alert.trigger_count or 0) + 1
+        if self._max_triggers_reached(alert):
+            alert.status = AlertStatus.EXPIRED.value
+        trigger_row = AlertTriggerORM(
+            alert_id=alert.id,
+            user_id=alert.user_id,
+            symbol=alert.symbol,
+            condition_type=alert.condition_type,
+            triggered_value=triggered_value,
+            context=trigger_context,
+            triggered_at=now,
+        )
+        db.add(trigger_row)
+        db.flush()
+        return {
+            "alert": self._snapshot(alert),
+            "trigger_id": trigger_row.id,
+            "triggered_value": triggered_value,
+            "now": now,
+            "context": trigger_context,
+        }
+
+    def _evaluate_symbol_sync(self, symbol: str, tick: dict[str, Any]) -> tuple[list[dict[str, Any]], set[str]]:
+        """Runs in a worker thread: evaluate and persist triggers; each alert in its own savepoint."""
+        fired: list[dict[str, Any]] = []
+        active_ids: set[str] = set()
         db = SessionLocal()
         try:
             alerts = (
                 db.query(AlertORM)
-                .filter(
-                    AlertORM.symbol == symbol,
-                    AlertORM.status == AlertStatus.ACTIVE.value,
-                )
+                .filter(AlertORM.symbol == symbol, AlertORM.status == AlertStatus.ACTIVE.value)
                 .all()
             )
             for alert in alerts:
-                now = _utcnow()
-                if self._should_expire(alert, now):
-                    alert.status = AlertStatus.EXPIRED.value
+                alert_id = str(alert.id)
+                try:
+                    with db.begin_nested():
+                        item = self._evaluate_one(db, alert, tick)
                     db.commit()
+                except Exception:
+                    db.rollback()
+                    logger.exception("Alert evaluation failed for alert %s (%s)", alert_id, symbol)
+                    active_ids.add(alert_id)
                     continue
-                if self._max_triggers_reached(alert):
-                    alert.status = AlertStatus.EXPIRED.value
-                    db.commit()
-                    continue
-                if not self._cooldown_ready(alert):
-                    continue
-                ok, triggered_value = self._evaluate(alert, tick)
-                if not ok:
-                    continue
-                trigger_context = self._build_trigger_context(alert, tick, triggered_value)
-                alert.triggered_at = now
-                alert.last_triggered_at = now
-                alert.last_triggered_value = triggered_value
-                alert.trigger_count = int(alert.trigger_count or 0) + 1
-                if self._max_triggers_reached(alert):
-                    alert.status = AlertStatus.EXPIRED.value
-                trigger_row = AlertTriggerORM(
-                    alert_id=alert.id,
-                    user_id=alert.user_id,
-                    symbol=alert.symbol,
-                    condition_type=alert.condition_type,
-                    triggered_value=triggered_value,
-                    context=trigger_context,
-                    triggered_at=now,
-                )
-                db.add(trigger_row)
-                db.commit()
-                message = self._build_delivery_message(alert, triggered_value, now)
-                await deliver_alert(alert, message, db=db)
-                if (alert.delivery_config or {}).get("actions"):
-                    try:
-                        results = await run_actions(db, alert, {**trigger_context, "message": message})
-                        trigger_row.context = {**(trigger_row.context or {}), "actions": results}
-                        db.commit()
-                    except Exception:
-                        logger.exception("Action execution failed for alert %s", alert.id)
-                await self._emit_alert_event(alert, triggered_value, now, trigger_context)
-            if self._hub is not None:
-                await process_scanner_tick(db, self._hub, tick)
+                if item is not None:
+                    fired.append(item)
+                if alert.status == AlertStatus.ACTIVE.value:
+                    active_ids.add(alert_id)
+            return fired, active_ids
         finally:
             db.close()
+
+    async def _dispatch_triggered(self, item: dict[str, Any]) -> None:
+        alert = item["alert"]
+        triggered_value = item["triggered_value"]
+        now = item["now"]
+        trigger_context = item["context"]
+        message = self._build_delivery_message(alert, triggered_value, now)
+        db = SessionLocal()
+        try:
+            await deliver_alert(alert, message, db=db)
+        finally:
+            db.close()
+        if (alert.delivery_config or {}).get("actions"):
+            db = SessionLocal()
+            try:
+                results = await run_actions(db, alert, {**trigger_context, "message": message})
+                trigger_row = db.get(AlertTriggerORM, item["trigger_id"])
+                if trigger_row is not None:
+                    trigger_row.context = {**(trigger_row.context or {}), "actions": results}
+                    db.commit()
+            except Exception:
+                db.rollback()
+                logger.exception("Action execution failed for alert %s", alert.id)
+            finally:
+                db.close()
+        await self._emit_alert_event(alert, triggered_value, now, trigger_context)
 
     @staticmethod
     def _should_expire(alert: AlertORM, now: datetime) -> bool:
@@ -783,6 +911,8 @@ class AlertEvaluatorService:
         payload: dict[str, Any] = {
             "type": "alert_triggered",
             "alert_id": alert.id,
+            # Contract C2: the hub delivers user-scoped payloads only to that user's sockets.
+            "user_id": str(alert.user_id) if getattr(alert, "user_id", None) is not None else None,
             "symbol": alert.symbol,
             "condition": str(alert.condition_type),
             "triggered_value": triggered_value,
@@ -807,8 +937,13 @@ class AlertEvaluatorService:
         if not self._hub:
             return
         payload = self._build_event_payload(alert, triggered_value, now, context)
-        await self._hub.broadcast_alert(payload)
-        await self._hub.broadcast(alert.symbol, payload)
+        owner_id = payload.get("user_id")
+        if owner_id:
+            # Only the alert owner's quote + alert sockets; never every symbol subscriber.
+            await self._hub.send_to_user(owner_id, payload)
+        else:
+            # System alert (no owner): broadcast_alert fans out to all alert sockets.
+            await self._hub.broadcast_alert(payload)
         try:
             from backend.models.notification import Notification
             from backend.shared.db import SessionLocal

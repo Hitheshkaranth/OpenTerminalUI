@@ -1,5 +1,5 @@
 import subprocess
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from backend.experiments.models import Experiment
 from backend.experiments.schemas import ExperimentCreate
@@ -13,7 +13,7 @@ def get_git_revision_hash() -> str:
         return "dirty"
 
 
-def create_experiment(db: Session, request: ExperimentCreate) -> Experiment:
+def create_experiment(db: Session, request: ExperimentCreate, owner_id: str | None = None) -> Experiment:
     # This legacy registry saves configuration; no execution engine or dataset
     # is attached. A configuration hash must not masquerade as data provenance.
     code_hash = get_git_revision_hash()
@@ -24,7 +24,8 @@ def create_experiment(db: Session, request: ExperimentCreate) -> Experiment:
         data_hash=None,
         code_hash=code_hash,
         metrics_json={},
-        tags=["unexecuted", "execution_engine_unavailable"]
+        tags=["unexecuted", "execution_engine_unavailable"],
+        owner_id=owner_id,
     )
     db.add(exp)
     db.commit()
@@ -32,16 +33,24 @@ def create_experiment(db: Session, request: ExperimentCreate) -> Experiment:
     return exp
 
 
-def get_experiments(db: Session, limit: int = 100, offset: int = 0) -> List[Experiment]:
-    return db.query(Experiment).order_by(Experiment.id.desc()).offset(offset).limit(limit).all()
+def _scoped(db: Session, owner_id: Optional[str]):
+    # owner_id None means unrestricted (admin callers / internal use).
+    query = db.query(Experiment)
+    if owner_id is not None:
+        query = query.filter(Experiment.owner_id == owner_id)
+    return query
 
 
-def get_experiment_by_id(db: Session, experiment_id: int) -> Experiment:
-    return db.query(Experiment).filter(Experiment.id == experiment_id).first()
+def get_experiments(db: Session, limit: int = 100, offset: int = 0, owner_id: Optional[str] = None) -> List[Experiment]:
+    return _scoped(db, owner_id).order_by(Experiment.id.desc()).offset(offset).limit(limit).all()
 
 
-def compare_experiments(db: Session, experiment_ids: List[int]) -> Dict[str, Any]:
-    exps = db.query(Experiment).filter(Experiment.id.in_(experiment_ids)).all()
+def get_experiment_by_id(db: Session, experiment_id: int, owner_id: Optional[str] = None) -> Experiment:
+    return _scoped(db, owner_id).filter(Experiment.id == experiment_id).first()
+
+
+def compare_experiments(db: Session, experiment_ids: List[int], owner_id: Optional[str] = None) -> Dict[str, Any]:
+    exps = _scoped(db, owner_id).filter(Experiment.id.in_(experiment_ids)).all()
 
     # Create a metrics table
     metrics_table = {}
@@ -67,8 +76,8 @@ def compare_experiments(db: Session, experiment_ids: List[int]) -> Dict[str, Any
     }
 
 
-def promote_experiment_to_paper(db: Session, experiment_id: int) -> str:
-    exp = get_experiment_by_id(db, experiment_id)
+def promote_experiment_to_paper(db: Session, experiment_id: int, owner_id: Optional[str] = None) -> str:
+    exp = get_experiment_by_id(db, experiment_id, owner_id=owner_id)
     if not exp:
         raise ValueError("Experiment not found")
 

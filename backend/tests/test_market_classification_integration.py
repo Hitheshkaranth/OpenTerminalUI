@@ -1,4 +1,5 @@
 from __future__ import annotations
+from types import SimpleNamespace
 
 import asyncio
 from dataclasses import dataclass
@@ -24,9 +25,16 @@ class _FakeWatchlist:
     ticker: str
 
 
+_FAKE_USER = SimpleNamespace(id="user-1", role="viewer")
+
+
 class _FakeQuery:
     def __init__(self, rows):
         self._rows = rows
+
+    def filter(self, *_args, **_kwargs):
+        # Routes now scope rows by owner; the fake DB holds a single user's rows.
+        return self
 
     def all(self):
         return list(self._rows)
@@ -114,8 +122,8 @@ def test_portfolio_and_watchlist_are_enriched_with_market_fields(monkeypatch) ->
         holdings=[_FakeHolding(id=1, ticker="AAPL", quantity=2, avg_buy_price=150, buy_date="2025-01-01")],
         watchlists=[_FakeWatchlist(id=1, watchlist_name="Core", ticker="AAPL")],
     )
-    port = asyncio.run(portfolio.get_portfolio(db=db))
-    watch = asyncio.run(portfolio.get_watchlists(db=db))
+    port = asyncio.run(portfolio.get_portfolio(db=db, current_user=_FAKE_USER))
+    watch = asyncio.run(portfolio.get_watchlists(db=db, current_user=_FAKE_USER))
 
     assert len(port["items"]) == 1
     row = port["items"][0]
@@ -167,8 +175,8 @@ def test_portfolio_watchlist_mixed_india_us_enrichment(monkeypatch) -> None:
         ],
     )
 
-    port = asyncio.run(portfolio.get_portfolio(db=db))
-    watch = asyncio.run(portfolio.get_watchlists(db=db))
+    port = asyncio.run(portfolio.get_portfolio(db=db, current_user=_FAKE_USER))
+    watch = asyncio.run(portfolio.get_watchlists(db=db, current_user=_FAKE_USER))
 
     by_ticker_port = {row["ticker"]: row for row in port["items"]}
     by_ticker_watch = {row["ticker"]: row for row in watch["items"]}

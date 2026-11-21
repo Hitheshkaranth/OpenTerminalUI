@@ -76,7 +76,7 @@ def seeded(test_db, monkeypatch_session_local):
     test_db.add(AlertORM(id="al-a-triggered", user_id=USER_A, symbol="AAPL", condition_type="price_above", status=AlertStatus.TRIGGERED.value, parameters={}))
     test_db.add(AlertORM(id="al-b-active", user_id=USER_B, symbol="TSLA", condition_type="price_above", status=AlertStatus.ACTIVE.value, parameters={}))
 
-    test_db.add(Holding(ticker="AAPL", quantity=10, avg_buy_price=100.0, buy_date="2024-01-01"))
+    test_db.add(Holding(user_id=USER_A, ticker="AAPL", quantity=10, avg_buy_price=100.0, buy_date="2024-01-01"))
 
     test_db.commit()
 

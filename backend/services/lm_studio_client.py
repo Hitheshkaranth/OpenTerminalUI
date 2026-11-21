@@ -14,6 +14,7 @@ from typing import Any
 import httpx
 
 from backend.config.settings import get_settings
+from backend.shared.http_client import shared_session
 
 _JSON_OBJ_RE = re.compile(r"\{.*\}", re.DOTALL)
 
@@ -76,7 +77,7 @@ class LMStudioClient:
             }
         url = f"{self.base_url}/chat/completions"
         try:
-            async with httpx.AsyncClient(timeout=self.timeout, trust_env=False, headers=self._headers) as client:
+            async with shared_session(timeout=self.timeout, headers=self._headers) as client:
                 resp = await client.post(url, json=payload)
                 resp.raise_for_status()
                 data = resp.json()
@@ -103,7 +104,7 @@ class LMStudioClient:
     async def health(self) -> bool:
         """Return True when the LM Studio model endpoint is reachable."""
         try:
-            async with httpx.AsyncClient(timeout=min(5.0, self.timeout), trust_env=False, headers=self._headers) as client:
+            async with shared_session(timeout=min(5.0, self.timeout), headers=self._headers) as client:
                 resp = await client.get(f"{self.base_url}/models")
                 resp.raise_for_status()
             return True

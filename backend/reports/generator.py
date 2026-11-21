@@ -8,7 +8,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from backend.db.models import BacktestRun, Holding, TaxLot, VirtualTrade, WatchlistItem
+from backend.db.models import BacktestRun, Holding, TaxLot, VirtualPortfolio, VirtualTrade, WatchlistItem
 
 
 def _json_flatten(row: dict[str, Any]) -> dict[str, Any]:
@@ -21,12 +21,15 @@ def _json_flatten(row: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def rows_for_data_type(db: Session, data_type: str) -> list[dict[str, Any]]:
+def rows_for_data_type(db: Session, data_type: str, *, user_id: str | None = None) -> list[dict[str, Any]]:
+    """Export rows for *data_type*, scoped to *user_id*. Without a user there is nothing to export."""
+    if not user_id:
+        return []
     key = data_type.strip().lower()
     if key == "watchlist":
         return [
             {"id": x.id, "watchlist_name": x.watchlist_name, "ticker": x.ticker}
-            for x in db.query(WatchlistItem).all()
+            for x in db.query(WatchlistItem).filter(WatchlistItem.user_id == user_id).all()
         ]
     if key == "positions":
         return [
@@ -37,7 +40,7 @@ def rows_for_data_type(db: Session, data_type: str) -> list[dict[str, Any]]:
                 "avg_buy_price": x.avg_buy_price,
                 "buy_date": x.buy_date,
             }
-            for x in db.query(Holding).all()
+            for x in db.query(Holding).filter(Holding.user_id == user_id).all()
         ]
     if key in {"trades", "backtest_trades"}:
         return [
@@ -51,7 +54,10 @@ def rows_for_data_type(db: Session, data_type: str) -> list[dict[str, Any]]:
                 "timestamp": x.timestamp.isoformat() if x.timestamp else None,
                 "pnl_realized": x.pnl_realized,
             }
-            for x in db.query(VirtualTrade).all()
+            for x in db.query(VirtualTrade)
+            .join(VirtualPortfolio, VirtualPortfolio.id == VirtualTrade.portfolio_id)
+            .filter(VirtualPortfolio.user_id == user_id)
+            .all()
         ]
     if key == "screening_results":
         rows: list[dict[str, Any]] = []
@@ -72,7 +78,7 @@ def rows_for_data_type(db: Session, data_type: str) -> list[dict[str, Any]]:
                 "buy_price": x.buy_price,
                 "buy_date": x.buy_date,
             }
-            for x in db.query(TaxLot).all()
+            for x in db.query(TaxLot).filter(TaxLot.user_id == user_id).all()
         ]
     return []
 

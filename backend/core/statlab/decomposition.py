@@ -8,7 +8,7 @@ def _safe_float(val):
         if np.isnan(f) or np.isinf(f):
             return 0.0
         return round(f, 6)
-    except:
+    except Exception:
         return 0.0
 
 def decompose_series(prices, *, period: int = 21) -> dict:
@@ -35,7 +35,7 @@ def decompose_series(prices, *, period: int = 21) -> dict:
         seasonal = res.seasonal
         resid = res.resid
         success = True
-    except:
+    except Exception:
         pass
 
     if not success:

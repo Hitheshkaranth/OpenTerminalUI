@@ -6,6 +6,7 @@ from typing import Optional, List, Dict, Any
 from zoneinfo import ZoneInfo
 import httpx
 import os
+from backend.shared.http_client import shared_session
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +181,7 @@ class ExtendedHoursService:
             params["to"] = end_dt.strftime("%Y-%m-%d")
 
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with shared_session(timeout=15.0) as client:
                 resp = await client.get(url, params=params)
                 resp.raise_for_status()
                 data = resp.json()
@@ -236,7 +237,7 @@ class ExtendedHoursService:
             params["prepost"] = "true"
 
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with shared_session(timeout=15.0) as client:
                 resp = await client.get("https://finnhub.io/api/v1/stock/candle", params=params)
                 resp.raise_for_status()
                 data = resp.json()

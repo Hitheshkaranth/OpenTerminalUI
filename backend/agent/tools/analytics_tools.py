@@ -210,7 +210,7 @@ async def _load_universe(tickers: list[str], period: str) -> tuple[list[dict[str
     return holdings, universe_data
 
 
-async def run_factor_analysis(args: dict[str, Any]) -> dict[str, Any]:
+async def run_factor_analysis(args: dict[str, Any], user_id: str | None = None) -> dict[str, Any]:
     try:
         tickers = list(dict.fromkeys(str(t).strip().upper() for t in (args.get("tickers") or []) if str(t).strip()))
         period = str(args.get("period") or "1Y").upper()
@@ -220,11 +220,13 @@ async def run_factor_analysis(args: dict[str, Any]) -> dict[str, Any]:
         else:
             from backend.models import Holding  # local import: only needed for the portfolio fallback path
 
-            db = SessionLocal()
-            try:
-                rows = db.query(Holding).all()
-            finally:
-                db.close()
+            rows: list[Any] = []
+            if user_id:  # no acting user -> empty portfolio, never every user's holdings
+                db = SessionLocal()
+                try:
+                    rows = db.query(Holding).filter(Holding.user_id == user_id).all()
+                finally:
+                    db.close()
             if not rows:
                 return err(
                     "No holdings available and no tickers were provided.",
@@ -310,8 +312,13 @@ def analyze_execution_quality(args: dict[str, Any]) -> dict[str, Any]:
 # Public API
 # ---------------------------------------------------------------------------
 
-def analytics_tool_specs() -> list[ToolSpec]:
-    """Return the four read-only, non-user-scoped analytics tool specs."""
+def analytics_tool_specs(user_id: str | None = None) -> list[ToolSpec]:
+    """Return the four read-only analytics tool specs. Only ``run_factor_analysis``'s
+    holdings fallback is user-scoped; without *user_id* it requires explicit tickers."""
+
+    async def _run_factor_analysis_handler(args: dict[str, Any]) -> dict[str, Any]:
+        return await run_factor_analysis(args, user_id=user_id)
+
     return [
         ToolSpec(
             name="get_correlation_matrix",
@@ -354,7 +361,7 @@ def analytics_tool_specs() -> list[ToolSpec]:
             name="run_factor_analysis",
             description="Decompose returns into Fama-French-style factor exposures (market, size, "
             "value, momentum, quality, low_vol) and attribution (factor contributions + alpha) for "
-            "either an explicit tickers list or, if omitted, the shared holdings table. Optionally "
+            "either an explicit tickers list or, if omitted, the user's holdings. Optionally "
             "filter to specific factors. Needs at least 5 names with usable price history to form "
             "quintile spreads; returns err() otherwise.",
             parameters={
@@ -366,7 +373,7 @@ def analytics_tool_specs() -> list[ToolSpec]:
                     "period": {"type": "string", "enum": ["3M", "6M", "1Y", "3Y"], "default": "1Y"},
                 },
             },
-            handler=run_factor_analysis,
+            handler=_run_factor_analysis_handler,
             read_only=True,
             write_class="none",
         ),

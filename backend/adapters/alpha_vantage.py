@@ -8,6 +8,7 @@ from typing import Any
 import httpx
 
 from backend.adapters.base import DataAdapter, FuturesContract, Instrument, OHLCV, OptionChain, QuoteResponse
+from backend.shared.http_client import shared_session
 
 
 ALPHA_VANTAGE_URL = "https://www.alphavantage.co/query"
@@ -50,8 +51,8 @@ class AlphaVantageAdapter(DataAdapter):
                 req_params: dict[str, Any] = {"function": function, "apikey": self.api_key}
                 if params:
                     req_params.update(params)
-                async with httpx.AsyncClient(base_url=base_url, timeout=15.0, trust_env=False) as client:
-                    resp = await client.get("", params=req_params)
+                async with shared_session(timeout=15.0) as client:
+                    resp = await client.get(base_url, params=req_params)
                 if resp.status_code == 429:
                     await asyncio.sleep(min(1.5 * attempt, 5.0))
                     continue

@@ -16,6 +16,7 @@ class Experiment(Base):
     code_hash = Column(String, nullable=True)
     metrics_json = Column(JSON, nullable=True)
     tags = Column(JSON, nullable=True)
+    owner_id = Column(String(36), index=True, nullable=True)
 
 class ExperimentArtifact(Base):
     __tablename__ = "experiment_artifacts"

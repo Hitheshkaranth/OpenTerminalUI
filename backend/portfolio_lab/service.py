@@ -66,11 +66,12 @@ class PortfolioLabService:
     def _parse_date(value: str) -> date:
         return datetime.strptime(value, "%Y-%m-%d").date()
 
-    async def create_portfolio(self, payload: PortfolioDefinitionCreate) -> dict:
+    async def create_portfolio(self, payload: PortfolioDefinitionCreate, owner_id: str | None = None) -> dict:
         db = next(get_db())
         try:
             row = PortfolioDefinition(
                 id=str(uuid4()),
+                owner_id=owner_id,
                 name=payload.name,
                 description=payload.description,
                 tags=payload.tags,
@@ -89,10 +90,14 @@ class PortfolioLabService:
         finally:
             db.close()
 
-    async def list_portfolios(self, tag: str | None = None, weighting_method: str | None = None) -> list[dict]:
+    async def list_portfolios(
+        self, tag: str | None = None, weighting_method: str | None = None, owner_id: str | None = None
+    ) -> list[dict]:
         db = next(get_db())
         try:
             query = db.query(PortfolioDefinition)
+            if owner_id is not None:
+                query = query.filter(PortfolioDefinition.owner_id == owner_id)
             if weighting_method:
                 query = query.filter(PortfolioDefinition.weighting_method == weighting_method)
             rows = query.order_by(PortfolioDefinition.created_at.desc()).all()
@@ -122,13 +127,14 @@ class PortfolioLabService:
         finally:
             db.close()
 
-    async def create_blend(self, payload: StrategyBlendCreate) -> dict:
+    async def create_blend(self, payload: StrategyBlendCreate, owner_id: str | None = None) -> dict:
         if len(payload.strategies_json) > self.max_strategies:
             raise HTTPException(status_code=400, detail=f"Blend strategy count exceeds limit {self.max_strategies}")
         db = next(get_db())
         try:
             row = StrategyBlend(
                 id=str(uuid4()),
+                owner_id=owner_id,
                 name=payload.name,
                 strategies_json=payload.strategies_json,
                 blend_method=payload.blend_method,
@@ -146,10 +152,13 @@ class PortfolioLabService:
         finally:
             db.close()
 
-    async def list_blends(self) -> list[dict]:
+    async def list_blends(self, owner_id: str | None = None) -> list[dict]:
         db = next(get_db())
         try:
-            rows = db.query(StrategyBlend).order_by(StrategyBlend.created_at.desc()).all()
+            query = db.query(StrategyBlend)
+            if owner_id is not None:
+                query = query.filter(StrategyBlend.owner_id == owner_id)
+            rows = query.order_by(StrategyBlend.created_at.desc()).all()
             return [
                 {
                     "id": row.id,
@@ -194,6 +203,7 @@ class PortfolioLabService:
         *,
         start: str,
         end: str,
+        owner_id: str | None = None,
     ) -> pd.Series:
         weighted_frames: list[pd.DataFrame] = []
         weights = np.array([float(item.get("weight", 1.0) or 1.0) for item in strategies], dtype=float)
@@ -219,7 +229,8 @@ class PortfolioLabService:
                     strategy=strat,
                     context=context,
                     config={"initial_cash": 100000.0, "position_fraction": 1.0},
-                )
+                ),
+                user_id=owner_id,
             )
             result = await self._wait_for_backtest(backtest_run_id)
             if str(result.get("status")) != "done":
@@ -331,7 +342,9 @@ class PortfolioLabService:
 
         returns_frames: list[pd.Series] = []
         for asset in tickers:
-            series = await self._asset_strategy_returns(asset, strategies, start=start, end=end)
+            series = await self._asset_strategy_returns(
+                asset, strategies, start=start, end=end, owner_id=getattr(portfolio, "owner_id", None)
+            )
             if series.empty:
                 continue
             series.name = asset
@@ -543,16 +556,22 @@ class PortfolioLabService:
         finally:
             db.close()
 
-    async def leaderboard(self, sort_by: str = "sharpe", descending: bool = True, limit: int = 50) -> dict:
+    async def leaderboard(
+        self, sort_by: str = "sharpe", descending: bool = True, limit: int = 50, owner_id: str | None = None
+    ) -> dict:
         allowed = {"sharpe", "cagr", "max_drawdown", "turnover", "stability", "recency", "governance_state"}
         sort_key = sort_by if sort_by in allowed else "sharpe"
         db = next(get_db())
         try:
-            rows = (
+            query = (
                 db.query(PortfolioRun, PortfolioDefinition, PortfolioRunMetrics)
                 .join(PortfolioDefinition, PortfolioRun.portfolio_id == PortfolioDefinition.id)
                 .outerjoin(PortfolioRunMetrics, PortfolioRunMetrics.run_id == PortfolioRun.id)
-                .order_by(PortfolioRun.started_at.desc())
+            )
+            if owner_id is not None:
+                query = query.filter(PortfolioDefinition.owner_id == owner_id)
+            rows = (
+                query.order_by(PortfolioRun.started_at.desc())
                 .limit(max(limit * 4, limit))
                 .all()
             )

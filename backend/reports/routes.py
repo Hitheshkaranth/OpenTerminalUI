@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import asyncio
 import hashlib
 from datetime import date, datetime, timezone
@@ -11,6 +13,7 @@ from backend.api.deps import get_unified_fetcher
 from backend.shared.market_calendar import is_market_open
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 US_MARKETS = {"NASDAQ", "NYSE"}
 IN_MARKETS = {"NSE", "BSE"}
 SUPPORTED_MARKETS = US_MARKETS | IN_MARKETS
@@ -110,8 +113,9 @@ async def bulk_deals() -> Dict[str, Any]:
     try:
         data = await fetcher.nse.get_bulk_deals()
         return data
-    except Exception as e:
-        return {"error": str(e), "data": []}
+    except Exception:
+        logger.exception("Bulk deals fetch failed")
+        return {"error": "Bulk deals unavailable", "data": []}
 
 @router.get("/reports/block-deals")
 async def block_deals() -> Dict[str, Any]:
@@ -119,8 +123,9 @@ async def block_deals() -> Dict[str, Any]:
     try:
         data = await fetcher.nse.get_block_deals()
         return data
-    except Exception as e:
-        return {"error": str(e), "data": []}
+    except Exception:
+        logger.exception("Block deals fetch failed")
+        return {"error": "Block deals unavailable", "data": []}
 
 # Last successfully fetched value per ticker key. When a provider call fails we
 # serve the last real value flagged as stale instead of fabricating a number.

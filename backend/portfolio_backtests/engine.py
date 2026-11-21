@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import date, datetime, timezone
 from typing import Any
@@ -246,53 +247,70 @@ def _run_weighted_backtest(
     }
 
 
-async def run_portfolio_backtest(job_id: str, request: JobRequest, db: Session) -> None:
+async def run_portfolio_backtest(job_id: str, request: JobRequest, db: Session | None = None) -> None:
+    """Run a queued portfolio backtest job.
+
+    ``db`` must be a session owned by the caller for the duration of the job
+    (never the request-scoped session, which is closed before background tasks
+    run). When omitted, the job opens and closes its own SessionLocal().
+    """
     logger.info("Starting portfolio backtest job %s", job_id)
-    job = db.query(PortfolioBacktestJob).filter(PortfolioBacktestJob.id == job_id).first()
-    if not job:
-        return
-    job.status = "running"
-    job.started_at = datetime.now(timezone.utc)
-    db.commit()
+    owns_session = db is None
+    if owns_session:
+        from backend.shared.db import SessionLocal
 
-    fetcher = UnifiedFetcher.build_default()
+        db = SessionLocal()
     try:
-        universe = [str(sym).strip().upper() for sym in request.universe if str(sym).strip()]
-        if not universe:
-            raise ValueError("Universe must contain at least one symbol")
-        if request.end_date <= request.start_date:
-            raise ValueError("end_date must be after start_date")
-
-        await fetcher.startup()
-        closes = await _fetch_close_frame(fetcher, universe, request.start_date, request.end_date)
-        missing = sorted(set(universe) - set(closes.columns))
-        if closes.empty:
-            params = request.params or {}
-            closes = _synthetic_close_frame(universe, request.start_date, request.end_date, int(params.get("seed", 42) or 42))
-            missing = []
-
-        symbols = list(closes.columns)
-        params = request.params or {}
-        result = _run_weighted_backtest(
-            closes=closes,
-            target=_target_weights(symbols, params),
-            rebalance_frequency=str(params.get("rebalance_frequency") or params.get("rebalance") or "monthly"),
-            initial_capital=float(params.get("initial_capital") or 10_000.0),
-            transaction_cost_bps=float(params.get("transaction_cost_bps") or params.get("cost_bps") or 0.0),
-            execution_config=params.get("execution_model") if isinstance(params.get("execution_model"), dict) else params,
-        )
-        result["symbols"] = symbols
-        result["missing_symbols"] = missing
-
-        job.status = "completed"
-        job.result_json = result
-        job.finished_at = datetime.now(timezone.utc)
-        job.error = None
-    except Exception as exc:
-        logger.error("Job %s failed: %s", job_id, exc)
-        job.status = "failed"
-        job.error = str(exc)
-        job.finished_at = datetime.now(timezone.utc)
-    finally:
-        await fetcher.shutdown()
+        job = db.query(PortfolioBacktestJob).filter(PortfolioBacktestJob.id == job_id).first()
+        if not job:
+            return
+        job.status = "running"
+        job.started_at = datetime.now(timezone.utc)
         db.commit()
+
+        try:
+            universe = [str(sym).strip().upper() for sym in request.universe if str(sym).strip()]
+            if not universe:
+                raise ValueError("Universe must contain at least one symbol")
+            if request.end_date <= request.start_date:
+                raise ValueError("end_date must be after start_date")
+
+            # Shared process-wide fetcher: no per-job client/startup/shutdown churn.
+            from backend.api.deps import get_unified_fetcher
+
+            fetcher = await get_unified_fetcher()
+            closes = await _fetch_close_frame(fetcher, universe, request.start_date, request.end_date)
+            missing = sorted(set(universe) - set(closes.columns))
+            params = request.params or {}
+            if closes.empty:
+                closes = _synthetic_close_frame(universe, request.start_date, request.end_date, int(params.get("seed", 42) or 42))
+                missing = []
+
+            symbols = list(closes.columns)
+            # pandas/numpy compute is CPU-bound; keep it off the event loop.
+            result = await asyncio.to_thread(
+                _run_weighted_backtest,
+                closes=closes,
+                target=_target_weights(symbols, params),
+                rebalance_frequency=str(params.get("rebalance_frequency") or params.get("rebalance") or "monthly"),
+                initial_capital=float(params.get("initial_capital") or 10_000.0),
+                transaction_cost_bps=float(params.get("transaction_cost_bps") or params.get("cost_bps") or 0.0),
+                execution_config=params.get("execution_model") if isinstance(params.get("execution_model"), dict) else params,
+            )
+            result["symbols"] = symbols
+            result["missing_symbols"] = missing
+
+            job.status = "completed"
+            job.result_json = result
+            job.finished_at = datetime.now(timezone.utc)
+            job.error = None
+        except Exception as exc:
+            logger.error("Job %s failed: %s", job_id, exc)
+            job.status = "failed"
+            job.error = str(exc)
+            job.finished_at = datetime.now(timezone.utc)
+        finally:
+            db.commit()
+    finally:
+        if owns_session:
+            db.close()

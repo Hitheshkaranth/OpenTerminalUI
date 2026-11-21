@@ -21,6 +21,7 @@ from backend.core.ttl_policy import market_open_now, ttl_seconds
 from backend.services.sentiment_engine import score_article_sentiment
 from backend.shared.db import SessionLocal
 from backend.db.models import NewsArticle
+from backend.shared.http_client import shared_session
 
 router = APIRouter()
 
@@ -217,7 +218,7 @@ async def _fetch_google_news_rss(query: str, limit: int = 50) -> list[dict[str, 
         "ceid": "US:en",
     }
     try:
-        async with httpx.AsyncClient(timeout=10.0, trust_env=False, follow_redirects=True) as client:
+        async with shared_session(timeout=10.0, follow_redirects=True) as client:
             resp = await client.get(url, params=params)
             resp.raise_for_status()
             root = ET.fromstring(resp.text)

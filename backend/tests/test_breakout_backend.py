@@ -134,8 +134,13 @@ async def test_occurrence_tracker_uses_cache_and_is_deterministic(monkeypatch: p
 
 
 def _build_client() -> TestClient:
+    from types import SimpleNamespace
+
+    from backend.auth.deps import get_current_user
+
     app = FastAPI()
     app.include_router(breakouts.router, prefix="/api")
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id="user-1", role="trader")
     return TestClient(app)
 
 

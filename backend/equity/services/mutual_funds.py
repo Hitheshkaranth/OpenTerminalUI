@@ -18,6 +18,7 @@ import httpx
 from pydantic import BaseModel
 
 from backend.shared.cache import cache
+from backend.shared.http_client import shared_session
 
 
 class MutualFund(BaseModel):
@@ -138,7 +139,7 @@ class MutualFundService:
         if isinstance(cached, list) and cached:
             return [MutualFund(**row) if isinstance(row, dict) else row for row in cached]
 
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, trust_env=False) as client:
+        async with shared_session(timeout=30.0, follow_redirects=True) as client:
             resp = await client.get(self.AMFI_NAV_URL)
             resp.raise_for_status()
             text = resp.text
@@ -221,7 +222,7 @@ class MutualFundService:
     async def _fetch_mfapi_json(self, scheme_code: int) -> dict[str, Any]:
         async with self._mfapi_semaphore:
             await self._rate_limit_mfapi()
-            async with httpx.AsyncClient(timeout=25.0, follow_redirects=True, trust_env=False) as client:
+            async with shared_session(timeout=25.0, follow_redirects=True) as client:
                 resp = await client.get(f"{self.MFAPI_BASE}/{scheme_code}")
                 resp.raise_for_status()
                 payload = resp.json()

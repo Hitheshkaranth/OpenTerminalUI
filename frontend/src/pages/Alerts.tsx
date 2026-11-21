@@ -12,6 +12,7 @@ import { AlertBuilder } from "../components/Alerts/AlertBuilder";
 import { FilingsWatchPanel } from "../components/filingswatch/FilingsWatchPanel";
 import { TerminalTabs, type TerminalTabItem } from "../components/terminal/TerminalTabs";
 import { useAlertsStore } from "../store/alertsStore";
+import { withWsAuth } from "../realtime/wsAuth";
 import type { AlertRule, AlertTriggerEvent } from "../types";
 
 const DELIVERY_SETTINGS_KEY = "ot.alert.delivery.defaults";
@@ -81,7 +82,7 @@ export function AlertsPage() {
   }, [resetUnread]);
 
   useEffect(() => {
-    const ws = new WebSocket(alertsWsUrl());
+    const ws = new WebSocket(withWsAuth(alertsWsUrl()));
     ws.onmessage = (event) => {
       try {
         const payload = JSON.parse(String(event.data));

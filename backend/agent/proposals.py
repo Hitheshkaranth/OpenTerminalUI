@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
+import logging
 import math
 
 from sqlalchemy import or_
@@ -16,6 +17,8 @@ from backend.agent.tools.registry import ToolSpec
 from backend.models.agent_proposals import AgentProposal
 from backend.paper_trading import get_paper_engine  # noqa: F401 — for test monkeypatching
 from backend.shared.db import SessionLocal  # noqa: F401 — for test monkeypatching
+
+logger = logging.getLogger(__name__)
 
 # Lazy imports to avoid circular deps at import time.
 
@@ -150,6 +153,17 @@ async def confirm_proposal(
     p.result = result
     db.commit()
     db.refresh(p)
+    if p.type == "paper_order" and isinstance(result, dict) and result.get("status") == "pending":
+        # A guarded limit/stop order rests pending (confirm_guarded_order). Index it
+        # only now that it is committed: a tick evaluated before the commit would
+        # rebuild the symbol's index from the DB and drop an uncommitted id.
+        try:
+            from backend.models import VirtualOrder
+            order = db.get(VirtualOrder, result.get("order_id"))
+            if order is not None:
+                get_paper_engine().track_order(order)
+        except Exception:  # noqa: BLE001 - tracking is best-effort; the index TTL reload recovers
+            logger.exception("Failed to track pending paper order %s", result.get("order_id"))
     return {"id": p.id, "status": p.status, "result": result}
 
 
@@ -195,7 +209,12 @@ async def _confirm_paper_order(db: Session, p: AgentProposal) -> dict:
     from backend.agent.trade_preflight import confirm_guarded_order, get_risk_policy
 
     if get_risk_policy(db, p.user_id)["enabled"] or p.payload.get("preflight"):
-        return await confirm_guarded_order(db, p, get_paper_engine())
+        engine = get_paper_engine()
+        result = await confirm_guarded_order(db, p, engine)
+        if result.get("status") == "pending" and hasattr(engine, "invalidate_order_index"):
+            # A resting limit/stop order: make the tick worker see it promptly.
+            engine.invalidate_order_index()
+        return result
 
     payload = p.payload
     symbol = str(payload.get("symbol", "")).strip().upper()
@@ -246,7 +265,8 @@ async def _confirm_paper_order(db: Session, p: AgentProposal) -> dict:
     db.commit()
     db.refresh(order)
 
-    # Fill immediately (market order)
+    # Fill immediately (market order). The engine claims the order atomically,
+    # so a racing tick worker cannot fill it twice.
     await get_paper_engine().maybe_fill_market_order_now(db, order)
     db.commit()
     db.refresh(order)

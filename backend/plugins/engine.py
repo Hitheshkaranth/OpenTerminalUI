@@ -147,7 +147,7 @@ class PluginEngine:
             return {"plugin": plugin_name, "hook": hook_name, "result": result}
         except Exception as exc:
             logger.exception("Plugin hook %s on %s failed", hook_name, plugin_name)
-            return {"error": str(exc)}
+            return {"error": f"Plugin hook failed ({type(exc).__name__})"}
 
     async def run_all_hooks(
         self,

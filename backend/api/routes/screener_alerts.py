@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +15,7 @@ from backend.auth.deps import get_current_user
 from backend.models.user import User
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class ScreenerAlertCreate(BaseModel):
@@ -47,4 +50,5 @@ async def create_screener_alert_endpoint(
             },
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Failed to create screener alert")
+        raise HTTPException(status_code=500, detail="Failed to create screener alert") from e

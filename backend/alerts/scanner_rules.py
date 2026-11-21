@@ -63,6 +63,8 @@ async def process_scanner_tick(db: Session, hub: MarketDataHub, tick: dict[str, 
         payload = {
             "type": "alert_triggered",
             "source": "scanner",
+            # Contract C2: the hub delivers this only to the rule owner's sockets.
+            "user_id": str(row.user_id) if getattr(row, "user_id", None) else None,
             "alert_id": row.id,
             "preset_id": row.preset_id,
             "symbol": row.symbol,

@@ -1,3 +1,5 @@
+import logging
+
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
@@ -5,6 +7,7 @@ from statsmodels.regression.rolling import RollingOLS
 import warnings
 
 warnings.filterwarnings("ignore")
+logger = logging.getLogger(__name__)
 
 def _safe_float(val):
     try:
@@ -108,8 +111,9 @@ def factor_regression(asset: pd.Series, benchmark: pd.Series, *, rolling_window:
             "fit_line": fit_line,
             "interpretation": interpretation
         }
-    except Exception as e:
+    except Exception:
         # If OLS fails significantly
+        logger.warning("Regression analysis failed", exc_info=True)
         return {
             "asset": asset.name or "ASSET",
             "benchmark": benchmark.name or "BENCH",
@@ -129,5 +133,5 @@ def factor_regression(asset: pd.Series, benchmark: pd.Series, *, rolling_window:
             "rolling_beta": [],
             "scatter": [],
             "fit_line": [],
-            "interpretation": f"Regression failed: {str(e)}"
+            "interpretation": "Regression failed for this series."
         }

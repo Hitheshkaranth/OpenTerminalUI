@@ -12,7 +12,7 @@ def _safe_float(val):
         if np.isnan(f) or np.isinf(f):
             return 0.0
         return round(f, 6)
-    except:
+    except Exception:
         return 0.0
 
 def _hurst_exponent(series):
@@ -22,7 +22,7 @@ def _hurst_exponent(series):
         tau = [np.std(np.subtract(series[lag:], series[:-lag])) for lag in lags]
         reg = np.polyfit(np.log(lags), np.log(tau), 1)
         return reg[0]
-    except:
+    except Exception:
         return 0.5
 
 def stationarity_tests(prices) -> dict:
@@ -37,7 +37,7 @@ def stationarity_tests(prices) -> dict:
             "pvalue": _safe_float(adf_res[1]),
             "is_stationary": bool(adf_res[1] < 0.05)
         }
-    except:
+    except Exception:
         adf_dict = {"stat": 0.0, "pvalue": 1.0, "is_stationary": False}
 
     # KPSS
@@ -48,7 +48,7 @@ def stationarity_tests(prices) -> dict:
             "pvalue": _safe_float(kpss_res[1]),
             "is_stationary": bool(kpss_res[1] > 0.05)
         }
-    except:
+    except Exception:
         kpss_dict = {"stat": 0.0, "pvalue": 0.0, "is_stationary": False}
 
     # Returns ADF
@@ -63,7 +63,7 @@ def stationarity_tests(prices) -> dict:
             }
         else:
             ret_adf_dict = {"stat": 0.0, "pvalue": 1.0, "is_stationary": False}
-    except:
+    except Exception:
         ret_adf_dict = {"stat": 0.0, "pvalue": 1.0, "is_stationary": False}
 
     # Hurst

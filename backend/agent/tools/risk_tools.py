@@ -48,18 +48,18 @@ _OBJECTIVE_MAP: dict[str, tuple[str, str]] = {
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-def _resolve_holdings(portfolio_id: str | None) -> tuple[list[Any], str] | dict[str, Any]:
-    """Resolve holdings for *portfolio_id* via the stress-test service's own lookup.
+def _resolve_holdings(portfolio_id: str | None, user_id: str | None = None) -> tuple[list[Any], str] | dict[str, Any]:
+    """Resolve *user_id*'s holdings for *portfolio_id* via the stress-test service's own lookup.
 
-    Returns ``(holdings, resolved_portfolio_id)`` or an ``err()`` envelope. The legacy
-    ``holdings`` table carries no ``user_id`` column (same limitation documented in
-    ``portfolio_tools.py``'s ``_holdings_snapshot``), so "scoping" here means validating
-    a named portfolio_id exists, not filtering rows by user.
+    Returns ``(holdings, resolved_portfolio_id)`` or an ``err()`` envelope. With no user the
+    service returns no rows (never every user's holdings), which surfaces as ``not_found``.
     """
     db = SessionLocal()
     try:
         try:
-            holdings, resolved = stress_test_service.resolve_portfolio_holdings(db, portfolio_id or "current")
+            holdings, resolved = stress_test_service.resolve_portfolio_holdings(
+                db, portfolio_id or "current", user_id=user_id
+            )
         except LookupError as exc:
             return err(str(exc), code="not_found", hint="Add holdings or pass a valid portfolio_id.")
         return holdings, resolved
@@ -115,9 +115,9 @@ def _pick_benchmark(symbols: list[str]) -> str:
 # get_portfolio_risk
 # ---------------------------------------------------------------------------
 
-async def _get_portfolio_risk(args: dict[str, Any]) -> dict[str, Any]:
+async def _get_portfolio_risk(args: dict[str, Any], user_id: str | None = None) -> dict[str, Any]:
     try:
-        resolved = _resolve_holdings(args.get("portfolio_id"))
+        resolved = _resolve_holdings(args.get("portfolio_id"), user_id=user_id)
         if isinstance(resolved, dict):
             return resolved
         holdings, resolved_id = resolved
@@ -193,14 +193,14 @@ async def _get_portfolio_risk(args: dict[str, Any]) -> dict[str, Any]:
 # run_stress_test
 # ---------------------------------------------------------------------------
 
-def _run_stress_test(args: dict[str, Any]) -> dict[str, Any]:
+def _run_stress_test(args: dict[str, Any], user_id: str | None = None) -> dict[str, Any]:
     try:
         portfolio_id = args.get("portfolio_id") or "current"
         scenario = args.get("scenario") or "2008_gfc"
         db = SessionLocal()
         try:
             try:
-                result = stress_test_service.run_stress_test(db, portfolio_id, scenario, {})
+                result = stress_test_service.run_stress_test(db, portfolio_id, scenario, {}, user_id=user_id)
             except KeyError:
                 # KeyError is a LookupError subclass, so it must be caught before LookupError below.
                 valid = [s["key"] for s in stress_test_service.list_scenarios()]
@@ -237,12 +237,12 @@ def _run_stress_test(args: dict[str, Any]) -> dict[str, Any]:
 # optimize_portfolio
 # ---------------------------------------------------------------------------
 
-async def _optimize_portfolio(args: dict[str, Any]) -> dict[str, Any]:
+async def _optimize_portfolio(args: dict[str, Any], user_id: str | None = None) -> dict[str, Any]:
     try:
         raw_tickers = [str(t).strip().upper() for t in (args.get("tickers") or []) if str(t).strip()]
         tickers = list(dict.fromkeys(raw_tickers))
         if not tickers:
-            resolved = _resolve_holdings(None)
+            resolved = _resolve_holdings(None, user_id=user_id)
             if isinstance(resolved, dict):
                 return resolved
             holdings, _resolved_id = resolved
@@ -316,9 +316,9 @@ async def _optimize_portfolio(args: dict[str, Any]) -> dict[str, Any]:
 # get_exposure_breakdown
 # ---------------------------------------------------------------------------
 
-async def _get_exposure_breakdown(args: dict[str, Any]) -> dict[str, Any]:
+async def _get_exposure_breakdown(args: dict[str, Any], user_id: str | None = None) -> dict[str, Any]:
     try:
-        resolved = _resolve_holdings(args.get("portfolio_id"))
+        resolved = _resolve_holdings(args.get("portfolio_id"), user_id=user_id)
         if isinstance(resolved, dict):
             return resolved
         holdings, resolved_id = resolved
@@ -395,23 +395,19 @@ async def _get_exposure_breakdown(args: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def risk_tool_specs(user_id: str) -> list[ToolSpec]:
-    """Return the four read-only, user-scoped risk tool specs. *user_id* is accepted for factory
-    symmetry with ``portfolio_tool_specs`` — the underlying holdings table has no user_id column
-    (documented above), so scoping is by explicit ``portfolio_id`` rather than caller identity.
-    """
-    del user_id  # not usable for scoping today; see _resolve_holdings docstring
+    """Return the four read-only risk tool specs, scoped to *user_id*'s holdings."""
 
     async def _get_portfolio_risk_handler(args: dict[str, Any]) -> dict[str, Any]:
-        return await _get_portfolio_risk(args)
+        return await _get_portfolio_risk(args, user_id=user_id)
 
     def _run_stress_test_handler(args: dict[str, Any]) -> dict[str, Any]:
-        return _run_stress_test(args)
+        return _run_stress_test(args, user_id=user_id)
 
     async def _optimize_portfolio_handler(args: dict[str, Any]) -> dict[str, Any]:
-        return await _optimize_portfolio(args)
+        return await _optimize_portfolio(args, user_id=user_id)
 
     async def _get_exposure_breakdown_handler(args: dict[str, Any]) -> dict[str, Any]:
-        return await _get_exposure_breakdown(args)
+        return await _get_exposure_breakdown(args, user_id=user_id)
 
     return [
         ToolSpec(

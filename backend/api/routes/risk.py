@@ -62,11 +62,11 @@ async def _load_returns_frame(symbols: list[str]) -> pd.DataFrame:
 async def risk_portfolio(
     payload: RiskPortfolioRequest,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     symbols = [s.strip().upper() for s in payload.symbols if s.strip()]
     if not symbols:
-        rows = db.query(Holding).all()
+        rows = db.query(Holding).filter(Holding.user_id == current_user.id).all()
         symbols = sorted({str(row.ticker).strip().upper() for row in rows if str(row.ticker).strip()})
     if not symbols:
         raise HTTPException(status_code=400, detail="No symbols provided for risk calculation")
@@ -136,11 +136,13 @@ def _validate_portfolio_id(db: Session, portfolio_id: str) -> None:
 def risk_stress_test(
     payload: StressTestRequest,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     _validate_portfolio_id(db, payload.portfolio_id)
     try:
-        result = stress_test_service.run_stress_test(db, payload.portfolio_id, payload.scenario, payload.custom_params)
+        result = stress_test_service.run_stress_test(
+            db, payload.portfolio_id, payload.scenario, payload.custom_params, user_id=current_user.id
+        )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except KeyError:
@@ -152,11 +154,13 @@ def risk_stress_test(
 def risk_stress_test_replay(
     payload: StressReplayRequest,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     _validate_portfolio_id(db, payload.portfolio_id)
     try:
-        result = stress_test_service.run_historical_replay(db, payload.portfolio_id, payload.scenario)
+        result = stress_test_service.run_historical_replay(
+            db, payload.portfolio_id, payload.scenario, user_id=current_user.id
+        )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except KeyError:

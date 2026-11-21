@@ -9,7 +9,7 @@ def _safe_float(val):
         if np.isnan(f) or np.isinf(f):
             return 0.0
         return round(f, 6)
-    except:
+    except Exception:
         return 0.0
 
 def cointegration_analysis(a, b, *, entry_z: float = 2.0, exit_z: float = 0.5) -> dict:
@@ -26,7 +26,7 @@ def cointegration_analysis(a, b, *, entry_z: float = 2.0, exit_z: float = 0.5) -
     # Engle-Granger
     try:
         score, pvalue, _ = coint(s1, s2)
-    except:
+    except Exception:
         pvalue = 1.0
 
     # Hedge Ratio via OLS
@@ -35,7 +35,7 @@ def cointegration_analysis(a, b, *, entry_z: float = 2.0, exit_z: float = 0.5) -
         beta = model.params.iloc[1]
         alpha = model.params.iloc[0]
         spread = s1 - beta * s2 - alpha
-    except:
+    except Exception:
         beta = 0.0
         spread = s1 - s2
 
@@ -62,7 +62,7 @@ def cointegration_analysis(a, b, *, entry_z: float = 2.0, exit_z: float = 0.5) -
             half_life = _safe_float(-np.log(2) / coef)
         else:
             half_life = 0.0
-    except:
+    except Exception:
         half_life = 0.0
 
     # Signal

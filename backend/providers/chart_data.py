@@ -16,6 +16,7 @@ import yfinance as yf
 from backend.db.ohlcv_cache import get_ohlcv_cache
 from backend.services.instrument_map import get_instrument_map_service
 from backend.shared.market_classifier import market_classifier
+from backend.shared.http_client import shared_session
 
 logger = logging.getLogger(__name__)
 
@@ -413,7 +414,7 @@ class ChartDataProvider:
             "APCA-API-KEY-ID": self.alpaca_key,
             "APCA-API-SECRET-KEY": self.alpaca_secret,
         }
-        async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
+        async with shared_session(timeout=15.0) as client:
             while True:
                 params: dict[str, str | int] = {
                     "symbols": ticker,
@@ -565,7 +566,7 @@ class ChartDataProvider:
             params["from"] = start.strftime("%Y-%m-%d")
         if end:
             params["to"] = end.strftime("%Y-%m-%d")
-        async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
+        async with shared_session(timeout=15.0) as client:
             resp = await client.get(url, params=params)
             resp.raise_for_status()
             data = resp.json()
@@ -619,7 +620,7 @@ class ChartDataProvider:
         resolution = resolution_map.get(interval, "D")
         _end = end or datetime.now(timezone.utc)
         _start = start or (_end - timedelta(days=180))
-        async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
+        async with shared_session(timeout=15.0) as client:
             resp = await client.get(
                 "https://finnhub.io/api/v1/stock/candle",
                 params={

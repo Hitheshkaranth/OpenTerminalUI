@@ -82,8 +82,7 @@ def set_kill_switch(
         row.enabled = payload.enabled
         row.reason = payload.reason
         row.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(row)
+    db.flush()  # assign row.id; the change and its audit row commit together below
     log_audit(
         db=db,
         event_type="ops_kill_switch_updated",
@@ -91,7 +90,10 @@ def set_kill_switch(
         entity_id=row.id,
         payload={"scope": row.scope, "enabled": row.enabled, "reason": row.reason},
         user_id=current_user.id,
+        commit=False,
     )
+    db.commit()
+    db.refresh(row)
     return {
         "id": row.id,
         "scope": row.scope,

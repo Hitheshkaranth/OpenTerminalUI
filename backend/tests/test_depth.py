@@ -7,6 +7,14 @@ from backend.api.routes import depth as depth_routes
 from backend.api.routes import stream as stream_routes
 
 
+def _ws_auth(monkeypatch) -> dict[str, str]:  # noqa: ANN001
+    """WebSockets require an access token (SEC-2)."""
+    from backend.auth.jwt import create_access_token
+
+    monkeypatch.setenv("JWT_SECRET_KEY", "ws-test-secret-key-0123456789abcdef")
+    return {"Authorization": f"Bearer {create_access_token('ws-test-user', 'ws@example.com', 'trader')}"}
+
+
 class _FakeHub:
     def __init__(self) -> None:
         self.registered = False
@@ -66,10 +74,10 @@ def test_depth_snapshot_http_returns_sorted_book_and_provider_key() -> None:
         assert payload["total_ask_quantity"] > 0
 
 
-def test_depth_websocket_emits_ready_subscribed_and_snapshot() -> None:
+def test_depth_websocket_emits_ready_subscribed_and_snapshot(monkeypatch) -> None:
     client = TestClient(_build_app())
 
-    with client.websocket_connect("/api/ws/depth") as websocket:
+    with client.websocket_connect("/api/ws/depth", headers=_ws_auth(monkeypatch)) as websocket:
         ready = websocket.receive_json()
         assert ready == {"type": "ready", "channels": ["depth"]}
 
@@ -92,7 +100,7 @@ def test_quotes_websocket_can_emit_depth_channel_messages(monkeypatch) -> None:
     fake_hub = _FakeHub()
     monkeypatch.setattr(stream_routes, "get_marketdata_hub", lambda: fake_hub)
 
-    with client.websocket_connect("/api/ws/quotes") as websocket:
+    with client.websocket_connect("/api/ws/quotes", headers=_ws_auth(monkeypatch)) as websocket:
         websocket.send_json({"op": "subscribe", "symbols": ["TCS"], "market": "IN", "channels": ["depth"]})
         depth_msg = websocket.receive_json()
         assert depth_msg["type"] == "depth"

@@ -13,6 +13,7 @@ import httpx
 from pydantic import BaseModel, Field, field_validator
 
 from backend.shared.cache import cache
+from backend.shared.http_client import shared_session
 
 logger = logging.getLogger(__name__)
 
@@ -507,7 +508,7 @@ class ShareholdingService:
         else:
             endpoint = f"https://financialmodelingprep.com/api/v3/institutional-holder/{symbol}"
             try:
-                async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, trust_env=False) as client:
+                async with shared_session(timeout=15.0, follow_redirects=True) as client:
                     response = await client.get(endpoint, params={"apikey": api_key})
                     response.raise_for_status()
                     payload = response.json()

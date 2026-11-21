@@ -62,7 +62,7 @@ def test_risk_tool_specs_schema_and_registration():
 @pytest.mark.asyncio
 async def test_get_portfolio_risk_happy_path(monkeypatch):
     holdings = [_holding("AAPL", 10, 150.0), _holding("MSFT", 5, 300.0)]
-    monkeypatch.setattr(rt, "_resolve_holdings", lambda portfolio_id: (holdings, "current"))
+    monkeypatch.setattr(rt, "_resolve_holdings", lambda portfolio_id, user_id=None: (holdings, "current"))
 
     async def fake_returns_frame(symbols, range_str="2y"):
         return _synthetic_returns(symbols, n=40)
@@ -84,7 +84,7 @@ async def test_get_portfolio_risk_happy_path(monkeypatch):
 @pytest.mark.asyncio
 async def test_get_portfolio_risk_empty_portfolio_is_err_not_zero_report(monkeypatch):
     # No holdings at all -> must be err(), never a VaR=0.0 report an agent could repeat as real.
-    monkeypatch.setattr(rt, "_resolve_holdings", lambda portfolio_id: ([], "current"))
+    monkeypatch.setattr(rt, "_resolve_holdings", lambda portfolio_id, user_id=None: ([], "current"))
 
     out = await rt._get_portfolio_risk({})
     assert out["ok"] is False
@@ -95,7 +95,7 @@ async def test_get_portfolio_risk_empty_portfolio_is_err_not_zero_report(monkeyp
 @pytest.mark.asyncio
 async def test_get_portfolio_risk_insufficient_history_is_err(monkeypatch):
     holdings = [_holding("AAPL", 10, 150.0)]
-    monkeypatch.setattr(rt, "_resolve_holdings", lambda portfolio_id: (holdings, "current"))
+    monkeypatch.setattr(rt, "_resolve_holdings", lambda portfolio_id, user_id=None: (holdings, "current"))
 
     async def fake_returns_frame(symbols, range_str="2y"):
         return pd.DataFrame()  # provider failure / no price history
@@ -109,7 +109,7 @@ async def test_get_portfolio_risk_insufficient_history_is_err(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_portfolio_risk_not_found_portfolio_is_err(monkeypatch):
-    def fake_resolve(portfolio_id):
+    def fake_resolve(portfolio_id, user_id=None):
         return rt.err("Portfolio not found", code="not_found")
 
     monkeypatch.setattr(rt, "_resolve_holdings", fake_resolve)
@@ -138,7 +138,7 @@ def test_run_stress_test_happy_path(monkeypatch):
     monkeypatch.setattr(rt, "SessionLocal", lambda: DummyDB())
     monkeypatch.setattr(
         rt.stress_test_service, "run_stress_test",
-        lambda db, pid, scenario, params: _FakeStressResult(),
+        lambda db, pid, scenario, params, user_id=None: _FakeStressResult(),
     )
 
     out = rt._run_stress_test({"scenario": "2008_gfc"})
@@ -150,7 +150,7 @@ def test_run_stress_test_happy_path(monkeypatch):
 def test_run_stress_test_unknown_scenario_is_err(monkeypatch):
     monkeypatch.setattr(rt, "SessionLocal", lambda: DummyDB())
 
-    def raise_key_error(db, pid, scenario, params):
+    def raise_key_error(db, pid, scenario, params, user_id=None):
         raise KeyError(scenario)
 
     monkeypatch.setattr(rt.stress_test_service, "run_stress_test", raise_key_error)
@@ -165,7 +165,7 @@ def test_run_stress_test_unknown_scenario_is_err(monkeypatch):
 def test_run_stress_test_portfolio_not_found_is_err(monkeypatch):
     monkeypatch.setattr(rt, "SessionLocal", lambda: DummyDB())
 
-    def raise_lookup_error(db, pid, scenario, params):
+    def raise_lookup_error(db, pid, scenario, params, user_id=None):
         raise LookupError("Portfolio not found")
 
     monkeypatch.setattr(rt.stress_test_service, "run_stress_test", raise_lookup_error)
@@ -204,7 +204,7 @@ async def test_optimize_portfolio_too_few_tickers_is_err():
 @pytest.mark.asyncio
 async def test_optimize_portfolio_empty_portfolio_fallback_is_err(monkeypatch):
     # No tickers given and no holdings to fall back to -> err, not an empty-universe optimization.
-    monkeypatch.setattr(rt, "_resolve_holdings", lambda portfolio_id: rt.err("No holdings available", code="not_found"))
+    monkeypatch.setattr(rt, "_resolve_holdings", lambda portfolio_id, user_id=None: rt.err("No holdings available", code="not_found"))
     out = await rt._optimize_portfolio({})
     assert out["ok"] is False
     assert out["error"]["code"] == "not_found"
@@ -224,7 +224,7 @@ async def test_optimize_portfolio_bad_objective_is_err():
 @pytest.mark.asyncio
 async def test_get_exposure_breakdown_happy_path(monkeypatch):
     holdings = [_holding("AAPL", 10, 150.0), _holding("RELIANCE", 4, 2500.0)]
-    monkeypatch.setattr(rt, "_resolve_holdings", lambda portfolio_id: (holdings, "current"))
+    monkeypatch.setattr(rt, "_resolve_holdings", lambda portfolio_id, user_id=None: (holdings, "current"))
 
     async def fake_classify(symbol):
         return SimpleNamespace(country_name="United States" if symbol == "AAPL" else "India")
@@ -242,7 +242,7 @@ async def test_get_exposure_breakdown_happy_path(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_exposure_breakdown_empty_portfolio_is_err(monkeypatch):
-    monkeypatch.setattr(rt, "_resolve_holdings", lambda portfolio_id: rt.err("No holdings available", code="not_found"))
+    monkeypatch.setattr(rt, "_resolve_holdings", lambda portfolio_id, user_id=None: rt.err("No holdings available", code="not_found"))
     out = await rt._get_exposure_breakdown({})
     assert out["ok"] is False
     assert out["error"]["code"] == "not_found"

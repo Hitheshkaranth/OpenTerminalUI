@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
+from backend.auth.deps import get_current_user
 from backend.breakout_engine.detectors import detect_pattern
+from backend.models.ownership import can_access
+from backend.models.user import User
 from backend.services.breakout_builder_service import (
     BreakoutBuilderValidationError,
     evaluate_builder_breakout,
@@ -15,6 +18,10 @@ from backend.services.breakout_occurrence_service import get_breakout_occurrence
 from backend.services.breakout_scanner_service import get_breakout_scanner_service
 
 router = APIRouter()
+
+# Saved builders live in the service's in-memory store (not the ORM), so ownership is
+# tracked here: builder id -> owner user id. Lost on restart together with the builders.
+_BUILDER_OWNERS: dict[str, str] = {}
 
 
 class DetectRequest(BaseModel):
@@ -117,25 +124,27 @@ def validate_builder(payload: BuilderValidateRequest) -> dict[str, Any]:
 
 
 @router.post("/breakouts/builder/save")
-def save_builder(payload: BuilderSaveRequest) -> dict[str, Any]:
+def save_builder(payload: BuilderSaveRequest, current_user: User = Depends(get_current_user)) -> dict[str, Any]:
     service = get_breakout_builder_service()
     try:
-        return service.save(payload.name, payload.dsl)
+        row = service.save(payload.name, payload.dsl)
     except BreakoutBuilderValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    _BUILDER_OWNERS[str(row["id"])] = str(current_user.id)
+    return row
 
 
 @router.get("/breakouts/builder")
-def list_builders() -> dict[str, Any]:
+def list_builders(current_user: User = Depends(get_current_user)) -> dict[str, Any]:
     service = get_breakout_builder_service()
-    return {"items": service.list()}
+    return {"items": [row for row in service.list() if can_access(current_user, _BUILDER_OWNERS.get(str(row.get("id"))))]}
 
 
 @router.get("/breakouts/builder/{builder_id}")
-def get_builder(builder_id: str) -> dict[str, Any]:
+def get_builder(builder_id: str, current_user: User = Depends(get_current_user)) -> dict[str, Any]:
     service = get_breakout_builder_service()
     row = service.get(builder_id)
-    if row is None:
+    if row is None or not can_access(current_user, _BUILDER_OWNERS.get(builder_id)):
         raise HTTPException(status_code=404, detail="Builder not found")
     return row
 

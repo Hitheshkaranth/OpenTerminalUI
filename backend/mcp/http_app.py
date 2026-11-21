@@ -9,6 +9,7 @@ caller's user and write permission through ``backend.mcp.session``.
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Request
@@ -17,6 +18,12 @@ from backend.agent.tools.envelope import ensure_envelope, err
 from backend.config.settings import get_settings
 from backend.mcp.auth import McpAuthError, McpPrincipal, authenticate
 from backend.mcp.session import build_session_registry
+
+logger = logging.getLogger(__name__)
+
+# Our own tools raise these with user-safe messages (validation, not-found,
+# permission); anything else may carry library internals and is logged instead.
+_SAFE_TOOL_ERRORS = (ValueError, LookupError, PermissionError, TimeoutError)
 
 
 def _authenticate(x_api_key: str | None) -> McpPrincipal:
@@ -84,7 +91,11 @@ def build_mcp_router() -> APIRouter:
         try:
             result = await registry.execute(name, arguments)
         except Exception as exc:  # noqa: BLE001 - deliberately broad, see docstring
-            result = err(str(exc))
+            if isinstance(exc, _SAFE_TOOL_ERRORS):
+                result = err(str(exc))
+            else:
+                logger.exception("MCP tool %s failed", name)
+                result = err(f"Tool {name} failed ({type(exc).__name__})")
         # Legacy market tools predate the envelope; normalise so every MCP
         # client sees one shape regardless of when the tool was written.
         return _jsonable(ensure_envelope(result))

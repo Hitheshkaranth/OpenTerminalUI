@@ -76,7 +76,9 @@ async def test_call_failing_tool_returns_error_payload() -> None:
 
     payload = json.loads(content[0].text)
     assert payload["ok"] is False
-    assert payload["error"]["message"] == "boom"
+    # Internal exception text is not leaked to the client (SEC-21).
+    assert payload["error"]["message"] == "Tool fail failed (RuntimeError)"
+    assert "boom" not in content[0].text
 
 
 def test_build_mcp_server_uses_expected_name() -> None:

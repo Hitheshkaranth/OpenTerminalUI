@@ -140,7 +140,7 @@ def test_api_endpoint_integration():
 
     # Seed data
     db = TestingSessionLocal()
-    db.add(Holding(ticker="AAPL", quantity=100, avg_buy_price=150.0, buy_date="2024-01-15"))
+    db.add(Holding(user_id="test_user", ticker="AAPL", quantity=100, avg_buy_price=150.0, buy_date="2024-01-15"))
     db.commit()
     db.close()
 

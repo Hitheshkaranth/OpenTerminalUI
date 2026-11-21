@@ -1,3 +1,5 @@
+import logging
+
 import pandas as pd
 import numpy as np
 import warnings
@@ -5,6 +7,7 @@ from statsmodels.tsa.stattools import acf, pacf
 from statsmodels.stats.diagnostic import acorr_ljungbox
 
 warnings.filterwarnings("ignore")
+logger = logging.getLogger(__name__)
 
 def _safe_float(val):
     try:
@@ -84,7 +87,8 @@ def autocorrelation_analysis(prices: pd.Series, *, nlags: int = 30, use_returns:
             "ljung_box": ljung_box_list,
             "interpretation": interpretation
         }
-    except Exception as e:
+    except Exception:
+        logger.warning("Autocorrelation analysis failed", exc_info=True)
         return {
             "use_returns": use_returns,
             "n_obs": int(n),
@@ -92,5 +96,5 @@ def autocorrelation_analysis(prices: pd.Series, *, nlags: int = 30, use_returns:
             "acf": [],
             "pacf": [],
             "ljung_box": [],
-            "interpretation": f"Autocorrelation analysis failed: {str(e)}"
+            "interpretation": "Autocorrelation analysis failed for this series."
         }

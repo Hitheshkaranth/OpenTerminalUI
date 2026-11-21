@@ -20,6 +20,7 @@ import httpx
 from backend.config.settings import get_settings
 from backend.services.fxmacrodata_economics import FXMacroDataEconomics, OperationResult
 from backend.shared.cache import cache
+from backend.shared.http_client import shared_session
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +100,7 @@ class EconomicDataService:
         # Try Finnhub
         if self.finnhub_key:
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with shared_session(timeout=10.0) as client:
                     resp = await client.get(
                         f"{self.base_finnhub}/calendar/economic",
                         params={"from": start_date, "to": end_date, "token": self.finnhub_key}
@@ -125,7 +126,7 @@ class EconomicDataService:
         # Try FMP if Finnhub failed or returned little
         if not events and self.fmp_key:
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with shared_session(timeout=10.0) as client:
                     resp = await client.get(
                         f"{self.base_fmp}/economic_calendar",
                         params={"from": start_date, "to": end_date, "apikey": self.fmp_key}
@@ -227,7 +228,7 @@ class EconomicDataService:
                 "sort_order": "desc",
                 "limit": 13 # 12 months + 1 for trend
             }
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with shared_session(timeout=10.0) as client:
                 resp = await client.get(url, params=params)
                 if resp.status_code != 200:
                     return None

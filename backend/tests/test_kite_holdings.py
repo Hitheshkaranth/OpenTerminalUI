@@ -63,7 +63,7 @@ def fake_kite(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_kite_holdings(monkeypatch, fake_kite):
-    result = await kite_holdings(authorization="Bearer tok")
+    result = await kite_holdings(kite_access_token="tok")
     assert result["source"] == "kite"
     assert "fetched_at" in result
     holdings = result["holdings"]
@@ -88,7 +88,7 @@ async def test_kite_holdings(monkeypatch, fake_kite):
 
 @pytest.mark.asyncio
 async def test_kite_positions(monkeypatch, fake_kite):
-    result = await kite_positions(authorization="Bearer tok")
+    result = await kite_positions(kite_access_token="tok")
     assert result["source"] == "kite"
     assert "fetched_at" in result
     positions = result["positions"]
@@ -114,7 +114,7 @@ async def test_kite_holdings_400_when_no_api_key(monkeypatch):
 
     from fastapi import HTTPException
     with pytest.raises(HTTPException) as exc_info:
-        await kite_holdings(authorization="Bearer tok")
+        await kite_holdings(kite_access_token="tok")
     assert exc_info.value.status_code == 400
     assert "KITE_API_KEY is not configured" in exc_info.value.detail
 
@@ -129,7 +129,7 @@ async def test_kite_positions_400_when_no_api_key(monkeypatch):
 
     from fastapi import HTTPException
     with pytest.raises(HTTPException) as exc_info:
-        await kite_positions(authorization="Bearer tok")
+        await kite_positions(kite_access_token="tok")
     assert exc_info.value.status_code == 400
     assert "KITE_API_KEY is not configured" in exc_info.value.detail
 
@@ -150,9 +150,9 @@ async def test_empty_kite_account_is_200_not_502(monkeypatch):
             return {"net": [], "day": []}
 
     monkeypatch.setattr("backend.api.routes.kite.kite", EmptyKite())
-    out = await kite_holdings(authorization="Bearer tok")
+    out = await kite_holdings(kite_access_token="tok")
     assert out["holdings"] == [] and out["source"] == "kite"
-    out = await kite_positions(authorization="Bearer tok")
+    out = await kite_positions(kite_access_token="tok")
     assert out["positions"] == []
 
 
@@ -171,7 +171,7 @@ async def test_kite_request_failure_is_502_with_token_hint(monkeypatch):
 
     monkeypatch.setattr("backend.api.routes.kite.kite", FailingKite())
     with pytest.raises(HTTPException) as ei:
-        await kite_holdings(authorization="Bearer tok")
+        await kite_holdings(kite_access_token="tok")
     assert ei.value.status_code == 502
     assert "KITE_ACCESS_TOKEN" in ei.value.detail
 

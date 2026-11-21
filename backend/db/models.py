@@ -10,3 +10,6 @@ from backend.research_dossiers.models import *  # noqa: F401,F403,E402
 from backend.screen_monitoring.models import ScreenSchedule, ScreenChange  # noqa: F401,E402
 
 from backend.research_inbox.models import *  # noqa: F401,F403,E402
+
+# Research library items (previously created at import time by core/research/service.py).
+from backend.core.research.models import ResearchItem  # noqa: F401,E402

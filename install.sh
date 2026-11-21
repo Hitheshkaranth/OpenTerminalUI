@@ -8,7 +8,10 @@
 #
 # What it does so you are never blocked on first launch:
 #   * Creates a single .env from .env.example (if missing).
-#   * Auto-generates strong JWT_SECRET_KEY + CACHE_SIGNING_KEY (no secret errors).
+#   * Auto-generates strong JWT_SECRET_KEY + CACHE_SIGNING_KEY + REDIS_PASSWORD +
+#     POSTGRES_PASSWORD (no secret errors; Docker Compose requires the last two).
+#   * Local (non-Docker) single-user mode sets OPENTERMINALUI_ENV=development
+#     (unset now means production, which requires Postgres).
 #   * Auto-generates a unique admin password and seeds an admin account
 #     (no "user not found" / login errors).
 #   * Builds and starts the app at http://localhost:8000.
@@ -134,6 +137,8 @@ fi
 # --- 2. Auto-fill secrets + admin so there are no login/secret errors -----
 ensure_var JWT_SECRET_KEY "$(gen_secret)"
 ensure_var CACHE_SIGNING_KEY "$(gen_secret)"
+ensure_var REDIS_PASSWORD "$(gen_secret)"
+ensure_var POSTGRES_PASSWORD "$(gen_secret)"
 ensure_var BOOTSTRAP_ADMIN_EMAIL "admin@openterminal.local"
 
 ADMIN_PASS="$(env_get BOOTSTRAP_ADMIN_PASSWORD)"
@@ -160,6 +165,11 @@ if [ "$MODE" = "auto" ]; then
   fi
 fi
 cyan "==> install mode: $MODE"
+
+if [ "$MODE" = "local" ]; then
+  # Local single-user install runs on SQLite; production mode would refuse it.
+  ensure_var OPENTERMINALUI_ENV "development"
+fi
 
 run_docker() {
   green "    building & starting containers (docker compose)..."

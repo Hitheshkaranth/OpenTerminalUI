@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createAlert,
   fetchAlertsFiltered,
-  fetchMarketStatus,
   fetchPitFundamentals,
   fetchStockEvents,
   fetchVolumeProfile,
@@ -28,6 +27,12 @@ import type { ReplayCommand } from "../../shared/chart/replay";
 import { ChartPanelHeader } from "./ChartPanelHeader";
 import { ChartPanelFooter } from "./ChartPanelFooter";
 import type { QuoteTick } from "../../realtime/useQuotesStream";
+import { useMarketStatus } from "../../hooks/useStocks";
+
+// Polling pauses while the tab is hidden; the hub also pushes market status.
+function isPageHidden(): boolean {
+  return typeof document !== "undefined" && document.visibilityState === "hidden";
+}
 import { quickAddToFirstPortfolio } from "../../shared/portfolioQuickAdd";
 import {
   buildActiveChartAlertPreview,
@@ -137,7 +142,9 @@ export function ChartPanel({
   const [vpLoading, setVpLoading] = useState(false);
   const [contextEvents, setContextEvents] = useState<CorporateEvent[]>([]);
   const [contextFundamentals, setContextFundamentals] = useState<PitFundamentalsResponse | null>(null);
-  const [contextMarketStatus, setContextMarketStatus] = useState<Record<string, unknown> | null>(null);
+  // Shared ["market-status"] react-query cache: one poll for every panel, paused in background tabs.
+  const marketStatusQuery = useMarketStatus();
+  const contextMarketStatus = (marketStatusQuery.data as Record<string, unknown> | undefined) ?? null;
   const [alertDraft, setAlertDraft] = useState<ChartAlertDraft | null>(null);
   const [alertError, setAlertError] = useState<string | null>(null);
   const [alertSubmitting, setAlertSubmitting] = useState(false);
@@ -286,6 +293,7 @@ export function ChartPanel({
     };
     void load();
     const timer = setInterval(() => {
+      if (isPageHidden()) return;
       void load();
     }, 15000);
     return () => {
@@ -323,26 +331,6 @@ export function ChartPanel({
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      try {
-        const payload = await fetchMarketStatus();
-        if (!cancelled) setContextMarketStatus(payload);
-      } catch {
-        if (!cancelled) setContextMarketStatus(null);
-      }
-    };
-    void load();
-    const timer = window.setInterval(() => {
-      void load();
-    }, 15_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
       await loadActiveAlerts();
     };
     if (alertSymbol) {
@@ -351,7 +339,7 @@ export function ChartPanel({
       setActiveAlerts([]);
     }
     const timer = window.setInterval(() => {
-      if (cancelled || !alertSymbol) return;
+      if (cancelled || !alertSymbol || isPageHidden()) return;
       void load();
     }, 30_000);
     return () => {

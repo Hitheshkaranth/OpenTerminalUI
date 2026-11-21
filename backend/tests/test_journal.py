@@ -10,6 +10,24 @@ from backend.main import app
 from backend.shared.db import Base
 
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _restore_app_overrides():
+    # _build_client mutates the shared app; don't leak the in-memory DB into later test modules.
+    saved = dict(app.dependency_overrides)
+    saved_factory = getattr(app.state, "db_session_factory", None)
+    yield
+    app.dependency_overrides.clear()
+    app.dependency_overrides.update(saved)
+    if saved_factory is None:
+        if hasattr(app.state, "db_session_factory"):
+            del app.state.db_session_factory
+    else:
+        app.state.db_session_factory = saved_factory
+
+
 def _build_client() -> tuple[TestClient, sessionmaker]:
     engine = create_engine(
         "sqlite://",

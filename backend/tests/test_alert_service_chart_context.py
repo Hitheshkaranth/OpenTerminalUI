@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -7,25 +9,34 @@ import pytest
 from backend.alerts import service as alert_service
 from backend.alerts.service import AlertEvaluatorService
 from backend.models import AlertORM, AlertStatus, AlertTriggerORM, User, UserRole
+from backend.services.marketdata_hub import MarketDataHub
 from backend.shared.db import SessionLocal, init_db
 
 
-class _FakeHub:
-    def __init__(self) -> None:
-        self.alert_payloads: list[dict] = []
-        self.symbol_payloads: list[tuple[str, dict]] = []
+class _FakeSocket:
+    def __init__(self, user_id: str) -> None:
+        self.state = SimpleNamespace(user_id=user_id)
+        self.received: list[dict] = []
 
-    async def broadcast_alert(self, payload: dict) -> None:
-        self.alert_payloads.append(payload)
+    async def send_json(self, payload: dict) -> None:
+        self.received.append(payload)
 
-    async def broadcast(self, symbol: str, payload: dict) -> None:
-        self.symbol_payloads.append((symbol, payload))
+    async def close(self) -> None:
+        return None
+
+
+async def _drain(hub: MarketDataHub) -> None:
+    for _ in range(200):
+        if all(ch.queue.empty() for ch in hub._clients.values()):  # noqa: SLF001
+            break
+        await asyncio.sleep(0.005)
+    await asyncio.sleep(0.01)
 
 
 @pytest.mark.asyncio
 async def test_process_tick_persists_chart_context_and_emits_payload(monkeypatch: pytest.MonkeyPatch) -> None:
     init_db()
-    hub = _FakeHub()
+    hub = MarketDataHub()
     service = AlertEvaluatorService()
     service._hub = hub
     symbol = f"NSE:RELIANCE-{uuid4().hex[:8]}".upper()
@@ -41,6 +52,7 @@ async def test_process_tick_persists_chart_context_and_emits_payload(monkeypatch
         db.add(user)
         db.commit()
         db.refresh(user)
+        owner_id = str(user.id)
 
         alert = AlertORM(
             user_id=user.id,
@@ -70,6 +82,14 @@ async def test_process_tick_persists_chart_context_and_emits_payload(monkeypatch
     finally:
         db.close()
 
+    # Owner and another user are both subscribed to the symbol (quote socket) and
+    # hold an alert socket; only the owner may receive the alert event.
+    owner_quote, owner_alert = _FakeSocket(owner_id), _FakeSocket(owner_id)
+    other_quote, other_alert = _FakeSocket("someone-else"), _FakeSocket("someone-else")
+    hub._connections[owner_quote] = {symbol}  # noqa: SLF001
+    hub._connections[other_quote] = {symbol}  # noqa: SLF001
+    hub._alert_connections.update({owner_alert, other_alert})  # noqa: SLF001
+
     await service._process_tick({"symbol": symbol, "ltp": 2550, "volume": 1000, "change_pct": 1.1})
 
     db = SessionLocal()
@@ -82,8 +102,17 @@ async def test_process_tick_persists_chart_context_and_emits_payload(monkeypatch
     finally:
         db.close()
 
-    assert hub.alert_payloads
-    payload = next(item for item in hub.alert_payloads if item["alert_id"] == alert.id)
-    assert payload["payload"]["chart_context"]["panelId"] == "slot-1"
-    assert payload["payload"]["chart_context"]["source"] == "drawing"
-    assert any(channel_symbol == symbol for channel_symbol, _ in hub.symbol_payloads)
+    await _drain(hub)
+    for sock in (owner_quote, owner_alert):
+        events = [item for item in sock.received if item.get("type") == "alert_triggered"]
+        assert len(events) == 1
+        payload = events[0]
+        assert payload["alert_id"] == alert.id
+        assert payload["user_id"] == owner_id
+        assert payload["payload"]["chart_context"]["panelId"] == "slot-1"
+        assert payload["payload"]["chart_context"]["source"] == "drawing"
+    for sock in (other_quote, other_alert):
+        assert not [item for item in sock.received if item.get("type") == "alert_triggered"]
+
+    for task in [ch.task for ch in hub._clients.values() if ch.task]:  # noqa: SLF001
+        task.cancel()

@@ -11,9 +11,11 @@ from typing import Any
 from uuid import uuid4
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from backend.auth.deps import get_current_user
 from backend.core.models import PythonExecuteRequest, PythonExecuteResponse
+from backend.core.python_execution_worker import MAX_OUTPUT_BYTES, child_resource_limiter
 from backend.models.user_script import (
     OpenScriptCompileRequest,
     OpenScriptOutput,
@@ -59,6 +61,21 @@ _SAFE_BUILTINS: dict[str, Any] = {
 }
 _COMPILER = OpenScriptCompiler()
 _SCRIPT_STORE: dict[str, UserScript] = {}
+_MAX_SCRIPTS_PER_USER = 200
+
+
+def _owner_id(current_user: Any) -> str | None:
+    """Owner key for the script store. Direct (non-HTTP) calls pass no user."""
+    user_id = getattr(current_user, "id", None)
+    return str(user_id) if user_id is not None else None
+
+
+def _owned_script_or_404(script_id: str, owner_id: str | None) -> UserScript:
+    script = _SCRIPT_STORE.get(script_id)
+    # Another user's script is indistinguishable from a missing one.
+    if script is None or script.owner_id != owner_id:
+        raise HTTPException(status_code=404, detail="Script not found")
+    return script
 
 
 def _callable_name(func: ast.expr) -> str:
@@ -115,6 +132,8 @@ def _run_user_code(code: str, timeout: float) -> PythonExecuteResponse:
             command,
             input=json.dumps({"code": code, "builtins": list(_SAFE_BUILTINS)}),
             capture_output=True, text=True, timeout=timeout, check=False,
+            # RLIMIT_AS 1GiB + RLIMIT_CPU timeout+1 (POSIX); wall-clock kill above.
+            preexec_fn=child_resource_limiter(int(timeout) + 1),
         )
     except subprocess.TimeoutExpired:
         # subprocess.run kills and waits for the child before raising. No executing
@@ -124,6 +143,9 @@ def _run_user_code(code: str, timeout: float) -> PythonExecuteResponse:
         return PythonExecuteResponse(stdout="", stderr="Execution worker could not be started", result=None, timed_out=False)
     if completed.returncode:
         return PythonExecuteResponse(stdout="", stderr="Execution worker failed", result=None, timed_out=False)
+    # The worker caps stdout/result at 1MB each; anything far beyond that is refused.
+    if len(completed.stdout or "") > MAX_OUTPUT_BYTES * 8:
+        return PythonExecuteResponse(stdout="", stderr="Execution output exceeded the size limit", result=None, timed_out=False)
     try:
         return PythonExecuteResponse(**json.loads(completed.stdout))
     except (ValueError, TypeError):
@@ -140,7 +162,7 @@ def _compile_or_raise(source: str) -> CompileResult:
     raise HTTPException(status_code=400, detail=detail)
 
 
-def _script_from_source(script_id: str, payload: UserScriptCreateRequest | UserScriptUpdateRequest, *, existing: UserScript | None = None) -> UserScript:
+def _script_from_source(script_id: str, payload: UserScriptCreateRequest | UserScriptUpdateRequest, *, existing: UserScript | None = None, owner_id: str | None = None) -> UserScript:
     source = payload.source if isinstance(payload, UserScriptCreateRequest) else payload.source or (existing.source if existing else "")
     compile_result = _compile_or_raise(source)
     created_at = existing.created_at if existing else datetime.now(timezone.utc)
@@ -153,6 +175,7 @@ def _script_from_source(script_id: str, payload: UserScriptCreateRequest | UserS
         compiled_ast=compile_result.ast or {},
         outputs=compile_result.outputs,
         is_public=payload.is_public if isinstance(payload, UserScriptCreateRequest) else (payload.is_public if payload.is_public is not None else existing.is_public if existing else False),
+        owner_id=existing.owner_id if existing else owner_id,
         created_at=created_at,
         updated_at=updated_at,
     )
@@ -185,30 +208,30 @@ async def compile_openscript(payload: OpenScriptCompileRequest) -> CompileResult
 
 
 @router.post("/scripting/scripts", response_model=UserScript)
-async def create_script(payload: UserScriptCreateRequest) -> UserScript:
-    script = _script_from_source("", payload)
+async def create_script(payload: UserScriptCreateRequest, current_user: Any = Depends(get_current_user)) -> UserScript:
+    owner_id = _owner_id(current_user)
+    if sum(1 for item in _SCRIPT_STORE.values() if item.owner_id == owner_id) >= _MAX_SCRIPTS_PER_USER:
+        raise HTTPException(status_code=409, detail=f"Script limit reached ({_MAX_SCRIPTS_PER_USER} per user)")
+    script = _script_from_source("", payload, owner_id=owner_id)
     _SCRIPT_STORE[script.id] = script
     return script
 
 
 @router.get("/scripting/scripts", response_model=list[UserScript])
-async def list_scripts() -> list[UserScript]:
-    return sorted(_SCRIPT_STORE.values(), key=lambda item: item.updated_at, reverse=True)
+async def list_scripts(current_user: Any = Depends(get_current_user)) -> list[UserScript]:
+    owner_id = _owner_id(current_user)
+    owned = [item for item in _SCRIPT_STORE.values() if item.owner_id == owner_id]
+    return sorted(owned, key=lambda item: item.updated_at, reverse=True)
 
 
 @router.get("/scripting/scripts/{script_id}", response_model=UserScript)
-async def get_script(script_id: str) -> UserScript:
-    script = _SCRIPT_STORE.get(script_id)
-    if script is None:
-        raise HTTPException(status_code=404, detail="Script not found")
-    return script
+async def get_script(script_id: str, current_user: Any = Depends(get_current_user)) -> UserScript:
+    return _owned_script_or_404(script_id, _owner_id(current_user))
 
 
 @router.put("/scripting/scripts/{script_id}", response_model=UserScript)
-async def update_script(script_id: str, payload: UserScriptUpdateRequest) -> UserScript:
-    existing = _SCRIPT_STORE.get(script_id)
-    if existing is None:
-        raise HTTPException(status_code=404, detail="Script not found")
+async def update_script(script_id: str, payload: UserScriptUpdateRequest, current_user: Any = Depends(get_current_user)) -> UserScript:
+    existing = _owned_script_or_404(script_id, _owner_id(current_user))
     updated_payload = UserScriptCreateRequest(
         name=payload.name if payload.name is not None else existing.name,
         description=payload.description if payload.description is not None else existing.description,
@@ -221,18 +244,15 @@ async def update_script(script_id: str, payload: UserScriptUpdateRequest) -> Use
 
 
 @router.delete("/scripting/scripts/{script_id}")
-async def delete_script(script_id: str) -> dict[str, Any]:
-    existing = _SCRIPT_STORE.pop(script_id, None)
-    if existing is None:
-        raise HTTPException(status_code=404, detail="Script not found")
+async def delete_script(script_id: str, current_user: Any = Depends(get_current_user)) -> dict[str, Any]:
+    _owned_script_or_404(script_id, _owner_id(current_user))
+    _SCRIPT_STORE.pop(script_id, None)
     return {"deleted": True, "id": script_id}
 
 
 @router.post("/scripting/scripts/{script_id}/run", response_model=OpenScriptRunResponse)
-async def run_script(script_id: str, payload: OpenScriptRunRequest) -> OpenScriptRunResponse:
-    script = _SCRIPT_STORE.get(script_id)
-    if script is None:
-        raise HTTPException(status_code=404, detail="Script not found")
+async def run_script(script_id: str, payload: OpenScriptRunRequest, current_user: Any = Depends(get_current_user)) -> OpenScriptRunResponse:
+    script = _owned_script_or_404(script_id, _owner_id(current_user))
     if not script.compiled_ast:
         script = _script_from_source(script_id, UserScriptCreateRequest(name=script.name, description=script.description, source=script.source, is_public=script.is_public), existing=script)
         _SCRIPT_STORE[script_id] = script

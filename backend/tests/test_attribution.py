@@ -7,7 +7,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from types import SimpleNamespace
+
 from backend.api.deps import get_db
+from backend.auth.deps import get_current_user
 from backend.api.routes import portfolio as portfolio_routes
 from backend.services.portfolio_analytics import compute_brinson_attribution, compute_factor_attribution, portfolio_analytics_service
 
@@ -154,6 +157,7 @@ def test_attribution_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(portfolio_routes.portfolio_analytics_service, "portfolio_attribution", _fake_portfolio_attribution)
     app.dependency_overrides[get_db] = lambda: object()
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id="user-1", role="trader")
 
     client = TestClient(app)
     response = client.get("/api/portfolio/current/attribution?period=1M&benchmark=NIFTY50")
@@ -174,6 +178,7 @@ def test_attribution_invalid_portfolio(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(portfolio_routes.portfolio_analytics_service, "portfolio_attribution", _raise_value_error)
     app.dependency_overrides[get_db] = lambda: object()
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id="user-1", role="trader")
 
     client = TestClient(app)
     response = client.get("/api/portfolio/missing/attribution?period=1M&benchmark=NIFTY50")

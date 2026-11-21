@@ -11,6 +11,8 @@ from backend.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
+INBOX_MAXSIZE = 10_000
+
 class RedisQuoteBus:
     def __init__(self):
         self.settings = get_settings()
@@ -20,6 +22,12 @@ class RedisQuoteBus:
         self._subscribed_channels: Set[str] = set()
         self._is_connected = False
         self._listen_task: Optional[asyncio.Task] = None
+        self._consumer_task: Optional[asyncio.Task] = None
+        # Reading from Redis is decoupled from fan-out: the listener only enqueues,
+        # a consumer task drains. Bounded, drop-oldest so a slow consumer can't grow
+        # memory without limit.
+        self._inbox: Optional[asyncio.Queue] = None
+        self.dropped_messages = 0
         self._lock = asyncio.Lock()
 
     async def connect(self) -> bool:
@@ -45,13 +53,16 @@ class RedisQuoteBus:
 
     async def disconnect(self):
         async with self._lock:
-            if self._listen_task:
-                self._listen_task.cancel()
-                try:
-                    await self._listen_task
-                except asyncio.CancelledError:
-                    pass
-                self._listen_task = None
+            for attr in ("_listen_task", "_consumer_task"):
+                task = getattr(self, attr)
+                if task:
+                    task.cancel()
+                    try:
+                        await task
+                    except (asyncio.CancelledError, Exception):
+                        pass
+                    setattr(self, attr, None)
+            self._inbox = None
 
             if self._pubsub:
                 await self._pubsub.close()
@@ -126,31 +137,65 @@ class RedisQuoteBus:
 
             if not self._pubsub:
                 self._pubsub = self._redis.pubsub()
-                self._listen_task = asyncio.create_task(self._listen_loop())
+                self._inbox = asyncio.Queue(maxsize=INBOX_MAXSIZE)
+                self._consumer_task = asyncio.create_task(self._consume_loop(), name="redis-quote-bus-consumer")
+                self._listen_task = asyncio.create_task(self._listen_loop(), name="redis-quote-bus-listener")
 
             await self._pubsub.subscribe(channel)
             self._subscribed_channels.add(channel)
             logger.info("Subscribed to Redis channel: %s", channel)
 
+    def _enqueue(self, channel: str, payload: Dict[str, Any]) -> None:
+        inbox = self._inbox
+        if inbox is None:
+            return
+        while True:
+            try:
+                inbox.put_nowait((channel, payload))
+                return
+            except asyncio.QueueFull:
+                try:
+                    inbox.get_nowait()
+                    self.dropped_messages += 1
+                    if self.dropped_messages % 1000 == 1:
+                        logger.warning("Redis Quote Bus inbox full; dropped %s messages so far", self.dropped_messages)
+                except asyncio.QueueEmpty:  # pragma: no cover
+                    pass
+
     async def _listen_loop(self):
+        # get_message(timeout=...) already blocks until a message or the timeout,
+        # so no extra sleep is needed (a per-message sleep capped throughput at ~100/s).
         try:
             while self._is_connected and self._pubsub:
                 message = await self._pubsub.get_message(timeout=1.0)
-                if message:
-                    if message["type"] != "message":
-                        continue
-                    channel = message["channel"]
-                    try:
-                        data = json.loads(message["data"])
-                        await self._emit_local(channel, data)
-                    except Exception:
-                        logger.exception("Failed to process Redis message on %s", channel)
-                await asyncio.sleep(0.01)
+                if not message or message.get("type") != "message":
+                    continue
+                channel = message["channel"]
+                try:
+                    data = json.loads(message["data"])
+                except Exception:
+                    logger.exception("Failed to decode Redis message on %s", channel)
+                    continue
+                self._enqueue(channel, data)
         except asyncio.CancelledError:
             pass
         except Exception:
             logger.exception("Redis Quote Bus listen loop crashed")
             self._is_connected = False
+
+    async def _consume_loop(self):
+        inbox = self._inbox
+        if inbox is None:
+            return
+        try:
+            while True:
+                channel, data = await inbox.get()
+                try:
+                    await self._emit_local(channel, data)
+                except Exception:
+                    logger.exception("Failed to process Redis message on %s", channel)
+        except asyncio.CancelledError:
+            pass
 
     async def _emit_local(self, channel: str, payload: Dict[str, Any]):
         for cb in list(self._local_listeners):

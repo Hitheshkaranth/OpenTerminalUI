@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from backend.api.deps import get_db
-from backend.db.models import Holding
+from backend.auth.deps import get_current_user
+from backend.db.models import Holding, User
 from backend.equity.services.corporate_actions import CorporateEvent, EventType, corporate_actions_service
 
 router = APIRouter()
@@ -120,11 +121,14 @@ async def get_dividend_aristocrats(market: str = "NSE", min_years: int = 3):
 
 
 @router.get("/dividends/portfolio-income")
-async def get_portfolio_dividend_income(db: Session = Depends(get_db)):
-    """Projected dividend income for the stored portfolio holdings (announced dividends x quantity)."""
+async def get_portfolio_dividend_income(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Projected dividend income for the caller's portfolio holdings (announced dividends x quantity)."""
     from backend.services.portfolio_analytics import portfolio_analytics_service
 
-    holdings = db.query(Holding).all()
+    holdings = db.query(Holding).filter(Holding.user_id == current_user.id).all()
     if not holdings:
         return {"annual_income": None, "monthly_breakdown": [], "holdings_count": 0}
     tracker = await portfolio_analytics_service.dividend_tracker(holdings, days=365)

@@ -80,7 +80,7 @@ def export_excel(sheets: Dict[str, List[Dict[str, Any]]]) -> bytes:
                 try:
                     if len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
-                except:
+                except Exception:
                     pass
             adjusted_width = (max_length + 2)
             ws.column_dimensions[column].width = min(adjusted_width, 50)

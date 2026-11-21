@@ -92,3 +92,8 @@ frontend/public/landing/uploads/
 .vite/
 # Local JWT used by scripts/capture_*.mjs
 .ot-token
+
+# Test/run artifacts
+frontend/vitest.log
+frontend/vitest-report.xml
+.playwright-cli/

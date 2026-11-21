@@ -55,10 +55,20 @@ def _make_session():
     return TestingSessionLocal()
 
 
-def _auth_headers(client: TestClient, email: str) -> dict[str, str]:
+def _auth_headers(client: TestClient, email: str, role: str = "admin") -> dict[str, str]:
+    """Register + log in. Document upload/fetch/delete are admin-only, so promote by default."""
+    from backend.models.user import User, UserRole
+
     password = "StrongPass123!"
     register = client.post("/api/auth/register", json={"email": email, "password": password, "role": "trader"})
     assert register.status_code == 200, register.text
+    session = app.state.db_session_factory()
+    try:
+        user = session.query(User).filter(User.email == email).one()
+        user.role = UserRole(role)
+        session.commit()
+    finally:
+        session.close()
     login = client.post("/api/auth/login", json={"email": email, "password": password})
     assert login.status_code == 200, login.text
     token = login.json()["access_token"]

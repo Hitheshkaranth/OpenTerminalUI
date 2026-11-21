@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-from dataclasses import asdict, dataclass
+import logging
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timedelta, timezone
 import math
 import random
@@ -18,6 +19,8 @@ from backend.core.strategy_runner import StrategyRunner
 from backend.db.models import BacktestRun
 from backend.shared.ws_manager import ws_manager
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class BacktestJobRequest:
@@ -31,6 +34,9 @@ class BacktestJobRequest:
     strategy: str = "example:sma_crossover"
     context: dict | None = None
     config: dict | None = None
+    # Submitting user; progress is delivered only to that user's sockets and
+    # status/result reads are scoped to them when a user id is supplied.
+    user_id: str | None = None
 
 
 class BacktestJobService:
@@ -44,7 +50,9 @@ class BacktestJobService:
             return
         self._worker_task = asyncio.create_task(self._worker(), name="backtest-jobs-worker")
 
-    async def submit(self, req: BacktestJobRequest) -> str:
+    async def submit(self, req: BacktestJobRequest, user_id: str | None = None) -> str:
+        if user_id is not None:
+            req = replace(req, user_id=str(user_id))
         run_id = f"bt_{uuid4().hex[:12]}"
         db = next(get_db())
         try:
@@ -69,6 +77,81 @@ class BacktestJobService:
             finally:
                 self._queue.task_done()
 
+    @staticmethod
+    async def _send_progress(user_id: str | None, message: dict) -> None:
+        """Deliver progress only to the submitting user's sockets (contract C3).
+
+        Never broadcasts to everyone: without a user id, or before the hub
+        exposes send_to_user, the progress event is simply skipped.
+        """
+        send_to_user = getattr(ws_manager, "send_to_user", None)
+        if not user_id or send_to_user is None:
+            return
+        try:
+            await send_to_user(str(user_id), message)
+        except Exception:  # progress is best-effort; never fail the job over it
+            logger.debug("backtest progress delivery failed", exc_info=True)
+
+    def _load_frame(self, req: BacktestJobRequest):
+        """Blocking: provider fetch + DataFrame build. Runs in a worker thread."""
+        service = get_historical_data_service()
+        raw_symbol = (req.asset or req.symbol)
+        if getattr(req, "timeframe", "1d") == "1d":
+            symbol, bars, market_used = self._fetch_with_market_fallback(
+                service=service,
+                raw_symbol=raw_symbol,
+                market=req.market,
+                start=req.start,
+                end=req.end,
+                limit=req.limit,
+            )
+        else:
+            # Intraday
+            symbol, bars = service.fetch_intraday_ohlcv(
+                raw_symbol=raw_symbol,
+                timeframe=req.timeframe,
+                market=req.market,
+                start=req.start,
+                end=req.end,
+                limit=req.limit,
+            )
+            market_used = req.market
+
+        frame = pd.DataFrame(
+            [
+                {
+                    "date": b.date,
+                    "open": b.open,
+                    "high": b.high,
+                    "low": b.low,
+                    "close": b.close,
+                    "volume": b.volume,
+                }
+                for b in bars
+            ]
+        )
+        if frame.empty:
+            frame = self._build_synthetic_frame(
+                start=req.start,
+                end=req.end,
+                seed_key=f"{req.market}:{req.symbol}:{req.asset or ''}",
+            )
+        if frame.empty:
+            raise ValueError("No OHLCV bars available for request")
+        return symbol, bars, market_used, frame
+
+    @staticmethod
+    def _run_engine(req: BacktestJobRequest, symbol, frame: pd.DataFrame, signals: pd.Series):
+        """Blocking: backtest engine. Runs in a worker thread."""
+        cfg = BacktestConfig(**(req.config or {}))
+        traded_asset = (req.asset or req.symbol or symbol.canonical).strip().upper()
+        return BacktestEngine(cfg).run(
+            symbol=symbol.canonical,
+            asset=traded_asset,
+            frame=frame,
+            signals=signals,
+        )
+
     async def _execute(self, run_id: str) -> None:
         db = next(get_db())
         try:
@@ -79,67 +162,21 @@ class BacktestJobService:
             row.updated_at = datetime.now(timezone.utc).isoformat()
             db.commit()
 
-            await ws_manager.broadcast_to_all({"type": "backtest_progress", "run_id": run_id, "progress": 10, "status": "fetching data"})
-
             req = BacktestJobRequest(**json.loads(row.request_json))
-            service = get_historical_data_service()
-            raw_symbol = (req.asset or req.symbol)
-            if getattr(req, "timeframe", "1d") == "1d":
-                symbol, bars, market_used = self._fetch_with_market_fallback(
-                    service=service,
-                    raw_symbol=raw_symbol,
-                    market=req.market,
-                    start=req.start,
-                    end=req.end,
-                    limit=req.limit,
-                )
-            else:
-                # Intraday
-                symbol, bars = service.fetch_intraday_ohlcv(
-                    raw_symbol=raw_symbol,
-                    timeframe=req.timeframe,
-                    market=req.market,
-                    start=req.start,
-                    end=req.end,
-                    limit=req.limit,
-                )
-                market_used = req.market
+            user_id = req.user_id
+            await self._send_progress(user_id, {"type": "backtest_progress", "run_id": run_id, "progress": 10, "status": "fetching data"})
 
-            await ws_manager.broadcast_to_all({"type": "backtest_progress", "run_id": run_id, "progress": 50, "status": "generating signals"})
+            # Provider I/O, pandas, the strategy sandbox and the engine are all
+            # blocking; keep them off the event loop.
+            symbol, bars, market_used, frame = await asyncio.to_thread(self._load_frame, req)
 
-            frame = pd.DataFrame(
-                [
-                    {
-                        "date": b.date,
-                        "open": b.open,
-                        "high": b.high,
-                        "low": b.low,
-                        "close": b.close,
-                        "volume": b.volume,
-                    }
-                    for b in bars
-                ]
-            )
-            if frame.empty:
-                frame = self._build_synthetic_frame(
-                    start=req.start,
-                    end=req.end,
-                    seed_key=f"{req.market}:{req.symbol}:{req.asset or ''}",
-                )
-            if frame.empty:
-                raise ValueError("No OHLCV bars available for request")
-            strategy_out = self._runner.run(req.strategy, frame, context=req.context or {})
+            await self._send_progress(user_id, {"type": "backtest_progress", "run_id": run_id, "progress": 50, "status": "generating signals"})
 
-            await ws_manager.broadcast_to_all({"type": "backtest_progress", "run_id": run_id, "progress": 80, "status": "running backtest"})
+            strategy_out = await asyncio.to_thread(self._runner.run, req.strategy, frame, req.context or {})
 
-            cfg = BacktestConfig(**(req.config or {}))
-            traded_asset = (req.asset or req.symbol or symbol.canonical).strip().upper()
-            result = BacktestEngine(cfg).run(
-                symbol=symbol.canonical,
-                asset=traded_asset,
-                frame=frame,
-                signals=strategy_out.signals,
-            )
+            await self._send_progress(user_id, {"type": "backtest_progress", "run_id": run_id, "progress": 80, "status": "running backtest"})
+
+            result = await asyncio.to_thread(self._run_engine, req, symbol, frame, strategy_out.signals)
             row.result_json = result.model_dump_json()
             market_note = ""
             if market_used != req.market:
@@ -152,8 +189,9 @@ class BacktestJobService:
             row.updated_at = datetime.now(timezone.utc).isoformat()
             db.commit()
 
-            await ws_manager.broadcast_to_all({"type": "backtest_progress", "run_id": run_id, "progress": 100, "status": "done"})
+            await self._send_progress(user_id, {"type": "backtest_progress", "run_id": run_id, "progress": 100, "status": "done"})
         except Exception as exc:
+            db.rollback()
             row = db.query(BacktestRun).filter(BacktestRun.run_id == run_id).first()
             if row is not None:
                 row.status = "failed"
@@ -242,21 +280,35 @@ class BacktestJobService:
             d += timedelta(days=1)
         return pd.DataFrame(rows)
 
-    async def get_status(self, run_id: str) -> dict[str, str]:
+    @staticmethod
+    def _row_owner(row: BacktestRun) -> str | None:
+        try:
+            owner = json.loads(row.request_json or "{}").get("user_id")
+        except (TypeError, ValueError, AttributeError):
+            return None
+        return str(owner) if owner is not None else None
+
+    def _visible(self, row: BacktestRun | None, user_id: str | None) -> bool:
+        """A run is visible when no user scope is requested or it belongs to that user."""
+        if row is None:
+            return False
+        return user_id is None or self._row_owner(row) == str(user_id)
+
+    async def get_status(self, run_id: str, user_id: str | None = None) -> dict[str, str]:
         db = next(get_db())
         try:
             row = db.query(BacktestRun).filter(BacktestRun.run_id == run_id).first()
-            if row is None:
+            if not self._visible(row, user_id):
                 return {"run_id": run_id, "status": "not_found"}
             return {"run_id": run_id, "status": row.status}
         finally:
             db.close()
 
-    async def get_result(self, run_id: str) -> dict:
+    async def get_result(self, run_id: str, user_id: str | None = None) -> dict:
         db = next(get_db())
         try:
             row = db.query(BacktestRun).filter(BacktestRun.run_id == run_id).first()
-            if row is None:
+            if not self._visible(row, user_id):
                 return {"run_id": run_id, "status": "not_found"}
             payload = json.loads(row.result_json) if row.result_json else None
             return {

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
@@ -19,6 +20,10 @@ from backend.models import (
 from backend.paper_trading import get_paper_engine
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+_LIST_LIMIT_DEFAULT = 200
+_LIST_LIMIT_MAX = 1000
 
 
 class PortfolioCreateRequest(BaseModel):
@@ -160,9 +165,14 @@ async def place_virtual_order(
         order_payload.update(symbol=symbol, side=side, order_type=order_type)
         try:
             preflight = await build_preflight(db, current_user.id, order_payload)
-        except (ValueError, TypeError, OverflowError) as exc:
+        except ValueError as exc:
+            # Curated risk-policy reasons the trader needs to see.
             db.rollback()
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except (TypeError, OverflowError) as exc:
+            db.rollback()
+            logger.exception("Paper order preflight failed for %s", symbol)
+            raise HTTPException(status_code=422, detail="Order could not be risk-checked") from exc
         row.signal_metadata = {"risk_order": order_payload, "preflight": preflight, "paper_only": True}
     db.add(row)
     db.commit()
@@ -226,6 +236,8 @@ def get_positions(
 @router.get("/paper/portfolios/{portfolio_id}/orders")
 def get_orders(
     portfolio_id: str,
+    limit: int = Query(default=_LIST_LIMIT_DEFAULT, ge=1, le=_LIST_LIMIT_MAX),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
@@ -233,7 +245,9 @@ def get_orders(
     rows = (
         db.query(VirtualOrder)
         .filter(VirtualOrder.portfolio_id == portfolio_id)
-        .order_by(VirtualOrder.created_at.desc())
+        .order_by(VirtualOrder.created_at.desc(), VirtualOrder.id.desc())
+        .offset(offset)
+        .limit(limit)
         .all()
     )
     return {
@@ -262,6 +276,8 @@ def get_orders(
 @router.get("/paper/portfolios/{portfolio_id}/trades")
 def get_trades(
     portfolio_id: str,
+    limit: int = Query(default=_LIST_LIMIT_DEFAULT, ge=1, le=_LIST_LIMIT_MAX),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
@@ -269,7 +285,9 @@ def get_trades(
     rows = (
         db.query(VirtualTrade)
         .filter(VirtualTrade.portfolio_id == portfolio_id)
-        .order_by(VirtualTrade.timestamp.desc())
+        .order_by(VirtualTrade.timestamp.desc(), VirtualTrade.id.desc())
+        .offset(offset)
+        .limit(limit)
         .all()
     )
     return {

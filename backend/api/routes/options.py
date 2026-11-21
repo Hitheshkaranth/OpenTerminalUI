@@ -1,6 +1,8 @@
 """Option chain and options analytics endpoints."""
 from __future__ import annotations
 
+import logging
+
 from dataclasses import asdict
 from datetime import date, timedelta
 
@@ -11,6 +13,7 @@ from backend.adapters.registry import get_adapter_registry
 from backend.fno.services.option_chain_fetcher import get_option_chain_fetcher
 
 router = APIRouter(prefix="/api/options", tags=["options"])
+logger = logging.getLogger(__name__)
 
 
 class GreeksRequest(BaseModel):
@@ -84,8 +87,11 @@ async def get_option_chain(
                 "max_pain": chain.max_pain,
                 "timestamp": chain.timestamp,
             }
+        except HTTPException:
+            raise
         except Exception as e:
-            raise HTTPException(500, f"Error fetching mock option chain: {str(e)}")
+            logger.exception("Error fetching mock option chain")
+            raise HTTPException(500, "Error fetching mock option chain") from e
 
     fetcher = get_option_chain_fetcher()
     try:
@@ -93,8 +99,11 @@ async def get_option_chain(
         if not result.get("strikes"):
              raise HTTPException(404, f"No option chain found for {underlying}")
         return result
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(500, f"Error fetching option chain: {str(e)}")
+        logger.exception("Error fetching option chain")
+        raise HTTPException(500, "Error fetching option chain") from e
 
 
 @router.get("/expirations/{underlying}")
@@ -105,4 +114,5 @@ async def get_available_expiries(underlying: str):
         items = await fetcher.get_expiry_dates(underlying.upper())
         return {"underlying": underlying.upper(), "expiries": items}
     except Exception as e:
-        raise HTTPException(500, f"Error fetching expiries: {str(e)}")
+        logger.exception("Error fetching expiries")
+        raise HTTPException(500, "Error fetching expiries") from e

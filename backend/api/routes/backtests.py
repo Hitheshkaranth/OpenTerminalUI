@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
+
 import asyncio
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from backend.auth.deps import get_current_user
 from backend.core.backtest_analytics import compute_full_analytics
 from backend.core.backtest_robustness import permutation_test, multi_window_robustness
 from backend.core.data_store import list_store_items, write_equity_curve
@@ -20,6 +23,7 @@ from backend.core.walk_forward import run_walk_forward_validation
 from backend.services.backtest_jobs import BacktestJobRequest, get_backtest_job_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class BacktestSubmitPayload(BaseModel):
@@ -110,10 +114,10 @@ class FactorPayload(BaseModel):
     factors: list[dict[str, Any]] | None = None
 
 
-async def _resolve_finished_result(run_id: str | None) -> dict[str, Any]:
+async def _resolve_finished_result(run_id: str | None, user_id: str | None) -> dict[str, Any]:
     if not run_id:
         raise HTTPException(status_code=400, detail="run_id is required")
-    result = await get_backtest_job_service().get_result(run_id)
+    result = await get_backtest_job_service().get_result(run_id, user_id=user_id)
     if result.get("status") == "not_found":
         raise HTTPException(status_code=404, detail="Backtest run not found")
     if result.get("status") != "done":
@@ -130,7 +134,7 @@ async def list_strategies() -> list[dict[str, Any]]:
 
 
 @router.post("/backtests")
-async def submit_backtest(payload: BacktestSubmitPayload) -> dict[str, str]:
+async def submit_backtest(payload: BacktestSubmitPayload, current_user=Depends(get_current_user)) -> dict[str, str]:
     service = get_backtest_job_service()
     run_id = await service.submit(
         BacktestJobRequest(
@@ -143,13 +147,14 @@ async def submit_backtest(payload: BacktestSubmitPayload) -> dict[str, str]:
             strategy=payload.strategy,
             context=payload.context,
             config=payload.config,
-        )
+        ),
+        user_id=str(current_user.id),
     )
     return {"run_id": run_id, "status": "queued"}
 
 
 @router.post("/backtests/compare")
-async def compare_strategies(payload: ComparePayload) -> dict[str, Any]:
+async def compare_strategies(payload: ComparePayload, current_user=Depends(get_current_user)) -> dict[str, Any]:
     service = get_backtest_job_service()
     catalog = get_strategy_catalog()
     catalog_by_key = {str(item.get("key", "")).strip().lower(): item for item in catalog}
@@ -173,23 +178,24 @@ async def compare_strategies(payload: ComparePayload) -> dict[str, Any]:
                 strategy=f"example:{key}",
                 context=default_context,
                 config=payload.config,
-            )
+            ),
+            user_id=str(current_user.id),
         )
         run_ids[key] = run_id
     return {"run_ids": run_ids, "status": "queued"}
 
 
 @router.get("/backtests/{run_id}/status")
-async def backtest_status(run_id: str) -> dict[str, str]:
-    status = await get_backtest_job_service().get_status(run_id)
+async def backtest_status(run_id: str, current_user=Depends(get_current_user)) -> dict[str, str]:
+    status = await get_backtest_job_service().get_status(run_id, user_id=str(current_user.id))
     if status.get("status") == "not_found":
         raise HTTPException(status_code=404, detail="Backtest run not found")
     return status
 
 
 @router.get("/backtests/{run_id}/result")
-async def backtest_result(run_id: str) -> dict[str, Any]:
-    result = await get_backtest_job_service().get_result(run_id)
+async def backtest_result(run_id: str, current_user=Depends(get_current_user)) -> dict[str, Any]:
+    result = await get_backtest_job_service().get_result(run_id, user_id=str(current_user.id))
     if result.get("status") == "not_found":
         raise HTTPException(status_code=404, detail="Backtest run not found")
     return result
@@ -200,13 +206,14 @@ async def backtest_analytics(
     run_id: str,
     rolling_window: int = 60,
     histogram_bins: int = 50,
+    current_user=Depends(get_current_user),
 ) -> dict[str, Any]:
     if rolling_window < 10 or rolling_window > 252:
         raise HTTPException(status_code=400, detail="rolling_window must be between 10 and 252")
     if histogram_bins < 10 or histogram_bins > 200:
         raise HTTPException(status_code=400, detail="histogram_bins must be between 10 and 200")
 
-    payload = await _resolve_finished_result(run_id)
+    payload = await _resolve_finished_result(run_id, str(current_user.id))
 
     analytics = compute_full_analytics(
         equity_curve=payload.get("equity_curve", []),
@@ -223,6 +230,7 @@ async def backtest_robustness(
     n_permutations: int = 500,
     n_windows: int = 5,
     metric: str = "sharpe",
+    current_user=Depends(get_current_user),
 ) -> dict[str, Any]:
     if n_permutations < 50 or n_permutations > 2000:
         raise HTTPException(status_code=400, detail="n_permutations must be between 50 and 2000")
@@ -231,7 +239,7 @@ async def backtest_robustness(
     if metric not in ("sharpe", "total_return"):
         raise HTTPException(status_code=400, detail="metric must be 'sharpe' or 'total_return'")
 
-    payload = await _resolve_finished_result(run_id)
+    payload = await _resolve_finished_result(run_id, str(current_user.id))
     equity_curve = payload.get("equity_curve", [])
     return {
         "run_id": run_id,
@@ -262,26 +270,27 @@ async def vectorized_backtest_sweep(payload: VectorizedSweepPayload) -> dict[str
     try:
         sweep = await asyncio.to_thread(_work)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Vectorized sweep failed: {e}")
+        logger.exception("Vectorized sweep failed")
+        raise HTTPException(status_code=500, detail="Vectorized sweep failed") from e
     return {"symbol": payload.symbol, "market": payload.market, "strategy": strategy, "sweep": sweep}
 
 
 # Pro v1 compatibility endpoints (blueprint adapter layer)
 @router.post("/v1/backtest/submit", response_model=BacktestStatusResponse)
-async def v1_submit_backtest(payload: BacktestSubmitPayload) -> BacktestStatusResponse:
-    response = await submit_backtest(payload)
+async def v1_submit_backtest(payload: BacktestSubmitPayload, current_user=Depends(get_current_user)) -> BacktestStatusResponse:
+    response = await submit_backtest(payload, current_user)
     return BacktestStatusResponse(**response)
 
 
 @router.get("/v1/backtest/status/{run_id}", response_model=BacktestStatusResponse)
-async def v1_backtest_status(run_id: str) -> BacktestStatusResponse:
-    response = await backtest_status(run_id)
+async def v1_backtest_status(run_id: str, current_user=Depends(get_current_user)) -> BacktestStatusResponse:
+    response = await backtest_status(run_id, current_user)
     return BacktestStatusResponse(**response)
 
 
 @router.get("/v1/backtest/result/{run_id}", response_model=BacktestResultResponse)
-async def v1_backtest_result(run_id: str) -> BacktestResultResponse:
-    response = await backtest_result(run_id)
+async def v1_backtest_result(run_id: str, current_user=Depends(get_current_user)) -> BacktestResultResponse:
+    response = await backtest_result(run_id, current_user)
     return BacktestResultResponse(**response)
 
 
@@ -291,8 +300,8 @@ async def v1_backtest_presets() -> dict[str, Any]:
 
 
 @router.post("/v1/backtest/validate/walkforward")
-async def v1_validate_walkforward(payload: WalkForwardPayload) -> dict[str, Any]:
-    result = await _resolve_finished_result(payload.run_id)
+async def v1_validate_walkforward(payload: WalkForwardPayload, current_user=Depends(get_current_user)) -> dict[str, Any]:
+    result = await _resolve_finished_result(payload.run_id, str(current_user.id))
     return {
         "run_id": payload.run_id,
         "validation": run_walk_forward_validation(
@@ -304,8 +313,8 @@ async def v1_validate_walkforward(payload: WalkForwardPayload) -> dict[str, Any]
 
 
 @router.post("/v1/backtest/simulate/montecarlo")
-async def v1_simulate_montecarlo(payload: MonteCarloPayload) -> dict[str, Any]:
-    result = await _resolve_finished_result(payload.run_id)
+async def v1_simulate_montecarlo(payload: MonteCarloPayload, current_user=Depends(get_current_user)) -> dict[str, Any]:
+    result = await _resolve_finished_result(payload.run_id, str(current_user.id))
     equity = result.get("equity_curve", [])
     daily_returns = result.get("daily_returns") or []
     initial_equity = float(result.get("initial_cash", 0.0) or 0.0)
@@ -374,8 +383,8 @@ async def v1_portfolio_submit(payload: PortfolioSubmitPayload) -> dict[str, Any]
 
 
 @router.post("/v1/backtest/factor/decompose")
-async def v1_factor_decompose(payload: FactorPayload) -> dict[str, Any]:
-    result = await _resolve_finished_result(payload.run_id)
+async def v1_factor_decompose(payload: FactorPayload, current_user=Depends(get_current_user)) -> dict[str, Any]:
+    result = await _resolve_finished_result(payload.run_id, str(current_user.id))
     daily_returns = result.get("daily_returns") or []
     if not daily_returns:
         equity = result.get("equity_curve", [])
@@ -388,8 +397,8 @@ async def v1_factor_decompose(payload: FactorPayload) -> dict[str, Any]:
 
 
 @router.post("/v1/backtest/data/store/{run_id}")
-async def v1_data_store_run(run_id: str) -> dict[str, Any]:
-    result = await _resolve_finished_result(run_id)
+async def v1_data_store_run(run_id: str, current_user=Depends(get_current_user)) -> dict[str, Any]:
+    result = await _resolve_finished_result(run_id, str(current_user.id))
     stored = write_equity_curve(run_id=run_id, equity_curve=result.get("equity_curve", []))
     return {"status": "ok", "stored": stored}
 

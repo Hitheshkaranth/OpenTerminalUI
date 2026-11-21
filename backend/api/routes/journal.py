@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import logging
 from collections import defaultdict
 from datetime import datetime
 from typing import Any
@@ -16,7 +17,11 @@ from backend.models import JournalEntry, User
 
 router = APIRouter(prefix="/api/journal", tags=["journal"])
 
+logger = logging.getLogger(__name__)
+
 _ALLOWED_DIRECTIONS = {"LONG", "SHORT"}
+_LIST_LIMIT_DEFAULT = 200
+_LIST_LIMIT_MAX = 1000
 _DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
@@ -240,6 +245,8 @@ def list_journal_entries(
     start: datetime | None = Query(default=None),
     end: datetime | None = Query(default=None),
     tags: str | None = Query(default=None),
+    limit: int = Query(default=_LIST_LIMIT_DEFAULT, ge=1, le=_LIST_LIMIT_MAX),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, list[dict[str, Any]]]:
@@ -254,10 +261,14 @@ def list_journal_entries(
         query = query.filter(JournalEntry.entry_date >= start)
     if end:
         query = query.filter(JournalEntry.entry_date <= end)
-    rows = query.order_by(JournalEntry.entry_date.desc(), JournalEntry.id.desc()).all()
+    query = query.order_by(JournalEntry.entry_date.desc(), JournalEntry.id.desc())
     tag_filters = _normalize_tags(tags.split(",")) if tags else []
     if tag_filters:
-        rows = [row for row in rows if all(tag in (row.tags or []) for tag in tag_filters)]
+        # Tags are a JSON list; filter in Python, then page the filtered result.
+        rows = [row for row in query.all() if all(tag in (row.tags or []) for tag in tag_filters)]
+        rows = rows[offset : offset + limit]
+    else:
+        rows = query.offset(offset).limit(limit).all()
     return {"entries": [_serialize_entry(row) for row in rows]}
 
 
@@ -400,7 +411,11 @@ async def import_journal_csv(
                 rating=int(record["rating"]) if str(record.get("rating") or "").strip() else None,
             )
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=f"Invalid CSV row {line_no}: {exc}") from exc
+            logger.info("Rejected journal CSV row %s: %s", line_no, type(exc).__name__)
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid CSV row {line_no}: check symbol, direction, dates (ISO 8601) and numeric fields",
+            ) from exc
 
         pnl, pnl_pct = _compute_pnl(payload.direction, payload.entry_price, payload.exit_price, payload.quantity, payload.fees)
         row = JournalEntry(

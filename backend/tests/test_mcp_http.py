@@ -123,7 +123,9 @@ def test_raising_handler_returns_ok_false_not_500(monkeypatch):
     assert res.status_code == 200
     body = res.json()
     assert body["ok"] is False
-    assert body["error"]["message"] == "kaboom"
+    # Internal exception text is logged, not returned (SEC-21).
+    assert body["error"]["message"] == "Tool boom failed (RuntimeError)"
+    assert "kaboom" not in res.text
 
 
 def test_manifest_reports_tool_count_and_permissions():

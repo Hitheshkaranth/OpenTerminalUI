@@ -9,6 +9,7 @@ Building it without a principal yields the anonymous, read-only market tools.
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 import mcp.types as types
@@ -19,6 +20,12 @@ from backend.agent.tools.envelope import ensure_envelope
 from backend.agent.tools.registry import ToolRegistry
 from backend.mcp import prompts as prompt_lib
 from backend.mcp import resources as resource_lib
+
+logger = logging.getLogger(__name__)
+
+# Our own tools raise these with user-safe messages; other exception text may
+# carry library internals, so it is logged rather than returned to the client.
+_SAFE_TOOL_ERRORS = (ValueError, LookupError, PermissionError, TimeoutError)
 
 SERVER_NAME = "openterminalui"
 
@@ -44,7 +51,11 @@ async def call_tool_for(
     except KeyError:
         result = {"error": f"unknown tool: {name}"}
     except Exception as exc:  # tool failures are returned to the MCP client
-        result = {"error": str(exc)}
+        if isinstance(exc, _SAFE_TOOL_ERRORS):
+            result = {"error": str(exc)}
+        else:
+            logger.exception("MCP tool %s failed", name)
+            result = {"error": f"Tool {name} failed ({type(exc).__name__})"}
     return [types.TextContent(type="text", text=json.dumps(ensure_envelope(result), default=str))]
 
 

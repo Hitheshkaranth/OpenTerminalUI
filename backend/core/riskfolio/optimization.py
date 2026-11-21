@@ -178,7 +178,7 @@ def efficient_frontier(returns, *, points=20, rf=0.0, min_weight=0.0, max_weight
                 "return": res["metrics"]["expected_return"],
                 "sharpe": res["metrics"]["sharpe"]
             })
-        except:
+        except Exception:
             continue
             
     return sorted(frontier, key=lambda x: x["risk"])

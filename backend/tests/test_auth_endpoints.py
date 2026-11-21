@@ -126,7 +126,9 @@ def test_role_authorization() -> None:
     assert allowed.status_code == 200
 
 
-def test_forgot_access_resets_password_and_revokes_refresh_tokens() -> None:
+def test_forgot_access_resets_password_and_revokes_refresh_tokens(caplog) -> None:
+    # SEC-1: forgot-access no longer sets a password directly; it issues a
+    # single-use reset token (logged for the operator), redeemed via /reset-password.
     app, SessionLocal = _build_test_app()
     client = TestClient(app)
     email = "u5@example.com"
@@ -134,8 +136,16 @@ def test_forgot_access_resets_password_and_revokes_refresh_tokens() -> None:
     new_password = "newpassword123"
     tokens = _register_and_login(client, email=email, password=old_password)
 
-    reset = client.post("/api/auth/forgot-access", json={"email": email, "new_password": new_password})
+    with caplog.at_level("WARNING", logger="backend.equity.routes.auth"):
+        reset = client.post("/api/auth/forgot-access", json={"email": email, "new_password": new_password})
     assert reset.status_code == 204
+    assert reset.content == b""
+    # The request alone changes nothing.
+    assert client.post("/api/auth/login", json={"email": email, "password": old_password}).status_code == 200
+
+    token = next(r.args[-1] for r in caplog.records if "Password reset requested" in r.getMessage())
+    done = client.post("/api/auth/reset-password", json={"token": token, "new_password": new_password})
+    assert done.status_code == 204
 
     old_login = client.post("/api/auth/login", json={"email": email, "password": old_password})
     assert old_login.status_code == 401
@@ -155,6 +165,7 @@ def test_forgot_access_resets_password_and_revokes_refresh_tokens() -> None:
             .filter(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))
             .count()
         )
-        assert active_tokens == 1
+        # Replaying the revoked refresh token above revoked the whole family (SEC-17).
+        assert active_tokens == 0
     finally:
         db.close()

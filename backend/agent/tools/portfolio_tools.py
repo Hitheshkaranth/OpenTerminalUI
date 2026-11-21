@@ -17,12 +17,12 @@ from backend.shared.db import SessionLocal
 # ---------------------------------------------------------------------------
 
 def _holdings_snapshot(user_id: str) -> dict[str, Any]:
-    """Legacy ``holdings`` table has no user_id — return all rows."""
+    """Holdings owned by *user_id*; no user means an empty portfolio, never everyone's rows."""
     from backend.db.models import Holding
 
     db = SessionLocal()
     try:
-        holdings = db.query(Holding).all()
+        holdings = db.query(Holding).filter(Holding.user_id == user_id).all() if user_id else []
         total_cost = 0.0
         total_value = 0.0
         items = []
@@ -179,7 +179,7 @@ def portfolio_tool_specs(user_id: str) -> list[ToolSpec]:
     """Return the six read-only portfolio-aware tool specs for *user_id*."""
 
     def _get_portfolio(args: dict[str, Any]) -> dict[str, Any]:
-        # read-only; user_id scoping handled by caller (legacy holdings have no user_id → all rows)
+        # read-only; scoped to the acting user's holdings
         return _holdings_snapshot(user_id)
 
     def _get_paper_positions(args: dict[str, Any]) -> dict[str, Any]:

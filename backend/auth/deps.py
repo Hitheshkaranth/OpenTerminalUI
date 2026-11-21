@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import re
 from typing import Callable
 
 from fastapi import Depends, HTTPException, Request, status
@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.api.deps import get_db
 from backend.auth.jwt import decode_token
+from backend.config.security import auth_middleware_disabled, dev_auth_bypass_enabled, is_development_env
 from backend.models.user import User, UserRole
 
 security = HTTPBearer(auto_error=False)
@@ -69,25 +70,14 @@ def get_current_user(
     if existing is not None:
         return existing
 
-    # SECURITY: Dev-auth is ONLY allowed when OPENTERMINALUI_ENV is explicitly
-    # set to a development value.  This prevents the e2e dev-auth bypass from
-    # being accidentally (or maliciously) enabled in production.
-    _DEV_ENV_NAMES = {"dev", "development", "local", "test", "testing"}
-    _runtime_env = (
-        os.getenv("OPENTERMINALUI_ENV")
-        or os.getenv("APP_ENV")
-        or os.getenv("ENV")
-        or "development"
-    ).strip().lower()
-    _is_dev_env = _runtime_env in _DEV_ENV_NAMES
-
     # e2e dev-auth: the Playwright stack runs the backend with E2E_DEV_AUTH=1
     # and the frontend sends unsigned dev tokens the backend can't verify.
     # Resolve to a persisted dev user instead of 401 -- otherwise the frontend
     # treats the 401 as a session expiry, refreshes the dev token, fails, and
     # logs the user out, breaking every page that calls an authed endpoint.
-    # SECURITY: only allowed in development environments.
-    if _is_dev_env and os.environ.get("E2E_DEV_AUTH") == "1":
+    # SECURITY: honoured only when OPENTERMINALUI_ENV is explicitly a development
+    # value (unset == production); see backend.config.security.
+    if dev_auth_bypass_enabled():
         user = _get_or_create_dev_user(db)
         request.state.current_user = user
         return user
@@ -96,11 +86,7 @@ def get_current_user(
     # tests that patch AUTH_MIDDLEWARE_ENABLED=0 don't fail on direct
     # dependency auth.
     # SECURITY: this fallback also requires a dev environment.
-    if (
-        os.environ.get("AUTH_MIDDLEWARE_ENABLED", "1") != "1"
-        and str(getattr(request.url, "path", "")).startswith("/api/risk")
-        and _is_dev_env
-    ):
+    if str(getattr(request.url, "path", "")).startswith("/api/risk") and auth_middleware_disabled():
         user = User(
             id="dev-user",
             email="dev@example.com",
@@ -134,6 +120,17 @@ def require_role(required_role: str) -> Callable:
     return _dep
 
 
+_AUTH_EXEMPT_PATHS = frozenset(
+    {
+        "/api/auth/login",
+        "/api/auth/register",
+        "/api/auth/refresh",
+        "/api/auth/forgot-access",
+        "/api/auth/reset-password",
+    }
+)
+
+
 def auth_exempt_path(path: str) -> bool:
     """Return True if the given path is exempt from authentication.
 
@@ -141,24 +138,19 @@ def auth_exempt_path(path: str) -> bool:
     ``/api/v1`` which bypassed auth for the entire ``/api/v1`` namespace.
     Now it uses an explicit allowlist of specific route patterns only.
     """
-    # Health / docs
-    if path in {"/health", "/healthz", "/metrics-lite", "/docs", "/openapi.json", "/redoc"}:
+    # Health
+    if path in {"/health", "/healthz", "/metrics-lite"}:
         return True
+    # Interactive API docs leak the full route surface; only exempt them in development.
+    if path in {"/docs", "/openapi.json", "/redoc"}:
+        return is_development_env()
 
-    # Auth endpoints - specific routes only (not /api/v1/auth/...)
-    if path in {"/api/auth/login", "/api/auth/register", "/api/auth/refresh", "/api/auth/forgot-access"}:
-        return True
-    if path.startswith("/api/auth/") and path in {
-        "/api/auth/login",
-        "/api/auth/register",
-        "/api/auth/refresh",
-        "/api/auth/forgot-access",
-    }:
+    # Auth endpoints - exact routes only (not /api/v1/auth/..., not /api/auth/admin/...)
+    if path in _AUTH_EXEMPT_PATHS:
         return True
 
     # An unguessable token grants read-only access to one frozen research snapshot.
     # Exact shape only: never exempt the dossier collection, mutations, or nested paths.
-    import re
     if re.fullmatch(r"/api/research/dossiers/shared/[A-Za-z0-9_-]{43}", path):
         return True
 

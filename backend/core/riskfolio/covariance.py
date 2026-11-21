@@ -20,7 +20,7 @@ def estimate_covariance(returns, method: str = "sample") -> np.ndarray:
     if method == "ledoit_wolf":
         try:
             cov = LedoitWolf().fit(returns.values).covariance_
-        except:
+        except Exception:
             cov = returns.cov().values
     elif method == "ewma":
         # exponentially-weighted covariance; use returns.ewm(span=60).cov() last block

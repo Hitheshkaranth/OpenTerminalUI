@@ -9,7 +9,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from types import SimpleNamespace
+
 from backend.api.deps import get_db
+from backend.auth.deps import get_current_user
 from backend.api.routes.portfolio import router as portfolio_router
 from backend.models import Holding
 from backend.shared.db import Base
@@ -35,7 +38,11 @@ def _build_client():
             db.close()
 
     app.dependency_overrides[get_db] = _db_override
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id=TEST_USER_ID, role="trader")
     return TestClient(app), SessionLocal
+
+
+TEST_USER_ID = "test-user"
 
 
 def test_import_append_with_invalid_rows():
@@ -76,7 +83,7 @@ def test_import_replace_clears_prior():
 
     # Seed existing holding
     db = SessionLocal()
-    db.add(Holding(ticker="OLD", quantity=1, avg_buy_price=100.0, buy_date="2025-01-01"))
+    db.add(Holding(user_id=TEST_USER_ID, ticker="OLD", quantity=1, avg_buy_price=100.0, buy_date="2025-01-01"))
     db.commit()
     db.close()
 

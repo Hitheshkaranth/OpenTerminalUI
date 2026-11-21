@@ -11,6 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.services.lm_studio_client import LMStudioError, get_lm_studio_client, parse_json_response
+from backend.shared.http_client import shared_session
 
 _CATALYST_WORDS = {
     "earnings",
@@ -254,7 +255,7 @@ async def fetch_public_filings(symbol: str, market: str, limit: int = 5) -> list
     if not url:
         return []
     try:
-        async with httpx.AsyncClient(timeout=8.0, headers={"User-Agent": "OpenTerminalUI contact@example.com"}, trust_env=False) as client:
+        async with shared_session(timeout=8.0, headers={"User-Agent": "OpenTerminalUI contact@example.com"}) as client:
             resp = await client.get(url)
             resp.raise_for_status()
             payload = resp.json()

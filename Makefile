@@ -17,7 +17,7 @@ seed-admin:
 setup: setup-backend setup-frontend
 
 setup-backend:
-	cd backend && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && pip install pytest
+	cd backend && python -m venv .venv && source .venv/bin/activate && pip install -r requirements-dev.txt
 
 setup-frontend:
 	cd frontend && npm install

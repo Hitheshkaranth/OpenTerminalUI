@@ -1,10 +1,12 @@
-from typing import List, Dict, Union
+from typing import List, Dict, Optional, Union
 from pydantic import BaseModel
 
 
 class RiskSummary(BaseModel):
     ewma_vol: float
-    beta: float
+    # None when the benchmark series could not be loaded (never a fabricated 1.0).
+    beta: Optional[float] = None
+    benchmark_unavailable: bool = False
     marginal_contribution: Dict[str, float]
 
 

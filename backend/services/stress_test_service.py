@@ -193,13 +193,16 @@ class StressTestService:
                 return scenario
         raise KeyError(normalized)
 
-    def resolve_portfolio_holdings(self, db: Session, portfolio_id: str) -> tuple[list[Holding], str]:
+    def resolve_portfolio_holdings(
+        self, db: Session, portfolio_id: str, *, user_id: str | None = None
+    ) -> tuple[list[Holding], str]:
+        """Holdings owned by *user_id*. Without a user there is nothing to scope to, so none."""
         normalized = self._normalize_portfolio_id(portfolio_id)
         if normalized not in {"current", "portfolio", "default", ""}:
             portfolio = db.query(PortfolioDefinition).filter(PortfolioDefinition.id == portfolio_id).first()
             if portfolio is None:
                 raise LookupError("Portfolio not found")
-        holdings = db.query(Holding).all()
+        holdings = db.query(Holding).filter(Holding.user_id == user_id).all() if user_id else []
         if not holdings:
             raise LookupError("No holdings available")
         return holdings, normalized or "current"
@@ -210,8 +213,10 @@ class StressTestService:
         portfolio_id: str,
         scenario_key: str,
         custom_params: dict[str, float] | None = None,
+        *,
+        user_id: str | None = None,
     ) -> StressResult:
-        holdings, resolved_portfolio = self.resolve_portfolio_holdings(db, portfolio_id)
+        holdings, resolved_portfolio = self.resolve_portfolio_holdings(db, portfolio_id, user_id=user_id)
         if self._normalize_key(scenario_key) == "custom":
             scenario_name = "Custom Stress Scenario"
             shocks = self._normalize_custom_params(custom_params or {})
@@ -280,8 +285,10 @@ class StressTestService:
         db: Session,
         portfolio_id: str,
         scenario_key: str,
+        *,
+        user_id: str | None = None,
     ) -> ReplayResult:
-        holdings, resolved_portfolio = self.resolve_portfolio_holdings(db, portfolio_id)
+        holdings, resolved_portfolio = self.resolve_portfolio_holdings(db, portfolio_id, user_id=user_id)
         scenario = self.get_scenario(scenario_key)
         impacts = [self._impact_for_holding(h, scenario.shocks) for h in holdings]
         starting_value = sum(item.current_value for item in impacts)

@@ -20,3 +20,26 @@ backend/.env
 .env
 .env.*
 !.env.example
+
+# Local state / artefacts that must never ship in the image (SEC-5).
+# Patterns are anchored at the context root, so "**/" is needed to match in subdirs.
+**/*.db
+**/*.db-wal
+**/*.db-shm
+**/*.sqlite*
+.venv*/
+output/
+data/bars/
+data/cache/
+data/backtest_store/
+.playwright-cli/
+assets/screenshots/
+test-results/
+coverage.xml
+pytest-report.xml
+.coverage
+**/node_modules/
+.swarm/
+.forge/
+build/
+dist/

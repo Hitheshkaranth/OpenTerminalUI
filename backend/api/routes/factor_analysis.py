@@ -38,9 +38,9 @@ def _validate_portfolio_id(db: Session, portfolio_id: str) -> None:
         raise HTTPException(status_code=404, detail="Portfolio not found")
 
 
-async def _load_factor_context(db: Session, portfolio_id: str, period: str) -> dict[str, Any]:
+async def _load_factor_context(db: Session, portfolio_id: str, period: str, user_id: str) -> dict[str, Any]:
     _validate_portfolio_id(db, portfolio_id)
-    holdings = db.query(Holding).all()
+    holdings = db.query(Holding).filter(Holding.user_id == user_id).all()
     if not holdings:
         raise HTTPException(status_code=404, detail="No holdings available")
 
@@ -134,9 +134,9 @@ async def _load_factor_context(db: Session, portfolio_id: str, period: str) -> d
 async def get_factor_exposures(
     portfolio_id: str = Query(default="current"),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    context = await _load_factor_context(db, portfolio_id, "1Y")
+    context = await _load_factor_context(db, portfolio_id, "1Y", current_user.id)
     exposures = _engine.compute_factor_exposures(context["holdings"], context["universe_data"])
     return {"exposures": exposures}
 
@@ -146,9 +146,9 @@ async def get_factor_attribution(
     portfolio_id: str = Query(default="current"),
     period: str = Query(default="1Y", pattern="^(3M|6M|1Y|3Y)$"),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    context = await _load_factor_context(db, portfolio_id, period)
+    context = await _load_factor_context(db, portfolio_id, period, current_user.id)
     factor_returns = _engine.compute_factor_returns(context["universe_data"], period=period)
     _engine.compute_factor_exposures(context["holdings"], context["universe_data"])
     return _engine.attribute_returns(context["holdings"], factor_returns, period)
@@ -160,9 +160,9 @@ async def get_factor_history(
     period: str = Query(default="1Y", pattern="^(3M|6M|1Y|3Y)$"),
     window: int = Query(default=60, ge=20, le=252),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    context = await _load_factor_context(db, portfolio_id, period)
+    context = await _load_factor_context(db, portfolio_id, period, current_user.id)
     series = _engine.rolling_exposures(context["holdings"], context["universe_data"], window=window)
     return {"series": series}
 
@@ -171,9 +171,9 @@ async def get_factor_history(
 async def get_factor_returns(
     period: str = Query(default="1Y", pattern="^(3M|6M|1Y|3Y)$"),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    context = await _load_factor_context(db, "current", period)
+    context = await _load_factor_context(db, "current", period, current_user.id)
     factors = _engine.compute_factor_returns(context["universe_data"], period=period)
     dates = _engine.factor_dates
     payload = {

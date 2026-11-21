@@ -3,11 +3,23 @@ from __future__ import annotations
 import asyncio
 
 from backend.model_lab import routes
+from types import SimpleNamespace
+
 from backend.model_lab.schemas import CompareRequest, ExperimentCreate, ExperimentRunRequest, ParamSweepRequest, WalkForwardRequest
 
 
+# Route functions are called directly, so pass the auth/db dependencies explicitly.
+_USER = SimpleNamespace(id="user-1", role="trader")
+_DEPS = {"db": None, "current_user": _USER}
+
+
+def _allow_all(monkeypatch) -> None:  # noqa: ANN001
+    monkeypatch.setattr(routes, "_ensure_experiment_access", lambda db, user, experiment_id: None)
+    monkeypatch.setattr(routes, "_ensure_run_access", lambda db, user, run_id: None)
+
+
 class _FakeService:
-    async def create_experiment(self, payload: ExperimentCreate) -> dict:
+    async def create_experiment(self, payload: ExperimentCreate, owner_id=None) -> dict:  # noqa: ANN001
         return {
             "id": "exp_1",
             "name": payload.name,
@@ -20,7 +32,7 @@ class _FakeService:
             "created_at": "2026-02-19T00:00:00",
         }
 
-    async def list_experiments(self, tag, model_key, start_date, end_date):  # noqa: ANN001
+    async def list_experiments(self, tag, model_key, start_date, end_date, owner_id=None):  # noqa: ANN001
         return [{"id": "exp_1", "name": "Alpha", "description": "", "tags": ["r1"], "model_key": "example:sma_crossover", "benchmark_symbol": "NIFTY50", "start_date": "2025-01-01", "end_date": "2025-12-31", "created_at": "2026-02-19T00:00:00"}]
 
     async def get_experiment(self, experiment_id: str) -> dict:
@@ -60,6 +72,7 @@ class _FakeService:
 
 def test_create_list_run_report_compare(monkeypatch) -> None:
     monkeypatch.setattr(routes, "get_model_lab_service", lambda: _FakeService())
+    _allow_all(monkeypatch)
 
     created = asyncio.run(
         routes.create_experiment(
@@ -70,37 +83,40 @@ def test_create_list_run_report_compare(monkeypatch) -> None:
                 model_key="example:sma_crossover",
                 start_date="2025-01-01",
                 end_date="2025-12-31",
-            )
+            ),
+            current_user=_USER,
         )
     )
     assert created.id == "exp_1"
 
-    listing = asyncio.run(routes.list_experiments())
+    listing = asyncio.run(routes.list_experiments(tag=None, model=None, start_date=None, end_date=None, current_user=_USER))
     assert len(listing["items"]) == 1
 
-    enqueued = asyncio.run(routes.run_experiment("exp_1", ExperimentRunRequest()))
+    enqueued = asyncio.run(routes.run_experiment("exp_1", ExperimentRunRequest(), **_DEPS))
     assert enqueued["status"] == "queued"
 
-    status = asyncio.run(routes.run_status("run_exp_1"))
+    status = asyncio.run(routes.run_status("run_exp_1", **_DEPS))
     assert status["status"] == "running"
 
-    report = asyncio.run(routes.run_report("run_exp_1"))
+    report = asyncio.run(routes.run_report("run_exp_1", force_refresh=False, **_DEPS))
     assert report["metrics"]["sharpe"] == 1.2
 
-    compare = asyncio.run(routes.compare_runs(CompareRequest(run_ids=["r1", "r2"])))
+    compare = asyncio.run(routes.compare_runs(CompareRequest(run_ids=["r1", "r2"]), **_DEPS))
     assert len(compare["runs"]) == 2
 
 
 def test_walk_forward_and_param_sweep(monkeypatch) -> None:
     monkeypatch.setattr(routes, "get_model_lab_service", lambda: _FakeService())
+    _allow_all(monkeypatch)
 
-    wf = asyncio.run(routes.run_walk_forward("exp_1", WalkForwardRequest(train_window_days=252, test_window_days=63)))
+    wf = asyncio.run(routes.run_walk_forward("exp_1", WalkForwardRequest(train_window_days=252, test_window_days=63), **_DEPS))
     assert wf["train_window_days"] == 252
 
     sweep = asyncio.run(
         routes.run_param_sweep(
             "exp_1",
             ParamSweepRequest(grid={"short_window": [10, 20], "long_window": [50, 100]}, max_combinations=4),
+            **_DEPS,
         )
     )
     assert sweep["total_combinations"] == 4

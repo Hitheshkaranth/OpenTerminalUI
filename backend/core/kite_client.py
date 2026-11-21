@@ -39,7 +39,8 @@ class KiteClient:
             timeout=self.timeout,
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
             trust_env=False,
-            follow_redirects=True,
+            # Never replay the Kite auth header to a redirect target.
+            follow_redirects=False,
             headers={"X-Kite-Version": "3"},
         )
 

@@ -41,7 +41,6 @@ def register_run_meta(
     row.data_version_id = payload.data_version_id
     row.code_hash = payload.code_hash
     row.execution_profile_json = payload.execution_profile
-    db.commit()
     log_audit(
         db=db,
         event_type="governance_run_registered",
@@ -49,7 +48,9 @@ def register_run_meta(
         entity_id=row.id,
         payload={"data_version_id": payload.data_version_id, "code_hash": payload.code_hash},
         user_id=current_user.id,
+        commit=False,
     )
+    db.commit()
     return {"status": "updated", "run_id": row.id}
 
 
@@ -96,8 +97,7 @@ def promote_model(
         created_at=datetime.now(timezone.utc),
     )
     db.add(entry)
-    db.commit()
-    db.refresh(entry)
+    db.flush()  # assign entry.id; the entry and its audit row commit together below
     log_audit(
         db=db,
         event_type="governance_model_promoted",
@@ -105,7 +105,10 @@ def promote_model(
         entity_id=entry.id,
         payload={"name": entry.name, "run_id": entry.run_id, "stage": entry.stage},
         user_id=current_user.id,
+        commit=False,
     )
+    db.commit()
+    db.refresh(entry)
     return {
         "id": entry.id,
         "name": entry.name,

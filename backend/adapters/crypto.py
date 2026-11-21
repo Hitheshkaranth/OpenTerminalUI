@@ -8,6 +8,7 @@ import httpx
 from backend.adapters.base import DataAdapter, FuturesContract, Instrument, OHLCV, OptionChain, QuoteResponse
 from backend.core.crypto_adapter import CryptoAdapter
 from backend.core.yahoo_client import YahooClient
+from backend.shared.http_client import shared_session
 
 
 class CryptoDataAdapter(DataAdapter):
@@ -29,7 +30,7 @@ class CryptoDataAdapter(DataAdapter):
         coin_id = gecko_map.get(pair)
         if coin_id:
             try:
-                async with httpx.AsyncClient(timeout=6.0, trust_env=False) as client:
+                async with shared_session(timeout=6.0) as client:
                     resp = await client.get(
                         "https://api.coingecko.com/api/v3/simple/price",
                         params={"ids": coin_id, "vs_currencies": "usd", "include_24hr_change": "true"},

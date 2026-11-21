@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import json
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -14,6 +16,7 @@ from backend.db.models import PortfolioMutualFundHolding
 from backend.equity.services.mutual_funds import MutualFundPerformance, mutual_fund_service
 
 router = APIRouter(prefix="/api/mutual-funds", tags=["mutual-funds"])
+logger = logging.getLogger(__name__)
 
 
 class PortfolioMutualFund(BaseModel):
@@ -93,7 +96,8 @@ async def get_fund_performance(scheme_code: int) -> dict[str, Any]:
         out = await mutual_fund_service.get_fund_performance(scheme_code)
         return out.model_dump()
     except Exception as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        logger.warning("Mutual fund performance lookup failed for %s", scheme_code, exc_info=True)
+        raise HTTPException(status_code=404, detail="Mutual fund data not found") from exc
 
 
 @router.get("/{scheme_code}/nav-history")
@@ -102,7 +106,8 @@ async def get_fund_nav_history(scheme_code: int) -> dict[str, Any]:
         out = await mutual_fund_service.get_fund_nav_history(scheme_code)
         return out.model_dump()
     except Exception as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        logger.warning("Mutual fund NAV history lookup failed for %s", scheme_code, exc_info=True)
+        raise HTTPException(status_code=404, detail="Mutual fund data not found") from exc
 
 
 @router.get("/rankings")
@@ -233,7 +238,8 @@ async def get_fund_details(scheme_code: int) -> dict[str, Any]:
         hist = await mutual_fund_service.get_fund_nav_history(scheme_code)
         perf = await mutual_fund_service.get_fund_performance(scheme_code)
     except Exception as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        logger.warning("Mutual fund details lookup failed for %s", scheme_code, exc_info=True)
+        raise HTTPException(status_code=404, detail="Mutual fund data not found") from exc
     return {
         "fund": details.model_dump() if details else None,
         "nav_history": hist.model_dump(),

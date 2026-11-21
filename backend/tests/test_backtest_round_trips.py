@@ -102,7 +102,7 @@ def test_risk_summary_beta_aligns_on_dates(monkeypatch) -> None:
             return pd.DataFrame({"^NSEI": bm_missing})
         return pd.DataFrame({"RELIANCE": stock})
 
-    async def fake_targets(db, ticker=None):
+    async def fake_targets(db, ticker=None, user=None):
         return ["RELIANCE"]
 
     class _Cls:

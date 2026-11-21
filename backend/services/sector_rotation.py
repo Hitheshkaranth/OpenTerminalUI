@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 import os
 from datetime import datetime, timedelta, timezone
@@ -10,6 +11,8 @@ import pandas as pd
 import requests
 import yfinance as yf
 from backend.shared.cache import cache
+
+logger = logging.getLogger(__name__)
 
 if os.getenv("LTS_DISABLE_PROXY", "1") == "1":
     for proxy_key in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
@@ -135,7 +138,7 @@ async def fetch_sector_rotation(benchmark: str) -> Dict[str, Any]:
             if isinstance(close_data, pd.Series):
                 raise ValueError("Insufficient ticker data")
         except Exception as e:
-            print(f"yfinance download failed: {e}. Falling back to mock data.")
+            logger.warning("yfinance download failed (%s); falling back to mock data", type(e).__name__)
             close_data = _generate_mock_rrg(benchmark, tickers)
 
         # Drop naive timezone if present
@@ -153,6 +156,7 @@ async def fetch_sector_rotation(benchmark: str) -> Dict[str, Any]:
         await cache.set(cache_key, response, ttl=14400) # 4 hours cache
         return response
 
-    except Exception as e:
-        import traceback
-        return {"error": str(e), "trace": traceback.format_exc()}
+    except Exception:
+        # Never return tracebacks to clients and never cache the failure.
+        logger.exception("Sector rotation (RRG) computation failed")
+        return {"error": "Sector rotation data unavailable"}

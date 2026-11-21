@@ -8,7 +8,22 @@ from sqlalchemy.orm import Session
 from backend.models import AuditLogORM, OmsFillORM, OmsOrderORM, OpsKillSwitchORM, RestrictedListORM
 
 
-def log_audit(db: Session, event_type: str, entity_type: str, entity_id: str | None, payload: dict[str, Any], user_id: str | None = None) -> None:
+def log_audit(
+    db: Session,
+    event_type: str,
+    entity_type: str,
+    entity_id: str | None,
+    payload: dict[str, Any],
+    user_id: str | None = None,
+    *,
+    commit: bool = True,
+) -> None:
+    """Record an audit row.
+
+    ``commit=False`` only flushes so the caller can commit the audit row in the same
+    transaction as the change it describes (the OMS, ops and governance routes do this).
+    The default keeps committing for standalone audit events.
+    """
     db.add(
         AuditLogORM(
             user_id=user_id,
@@ -19,7 +34,10 @@ def log_audit(db: Session, event_type: str, entity_type: str, entity_id: str | N
             created_at=datetime.now(timezone.utc),
         )
     )
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
 
 
 def is_kill_switch_enabled(db: Session, scope: str = "orders") -> bool:
@@ -53,6 +71,7 @@ def create_order(
     accepted: bool,
     rejection_reason: str | None = None,
 ) -> OmsOrderORM:
+    """Stage an order (flush only; the caller commits)."""
     row = OmsOrderORM(
         user_id=user_id,
         symbol=symbol.upper(),
@@ -67,8 +86,7 @@ def create_order(
         updated_at=datetime.now(timezone.utc),
     )
     db.add(row)
-    db.commit()
-    db.refresh(row)
+    db.flush()
     log_audit(
         db,
         event_type="oms_order_created",
@@ -76,11 +94,13 @@ def create_order(
         entity_id=row.id,
         payload={"status": row.status, "symbol": row.symbol, "side": row.side, "quantity": row.quantity, "rejection_reason": row.rejection_reason},
         user_id=user_id,
+        commit=False,
     )
     return row
 
 
 def create_fill(db: Session, order_id: str, symbol: str, quantity: float, fill_price: float, cost: float) -> OmsFillORM:
+    """Stage a fill (flush only; the caller commits)."""
     row = OmsFillORM(
         order_id=order_id,
         symbol=symbol.upper(),
@@ -90,13 +110,13 @@ def create_fill(db: Session, order_id: str, symbol: str, quantity: float, fill_p
         created_at=datetime.now(timezone.utc),
     )
     db.add(row)
-    db.commit()
-    db.refresh(row)
+    db.flush()
     log_audit(
         db,
         event_type="oms_fill_created",
         entity_type="fill",
         entity_id=row.id,
         payload={"order_id": order_id, "symbol": symbol, "quantity": quantity, "fill_price": fill_price, "cost": cost},
+        commit=False,
     )
     return row

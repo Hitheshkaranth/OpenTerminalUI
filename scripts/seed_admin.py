@@ -8,7 +8,10 @@ Reads ``BOOTSTRAP_ADMIN_EMAIL`` / ``BOOTSTRAP_ADMIN_PASSWORD`` from the environm
 * No-op if no password is configured — never creates an account with a blank /
   guessable password.
 
-The script always exits 0 so it can run during startup without ever blocking it.
+Exit status: 0 when the admin was created or seeding was skipped (no credentials,
+or a user already exists — including a concurrent replica winning the race);
+non-zero on a real error (missing dependencies, schema or database failure), so the
+container entrypoint fails loudly instead of starting with no way to log in.
 """
 from __future__ import annotations
 
@@ -36,15 +39,17 @@ def main() -> int:
 
         from backend.models.user import User, UserRole
         from backend.shared.db import Base, SessionLocal, engine
-    except Exception as exc:  # pragma: no cover - defensive, never block startup
-        print(f"[seed-admin] dependencies unavailable ({exc}); skipping.")
-        return 0
+        from sqlalchemy.exc import IntegrityError
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[seed-admin] ERROR: dependencies unavailable ({exc}).", file=sys.stderr)
+        return 1
 
     # Make sure the users table exists (idempotent; harmless if migrations already ran).
     try:
         Base.metadata.create_all(bind=engine, tables=[User.__table__])
-    except Exception:
-        pass
+    except Exception as exc:
+        print(f"[seed-admin] ERROR: could not ensure users table ({exc}).", file=sys.stderr)
+        return 1
 
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
     db = SessionLocal()
@@ -61,9 +66,15 @@ def main() -> int:
         )
         db.commit()
         print(f"[seed-admin] created initial admin account: {email}")
-    except Exception as exc:  # pragma: no cover - defensive
+    except IntegrityError:
+        # Another process (e.g. a second replica) seeded concurrently: already exists.
         db.rollback()
-        print(f"[seed-admin] could not seed admin ({exc}); skipping.")
+        print("[seed-admin] admin already exists (concurrent seed); skipping.")
+        return 0
+    except Exception as exc:
+        db.rollback()
+        print(f"[seed-admin] ERROR: could not seed admin ({exc}).", file=sys.stderr)
+        return 1
     finally:
         db.close()
     return 0

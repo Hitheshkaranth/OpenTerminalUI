@@ -34,7 +34,8 @@ def _build_app(monkeypatch) -> TestClient:
             db.close()
 
     def _user_override():
-        return type("FakeUser", (), {"id": "u_test"})()
+        # Restricted-list edits require the admin role.
+        return type("FakeUser", (), {"id": "u_test", "role": "admin"})()
 
     app.dependency_overrides[get_db] = _db_override
     app.dependency_overrides[get_current_user] = _user_override

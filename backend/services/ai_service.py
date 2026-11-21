@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 from backend.config.settings import get_settings
 from backend.api.deps import get_unified_fetcher
+from backend.shared.http_client import shared_session
 from backend.services.lm_studio_client import (
     LMStudioError,
     get_lm_studio_client,
@@ -207,7 +208,7 @@ class AIQueryService:
         if not self.settings.openai_api_key:
             raise ValueError("OpenAI API Key not set")
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with shared_session(timeout=30.0) as client:
             resp = await client.post(
                 "https://api.openai.com/v1/chat/completions",
                 headers={"Authorization": f"Bearer {self.settings.openai_api_key}"},
@@ -224,7 +225,7 @@ class AIQueryService:
             return resp.json()["choices"][0]["message"]["content"]
 
     async def _call_ollama(self, query: str) -> str:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with shared_session(timeout=60.0) as client:
             resp = await client.post(
                 f"{self.settings.ollama_base_url}/api/chat",
                 json={

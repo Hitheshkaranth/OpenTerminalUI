@@ -1,6 +1,8 @@
 export type RiskSummaryData = {
   ewma_vol: number;
-  beta: number;
+  /** null when the benchmark could not be fetched (see benchmark_unavailable). */
+  beta: number | null;
+  benchmark_unavailable?: boolean;
   alpha?: number;
   sharpe?: number;
   sortino?: number;

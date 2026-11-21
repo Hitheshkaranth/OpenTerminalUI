@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from "react";
 import { create } from "zustand";
 
-import { getCsrfToken } from "../lib/csrf";
+import { withWsAuth } from "./wsAuth";
 
 export type QuotesConnectionState = "connecting" | "connected" | "disconnected";
 
@@ -79,20 +79,18 @@ function parseToken(token: string): { market: string; symbol: string } | null {
 
 function buildQuotesWsUrl(): string {
   const apiBase = String(import.meta.env.VITE_API_BASE_URL || "/api").trim();
-  const token = getCsrfToken();
-  const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
   if (apiBase.startsWith("http://") || apiBase.startsWith("https://")) {
     const url = new URL(apiBase);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     url.pathname = `${url.pathname.replace(/\/+$/, "")}/ws/quotes`;
-    url.search = tokenParam.replace("?", "");
-    return url.toString();
+    url.search = "";
+    return withWsAuth(url.toString());
   }
 
-  if (typeof window === "undefined") return `/api/ws/quotes${tokenParam}`;
+  if (typeof window === "undefined") return withWsAuth("/api/ws/quotes");
   const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const normalizedBase = apiBase.startsWith("/") ? apiBase : `/${apiBase}`;
-  return `${wsProtocol}//${window.location.host}${normalizedBase.replace(/\/+$/, "")}/ws/quotes${tokenParam}`;
+  return withWsAuth(`${wsProtocol}//${window.location.host}${normalizedBase.replace(/\/+$/, "")}/ws/quotes`);
 }
 
 class QuotesWsManager {

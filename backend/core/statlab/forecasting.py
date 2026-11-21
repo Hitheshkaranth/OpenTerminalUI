@@ -13,7 +13,7 @@ def _safe_float(val):
         if np.isnan(f) or np.isinf(f):
             return 0.0
         return round(f, 6)
-    except:
+    except Exception:
         return 0.0
 
 def _to_json_list(dates, values):

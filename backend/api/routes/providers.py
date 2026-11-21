@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import asyncio
 import os
 from datetime import datetime, timezone
@@ -11,6 +13,7 @@ from backend.api.deps import get_unified_fetcher
 from backend.adapters.registry import get_adapter_registry
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _PROVIDER_DEFS: list[dict[str, Any]] = [
     {
@@ -200,14 +203,21 @@ def _compute_overall(providers: list[dict[str, Any]]) -> str:
     return "degraded"
 
 
+class _ProbeFailure(RuntimeError):
+    """A probe failure whose message is ours and safe to show to the client."""
+
+
 async def _light_probe(name: str, coro) -> dict[str, Any]:
     try:
         await asyncio.wait_for(coro, timeout=2.0)
         return {"status": "ok"}
     except asyncio.TimeoutError:
         return {"status": "down", "error": f"{name} probe timed out (2s)"}
-    except Exception as exc:
+    except _ProbeFailure as exc:
         return {"status": "down", "error": str(exc)[:160]}
+    except Exception as exc:
+        logger.warning("Provider probe %s failed", name, exc_info=True)
+        return {"status": "down", "error": f"{name} probe failed ({type(exc).__name__})"}
 
 
 @router.get("/providers/status")
@@ -216,7 +226,8 @@ async def providers_status() -> dict[str, Any]:
     degraded/unconfigured and the error string is attached at the top level."""
     try:
         return await _providers_status_impl()
-    except Exception as exc:  # pragma: no cover - defensive
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("Provider status check failed")
         providers = _build_provider_list({}, {}, False)
         for row in providers:
             if row["configured"]:
@@ -225,7 +236,7 @@ async def providers_status() -> dict[str, Any]:
             "checked_at": datetime.now(timezone.utc).isoformat(),
             "overall": "degraded",
             "providers": providers,
-            "error": str(exc),
+            "error": "Provider status check failed",
         }
 
 
@@ -288,7 +299,7 @@ async def _providers_status_impl() -> dict[str, Any]:
                 except Exception:
                     pass
             if not profile:
-                raise RuntimeError("Kite rejected the access token (it expires daily)")
+                raise _ProbeFailure("Kite rejected the access token (it expires daily)")
 
         probe_tasks.append(("kite", asyncio.ensure_future(_light_probe("kite", _kite_profile_ok()))))
 

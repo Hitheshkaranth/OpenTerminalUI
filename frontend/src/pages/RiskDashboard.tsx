@@ -396,7 +396,7 @@ export function RiskDashboardPage() {
                   </div>
                   <div className="rounded border border-terminal-border/50 bg-terminal-bg p-2">
                     <div className="mb-1 text-[10px] text-terminal-muted">SYSTEMATIC BETA</div>
-                    <div className="text-lg font-bold text-terminal-accent">{Number(summary?.beta || 0).toFixed(2)}</div>
+                    <div className="text-lg font-bold text-terminal-accent">{summary?.beta == null ? "N/A" : Number(summary.beta).toFixed(2)}</div>
                   </div>
                 </div>
 

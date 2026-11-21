@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChartPanel } from "../components/chart-workstation/ChartPanel";
@@ -195,7 +196,10 @@ describe("ChartPanel Volume Profile controls", () => {
       viewRangeCommand?: { presetId: "1D" | "5D" | "1W" | "1M" | "3M" | "6M" | "1Y" | "MAX"; revision: number };
     },
   ) {
+    // ChartPanel reads market status from the shared react-query cache.
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
+      <QueryClientProvider client={queryClient}>
       <ChartPanel
         slot={SLOT}
         isActive={true}
@@ -226,7 +230,8 @@ describe("ChartPanel Volume Profile controls", () => {
         comparisonMode={compareProps?.comparisonMode}
         replayCommand={compareProps?.replayCommand}
         viewRangeCommand={compareProps?.viewRangeCommand}
-      />,
+      />
+      </QueryClientProvider>,
     );
   }
 

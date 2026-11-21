@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -16,6 +17,7 @@ from backend.models.api_response import ApiResponse
 from backend.shared.market_classifier import market_classifier
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Adapter class -> registry key (backend/adapters/registry.py factory names).
 _ADAPTER_KEYS = {
@@ -392,7 +394,8 @@ async def get_stocks(tickers: str) -> List[Dict[str, Any]]:
                 "pe": s.get("pe"),
                 "change_pct": s.get("change_pct"),
             }
-        except:
+        except Exception:
+            logger.debug("Snapshot fetch failed for %s", t, exc_info=True)
             return {"ticker": t, "error": "Fetch failed"}
 
     return await asyncio.gather(*(_fetch_one(t) for t in names))

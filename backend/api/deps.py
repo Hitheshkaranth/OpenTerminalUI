@@ -70,21 +70,18 @@ async def fetch_stock_snapshot_coalesced(ticker: str) -> dict[str, Any]:
             return cached_data
         logger.info("Cached snapshot missing company_name for %s; refreshing snapshot", symbol)
 
-    # 2. Coalescing (Single Flight)
-    # Since we lack a dedicated single-flight mechanism in cache.py, we can use a lock
-    # but that's local only. For distributed, we'd need Redis lock.
-    # For now, just fetch. The prefetch worker handles the heavy lifting.
-
+    # 2. Coalescing (single-flight, per process): concurrent misses for the same symbol
+    # share one upstream fetch. The cache read above already happened (and may have
+    # returned a stale entry lacking company_name), so skip get_or_fetch's own read.
     fetcher = await get_unified_fetcher()
     try:
-        data = await fetcher.fetch_stock_snapshot(symbol)
-        if data:
-            await cache_instance.set(
-                cache_key,
-                data,
-                ttl=ttl_seconds("snapshot", market_open_now()),
-            )
-        return data
+        return await cache_instance.get_or_fetch(
+            cache_key,
+            ttl_seconds("snapshot", market_open_now()),
+            lambda: fetcher.fetch_stock_snapshot(symbol),
+            force_refresh=True,
+            cache_if=bool,
+        )
     except Exception as e:
         logger.error(f"Snapshot fetch failed for {symbol}: {e}")
         if isinstance(cached_data, dict):

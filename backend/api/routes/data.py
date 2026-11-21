@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -8,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query
 from backend.core.historical_data_service import get_historical_data_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/data/ohlcv")
@@ -32,7 +35,8 @@ async def get_ohlcv(
             limit=limit,
         )
     except Exception as exc:  # pragma: no cover - defensive route guard
-        raise HTTPException(status_code=400, detail=f"Failed to fetch OHLCV: {exc}") from exc
+        logger.exception("Failed to fetch OHLCV")
+        raise HTTPException(status_code=400, detail="Failed to fetch OHLCV") from exc
 
     return {
         "symbol": normalized.canonical,

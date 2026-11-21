@@ -194,7 +194,7 @@ async def pair_test(
         raise
     except Exception as e:
         logger.exception("Pair test failed")
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail="Pair test failed") from e
 
 @router.post("/spread")
 async def pair_spread(
@@ -242,7 +242,7 @@ async def pair_spread(
         raise
     except Exception as e:
         logger.exception("Spread calculation failed")
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail="Spread calculation failed") from e
 
 @router.post("/signals")
 async def pair_signals(
@@ -344,7 +344,7 @@ async def pair_signals(
         raise
     except Exception as e:
         logger.exception("Signal calculation failed")
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail="Signal calculation failed") from e
 
 @router.post("/scan")
 async def pair_scan(
@@ -394,4 +394,4 @@ async def pair_scan(
         raise
     except Exception as e:
         logger.exception("Pair scan failed")
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail="Pair scan failed") from e

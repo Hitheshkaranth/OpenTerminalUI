@@ -1,9 +1,12 @@
+import logging
+
 import pandas as pd
 import numpy as np
 import warnings
 from statsmodels.tsa.regime_switching.markov_regression import MarkovRegression
 
 warnings.filterwarnings("ignore")
+logger = logging.getLogger(__name__)
 
 def _safe_float(val):
     try:
@@ -88,4 +91,5 @@ def regime_detection(prices: pd.Series, *, k_regimes: int = 2) -> dict:
             "interpretation": interpretation
         }
     except Exception as e:
-        raise ValueError(f"Markov regime model failed to converge: {str(e)}")
+        logger.warning("Markov regime model failed", exc_info=True)
+        raise ValueError("Markov regime model failed to converge") from e

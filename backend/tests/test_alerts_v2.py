@@ -193,7 +193,7 @@ async def test_delivery_called_for_external_channels(monkeypatch: pytest.MonkeyP
             "webhook_url": "https://example.com/hook",
             "telegram_token": "token",
             "telegram_chat_id": "chat-id",
-            "discord_webhook_url": "https://discord.example/hook",
+            "discord_webhook_url": "https://discord.com/api/webhooks/123/abc",
         },
     )
 

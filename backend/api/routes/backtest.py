@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import asyncio
 import json
 from datetime import datetime, timedelta, timezone
@@ -17,6 +19,7 @@ from backend.models import BacktestRun
 from backend.services.data_version_service import get_active_data_version
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class BacktestRequest(BaseModel):
@@ -60,7 +63,8 @@ async def run_backtest(payload: BacktestRequest, db: Session = Depends(get_db)) 
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Backtest failed: {exc}") from exc
+        logger.exception("Backtest failed")
+        raise HTTPException(status_code=500, detail="Backtest failed") from exc
 
     equity_df = result["equity_curve"]
     equity_records = []

@@ -1,0 +1,6 @@
+# Test / development tooling. Not installed in the runtime Docker image.
+-r requirements.txt
+
+pytest==9.0.2
+pytest-cov==7.1.0
+pytest-asyncio==1.3.0

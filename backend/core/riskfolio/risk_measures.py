@@ -49,7 +49,7 @@ def risk_report(returns, confidence: float = 0.95, rf: float = 0.0, periods_per_
         try:
             val = z * np.log(np.mean(np.exp(-r / z)) / (1 - alpha))
             return val
-        except:
+        except Exception:
             return 1e10
 
     res_evar = minimize_scalar(evar_objective, args=(returns, confidence), bounds=(1e-6, 1.0), method='bounded')
@@ -82,7 +82,7 @@ def risk_report(returns, confidence: float = 0.95, rf: float = 0.0, periods_per_
         if z <= 0: return 1e10
         try:
             return z * np.log(np.mean(np.exp(d / z)) / (1 - alpha))
-        except:
+        except Exception:
             return 1e10
             
     res_edar = minimize_scalar(edar_objective, args=(dd, confidence), bounds=(1e-6, 10.0), method='bounded')

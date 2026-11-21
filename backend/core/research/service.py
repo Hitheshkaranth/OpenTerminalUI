@@ -8,9 +8,9 @@ from sqlalchemy import inspect, select, text
 from backend.core.research import arxiv_source, fetch
 from backend.core.research.index import search_items
 from backend.core.research.models import ResearchItem, ResearchItemOut
-from backend.shared.db import Base, SessionLocal, engine
+from backend.shared.db import SessionLocal, engine
 
-Base.metadata.create_all(bind=engine, tables=[ResearchItem.__table__])
+# Schema is created by Alembic (0019) or by init_db() in development.
 logger = logging.getLogger(__name__)
 
 

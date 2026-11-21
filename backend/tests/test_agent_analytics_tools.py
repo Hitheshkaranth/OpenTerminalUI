@@ -206,6 +206,9 @@ async def test_run_factor_analysis_too_few_names_is_err(monkeypatch):
 @pytest.mark.asyncio
 async def test_run_factor_analysis_empty_portfolio_is_err(monkeypatch):
     class DummyQuery:
+        def filter(self, *_args):
+            return self
+
         def all(self):
             return []
 
@@ -217,7 +220,7 @@ async def test_run_factor_analysis_empty_portfolio_is_err(monkeypatch):
             pass
 
     monkeypatch.setattr(at, "SessionLocal", lambda: DummyDB())
-    out = await at.run_factor_analysis({})
+    out = await at.run_factor_analysis({}, user_id="user-1")
     assert out["ok"] is False
     assert out["error"]["code"] == "empty_portfolio"
 

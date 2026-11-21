@@ -111,7 +111,7 @@ async def get_option_chain_signals(symbol: str, *, market: str | None = None, ex
             "market": "IN",
             "available": False,
             "reason": "provider_unavailable",
-            "error": str(exc)[:200],
+            "error": type(exc).__name__,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 

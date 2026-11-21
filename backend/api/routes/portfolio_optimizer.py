@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import asyncio
 from datetime import datetime, timedelta
 
@@ -21,6 +23,7 @@ from backend.core.riskfolio import (
 )
 
 router = APIRouter(prefix="/api/portfolio-optimizer", tags=["portfolio-optimizer"])
+logger = logging.getLogger(__name__)
 
 
 class ViewModel(BaseModel):
@@ -131,7 +134,8 @@ async def optimize(req: OptimizeRequest):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Optimization failed: {e}")
+        logger.exception("Portfolio optimization failed")
+        raise HTTPException(status_code=500, detail="Optimization failed") from e
 
 
 @router.post("/risk-report")
@@ -210,4 +214,5 @@ async def get_risk_report(req: RiskReportRequest):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Risk report failed: {e}")
+        logger.exception("Risk report failed")
+        raise HTTPException(status_code=500, detail="Risk report failed") from e

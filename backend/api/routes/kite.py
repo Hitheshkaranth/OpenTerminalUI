@@ -3,10 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
+from backend.auth.deps import require_role
 from backend.core.kite_client import KiteClient
+from backend.models import User
 
 router = APIRouter()
 kite = KiteClient()
@@ -29,25 +31,24 @@ class KiteSessionRequest(BaseModel):
     request_token: str
 
 
-def _token_or_401(authorization: str | None) -> str:
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing Authorization header")
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not token:
-        raise HTTPException(status_code=401, detail="Use Authorization: Bearer <access_token>")
-    return token.strip()
+# The Kite access token travels in its own header. ``Authorization`` carries the
+# app's JWT and must never be forwarded to api.kite.trade (SEC-10).
+KITE_TOKEN_HEADER = "X-Kite-Access-Token"
 
-def _token_from_header_or_env(authorization: str | None) -> str:
-    header_token = ""
-    if authorization:
-        scheme, _, token = authorization.partition(" ")
-        if scheme.lower() == "bearer" and token:
-            header_token = token.strip()
-    access_token = kite.resolve_access_token(header_token)
+
+def _token_or_401(kite_access_token: str | None) -> str:
+    token = (kite_access_token or "").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail=f"Missing {KITE_TOKEN_HEADER} header")
+    return token
+
+
+def _token_from_header_or_env(kite_access_token: str | None) -> str:
+    access_token = kite.resolve_access_token((kite_access_token or "").strip())
     if not access_token:
         raise HTTPException(
             status_code=401,
-            detail="Missing access token. Use Authorization: Bearer <access_token> or set KITE_ACCESS_TOKEN.",
+            detail=f"Missing Kite access token. Send {KITE_TOKEN_HEADER} or set KITE_ACCESS_TOKEN.",
         )
     return access_token
 
@@ -99,10 +100,12 @@ async def kite_create_session(payload: KiteSessionRequest) -> dict[str, object]:
 
 
 @router.get("/kite/profile")
-async def kite_profile(authorization: str | None = Header(default=None)) -> dict[str, object]:
+async def kite_profile(
+    kite_access_token: str | None = Header(default=None, alias=KITE_TOKEN_HEADER),
+) -> dict[str, object]:
     if not kite.api_key:
         raise HTTPException(status_code=400, detail="KITE_API_KEY is not configured")
-    access_token = _token_or_401(authorization)
+    access_token = _token_or_401(kite_access_token)
     data = await kite.get_profile(access_token)
     if not data:
         raise HTTPException(status_code=502, detail="Failed to fetch Kite profile")
@@ -112,11 +115,11 @@ async def kite_profile(authorization: str | None = Header(default=None)) -> dict
 @router.get("/kite/ltp")
 async def kite_ltp(
     instruments: str = Query(..., description="Comma-separated list e.g. NSE:RELIANCE,NSE:TCS"),
-    authorization: str | None = Header(default=None),
+    kite_access_token: str | None = Header(default=None, alias=KITE_TOKEN_HEADER),
 ) -> dict[str, object]:
     if not kite.api_key:
         raise HTTPException(status_code=400, detail="KITE_API_KEY is not configured")
-    access_token = _token_from_header_or_env(authorization)
+    access_token = _token_from_header_or_env(kite_access_token)
     names = [x.strip() for x in instruments.split(",") if x.strip()]
     if not names:
         raise HTTPException(status_code=422, detail="At least one instrument is required")
@@ -129,11 +132,11 @@ async def kite_ltp(
 @router.get("/kite/latest/{symbol}")
 async def kite_latest_symbol(
     symbol: str,
-    authorization: str | None = Header(default=None),
+    kite_access_token: str | None = Header(default=None, alias=KITE_TOKEN_HEADER),
 ) -> dict[str, object]:
     if not kite.api_key:
         raise HTTPException(status_code=400, detail="KITE_API_KEY is not configured")
-    access_token = _token_from_header_or_env(authorization)
+    access_token = _token_from_header_or_env(kite_access_token)
     instrument = _normalize_instrument(symbol)
     data = await kite.get_quote(access_token, [instrument])
     quote_map = data.get("data") if isinstance(data, dict) else None
@@ -155,11 +158,11 @@ async def kite_latest_symbol(
 @router.get("/kite/latest")
 async def kite_latest_many(
     symbols: str = Query(..., description="Comma-separated symbols/instruments e.g. RELIANCE,TCS or NSE:RELIANCE"),
-    authorization: str | None = Header(default=None),
+    kite_access_token: str | None = Header(default=None, alias=KITE_TOKEN_HEADER),
 ) -> dict[str, object]:
     if not kite.api_key:
         raise HTTPException(status_code=400, detail="KITE_API_KEY is not configured")
-    access_token = _token_from_header_or_env(authorization)
+    access_token = _token_from_header_or_env(kite_access_token)
     instruments = [_normalize_instrument(x) for x in symbols.split(",") if x.strip()]
     if not instruments:
         raise HTTPException(status_code=422, detail="At least one symbol is required")
@@ -178,11 +181,12 @@ async def kite_latest_many(
 
 @router.get("/kite/holdings")
 async def kite_holdings(
-    authorization: str | None = Header(default=None),
+    kite_access_token: str | None = Header(default=None, alias=KITE_TOKEN_HEADER),
+    _admin: User = Depends(require_role("admin")),
 ) -> dict[str, object]:
     if not kite.api_key:
         raise HTTPException(status_code=400, detail="KITE_API_KEY is not configured")
-    access_token = _token_from_header_or_env(authorization)
+    access_token = _token_from_header_or_env(kite_access_token)
     raw = await kite.get_holdings(access_token)
     if raw is None:
         raise HTTPException(status_code=502, detail=_KITE_FAIL_HINT.format(what="holdings"))
@@ -209,11 +213,12 @@ async def kite_holdings(
 
 @router.get("/kite/positions")
 async def kite_positions(
-    authorization: str | None = Header(default=None),
+    kite_access_token: str | None = Header(default=None, alias=KITE_TOKEN_HEADER),
+    _admin: User = Depends(require_role("admin")),
 ) -> dict[str, object]:
     if not kite.api_key:
         raise HTTPException(status_code=400, detail="KITE_API_KEY is not configured")
-    access_token = _token_from_header_or_env(authorization)
+    access_token = _token_from_header_or_env(kite_access_token)
     data = await kite.get_positions(access_token)
     if data is None:
         raise HTTPException(status_code=502, detail=_KITE_FAIL_HINT.format(what="positions"))

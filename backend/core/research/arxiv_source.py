@@ -5,6 +5,7 @@ import re
 import xml.etree.ElementTree as ET
 
 import httpx
+from backend.shared.http_client import shared_session
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ async def fetch_arxiv(query: str = "cat:q-fin.*", *, max_results: int = 25, time
         "sortOrder": "descending",
     }
     try:
-        async with httpx.AsyncClient(trust_env=False, timeout=timeout, follow_redirects=True) as client:
+        async with shared_session(timeout=timeout, follow_redirects=True) as client:
             # arXiv 301-redirects http -> https; use https and follow redirects.
             response = await client.get("https://export.arxiv.org/api/query", params=params)
             response.raise_for_status()
