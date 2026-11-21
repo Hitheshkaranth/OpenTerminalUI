@@ -30,7 +30,6 @@ hmmlearn==0.3.3
 optuna==4.8.0
 statsmodels==0.14.6
 xgboost==3.2.0
-polygon-api-client==1.16.3
 websockets==16.0
 python-multipart==0.0.24
 scipy==1.17.1
