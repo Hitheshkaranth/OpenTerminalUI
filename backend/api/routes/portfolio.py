@@ -25,6 +25,23 @@ def _user_holdings(db: Session, user: User) -> list[Holding]:
     return db.query(Holding).filter(Holding.user_id == user.id).all()
 
 
+_COUNTRY_CURRENCY = {"US": "USD", "IN": "INR", "GB": "GBP", "JP": "JPY", "HK": "HKD", "AU": "AUD", "CA": "CAD"}
+
+
+def _holding_currency(snapshot: dict, classification: dict) -> str | None:
+    """Currency a holding is priced in: provider/classifier currency, else exchange, else country."""
+    from backend.paper_trading.currency import EXCHANGES
+
+    for value in (snapshot.get("currency"), classification.get("currency")):
+        if isinstance(value, str) and len(value.strip()) == 3:
+            return value.strip().upper()
+    exchange = str(classification.get("exchange") or snapshot.get("exchange") or "").strip().upper()
+    if exchange in EXCHANGES:
+        return EXCHANGES[exchange]
+    country = str(classification.get("country_code") or snapshot.get("country_code") or "").strip().upper()
+    return _COUNTRY_CURRENCY.get(country)
+
+
 class HoldingCreate(BaseModel):
     ticker: str
     quantity: float = Field(gt=0)
@@ -100,8 +117,12 @@ async def get_portfolio(
     rows: list[dict[str, object]] = []
     total_cost = 0.0
     total_value = 0.0
+    # Holdings are priced in their own market's currency. Track totals per currency so a
+    # mixed USD/INR book is never summed into one meaningless number.
+    by_currency: dict[str, dict[str, float]] = {}
     for h in holdings:
-        total_cost += float(h.quantity) * float(h.avg_buy_price)
+        cost = float(h.quantity) * float(h.avg_buy_price)
+        total_cost += cost
         snapshot = await snapshot_tasks[h.id]
         classification = snapshot.get("_classification") if isinstance(snapshot.get("_classification"), dict) else {}
         raw_price = snapshot.get("current_price")
@@ -110,6 +131,12 @@ async def get_portfolio(
         current_value = float(h.quantity) * float(price) if isinstance(price, (int, float)) else None
         if current_value is not None:
             total_value += current_value
+        currency = _holding_currency(snapshot, classification)
+        if currency:
+            bucket = by_currency.setdefault(currency, {"total_cost": 0.0, "total_value": 0.0})
+            bucket["total_cost"] += cost
+            if current_value is not None:
+                bucket["total_value"] += current_value
         rows.append(
             {
                 "id": h.id,
@@ -126,8 +153,31 @@ async def get_portfolio(
                 "flag_emoji": classification.get("flag_emoji") or snapshot.get("flag_emoji"),
                 "has_futures": bool(classification.get("has_futures")),
                 "has_options": bool(classification.get("has_options")),
+                "currency": currency,
             }
         )
+
+    totals_by_currency = {
+        ccy: {
+            "total_cost": t["total_cost"],
+            "total_value": t["total_value"] if t["total_value"] > 0 else None,
+            "overall_pnl": (t["total_value"] - t["total_cost"]) if t["total_value"] > 0 else None,
+        }
+        for ccy, t in sorted(by_currency.items())
+    }
+    if len(totals_by_currency) > 1:
+        # Mixed currencies: no single total exists without FX conversion, so don't fake one.
+        return {
+            "items": rows,
+            "summary": {
+                "total_cost": None,
+                "total_value": None,
+                "overall_pnl": None,
+                "currency": None,
+                "mixed_currency": True,
+                "totals_by_currency": totals_by_currency,
+            },
+        }
 
     overall_pnl = total_value - total_cost if total_value > 0 else None
     return {
@@ -136,6 +186,9 @@ async def get_portfolio(
             "total_cost": total_cost,
             "total_value": total_value if total_value > 0 else None,
             "overall_pnl": overall_pnl,
+            "currency": next(iter(totals_by_currency), None),
+            "mixed_currency": False,
+            "totals_by_currency": totals_by_currency,
         },
     }
 

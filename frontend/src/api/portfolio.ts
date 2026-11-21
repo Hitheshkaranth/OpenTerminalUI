@@ -88,9 +88,12 @@ export async function fetchPortfolio(): Promise<PortfolioResponse> {
   return {
     items,
     summary: {
-      total_cost: Number((summary as any).total_cost ?? 0),
+      total_cost: (summary as any).mixed_currency ? null : Number((summary as any).total_cost ?? 0),
       total_value: typeof (summary as any).total_value === "number" ? (summary as any).total_value : null,
       overall_pnl: typeof (summary as any).overall_pnl === "number" ? (summary as any).overall_pnl : null,
+      currency: typeof (summary as any).currency === "string" ? (summary as any).currency : null,
+      mixed_currency: Boolean((summary as any).mixed_currency),
+      totals_by_currency: (summary as any).totals_by_currency && typeof (summary as any).totals_by_currency === "object" ? (summary as any).totals_by_currency : {},
     },
   };
 }

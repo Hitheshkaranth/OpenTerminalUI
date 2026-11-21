@@ -265,14 +265,27 @@ export type PortfolioItem = {
   flag_emoji?: string | null;
   has_futures?: boolean;
   has_options?: boolean;
+  /** ISO currency the holding is priced in (e.g. "USD", "INR"); null when unknown. */
+  currency?: string | null;
+};
+
+export type PortfolioCurrencyTotals = {
+  total_cost: number;
+  total_value: number | null;
+  overall_pnl: number | null;
 };
 
 export type PortfolioResponse = {
   items: PortfolioItem[];
   summary: {
-    total_cost: number;
+    /** null when the book mixes currencies — see totals_by_currency. */
+    total_cost: number | null;
     total_value: number | null;
     overall_pnl: number | null;
+    /** The single currency of the book, or null when mixed/unknown. */
+    currency?: string | null;
+    mixed_currency?: boolean;
+    totals_by_currency?: Record<string, PortfolioCurrencyTotals>;
   };
 };
 
